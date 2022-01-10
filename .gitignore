@@ -1,0 +1,11 @@
+debug/
+target/
+**/*.rs.bk
+
+.idea/
+*.iws
+*.iml
+
+*.tgz
+deploy/helm/airflow-operator/configs
+deploy/helm/airflow-operator/templates/crds.yaml
