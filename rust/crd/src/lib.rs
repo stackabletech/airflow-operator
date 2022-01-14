@@ -40,7 +40,9 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nodes: Option<Role<AirflowConfig>>,
+    pub nodes: Option<Role<AirflowConfig>>, //pub webserver: Option<Role<AirflowConfig>>,
+                                            //pub scheduler: Option<Role<AirflowConfig>>,
+                                            //pub worker: Option<Role<AirflowConfig>>
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

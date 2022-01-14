@@ -23,7 +23,7 @@ mod built_info {
 }
 
 pub const APP_NAME: &str = "airflow";
-pub const APP_PORT: u16 = 8088;
+pub const APP_PORT: u16 = 8080;
 
 #[derive(StructOpt)]
 #[structopt(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
@@ -48,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("AIRFLOW_OPERATOR_LOG");
 
     let opts = Opts::from_args();
+
     match opts.cmd {
         Command::Crd => println!(
             "{}{}",
@@ -115,4 +116,58 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use stackable_operator::error;
+    use stackable_operator::kube::CustomResourceExt;
+    use stackable_operator::product_config::ProductConfigManager;
+    use std::error::Error;
+
+    #[test]
+    fn airflow_crd() {
+        println!(
+            "{}{}",
+            serde_yaml::to_string(&AirflowCluster::crd()).unwrap(),
+            serde_yaml::to_string(&Init::crd()).unwrap()
+        )
+    }
+
+    /*#[tokio::test]
+    async fn airflow_replicate() -> anyhow::Result<()> {
+        let product_config = ProductConfigManager::from_yaml_file(
+            "/home/andrew/gitrepos/airflow-operator/deploy/config-spec/properties.yaml",
+        )?;
+
+        let client =
+            stackable_operator::client::create_client(Some("airflow.stackable.tech".to_string()))
+                .await?;
+        let airflow_controller = Controller::new(
+            client.get_all_api::<AirflowCluster>(),
+            ListParams::default(),
+        )
+        .owns(client.get_all_api::<Service>(), ListParams::default())
+        .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+        .run(
+            airflow_controller::reconcile_airflow,
+            airflow_controller::error_policy,
+            Context::new(airflow_controller::Ctx {
+                client: client.clone(),
+                product_config,
+            }),
+        );
+
+        let init_controller = Controller::new(client.get_all_api::<Init>(), ListParams::default())
+            .run(
+                init_controller::reconcile_init,
+                init_controller::error_policy,
+                Context::new(init_controller::Ctx {
+                    client: client.clone(),
+                }),
+            );
+
+        Ok(())
+    }*/
 }

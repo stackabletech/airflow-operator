@@ -94,12 +94,17 @@ pub async fn reconcile_airflow(
         false,
     )
     .context(InvalidProductConfig)?;
+
+    tracing::info!("validated_config {:?}", &validated_config);
+
     let role_node_config = validated_config
         .get(&AirflowRole::Node.to_string())
         .map(Cow::Borrowed)
         .unwrap_or_default();
 
     let node_role_service = build_node_role_service(&airflow)?;
+    //tracing::info!("node_role_service {:?}", &node_role_service);
+
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
         .await
@@ -108,6 +113,8 @@ pub async fn reconcile_airflow(
         let rolegroup = airflow.node_rolegroup_ref(rolegroup_name);
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &airflow)?;
+        //tracing::info!("rg_service {:?}", &rg_service);
+
         let rg_statefulset =
             build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
         client
@@ -116,6 +123,7 @@ pub async fn reconcile_airflow(
             .with_context(|| ApplyRoleGroupService {
                 rolegroup: rolegroup.clone(),
             })?;
+        //tracing::info!("rg_statefulset {:?}", &rg_statefulset);
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
             .await
@@ -224,30 +232,79 @@ fn build_server_rolegroup_statefulset(
         .get(&rolegroup_ref.role_group);
 
     let airflow_version = airflow_version(airflow)?;
+    //tracing::info!("airflow_version {:?}", &airflow_version);
+    //tracing::info!("airflow {:?}", &airflow);
 
-    let image = format!(
+    /*let image = format!(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
-    );
+    );*/
 
-    let env = node_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY))
-        .map(|secret| {
-            vec![
-                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-                env_var_from_secret(
-                    "SQLALCHEMY_DATABASE_URI",
-                    secret,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
-            ]
-        })
-        .unwrap_or_default();
+    //let image = "puckel/docker-airflow:1.10.9"; // all-in-one image i.e. all services started (defaults to using SequentialExecutor)
+    let image = "apache/airflow:2.2.3";
+
+    /*let env = node_config
+    .get(&PropertyNameKind::Env)
+    .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY))
+    .map(|secret| {
+        vec![
+            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+            env_var_from_secret(
+                "SQLALCHEMY_DATABASE_URI",
+                secret,
+                "connections.sqlalchemyDatabaseUri",
+            ),
+        ]
+    })
+    .unwrap_or_default();*/
+
+    let mut commands = vec![
+        String::from("airflow db init"),
+        String::from("airflow db upgrade"),
+        String::from(
+            "airflow users create \
+                    --username \"admin\" \
+                    --firstname \"admin\" \
+                    --lastname \"admin\" \
+                    --email \"admin@airflow.com\" \
+                    --role \"Admin\" \
+                    --password \"admin\"",
+        ),
+        String::from("airflow webserver"),
+    ];
 
     let container = ContainerBuilder::new("airflow")
         .image(image)
-        .add_env_vars(env)
+        .command(vec!["/bin/bash".to_string()])
+        .args(vec![String::from("-c"), commands.join("; ")])
+        //.add_env_vars(env)
+        .add_env_vars(vec![
+            EnvVar {
+                name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
+                value: Some(String::from("true")),
+                value_from: None,
+            },
+            EnvVar {
+                name: String::from("AIRFLOW__WEBSERVER__EXPOSE_CONFIG"),
+                value: Some(String::from("true")),
+                value_from: None,
+            },
+            EnvVar {
+                name: String::from("AIRFLOW__CORE__SQL_ALCHEMY_CONN"),
+                value: Some(String::from("postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow")),
+                value_from: None
+            },
+            EnvVar {
+                name: String::from("AIRFLOW__CELERY__RESULT_BACKEND"),
+                value: Some(String::from("db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow")),
+                value_from: None
+            },
+            EnvVar {
+                name: String::from("AIRFLOW__CORE__EXECUTOR"),
+                value: Some(String::from("KubernetesExecutor")),
+                value_from: None
+            }
+        ])
         .add_container_port("http", APP_PORT.into())
         .build();
     Ok(StatefulSet {
@@ -321,5 +378,34 @@ fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar
             ..Default::default()
         }),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::airflow_controller::airflow_version;
+    use stackable_airflow_crd::{commands::Init, AirflowCluster, AirflowClusterSpec};
+    use stackable_operator::kube::CustomResourceExt;
+
+    #[test]
+    fn test_cluster_config() {
+        let cluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          version: 1.3.2
+          nodes:
+            roleGroups:
+              default:
+                config:
+                  credentialsSecret: simple-airflow-credentials
+          ",
+        )
+        .unwrap();
+
+        println!("{:?}", cluster);
     }
 }
