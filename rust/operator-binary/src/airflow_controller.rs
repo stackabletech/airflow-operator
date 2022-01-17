@@ -113,8 +113,6 @@ pub async fn reconcile_airflow(
         let rolegroup = airflow.node_rolegroup_ref(rolegroup_name);
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &airflow)?;
-        //tracing::info!("rg_service {:?}", &rg_service);
-
         let rg_statefulset =
             build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
         client
@@ -123,7 +121,6 @@ pub async fn reconcile_airflow(
             .with_context(|| ApplyRoleGroupService {
                 rolegroup: rolegroup.clone(),
             })?;
-        //tracing::info!("rg_statefulset {:?}", &rg_statefulset);
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
             .await
@@ -232,43 +229,47 @@ fn build_server_rolegroup_statefulset(
         .get(&rolegroup_ref.role_group);
 
     let airflow_version = airflow_version(airflow)?;
-    //tracing::info!("airflow_version {:?}", &airflow_version);
-    //tracing::info!("airflow {:?}", &airflow);
 
     /*let image = format!(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
     );*/
-
-    //let image = "puckel/docker-airflow:1.10.9"; // all-in-one image i.e. all services started (defaults to using SequentialExecutor)
+    // provisional...
     let image = "apache/airflow:2.2.3";
 
-    /*let env = node_config
-    .get(&PropertyNameKind::Env)
-    .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY))
-    .map(|secret| {
-        vec![
-            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-            env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            ),
-        ]
-    })
-    .unwrap_or_default();*/
+    let env = node_config
+        .get(&PropertyNameKind::Env)
+        .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY))
+        .map(|secret| {
+            vec![
+                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                env_var_from_secret(
+                    "SQLALCHEMY_DATABASE_URI",
+                    secret,
+                    "connections.sqlalchemyDatabaseUri",
+                ),
+                env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
+                env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
+                env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
+                env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
+                env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
+            ]
+        })
+        .unwrap_or_default();
+
+    tracing::info!("env {:?}", env);
 
     let mut commands = vec![
         String::from("airflow db init"),
         String::from("airflow db upgrade"),
         String::from(
             "airflow users create \
-                    --username \"admin\" \
-                    --firstname \"admin\" \
-                    --lastname \"admin\" \
-                    --email \"admin@airflow.com\" \
-                    --role \"Admin\" \
-                    --password \"admin\"",
+                    --username \"$ADMIN_USERNAME\" \
+                    --firstname \"$ADMIN_FIRSTNAME\" \
+                    --lastname \"$ADMIN_LASTNAME\" \
+                    --email \"$ADMIN_EMAIL\" \
+                    --password \"$ADMIN_PASSWORD\" \
+                    --role \"Admin\"",
         ),
         String::from("airflow webserver"),
     ];
@@ -277,7 +278,7 @@ fn build_server_rolegroup_statefulset(
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        //.add_env_vars(env)
+        .add_env_vars(env)
         .add_env_vars(vec![
             EnvVar {
                 name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
@@ -367,6 +368,8 @@ pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
 }
 
 fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
+    tracing::info!("env_var_from_secret {:?}, {:?}, {:?}", &var_name, &secret, &secret_key);
+
     EnvVar {
         name: String::from(var_name),
         value_from: Some(EnvVarSource {
