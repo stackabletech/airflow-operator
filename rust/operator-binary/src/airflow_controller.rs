@@ -286,7 +286,7 @@ fn build_server_rolegroup_statefulset(
 
     env.push(EnvVar {
         name: String::from("AIRFLOW__CORE__EXECUTOR"),
-        value: Option::from(executor),
+        value: executor,
         value_from: None,
     });
 
