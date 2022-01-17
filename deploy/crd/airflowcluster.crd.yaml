@@ -22,6 +22,15 @@ spec:
           properties:
             spec:
               properties:
+                executor:
+                  nullable: true
+                  type: string
+                exposeConfig:
+                  nullable: true
+                  type: boolean
+                loadExamples:
+                  nullable: true
+                  type: boolean
                 nodes:
                   nullable: true
                   properties:
@@ -124,7 +133,6 @@ spec:
                   nullable: true
                   type: boolean
                 version:
-                  description: Desired Airflow version
                   nullable: true
                   type: string
               type: object

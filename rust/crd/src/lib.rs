@@ -36,9 +36,14 @@ pub struct AirflowClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// Desired Airflow version
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_examples: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expose_config: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<AirflowConfig>>, //pub webserver: Option<Role<AirflowConfig>>,
                                             //pub scheduler: Option<Role<AirflowConfig>>,

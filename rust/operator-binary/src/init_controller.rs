@@ -117,45 +117,57 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
-    let mut commands = vec![
+    let commands = vec![
+        String::from("airflow db init"),
+        String::from("airflow db upgrade"),
         String::from(
-            "airflow fab create-admin \
+            "airflow users create \
                     --username \"$ADMIN_USERNAME\" \
                     --firstname \"$ADMIN_FIRSTNAME\" \
                     --lastname \"$ADMIN_LASTNAME\" \
                     --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\"",
+                    --password \"$ADMIN_PASSWORD\" \
+                    --role \"Admin\"",
         ),
-        String::from("airflow db upgrade"),
-        String::from("airflow init"),
     ];
-    if init.spec.load_examples {
-        commands.push(String::from("airflow load_examples"));
-    }
 
     let version = airflow_version(airflow)?;
+    tracing::info!("version {:?}", version);
     let secret = &init.spec.credentials_secret;
 
-    let container = ContainerBuilder::new("airflow-init-db")
-        .image(format!(
+    let env = vec![
+        env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+        env_var_from_secret(
+            "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        ),
+        env_var_from_secret(
+            "AIRFLOW__CELERY__RESULT_BACKEND",
+            secret,
+            "connections.celeryResultBackend",
+        ),
+        env_var_from_secret(
+            "AIRFLOW__CELERY__BROKER_URL",
+            secret,
+            "connections.celeryBrokerUrl",
+        ),
+        env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
+        env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
+        env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
+        env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
+        env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
+    ];
+
+    let container = ContainerBuilder::new("airflow-init")
+        /*.image(format!(
             "docker.stackable.tech/stackable/airflow:{}-stackable0",
             version
-        ))
-        .command(vec!["/bin/sh".to_string()])
+        ))*/
+        .image("apache/airflow:2.2.3")
+        .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_vars(vec![
-            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-            env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            ),
-            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
-        ])
+        .add_env_vars(env)
         .build();
 
     let pod = PodTemplateSpec {

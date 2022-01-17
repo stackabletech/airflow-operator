@@ -7,3 +7,4 @@ spec:
     name: airflow
   credentialsSecret: simple-airflow-credentials
   loadExamples: true
+  exposeConfig: true

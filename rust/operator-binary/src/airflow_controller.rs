@@ -236,7 +236,7 @@ fn build_server_rolegroup_statefulset(
     // provisional...
     let image = "apache/airflow:2.2.3";
 
-    let env = node_config
+    let mut env = node_config
         .get(&PropertyNameKind::Env)
         .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY))
         .map(|secret| {
@@ -257,9 +257,6 @@ fn build_server_rolegroup_statefulset(
                     secret,
                     "connections.celeryBrokerUrl",
                 ),
-                env_var_from_secret("AIRFLOW__CORE__EXECUTOR", secret, "executor"),
-                env_var_from_secret("AIRFLOW__CORE__LOAD_EXAMPLES", secret, "loadExamples"),
-                env_var_from_secret("AIRFLOW__WEBSERVER__EXPOSE_CONFIG", secret, "exposeConfig"),
                 env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
                 env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
                 env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
@@ -269,7 +266,29 @@ fn build_server_rolegroup_statefulset(
         })
         .unwrap_or_default();
 
-    tracing::info!("env {:?}", env);
+    if airflow.spec.load_examples.unwrap_or_default() {
+        env.push(EnvVar {
+            name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
+            value: Some(String::from("true")),
+            value_from: None,
+        })
+    }
+
+    if airflow.spec.expose_config.unwrap_or_default() {
+        env.push(EnvVar {
+            name: String::from("AIRFLOW__WEBSERVER__EXPOSE_CONFIG"),
+            value: Some(String::from("true")),
+            value_from: None,
+        })
+    }
+
+    let executor = airflow.spec.executor.clone();
+
+    env.push(EnvVar {
+        name: String::from("AIRFLOW__CORE__EXECUTOR"),
+        value: Option::from(executor),
+        value_from: None,
+    });
 
     let commands = vec![
         String::from("airflow db init"),
@@ -286,13 +305,14 @@ fn build_server_rolegroup_statefulset(
         String::from("airflow webserver"),
     ];
 
-    let container = ContainerBuilder::new("airflow")
+    let container = ContainerBuilder::new("airflow-webserver")
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
         .add_container_port("http", APP_PORT.into())
         .build();
+
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
@@ -353,13 +373,6 @@ pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
 }
 
 fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
-    tracing::info!(
-        "env_var_from_secret {:?}, {:?}, {:?}",
-        &var_name,
-        &secret,
-        &secret_key
-    );
-
     EnvVar {
         name: String::from(var_name),
         value_from: Some(EnvVarSource {
@@ -388,15 +401,25 @@ mod tests {
           name: airflow
         spec:
           version: 1.3.2
+          executor: KubernetesExecutor
+          loadExamples: true
+          exposeConfig: true
           nodes:
             roleGroups:
               default:
                 config:
                   credentialsSecret: simple-airflow-credentials
+
           ",
         )
         .unwrap();
 
-        assert_eq!("1.3.2", cluster.spec.version.unwrap());
+        assert_eq!("1.3.2", cluster.spec.version.unwrap_or_default());
+        assert_eq!(
+            "KubernetesExecutor",
+            cluster.spec.executor.unwrap_or_default()
+        );
+        assert_eq!(true, cluster.spec.load_examples.unwrap_or(false));
+        assert_eq!(true, cluster.spec.expose_config.unwrap_or(false));
     }
 }
