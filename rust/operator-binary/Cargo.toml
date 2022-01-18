@@ -20,6 +20,8 @@ stackable-airflow-crd = { path = "../crd" }
 structopt = "0.3"
 tokio = { version = "1.15", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
+strum = "0.23"
+strum_macros = "0.23"
 
 [build-dependencies]
 built = { version =  "0.5", features = ["chrono", "git2"] }

@@ -3,20 +3,20 @@ pub mod commands;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::{Role, RoleGroupRef};
+use stackable_operator::role_utils::Role;
 use stackable_operator::schemars::{self, JsonSchema};
 use strum_macros::Display;
 use strum_macros::EnumIter;
+use strum_macros::EnumString;
 
 pub const APP_NAME: &str = "airflow";
 pub const MANAGED_BY: &str = "airflow-operator";
 
 pub const HTTP_PORT: &str = "http";
 
-#[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
     version = "v1alpha1",
@@ -44,10 +44,9 @@ pub struct AirflowClusterSpec {
     pub load_examples: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nodes: Option<Role<AirflowConfig>>, //pub webserver: Option<Role<AirflowConfig>>,
-                                            //pub scheduler: Option<Role<AirflowConfig>>,
-                                            //pub worker: Option<Role<AirflowConfig>>
+    pub webservers: Role<AirflowConfig>,
+    pub schedulers: Role<AirflowConfig>,
+    pub workers: Role<AirflowConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -75,11 +74,56 @@ pub struct Connections {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    Eq,
+    Hash,
+    JsonSchema,
+    PartialEq,
+    Serialize,
+    EnumString,
 )]
 pub enum AirflowRole {
-    #[strum(serialize = "node")]
-    Node,
+    #[strum(serialize = "webserver")]
+    Webserver,
+    #[strum(serialize = "scheduler")]
+    Scheduler,
+    #[strum(serialize = "worker")]
+    Worker,
+}
+
+impl AirflowRole {
+    /// Returns the start commands for the different server types.
+    pub fn get_commands(&self) -> Vec<String> {
+        match &self {
+            AirflowRole::Webserver => vec!["airflow webserver".to_string()],
+            AirflowRole::Scheduler => vec!["airflow scheduler".to_string()],
+            // TODO this depends on the executor!
+            AirflowRole::Worker => vec!["airflow celery worker".to_string()],
+        }
+    }
+
+    /// Returns the default port for every role, as taken from the sample configs.
+    pub fn get_http_port(&self) -> Option<u16> {
+        match &self {
+            AirflowRole::Webserver => Some(8080),
+            AirflowRole::Scheduler => None,
+            AirflowRole::Worker => None,
+        }
+    }
+}
+
+impl AirflowCluster {
+    pub fn get_role(&self, role: &AirflowRole) -> &Role<AirflowConfig> {
+        match role {
+            AirflowRole::Webserver => &self.spec.webservers,
+            AirflowRole::Scheduler => &self.spec.schedulers,
+            AirflowRole::Worker => &self.spec.workers,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -133,18 +177,6 @@ impl AirflowCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`
     pub fn node_role_service_name(&self) -> Option<String> {
         self.metadata.name.clone()
-    }
-
-    /// Metadata about a node rolegroup
-    pub fn node_rolegroup_ref(
-        &self,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<AirflowCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: AirflowRole::Node.to_string(),
-            role_group: group_name.into(),
-        }
     }
 }
 

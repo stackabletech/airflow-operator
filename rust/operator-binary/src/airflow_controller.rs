@@ -1,14 +1,15 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, HashMap},
+    str::FromStr,
     time::Duration,
 };
 
 use crate::{APP_NAME, APP_PORT};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole};
+use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -26,6 +27,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
+use strum::IntoEnumIterator;
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
@@ -75,18 +77,15 @@ pub async fn reconcile_airflow(
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
+    let mut roles = HashMap::new();
 
-    let role_config = &transform_all_roles_to_config(
-        &airflow,
-        [(
-            AirflowRole::Node.to_string(),
-            (
-                vec![PropertyNameKind::Env],
-                airflow.spec.nodes.clone().context(NoNodeRole)?,
-            ),
-        )]
-        .into(),
-    );
+    for role in AirflowRole::iter() {
+        roles.insert(
+            role.to_string(),
+            (vec![PropertyNameKind::Env], airflow.get_role(&role).clone()),
+        );
+    }
+    let role_config = &transform_all_roles_to_config(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow_version(&airflow)?,
         role_config,
@@ -98,35 +97,34 @@ pub async fn reconcile_airflow(
 
     tracing::info!("validated_config {:?}", &validated_role_config);
 
-    let role_node_config = validated_role_config
-        .get(&AirflowRole::Node.to_string())
-        .map(Cow::Borrowed)
-        .unwrap_or_default();
-
-    let node_role_service = build_node_role_service(&airflow)?;
-
-    client
-        .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
-        .await
-        .context(ApplyRoleService)?;
-    for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
-        let rolegroup = airflow.node_rolegroup_ref(rolegroup_name);
-
-        let rg_service = build_node_rolegroup_service(&rolegroup, &airflow)?;
-        let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
+    for (role_name, role_config) in validated_role_config.iter() {
+        let role_service = build_role_service(role_name, &airflow)?;
         client
-            .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+            .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
             .await
-            .with_context(|| ApplyRoleGroupService {
-                rolegroup: rolegroup.clone(),
-            })?;
-        client
-            .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
-            .await
-            .with_context(|| ApplyRoleGroupStatefulSet {
-                rolegroup: rolegroup.clone(),
-            })?;
+            .context(ApplyRoleService)?;
+        for (rolegroup_name, rolegroup_config) in role_config.iter() {
+            let rolegroup = RoleGroupRef {
+                cluster: ObjectRef::from_obj(&airflow),
+                role: role_name.into(),
+                role_group: rolegroup_name.into(),
+            };
+            let rg_service = build_node_rolegroup_service(&rolegroup, &airflow)?;
+            let rg_statefulset =
+                build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
+            client
+                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+                .await
+                .with_context(|| ApplyRoleGroupService {
+                    rolegroup: rolegroup.clone(),
+                })?;
+            client
+                .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
+                .await
+                .with_context(|| ApplyRoleGroupStatefulSet {
+                    rolegroup: rolegroup.clone(),
+                })?;
+        }
     }
 
     Ok(ReconcilerAction {
@@ -136,11 +134,17 @@ pub async fn reconcile_airflow(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_node_role_service(airflow: &AirflowCluster) -> Result<Service> {
-    let role_name = AirflowRole::Node.to_string();
-    let role_svc_name = airflow
-        .node_role_service_name()
-        .context(GlobalServiceNameNotFound)?;
+pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<Service> {
+    let role_svc_name = format!(
+        "{}-{}",
+        airflow
+            .metadata
+            .name
+            .as_ref()
+            .unwrap_or(&"airflow".to_string()),
+        role_name
+    );
+
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
@@ -151,7 +155,7 @@ pub fn build_node_role_service(airflow: &AirflowCluster) -> Result<Service> {
                 airflow,
                 APP_NAME,
                 airflow_version(airflow)?,
-                &role_name,
+                role_name,
                 "global",
             )
             .build(),
@@ -162,7 +166,7 @@ pub fn build_node_role_service(airflow: &AirflowCluster) -> Result<Service> {
                 protocol: Some("TCP".to_string()),
                 ..ServicePort::default()
             }]),
-            selector: Some(role_selector_labels(airflow, APP_NAME, &role_name)),
+            selector: Some(role_selector_labels(airflow, APP_NAME, role_name)),
             type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
         }),
@@ -220,16 +224,13 @@ fn build_server_rolegroup_statefulset(
     airflow: &AirflowCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
-    let rolegroup = airflow
-        .spec
-        .nodes
-        .as_ref()
-        .context(NoNodeRole)?
-        .role_groups
-        .get(&rolegroup_ref.role_group);
-
+    let role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow_version(airflow)?;
 
+    let rolegroup = airflow
+        .get_role(&AirflowRole::from_str(&rolegroup_ref.role).unwrap())
+        .role_groups
+        .get(&rolegroup_ref.role_group);
     /*let image = format!(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
@@ -241,7 +242,7 @@ fn build_server_rolegroup_statefulset(
     let env = build_envs(airflow, node_config);
 
     // initialising commands
-    let commands = build_commands();
+    let commands = role.get_commands();
 
     let container = ContainerBuilder::new("airflow-webserver")
         .image(image)
@@ -326,7 +327,7 @@ fn build_envs(
                     "AIRFLOW__CELERY__BROKER_URL",
                     secret,
                     "connections.celeryBrokerUrl",
-                )
+                ),
             ]
         })
         .unwrap_or_default();
@@ -355,16 +356,6 @@ fn build_envs(
         value_from: None,
     });
     env
-}
-
-/// It doesn't make much sense to deploy the webserver without having first set up the database. The user creation and db initialization
-/// can be created by setting specific environment variables (e.g. _AIRFLOW_WWW_USER_CREATE, _AIRFLOW_DB_UPGRADE) but the order is important
-/// here so that the user is not created by default in the embedded database.
-fn build_commands() -> Vec<String> {
-    // TODO move this to AirflowRole/get_command
-    vec![
-        String::from("airflow webserver")
-    ]
 }
 
 pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str> {
