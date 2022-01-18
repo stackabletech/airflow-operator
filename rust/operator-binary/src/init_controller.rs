@@ -135,7 +135,7 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     tracing::info!("version {:?}", version);
     let secret = &init.spec.credentials_secret;
 
-    let env = vec![
+    let mut env = vec![
         env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
         env_var_from_secret(
             "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
@@ -159,12 +159,20 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
         env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
     ];
 
+    if init.spec.load_examples {
+        env.push(EnvVar {
+            name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
+            value: Some(String::from("true")),
+            value_from: None,
+        });
+    }
+
     let container = ContainerBuilder::new("airflow-init")
         /*.image(format!(
             "docker.stackable.tech/stackable/airflow:{}-stackable0",
             version
         ))*/
-        .image("apache/airflow:2.2.3")
+        .image("apache/airflow:2.2.3-python3.8")
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)

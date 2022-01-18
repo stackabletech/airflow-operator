@@ -68,7 +68,7 @@ pub enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn reconcile_airflow(
+pub async fn reconcile_worker(
     airflow: AirflowCluster,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
@@ -234,8 +234,7 @@ fn build_server_rolegroup_statefulset(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
     );*/
-    // specify python version here if needed (3.7+ is required for trigger processes; 2.2.3 has 3.6 as default)
-    let image = "apache/airflow:2.2.3-python3.8";
+    let image = "apache/airflow:2.2.3";
 
     // environment variables
     let env = build_envs(airflow, node_config);
@@ -243,7 +242,7 @@ fn build_server_rolegroup_statefulset(
     // initialising commands
     let commands = build_commands();
 
-    let container = ContainerBuilder::new("airflow-webserver")
+    let container = ContainerBuilder::new("airflow-worker")
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
@@ -362,23 +361,9 @@ fn build_envs(
     env
 }
 
-/// It doesn't make much sense to deploy the webserver without having first set up the database. The user creation and db initialization
-/// can be created by setting specific environment variables (e.g. _AIRFLOW_WWW_USER_CREATE, _AIRFLOW_DB_UPGRADE) but the order is important
-/// here so that the user is not created by default in the embedded database.
 fn build_commands() -> Vec<String> {
     vec![
-        /*String::from("airflow db init"),
-        String::from("airflow db upgrade"),
-        String::from(
-            "airflow users create \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" \
-                    --role \"Admin\"",
-        ),*/
-        String::from("airflow webserver"),
+        String::from("airflow celery worker"),
     ]
 }
 

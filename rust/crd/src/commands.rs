@@ -23,6 +23,7 @@ use crate::AirflowClusterRef;
 pub struct InitCommandSpec {
     pub cluster_ref: AirflowClusterRef,
     pub credentials_secret: String,
+    pub load_examples: bool
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]

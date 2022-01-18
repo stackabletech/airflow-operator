@@ -1,5 +1,6 @@
 mod airflow_controller;
 mod init_controller;
+mod worker_controller;
 
 use futures::StreamExt;
 use stackable_airflow_crd::{commands::Init, AirflowCluster};
