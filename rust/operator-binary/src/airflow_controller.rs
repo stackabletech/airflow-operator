@@ -326,12 +326,7 @@ fn build_envs(
                     "AIRFLOW__CELERY__BROKER_URL",
                     secret,
                     "connections.celeryBrokerUrl",
-                ),
-                env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-                env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-                env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-                env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-                env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
+                )
             ]
         })
         .unwrap_or_default();
@@ -366,19 +361,9 @@ fn build_envs(
 /// can be created by setting specific environment variables (e.g. _AIRFLOW_WWW_USER_CREATE, _AIRFLOW_DB_UPGRADE) but the order is important
 /// here so that the user is not created by default in the embedded database.
 fn build_commands() -> Vec<String> {
+    // TODO move this to AirflowRole/get_command
     vec![
-        /*String::from("airflow db init"),
-        String::from("airflow db upgrade"),
-        String::from(
-            "airflow users create \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" \
-                    --role \"Admin\"",
-        ),*/
-        String::from("airflow webserver"),
+        String::from("airflow webserver")
     ]
 }
 

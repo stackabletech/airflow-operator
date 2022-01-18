@@ -147,11 +147,6 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
             secret,
             "connections.celeryResultBackend",
         ),
-        env_var_from_secret(
-            "AIRFLOW__CELERY__BROKER_URL",
-            secret,
-            "connections.celeryBrokerUrl",
-        ),
         env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
         env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
         env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
