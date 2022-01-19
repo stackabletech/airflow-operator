@@ -1,10 +1,8 @@
 mod airflow_controller;
 mod init_controller;
 
-use clap::Parser;
 use futures::StreamExt;
 use stackable_airflow_crd::{commands::Init, AirflowCluster};
-use stackable_operator::cli::ProductOperatorRun;
 use stackable_operator::{
     cli::Command,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
@@ -18,6 +16,7 @@ use stackable_operator::{
         CustomResourceExt, Resource,
     },
 };
+use structopt::StructOpt;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -26,7 +25,7 @@ mod built_info {
 pub const APP_NAME: &str = "airflow";
 pub const APP_PORT: u16 = 8080;
 
-#[derive(Parser)]
+#[derive(StructOpt)]
 #[structopt(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
 struct Opts {
     #[structopt(subcommand)]
@@ -48,7 +47,7 @@ fn erase_controller_result_type<K: Resource, E: std::error::Error + Send + Sync 
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("AIRFLOW_OPERATOR_LOG");
 
-    let opts = Opts::parse();
+    let opts = Opts::from_args();
 
     match opts.cmd {
         Command::Crd => println!(
@@ -56,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
             serde_yaml::to_string(&AirflowCluster::crd())?,
             serde_yaml::to_string(&Init::crd())?
         ),
-        Command::Run(ProductOperatorRun { product_config }) => {
+        Command::Run { product_config } => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
