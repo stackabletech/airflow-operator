@@ -36,10 +36,10 @@ spec:
                     cliOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     config:
-                      nullable: true
+                      default: {}
                       properties:
                         credentialsSecret:
                           type: string
@@ -51,12 +51,12 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
-                      nullable: true
+                      default: {}
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     roleGroups:
                       additionalProperties:
@@ -64,10 +64,10 @@ spec:
                           cliOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           config:
-                            nullable: true
+                            default: {}
                             properties:
                               credentialsSecret:
                                 type: string
@@ -79,12 +79,12 @@ spec:
                               additionalProperties:
                                 type: string
                               type: object
-                            nullable: true
+                            default: {}
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           replicas:
                             format: uint16
@@ -139,10 +139,10 @@ spec:
                     cliOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     config:
-                      nullable: true
+                      default: {}
                       properties:
                         credentialsSecret:
                           type: string
@@ -154,12 +154,12 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
-                      nullable: true
+                      default: {}
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     roleGroups:
                       additionalProperties:
@@ -167,10 +167,10 @@ spec:
                           cliOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           config:
-                            nullable: true
+                            default: {}
                             properties:
                               credentialsSecret:
                                 type: string
@@ -182,12 +182,12 @@ spec:
                               additionalProperties:
                                 type: string
                               type: object
-                            nullable: true
+                            default: {}
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           replicas:
                             format: uint16
@@ -235,10 +235,10 @@ spec:
                     cliOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     config:
-                      nullable: true
+                      default: {}
                       properties:
                         credentialsSecret:
                           type: string
@@ -250,12 +250,12 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
-                      nullable: true
+                      default: {}
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
-                      nullable: true
+                      default: {}
                       type: object
                     roleGroups:
                       additionalProperties:
@@ -263,10 +263,10 @@ spec:
                           cliOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           config:
-                            nullable: true
+                            default: {}
                             properties:
                               credentialsSecret:
                                 type: string
@@ -278,12 +278,12 @@ spec:
                               additionalProperties:
                                 type: string
                               type: object
-                            nullable: true
+                            default: {}
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
-                            nullable: true
+                            default: {}
                             type: object
                           replicas:
                             format: uint16

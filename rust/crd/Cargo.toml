@@ -12,6 +12,6 @@ duplicate = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 snafu = "0.6"
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.6.0" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.7.0" }
 strum = { version = "0.23", features = ["derive"] }
 strum_macros = "0.23"

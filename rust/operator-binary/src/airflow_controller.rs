@@ -73,6 +73,10 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("Failed to transform configs"))]
+    ProductConfigTransform {
+        source: stackable_operator::product_config_utils::ConfigError,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -91,10 +95,10 @@ pub async fn reconcile_airflow(
             (vec![PropertyNameKind::Env], airflow.get_role(&role).clone()),
         );
     }
-    let role_config = &transform_all_roles_to_config(&airflow, roles);
+    let role_config = transform_all_roles_to_config(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow_version(&airflow)?,
-        role_config,
+        &role_config.with_context(|| ProductConfigTransform)?,
         &ctx.get_ref().product_config,
         false,
         false,
