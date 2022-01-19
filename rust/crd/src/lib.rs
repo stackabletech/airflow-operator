@@ -12,9 +12,6 @@ use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
 pub const APP_NAME: &str = "airflow";
-pub const MANAGED_BY: &str = "airflow-operator";
-
-pub const HTTP_PORT: &str = "http";
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -109,6 +106,7 @@ impl AirflowRole {
     /// Returns the default port for every role, as taken from the sample configs.
     pub fn get_http_port(&self) -> Option<u16> {
         match &self {
+            // TODO maybe replace with a bool so it can be set in the controller
             AirflowRole::Webserver => Some(8080),
             AirflowRole::Scheduler => None,
             AirflowRole::Worker => None,

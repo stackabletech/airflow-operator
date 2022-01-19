@@ -41,16 +41,22 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
-    #[snafu(display("object defines no node role"))]
-    NoNodeRole,
-    #[snafu(display("failed to calculate global service name"))]
-    GlobalServiceNameNotFound,
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
+    BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
@@ -109,7 +115,7 @@ pub async fn reconcile_airflow(
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
-            let rg_service = build_node_rolegroup_service(&rolegroup, &airflow)?;
+            let rg_service = build_rolegroup_service(&rolegroup, &airflow)?;
             let rg_statefulset =
                 build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
             client
@@ -177,7 +183,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<S
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
-fn build_node_rolegroup_service(
+fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
 ) -> Result<Service> {
@@ -222,7 +228,7 @@ fn build_node_rolegroup_service(
 fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
-    node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
     let role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow_version(airflow)?;
@@ -239,12 +245,12 @@ fn build_server_rolegroup_statefulset(
     let image = "apache/airflow:2.2.3-python3.8";
 
     // environment variables
-    let env = build_envs(airflow, node_config);
+    let env = build_envs(airflow, rolegroup_config);
 
     // initialising commands
     let commands = role.get_commands();
 
-    let container = ContainerBuilder::new("airflow-webserver")
+    let container = ContainerBuilder::new(APP_NAME)
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
@@ -303,9 +309,9 @@ fn build_server_rolegroup_statefulset(
 
 fn build_envs(
     airflow: &AirflowCluster,
-    node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
-    let secret_prop = node_config
+    let secret_prop = rolegroup_config
         .get(&PropertyNameKind::Env)
         .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
 
@@ -396,7 +402,7 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 1.3.2
+          version: 2.2.3
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -419,7 +425,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("1.3.2", cluster.spec.version.unwrap_or_default());
+        assert_eq!("2.2.3", cluster.spec.version.unwrap_or_default());
         assert_eq!(
             "KubernetesExecutor",
             cluster.spec.executor.unwrap_or_default()
