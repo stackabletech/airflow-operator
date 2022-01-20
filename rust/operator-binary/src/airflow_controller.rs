@@ -41,6 +41,8 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
+    #[snafu(display("object defines no airflow config role"))]
+    NoAirflowRole,
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
@@ -90,10 +92,12 @@ pub async fn reconcile_airflow(
     let mut roles = HashMap::new();
 
     for role in AirflowRole::iter() {
-        roles.insert(
-            role.to_string(),
-            (vec![PropertyNameKind::Env], airflow.get_role(&role).clone()),
-        );
+        if let Some(resolved_role) = airflow.get_role(&role).clone() {
+            roles.insert(
+                role.to_string(),
+                (vec![PropertyNameKind::Env], resolved_role),
+            );
+        }
     }
     let role_config = transform_all_roles_to_config(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
@@ -234,13 +238,15 @@ fn build_server_rolegroup_statefulset(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
-    let role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
+    let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow_version(airflow)?;
+    let role = airflow
+        .get_role(&airflow_role)
+        .as_ref()
+        .context(NoAirflowRole)?;
 
-    let rolegroup = airflow
-        .get_role(&AirflowRole::from_str(&rolegroup_ref.role).unwrap())
-        .role_groups
-        .get(&rolegroup_ref.role_group);
+    let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
+
     /*let image = format!(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
@@ -252,7 +258,7 @@ fn build_server_rolegroup_statefulset(
     let env = build_envs(airflow, rolegroup_config);
 
     // initialising commands
-    let commands = role.get_commands();
+    let commands = airflow_role.get_commands();
 
     let container = ContainerBuilder::new(APP_NAME)
         .image(image)

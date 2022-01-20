@@ -32,6 +32,7 @@ spec:
                   nullable: true
                   type: boolean
                 schedulers:
+                  nullable: true
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -42,9 +43,8 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
+                          nullable: true
                           type: string
-                      required:
-                        - credentialsSecret
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -70,9 +70,8 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
+                                nullable: true
                                 type: string
-                            required:
-                              - credentialsSecret
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -135,6 +134,7 @@ spec:
                   nullable: true
                   type: string
                 webservers:
+                  nullable: true
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -145,9 +145,8 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
+                          nullable: true
                           type: string
-                      required:
-                        - credentialsSecret
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -173,9 +172,8 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
+                                nullable: true
                                 type: string
-                            required:
-                              - credentialsSecret
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -231,6 +229,7 @@ spec:
                     - roleGroups
                   type: object
                 workers:
+                  nullable: true
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -241,9 +240,8 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
+                          nullable: true
                           type: string
-                      required:
-                        - credentialsSecret
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -269,9 +267,8 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
+                                nullable: true
                                 type: string
-                            required:
-                              - credentialsSecret
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -326,10 +323,6 @@ spec:
                   required:
                     - roleGroups
                   type: object
-              required:
-                - schedulers
-                - webservers
-                - workers
               type: object
             status:
               nullable: true

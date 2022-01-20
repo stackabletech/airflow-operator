@@ -41,9 +41,12 @@ pub struct AirflowClusterSpec {
     pub load_examples: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
-    pub webservers: Role<AirflowConfig>,
-    pub schedulers: Role<AirflowConfig>,
-    pub workers: Role<AirflowConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub webservers: Option<Role<AirflowConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedulers: Option<Role<AirflowConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workers: Option<Role<AirflowConfig>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -115,7 +118,7 @@ impl AirflowRole {
 }
 
 impl AirflowCluster {
-    pub fn get_role(&self, role: &AirflowRole) -> &Role<AirflowConfig> {
+    pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfig>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
@@ -127,7 +130,7 @@ impl AirflowCluster {
 #[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfig {
-    pub credentials_secret: String,
+    pub credentials_secret: Option<String>,
 }
 
 impl AirflowConfig {
@@ -144,7 +147,7 @@ impl Configuration for AirflowConfig {
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
             Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(self.credentials_secret.clone()),
+            self.credentials_secret.clone(),
         )]
         .into())
     }
