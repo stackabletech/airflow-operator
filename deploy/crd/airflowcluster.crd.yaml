@@ -43,7 +43,7 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
-                          nullable: true
+                          default: ""
                           type: string
                       type: object
                     configOverrides:
@@ -70,7 +70,7 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
-                                nullable: true
+                                default: ""
                                 type: string
                             type: object
                           configOverrides:
@@ -145,7 +145,7 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
-                          nullable: true
+                          default: ""
                           type: string
                       type: object
                     configOverrides:
@@ -172,7 +172,7 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
-                                nullable: true
+                                default: ""
                                 type: string
                             type: object
                           configOverrides:
@@ -240,7 +240,7 @@ spec:
                       default: {}
                       properties:
                         credentialsSecret:
-                          nullable: true
+                          default: ""
                           type: string
                       type: object
                     configOverrides:
@@ -267,7 +267,7 @@ spec:
                             default: {}
                             properties:
                               credentialsSecret:
-                                nullable: true
+                                default: ""
                                 type: string
                             type: object
                           configOverrides:

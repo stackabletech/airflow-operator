@@ -6,9 +6,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole};
+use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -158,6 +157,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<S
             .unwrap_or(&"airflow".to_string()),
         role_name
     );
+    let ports = role_ports(role_name);
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -174,18 +174,25 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<S
             )
             .build(),
         spec: Some(ServiceSpec {
-            ports: Some(vec![ServicePort {
-                name: Some("airflow".to_string()),
-                port: APP_PORT.into(),
-                protocol: Some("TCP".to_string()),
-                ..ServicePort::default()
-            }]),
+            ports,
             selector: Some(role_selector_labels(airflow, APP_NAME, role_name)),
             type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
         }),
         status: None,
     })
+}
+
+fn role_ports(role_name: &str) -> Option<Vec<ServicePort>> {
+    Some(vec![ServicePort {
+        name: Some("airflow".to_string()),
+        port: AirflowRole::from_str(role_name)
+            .unwrap()
+            .get_http_port()
+            .into(),
+        protocol: Some("TCP".to_string()),
+        ..ServicePort::default()
+    }])
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -195,6 +202,8 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
 ) -> Result<Service> {
+    let ports = role_ports(&rolegroup.role);
+
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
@@ -211,12 +220,7 @@ fn build_rolegroup_service(
             .build(),
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),
-            ports: Some(vec![ServicePort {
-                name: Some("airflow".to_string()),
-                port: APP_PORT.into(),
-                protocol: Some("TCP".to_string()),
-                ..ServicePort::default()
-            }]),
+            ports,
             selector: Some(role_group_selector_labels(
                 airflow,
                 APP_NAME,
@@ -259,13 +263,12 @@ fn build_server_rolegroup_statefulset(
 
     // initialising commands
     let commands = airflow_role.get_commands();
-
     let container = ContainerBuilder::new(APP_NAME)
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
-        .add_container_port("http", APP_PORT.into())
+        .add_container_port("http", airflow_role.get_http_port().into())
         .build();
 
     Ok(StatefulSet {

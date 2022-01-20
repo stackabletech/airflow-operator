@@ -106,13 +106,12 @@ impl AirflowRole {
         }
     }
 
-    /// Returns the default port for every role, as taken from the sample configs.
-    pub fn get_http_port(&self) -> Option<u16> {
+    pub fn get_http_port(&self) -> u16 {
         match &self {
-            // TODO maybe replace with a bool so it can be set in the controller
-            AirflowRole::Webserver => Some(8080),
-            AirflowRole::Scheduler => None,
-            AirflowRole::Worker => None,
+            // TODO what if service does not need to expose a port?
+            AirflowRole::Webserver => 8080,
+            AirflowRole::Scheduler => 8080,
+            AirflowRole::Worker => 8080,
         }
     }
 }
@@ -130,7 +129,8 @@ impl AirflowCluster {
 #[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfig {
-    pub credentials_secret: Option<String>,
+    #[serde(default)]
+    pub credentials_secret: String,
 }
 
 impl AirflowConfig {
@@ -147,7 +147,7 @@ impl Configuration for AirflowConfig {
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
             Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            self.credentials_secret.clone(),
+            Some(self.credentials_secret.clone()),
         )]
         .into())
     }
