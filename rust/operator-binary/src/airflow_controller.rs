@@ -412,7 +412,7 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 2.2.3
+          version: 1.3.2
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -435,7 +435,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("2.2.3", cluster.spec.version.unwrap_or_default());
+        assert_eq!("1.3.2", cluster.spec.version.unwrap_or_default());
         assert_eq!(
             "KubernetesExecutor",
             cluster.spec.executor.unwrap_or_default()
