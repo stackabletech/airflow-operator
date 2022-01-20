@@ -111,26 +111,34 @@ pub async fn reconcile_airflow(
     tracing::info!("validated_config {:?}", &validated_role_config);
 
     for (role_name, role_config) in validated_role_config.iter() {
-        let role_service = build_role_service(role_name, &airflow)?;
-        client
-            .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
-            .await
-            .context(ApplyRoleService)?;
+        // some roles will only run "internally" and do not need to be created as services
+        if let Some(resolved_port) = role_port(role_name) {
+            let role_service = build_role_service(role_name, &airflow, &resolved_port)?;
+            client
+                .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
+                .await
+                .context(ApplyRoleService)?;
+        }
+
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
                 cluster: ObjectRef::from_obj(&airflow),
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
-            let rg_service = build_rolegroup_service(&rolegroup, &airflow)?;
+
+            if let Some(resolved_port) = role_port(role_name) {
+                let rg_service = build_rolegroup_service(&rolegroup, &airflow, &resolved_port)?;
+                client
+                    .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+                    .await
+                    .with_context(|| ApplyRoleGroupService {
+                        rolegroup: rolegroup.clone(),
+                    })?;
+            }
+
             let rg_statefulset =
                 build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
-                .await
-                .with_context(|| ApplyRoleGroupService {
-                    rolegroup: rolegroup.clone(),
-                })?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
                 .await
@@ -147,7 +155,11 @@ pub async fn reconcile_airflow(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<Service> {
+pub fn build_role_service(
+    role_name: &str,
+    airflow: &AirflowCluster,
+    port: &u16,
+) -> Result<Service> {
     let role_svc_name = format!(
         "{}-{}",
         airflow
@@ -157,12 +169,12 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<S
             .unwrap_or(&"airflow".to_string()),
         role_name
     );
-    let ports = role_ports(role_name);
+    let ports = role_ports(port);
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
-            .name(format!("{}-external", &role_svc_name))
+            .name(&role_svc_name)
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?
             .with_recommended_labels(
@@ -183,16 +195,17 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster) -> Result<S
     })
 }
 
-fn role_ports(role_name: &str) -> Option<Vec<ServicePort>> {
+fn role_ports(port: &u16) -> Option<Vec<ServicePort>> {
     Some(vec![ServicePort {
         name: Some("airflow".to_string()),
-        port: AirflowRole::from_str(role_name)
-            .unwrap()
-            .get_http_port()
-            .into(),
+        port: (*port).into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
     }])
+}
+
+fn role_port(role_name: &str) -> Option<u16> {
+    AirflowRole::from_str(role_name).unwrap().get_http_port()
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -201,8 +214,9 @@ fn role_ports(role_name: &str) -> Option<Vec<ServicePort>> {
 fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
+    port: &u16,
 ) -> Result<Service> {
-    let ports = role_ports(&rolegroup.role);
+    let ports = role_ports(port);
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -251,12 +265,11 @@ fn build_server_rolegroup_statefulset(
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
-    /*let image = format!(
+    let image = format!(
         "docker.stackable.tech/stackable/airflow:{}-stackable0",
         airflow_version
-    );*/
-    // specify python version here if needed (3.7+ is required for trigger processes; 2.2.3 has 3.6 as default)
-    let image = "apache/airflow:2.2.3-python3.8";
+    );
+    tracing::info!("Using image {}", image);
 
     // environment variables
     let env = build_envs(airflow, rolegroup_config);
@@ -268,7 +281,6 @@ fn build_server_rolegroup_statefulset(
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
-        .add_container_port("http", airflow_role.get_http_port().into())
         .build();
 
     Ok(StatefulSet {
@@ -415,7 +427,7 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 1.3.2
+          version: 2.2.3
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -438,7 +450,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("1.3.2", cluster.spec.version.unwrap_or_default());
+        assert_eq!("2.2.3", cluster.spec.version.unwrap_or_default());
         assert_eq!(
             "KubernetesExecutor",
             cluster.spec.executor.unwrap_or_default()

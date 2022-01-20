@@ -106,12 +106,13 @@ impl AirflowRole {
         }
     }
 
-    pub fn get_http_port(&self) -> u16 {
+    /// Will be used to expose service ports and - by extension - which roles should be
+    /// created as services.
+    pub fn get_http_port(&self) -> Option<u16> {
         match &self {
-            // TODO what if service does not need to expose a port?
-            AirflowRole::Webserver => 8080,
-            AirflowRole::Scheduler => 8080,
-            AirflowRole::Worker => 8080,
+            AirflowRole::Webserver => Some(8080),
+            AirflowRole::Scheduler => None,
+            AirflowRole::Worker => None,
         }
     }
 }
