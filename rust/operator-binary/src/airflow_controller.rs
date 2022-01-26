@@ -474,7 +474,7 @@ mod tests {
             "KubernetesExecutor",
             cluster.spec.executor.unwrap_or_default()
         );
-        assert_eq!(true, cluster.spec.load_examples.unwrap_or(false));
-        assert_eq!(true, cluster.spec.expose_config.unwrap_or(false));
+        assert!(cluster.spec.load_examples.unwrap_or(false));
+        assert!(cluster.spec.expose_config.unwrap_or(false));
     }
 }
