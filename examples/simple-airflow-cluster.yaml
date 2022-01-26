@@ -17,6 +17,7 @@ spec:
       default:
         config:
           credentialsSecret: simple-airflow-credentials
+        replicas: 2
   schedulers:
     roleGroups:
       default:
