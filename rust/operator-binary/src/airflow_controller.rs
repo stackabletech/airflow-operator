@@ -288,22 +288,6 @@ fn build_server_rolegroup_statefulset(
         .add_env_vars(env);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
-        /*let probe = Probe {
-            exec: Some(ExecAction {
-                command: Some(vec![
-                    "bash".to_string(),
-                    "-c".to_string(),
-                    // We don't have telnet or netcat in the container images, but
-                    // we can use Bash's virtual /dev/tcp filesystem to accomplish the same thing
-                    format!(
-                        "exec 3<>/dev/tcp/localhost/{} && echo srvr >&3 && grep '^Mode: ' <&3",
-                        resolved_port
-                    ),
-                ]),
-            }),
-            period_seconds: Some(1),
-            ..Probe::default()
-        };*/
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(resolved_port.into()),
