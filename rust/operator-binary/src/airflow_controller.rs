@@ -8,6 +8,8 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
+use stackable_operator::k8s_openapi::api::core::v1::{Probe, TCPSocketAction};
+use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -276,12 +278,45 @@ fn build_server_rolegroup_statefulset(
 
     // initialising commands
     let commands = airflow_role.get_commands();
-    let container = ContainerBuilder::new(APP_NAME)
+
+    // container
+    let mut container_builder = ContainerBuilder::new(APP_NAME);
+    let container_builder = container_builder
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_vars(env)
-        .build();
+        .add_env_vars(env);
+
+    if let Some(resolved_port) = airflow_role.get_http_port() {
+        /*let probe = Probe {
+            exec: Some(ExecAction {
+                command: Some(vec![
+                    "bash".to_string(),
+                    "-c".to_string(),
+                    // We don't have telnet or netcat in the container images, but
+                    // we can use Bash's virtual /dev/tcp filesystem to accomplish the same thing
+                    format!(
+                        "exec 3<>/dev/tcp/localhost/{} && echo srvr >&3 && grep '^Mode: ' <&3",
+                        resolved_port
+                    ),
+                ]),
+            }),
+            period_seconds: Some(1),
+            ..Probe::default()
+        };*/
+        let probe = Probe {
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(resolved_port.into()),
+                ..TCPSocketAction::default()
+            }),
+            initial_delay_seconds: Some(20),
+            period_seconds: Some(5),
+            ..Probe::default()
+        };
+        container_builder.readiness_probe(probe);
+    }
+
+    let container = container_builder.build();
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()

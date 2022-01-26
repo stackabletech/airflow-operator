@@ -4,9 +4,7 @@ name: airflow-operator
 version: 0.1.0-nightly
 appVersion: "0.1.0-nightly"
 description: The Stackable Operator for Apache Airflow
-
 home: https://github.com/stackabletech/airflow-operator
-
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech
