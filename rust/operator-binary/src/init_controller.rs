@@ -113,9 +113,6 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     })
 }
 
-/// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
-///
-/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     let commands = vec![
         String::from("airflow db init"),
@@ -163,11 +160,10 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     }
 
     let container = ContainerBuilder::new("airflow-init")
-        /*.image(format!(
+        .image(format!(
             "docker.stackable.tech/stackable/airflow:{}-stackable0",
             version
-        ))*/
-        .image("apache/airflow:2.2.3-python3.8")
+        ))
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)

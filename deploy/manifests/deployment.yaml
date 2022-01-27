@@ -1,0 +1,38 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-operator-deployment
+  labels:
+    app.kubernetes.io/name: airflow-operator
+    app.kubernetes.io/instance: airflow-operator
+    app.kubernetes.io/version: "0.1.0-nightly"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: airflow-operator
+      app.kubernetes.io/instance: airflow-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: airflow-operator
+        app.kubernetes.io/instance: airflow-operator
+    spec:
+      serviceAccountName: airflow-operator-serviceaccount
+      securityContext: {}
+      containers:
+        - name: airflow-operator
+          securityContext: {}
+          image: "docker.stackable.tech/stackable/airflow-operator:0.1.0-nightly"
+          imagePullPolicy: IfNotPresent
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/stackable/airflow-operator/config-spec
+              name: config-spec
+      volumes:
+        - name: config-spec
+          configMap:
+            name: airflow-operator-configmap

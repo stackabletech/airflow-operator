@@ -4,9 +4,7 @@ name: airflow-operator
 version: <version_placeholder>
 appVersion: "<version_placeholder>"
 description: The Stackable Operator for Apache Airflow
-
 home: https://github.com/stackabletech/airflow-operator
-
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech
