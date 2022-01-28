@@ -1,0 +1,5 @@
+name: airflow
+version: master
+title: Stackable Operator for Apache Airflow
+nav:
+  - modules/ROOT/nav.adoc

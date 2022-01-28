@@ -1,5 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
+use std::time::Duration;
+
 use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -26,7 +28,6 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use std::time::Duration;
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
@@ -73,7 +74,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
-        .context(ApplyJobSnafu {
+        .with_context(|_| ApplyJobSnafu {
             airflow: ObjectRef::from_obj(&airflow),
         })?;
 

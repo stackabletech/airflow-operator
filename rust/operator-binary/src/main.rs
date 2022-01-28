@@ -74,6 +74,7 @@ async fn main() -> anyhow::Result<()> {
                 client.get_all_api::<AirflowCluster>(),
                 ListParams::default(),
             )
+            .shutdown_on_signal()
             .owns(client.get_all_api::<Service>(), ListParams::default())
             .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
             .run(
