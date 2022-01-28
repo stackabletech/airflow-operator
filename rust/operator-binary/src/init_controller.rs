@@ -1,7 +1,5 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
-use std::time::Duration;
-
 use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -28,6 +26,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
+use std::time::Duration;
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
@@ -74,7 +73,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
-        .with_context(|| ApplyJob {
+        .context(ApplyJobSnafu {
             airflow: ObjectRef::from_obj(&airflow),
         })?;
 
@@ -90,7 +89,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 },
             )
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
 
         wait_completed(client, &job).await;
 
@@ -105,7 +104,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 },
             )
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
     }
 
     Ok(ReconcilerAction {
@@ -187,7 +186,7 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
             .name(format!("{}-init", airflow.name()))
             .namespace_opt(airflow.metadata.namespace.clone())
             .ownerreference_from_resource(init, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .build(),
         spec: Some(JobSpec {
             template: pod,
@@ -212,11 +211,11 @@ async fn find_airflow_cluster_of_init_command(
         client
             .get::<AirflowCluster>(airflow_name, Some(airflow_ns))
             .await
-            .with_context(|| FindAirflow {
+            .context(FindAirflowSnafu {
                 airflow: ObjectRef::new(airflow_name).within(airflow_ns),
             })
     } else {
-        InvalidAirflowReference.fail()
+        InvalidAirflowReferenceSnafu.fail()
     }
 }
 
@@ -240,7 +239,11 @@ async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) 
 }
 
 pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str> {
-    airflow.spec.version.as_deref().context(ObjectHasNoVersion)
+    airflow
+        .spec
+        .version
+        .as_deref()
+        .context(ObjectHasNoVersionSnafu)
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {

@@ -24,9 +24,9 @@ mod built_info {
 }
 
 #[derive(Parser)]
-#[structopt(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
+#[clap(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
 struct Opts {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: Command,
 }
 
@@ -86,13 +86,15 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let init_controller =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default()).run(
-                    init_controller::reconcile_init,
-                    init_controller::error_policy,
-                    Context::new(init_controller::Ctx {
-                        client: client.clone(),
-                    }),
-                );
+                Controller::new(client.get_all_api::<Init>(), ListParams::default())
+                    .shutdown_on_signal()
+                    .run(
+                        init_controller::reconcile_init,
+                        init_controller::error_policy,
+                        Context::new(init_controller::Ctx {
+                            client: client.clone(),
+                        }),
+                    );
 
             futures::stream::select(
                 airflow_controller.map(erase_controller_result_type),

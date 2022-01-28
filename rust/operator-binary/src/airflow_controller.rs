@@ -53,16 +53,6 @@ pub enum Error {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
-    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
-    BuildRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
-    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
-    ApplyRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
     #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
@@ -93,7 +83,7 @@ pub async fn reconcile_airflow(
     let mut roles = HashMap::new();
 
     for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role).clone() {
+        if let Some(resolved_role) = airflow.get_role(role.clone()).clone() {
             roles.insert(
                 role.to_string(),
                 (vec![PropertyNameKind::Env], resolved_role),
@@ -103,23 +93,23 @@ pub async fn reconcile_airflow(
     let role_config = transform_all_roles_to_config(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow_version(&airflow)?,
-        &role_config.with_context(|| ProductConfigTransform)?,
+        &role_config.context(ProductConfigTransformSnafu)?,
         &ctx.get_ref().product_config,
         false,
         false,
     )
-    .context(InvalidProductConfig)?;
+    .context(InvalidProductConfigSnafu)?;
 
     tracing::info!("validated_config {:?}", &validated_role_config);
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
-            let role_service = build_role_service(role_name, &airflow, &resolved_port)?;
+            let role_service = build_role_service(role_name, &airflow, resolved_port)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
                 .await
-                .context(ApplyRoleService)?;
+                .context(ApplyRoleServiceSnafu)?;
         }
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
@@ -130,11 +120,11 @@ pub async fn reconcile_airflow(
             };
 
             if let Some(resolved_port) = role_port(role_name) {
-                let rg_service = build_rolegroup_service(&rolegroup, &airflow, &resolved_port)?;
+                let rg_service = build_rolegroup_service(&rolegroup, &airflow, resolved_port)?;
                 client
                     .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
                     .await
-                    .with_context(|| ApplyRoleGroupService {
+                    .context(ApplyRoleGroupServiceSnafu {
                         rolegroup: rolegroup.clone(),
                     })?;
             }
@@ -144,7 +134,7 @@ pub async fn reconcile_airflow(
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
                 .await
-                .with_context(|| ApplyRoleGroupStatefulSet {
+                .context(ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
         }
@@ -157,11 +147,7 @@ pub async fn reconcile_airflow(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_role_service(
-    role_name: &str,
-    airflow: &AirflowCluster,
-    port: &u16,
-) -> Result<Service> {
+pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
     let role_svc_name = format!(
         "{}-{}",
         airflow
@@ -178,7 +164,7 @@ pub fn build_role_service(
             .name_and_namespace(airflow)
             .name(&role_svc_name)
             .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
@@ -197,10 +183,10 @@ pub fn build_role_service(
     })
 }
 
-fn role_ports(port: &u16) -> Option<Vec<ServicePort>> {
+fn role_ports(port: u16) -> Option<Vec<ServicePort>> {
     Some(vec![ServicePort {
         name: Some("airflow".to_string()),
-        port: (*port).into(),
+        port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
     }])
@@ -216,7 +202,7 @@ fn role_port(role_name: &str) -> Option<u16> {
 fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
-    port: &u16,
+    port: u16,
 ) -> Result<Service> {
     let ports = role_ports(port);
 
@@ -225,7 +211,7 @@ fn build_rolegroup_service(
             .name_and_namespace(airflow)
             .name(&rolegroup.object_name())
             .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
@@ -261,9 +247,9 @@ fn build_server_rolegroup_statefulset(
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow_version(airflow)?;
     let role = airflow
-        .get_role(&airflow_role)
+        .get_role(airflow_role.clone())
         .as_ref()
-        .context(NoAirflowRole)?;
+        .context(NoAirflowRoleSnafu)?;
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
@@ -307,7 +293,7 @@ fn build_server_rolegroup_statefulset(
             .name_and_namespace(airflow)
             .name(&rolegroup_ref.object_name())
             .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
@@ -409,7 +395,11 @@ fn build_envs(
 }
 
 pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str> {
-    airflow.spec.version.as_deref().context(ObjectHasNoVersion)
+    airflow
+        .spec
+        .version
+        .as_deref()
+        .context(ObjectHasNoVersionSnafu)
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
@@ -430,51 +420,5 @@ fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar
             ..Default::default()
         }),
         ..Default::default()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use stackable_airflow_crd::AirflowCluster;
-
-    #[test]
-    fn test_cluster_config() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
-        apiVersion: airflow.stackable.tech/v1alpha1
-        kind: AirflowCluster
-        metadata:
-          name: airflow
-        spec:
-          version: 2.2.3
-          executor: KubernetesExecutor
-          loadExamples: true
-          exposeConfig: true
-          webservers:
-            roleGroups:
-              default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
-          workers:
-            roleGroups:
-              default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
-          schedulers:
-            roleGroups:
-              default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
-          ",
-        )
-        .unwrap();
-
-        assert_eq!("2.2.3", cluster.spec.version.unwrap_or_default());
-        assert_eq!(
-            "KubernetesExecutor",
-            cluster.spec.executor.unwrap_or_default()
-        );
-        assert!(cluster.spec.load_examples.unwrap_or(false));
-        assert!(cluster.spec.expose_config.unwrap_or(false));
     }
 }

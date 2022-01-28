@@ -101,7 +101,6 @@ impl AirflowRole {
         match &self {
             AirflowRole::Webserver => vec!["airflow webserver".to_string()],
             AirflowRole::Scheduler => vec!["airflow scheduler".to_string()],
-            // TODO this depends on the executor!
             AirflowRole::Worker => vec!["airflow celery worker".to_string()],
         }
     }
@@ -118,7 +117,7 @@ impl AirflowRole {
 }
 
 impl AirflowCluster {
-    pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfig>> {
+    pub fn get_role(&self, role: AirflowRole) -> &Option<Role<AirflowConfig>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
@@ -190,4 +189,50 @@ pub struct AirflowClusterRef {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::AirflowCluster;
+
+    #[test]
+    fn test_cluster_config() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          version: 2.2.3
+          executor: KubernetesExecutor
+          loadExamples: true
+          exposeConfig: true
+          webservers:
+            roleGroups:
+              default:
+                config:
+                  credentialsSecret: simple-airflow-credentials
+          workers:
+            roleGroups:
+              default:
+                config:
+                  credentialsSecret: simple-airflow-credentials
+          schedulers:
+            roleGroups:
+              default:
+                config:
+                  credentialsSecret: simple-airflow-credentials
+          ",
+        )
+        .unwrap();
+
+        assert_eq!("2.2.3", cluster.spec.version.unwrap_or_default());
+        assert_eq!(
+            "KubernetesExecutor",
+            cluster.spec.executor.unwrap_or_default()
+        );
+        assert!(cluster.spec.load_examples.unwrap_or(false));
+        assert!(cluster.spec.expose_config.unwrap_or(false));
+    }
 }
