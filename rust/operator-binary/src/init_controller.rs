@@ -132,7 +132,7 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     tracing::info!("version {:?}", version);
     let secret = &init.spec.credentials_secret;
 
-    let mut env = vec![
+    let env = vec![
         env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
         env_var_from_secret(
             "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
@@ -150,14 +150,6 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
         env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
         env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
     ];
-
-    if init.spec.load_examples {
-        env.push(EnvVar {
-            name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
-            value: Some(String::from("true")),
-            value_from: None,
-        });
-    }
 
     let container = ContainerBuilder::new("airflow-init")
         .image(format!(

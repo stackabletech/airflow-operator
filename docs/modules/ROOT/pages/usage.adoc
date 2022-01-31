@@ -137,15 +137,11 @@ spec:
   clusterRef:
     name: airflow
   credentialsSecret: simple-airflow-credentials
-  loadExamples: true
 ----
 
 `spec.clusterRef.name` refers to the name of the Airflow cluster.
 
 The previously created secret must be referenced in `spec.credentialsSecret`.
-
-Set `spec.loadExamples` to `true` if you want the database populated with example data and
-dashboards.
 
 A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
 

@@ -6,4 +6,3 @@ spec:
   clusterRef:
     name: airflow
   credentialsSecret: simple-airflow-credentials
-  loadExamples: true
