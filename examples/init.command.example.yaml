@@ -1,0 +1,8 @@
+apiVersion: command.airflow.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: airflow-cluster-command-init
+spec:
+  clusterRef:
+    name: airflow
+  credentialsSecret: simple-airflow-credentials

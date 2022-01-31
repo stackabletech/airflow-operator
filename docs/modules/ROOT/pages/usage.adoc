@@ -1,0 +1,173 @@
+= Usage
+
+Airflow can run in standalone mode (see https://airflow.apache.org/docs/apache-airflow/stable/start/local.html) but requires 2 external dependencies if we want to run jobs across more than one worker: these
+dependencies are
+
+- an external database (e.g. postgresql) for user/job data, and
+- a queuing component such as Redis.
+
+== External dependencies for the Airflow users/job data and job queues
+
+For testing purposes, first add the bitnami repository to helm:
+
+[source,bash]
+----
+helm repo add bitnami https://charts.bitnami.com/bitnami
+----
+
+You can spin up a PostgreSQL database with the following command:
+
+[source,bash]
+----
+helm install airflow bitnami/postgresql \
+    --set postgresqlUsername=airflow \
+    --set postgresqlPassword=airflow \
+    --set postgresqlDatabase=airflow
+----
+
+A Redis instance can be setup in a similar way:
+
+[source,bash]
+----
+helm install redis bitnami/redis \
+    --set auth.password=redis
+----
+
+== Secret with Airflow credentials
+
+A secret with the necessary credentials must be created:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simple-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryBrokerUrl: redis://:redis@redis-master:6379/0
+----
+
+The `connections.secretKey` will be used for securely signing the session cookies and can be used
+for any other security related needs by extensions. It should be a long random string of bytes.
+
+`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
+the Airflow metadata.
+
+`connections.celeryResultBackend` must contain the connection string to the SQL database storing
+the job metadata (in the example above we are using the same postgresql database for both).
+
+`connections.celeryBrokerUrl` must contain the connection string to the Redis instance used for queuing
+the jobs submitted to the airflow worker(s).
+
+The `adminUser` fields are used by the `init` command to create an admin user.
+
+== Creation of an Airflow Cluster
+
+An Airflow cluster must be created as a custom resource:
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  version: 2.2.3-python3.8
+  executor: CeleryExecutor
+  loadExamples: true
+  exposeConfig: false
+  webservers:
+    roleGroups:
+      default:
+        config:
+          credentialsSecret: simple-airflow-credentials
+  workers:
+    roleGroups:
+      default:
+        config:
+          credentialsSecret: simple-airflow-credentials
+        replicas: 2
+  schedulers:
+    roleGroups:
+      default:
+        config:
+          credentialsSecret: simple-airflow-credentials
+----
+
+Where:
+
+- `metadata.name` contains the name of the Airflow cluster
+- the label of the Docker image provided by Stackable must be set in `spec.version`
+- `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
+is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
+(whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
+- importing the sample workflows is determined by `loadExamples`
+- `exposeConfig` allows the contents of the configuration file `airflow.cfg` to be exposed via the webserver UI. This is only for debugging purposes and should be set to `false` otherwise as it presents a security risk.
+- the previously created secret must be referenced in `credentialsSecret`
+
+Each cluster requires 3 components:
+
+- `webservers`: this provides the main UI for user-interaction
+- `workers`: the nodes over which the job workload will be distributed by the scheduler
+- `schedulers`: responsible for triggering jobs and persisting their metadata to the backend database
+
+== Initializing the Airflow database
+
+If the database is not initialized yet for Airflow, the `init` command must be executed: the
+command initializes the database by creating the necessary database tables, creating the admin user
+account, and loading examples if desired. The webserver will not be available/ready until this initialization
+step has been completed.
+
+[source,yaml]
+----
+apiVersion: command.airflow.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: airflow-cluster-command-init
+spec:
+  clusterRef:
+    name: airflow
+  credentialsSecret: simple-airflow-credentials
+----
+
+`spec.clusterRef.name` refers to the name of the Airflow cluster.
+
+The previously created secret must be referenced in `spec.credentialsSecret`.
+
+A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
+
+== Using Airflow
+
+When the Airflow cluster is created and the database is initialized, Airflow can be opened in the
+browser.
+
+The Airflow port which defaults to `8080` can be forwarded to the local host:
+
+[source,bash]
+----
+kubectl port-forward airflow-webserver-default-0 8080
+----
+
+Then it can be opened in the browser with `http://localhost:8080`.
+
+Enter the admin credentials from the Kubernetes secret:
+
+image::airflow_login.png[Login screen of Airflow]
+
+If the examples were loaded then some dashboards are already available:
+
+image::airflow_dags.png[Airflow UI showing example DAGs]
+
+Click on an example DAG and then invoke the job: if the scheduler is correctly set up then the job
+will run and the job tree will update automatically:
+
+image::airflow_running.png[Airflow UI showing a running DAG]
