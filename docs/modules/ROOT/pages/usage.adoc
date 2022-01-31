@@ -111,6 +111,7 @@ Where:
 is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
 (whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
 - importing the sample workflows is determined by `loadExamples`
+- `exposeConfig` allows the contents of the configuration file `airflow.cfg` to be exposed via the webserver UI. This is only for debugging purposes and should be set to `false` otherwise as it presents a security risk.
 - the previously created secret must be referenced in `credentialsSecret`
 
 Each cluster requires 3 components:
@@ -171,6 +172,6 @@ If the examples were loaded then some dashboards are already available:
 image::airflow_dags.png[Airflow UI showing example DAGs]
 
 Click on an example DAG and then invoke the job: if the scheduler is correctly set up then the job
-will run and job tree will update automatically:
+will run and the job tree will update automatically:
 
 image::airflow_running.png[Airflow UI showing a running DAG]
