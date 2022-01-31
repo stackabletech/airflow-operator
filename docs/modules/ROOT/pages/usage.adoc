@@ -1,6 +1,6 @@
 = Usage
 
-Airflow can run in standalone mode (see ) but requires 2 external dependencies if we want to run jobs across more than one worker: these
+Airflow can run in standalone mode (see https://airflow.apache.org/docs/apache-airflow/stable/start/local.html) but requires 2 external dependencies if we want to run jobs across more than one worker: these
 dependencies are
 
 - an external database (e.g. postgresql) for user/job data, and
@@ -63,14 +63,14 @@ for any other security related needs by extensions. It should be a long random s
 the Airflow metadata.
 
 `connections.celeryResultBackend` must contain the connection string to the SQL database storing
-the job metadata (in the example above we are using the same postgresl database for both).
+the job metadata (in the example above we are using the same postgresql database for both).
 
 `connections.celeryBrokerUrl` must contain the connection string to the Redis instance used for queuing
 the jobs submitted to the airflow worker(s).
 
 The `adminUser` fields are used by the `init` command to create an admin user.
 
-== Creation of a Airflow Cluster
+== Creation of an Airflow Cluster
 
 An Airflow cluster must be created as a custom resource:
 
@@ -107,7 +107,7 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
-- `spec.executor`: this setting determines how the cluster will run. For more information see (): the `CeleryExecutor`
+- `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
 is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
 (whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
 - importing the sample workflows is determined by `loadExamples`
@@ -116,13 +116,13 @@ is the recommended setting although `SequentialExecutor` (all jobs run in one pr
 Each cluster requires 3 components:
 
 - `webservers`: this provides the main UI for user-interaction
-- `workers`: the nodes over which the job workload will distributed by the scheduler
+- `workers`: the nodes over which the job workload will be distributed by the scheduler
 - `schedulers`: responsible for triggering jobs and persisting their metadata to the backend database
 
 == Initializing the Airflow database
 
 If the database is not initialized yet for Airflow, the `init` command must be executed: the
-command initializes the dababase by creating the necessary database tables, creating the admin user
+command initializes the database by creating the necessary database tables, creating the admin user
 account, and loading examples if desired. The webserver will not be available/ready until this initialization
 step has been completed.
 
@@ -143,7 +143,7 @@ spec:
 
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
-Set `spec.loadExamples` to `true` if you want the dababase populated with example data and
+Set `spec.loadExamples` to `true` if you want the database populated with example data and
 dashboards.
 
 A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
@@ -170,7 +170,7 @@ If the examples were loaded then some dashboards are already available:
 
 image::airflow_dags.png[Airflow UI showing example DAGs]
 
-Click on an exampe DAG and then invoke the job: if the scheduler is correctly set up then the job
+Click on an example DAG and then invoke the job: if the scheduler is correctly set up then the job
 will run and job tree will update automatically:
 
 image::airflow_running.png[Airflow UI showing a running DAG]
