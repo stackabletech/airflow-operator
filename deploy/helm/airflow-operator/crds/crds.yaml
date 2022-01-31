@@ -374,12 +374,9 @@ spec:
                   type: object
                 credentialsSecret:
                   type: string
-                loadExamples:
-                  type: boolean
               required:
                 - clusterRef
                 - credentialsSecret
-                - loadExamples
               type: object
             status:
               nullable: true
