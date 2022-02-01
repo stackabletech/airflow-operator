@@ -34,21 +34,16 @@ compile-chart: version crds config
 chart-clean:
 	rm -rf deploy/helm/airflow-operator/configs
 	rm -rf deploy/helm/airflow-operator/crds
-	rm -rf deploy/helm/airflow-operator/templates/crds.yaml
 
 version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/airflow-operator/Chart.yaml
 
-config: deploy/helm/airflow-operator/configs
-
-deploy/helm/airflow-operator/configs:
+config:
 	cp -r deploy/config-spec deploy/helm/airflow-operator/configs
 
-crds: deploy/helm/airflow-operator/crds/crds.yaml
-
-deploy/helm/airflow-operator/crds/crds.yaml:
+crds:
 	mkdir -p deploy/helm/airflow-operator/crds
-	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > ${@}
+	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/airflow-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
