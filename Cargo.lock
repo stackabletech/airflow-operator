@@ -1481,7 +1481,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-airflow-crd"
-version = "0.1.0"
+version = "0.2.0-nightly"
 dependencies = [
  "serde",
  "serde_json",
@@ -1493,7 +1493,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-airflow-operator"
-version = "0.1.0"
+version = "0.2.0-nightly"
 dependencies = [
  "anyhow",
  "built",
