@@ -19,10 +19,10 @@ You can spin up a PostgreSQL database with the following command:
 
 [source,bash]
 ----
-helm install airflow bitnami/postgresql \
-    --set postgresqlUsername=airflow \
-    --set postgresqlPassword=airflow \
-    --set postgresqlDatabase=airflow
+helm install airflow-postgresql bitnami/postgresql --version 11.0.0 \
+    --set auth.username=airflow \
+    --set auth.password=airflow \
+    --set auth.database=airflow
 ----
 
 A Redis instance can be setup in a similar way:
