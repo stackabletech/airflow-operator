@@ -24,4 +24,4 @@ metadata:
   labels:
     app.kubernetes.io/name: airflow-operator
     app.kubernetes.io/instance: airflow-operator
-    app.kubernetes.io/version: "0.1.0-nightly"
+    app.kubernetes.io/version: "0.2.0-nightly"
