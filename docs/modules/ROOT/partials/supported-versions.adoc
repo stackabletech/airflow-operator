@@ -1,0 +1,5 @@
+// The version ranges supported by Airflow-Operator
+// This is a separate file, since it is used by both the direct Airflow-Operator documentation, and the overarching
+// Stackable Platform documentation.
+
+- 2.2.3-python3.8
