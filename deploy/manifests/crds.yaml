@@ -1,4 +1,5 @@
 ---
+# Source: airflow-operator/crds/crds.yaml
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -401,3 +402,4 @@ spec:
       storage: true
       subresources:
         status: {}
+
