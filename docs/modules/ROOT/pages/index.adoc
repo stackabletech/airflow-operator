@@ -6,8 +6,14 @@ clusters.
 WARNING: This operator is part of the Stackable Data Platform and only works with images from the
 https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fairflow[Stackable] repository.
 
-== Getting the Docker image
-￼
+== Supported Versions
+
+The Stackable Operator for Apache Airflow currently supports the following versions of Airflow:
+
+include::partial$supported-versions.adoc[]
+
+== Docker
+
 [source]
 ----
 docker pull docker.stackable.tech/stackable/airflow:<version>
