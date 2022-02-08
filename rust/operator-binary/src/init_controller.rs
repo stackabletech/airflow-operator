@@ -164,7 +164,7 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     let pod = PodTemplateSpec {
         metadata: Some(
             ObjectMetaBuilder::new()
-                .name(format!("{}-init", airflow.name()))
+                .name(format!("{}-init", init.name()))
                 .build(),
         ),
         spec: Some(PodSpec {
@@ -176,8 +176,8 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(format!("{}-init", airflow.name()))
-            .namespace_opt(airflow.metadata.namespace.clone())
+            .name(init.name())
+            .namespace_opt(init.namespace())
             .ownerreference_from_resource(init, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .build(),
@@ -200,7 +200,10 @@ async fn find_airflow_cluster_of_init_command(
         namespace: maybe_airflow_ns,
     } = &init.spec.cluster_ref
     {
-        let airflow_ns = maybe_airflow_ns.as_deref().unwrap_or("default");
+        let init_ns = init.namespace().unwrap_or_else(|| "default".to_string());
+        let airflow_ns = maybe_airflow_ns
+            .as_deref()
+            .unwrap_or_else(|| init_ns.as_str());
         client
             .get::<AirflowCluster>(airflow_name, Some(airflow_ns))
             .await
