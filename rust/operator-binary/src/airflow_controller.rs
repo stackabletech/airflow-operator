@@ -100,8 +100,6 @@ pub async fn reconcile_airflow(
     )
     .context(InvalidProductConfigSnafu)?;
 
-    tracing::info!("validated_config {:?}", &validated_role_config);
-
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
@@ -259,8 +257,8 @@ fn build_server_rolegroup_statefulset(
     );
     tracing::info!("Using image {}", image);
 
-    // environment variables
-    let env = build_envs(airflow, rolegroup_config);
+    // mapped environment variables
+    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
 
     // initialising commands
     let commands = airflow_role.get_commands();
@@ -270,8 +268,21 @@ fn build_server_rolegroup_statefulset(
     let container_builder = container_builder
         .image(image)
         .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_vars(env);
+        .args(vec![String::from("-c"), commands.join("; ")]);
+
+    let env_config = rolegroup_config
+        .get(&PropertyNameKind::Env)
+        .iter()
+        .flat_map(|env_vars| env_vars.iter())
+        .map(|(k, v)| EnvVar {
+            name: k.clone(),
+            value: Some(v.clone()),
+            ..EnvVar::default()
+        })
+        .collect::<Vec<_>>();
+
+    container_builder.add_env_vars(env_mapped);
+    container_builder.add_env_vars(env_config);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -337,7 +348,9 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-fn build_envs(
+/// This builds a collection of environment variables some require some minimal mapping,
+/// such as executor type, contents of the secret etc.
+fn build_mapped_envs(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
