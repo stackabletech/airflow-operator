@@ -3,9 +3,9 @@
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
-use std::sync::Arc;
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
