@@ -125,7 +125,7 @@ Each cluster requires 3 components:
 The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
 
 IMPORTANT: Overriding certain properties which are set by operator (such as the HTTP port) can interfere with the operator and can lead to problems. Additionally for Airflow it is recommended
-that each component has the same configuration: not all components use each setting, but some things - such as external end-points need to be consistent for things to work as expected.
+that each component has the same configuration: not all components use each setting, but some things - such as external end-points - need to be consistent for things to work as expected.
 
 === Configuration Properties
 

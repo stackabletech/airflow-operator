@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use std::sync::Arc;
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
@@ -74,7 +75,7 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn reconcile_airflow(
-    airflow: AirflowCluster,
+    airflow: Arc<AirflowCluster>,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
@@ -90,7 +91,7 @@ pub async fn reconcile_airflow(
             );
         }
     }
-    let role_config = transform_all_roles_to_config(&airflow, roles);
+    let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow_version(&airflow)?,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -112,13 +113,13 @@ pub async fn reconcile_airflow(
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
-                cluster: ObjectRef::from_obj(&airflow),
+                cluster: ObjectRef::from_obj(&*airflow),
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
 
             if let Some(resolved_port) = role_port(role_name) {
-                let rg_service = build_rolegroup_service(&rolegroup, &airflow, resolved_port)?;
+                let rg_service = build_rolegroup_service(&rolegroup, &*airflow, resolved_port)?;
                 client
                     .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
                     .await
