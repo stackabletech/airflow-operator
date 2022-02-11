@@ -1,5 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::{future, StreamExt};
@@ -63,7 +64,7 @@ pub enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
+pub async fn reconcile_init(init: Arc<Init>, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -83,7 +84,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
-                &init,
+                &*init,
                 &CommandStatus {
                     started_at: started_at.to_owned(),
                     finished_at: None,
@@ -98,7 +99,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
-                &init,
+                &*init,
                 &CommandStatus {
                     started_at,
                     finished_at,

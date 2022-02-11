@@ -3,6 +3,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -74,7 +75,7 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn reconcile_airflow(
-    airflow: AirflowCluster,
+    airflow: Arc<AirflowCluster>,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
@@ -90,7 +91,7 @@ pub async fn reconcile_airflow(
             );
         }
     }
-    let role_config = transform_all_roles_to_config(&airflow, roles);
+    let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow_version(&airflow)?,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -99,8 +100,6 @@ pub async fn reconcile_airflow(
         false,
     )
     .context(InvalidProductConfigSnafu)?;
-
-    tracing::info!("validated_config {:?}", &validated_role_config);
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -114,13 +113,13 @@ pub async fn reconcile_airflow(
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
-                cluster: ObjectRef::from_obj(&airflow),
+                cluster: ObjectRef::from_obj(&*airflow),
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
 
             if let Some(resolved_port) = role_port(role_name) {
-                let rg_service = build_rolegroup_service(&rolegroup, &airflow, resolved_port)?;
+                let rg_service = build_rolegroup_service(&rolegroup, &*airflow, resolved_port)?;
                 client
                     .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
                     .await
@@ -259,8 +258,8 @@ fn build_server_rolegroup_statefulset(
     );
     tracing::info!("Using image {}", image);
 
-    // environment variables
-    let env = build_envs(airflow, rolegroup_config);
+    // mapped environment variables
+    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
 
     // initialising commands
     let commands = airflow_role.get_commands();
@@ -270,8 +269,21 @@ fn build_server_rolegroup_statefulset(
     let container_builder = container_builder
         .image(image)
         .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_vars(env);
+        .args(vec![String::from("-c"), commands.join("; ")]);
+
+    let env_config = rolegroup_config
+        .get(&PropertyNameKind::Env)
+        .iter()
+        .flat_map(|env_vars| env_vars.iter())
+        .map(|(k, v)| EnvVar {
+            name: k.clone(),
+            value: Some(v.clone()),
+            ..EnvVar::default()
+        })
+        .collect::<Vec<_>>();
+
+    container_builder.add_env_vars(env_mapped);
+    container_builder.add_env_vars(env_config);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -337,7 +349,9 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-fn build_envs(
+/// This builds a collection of environment variables some require some minimal mapping,
+/// such as executor type, contents of the secret etc.
+fn build_mapped_envs(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
