@@ -5,10 +5,10 @@ kind: Deployment
 metadata:
   name: airflow-operator-deployment
   labels:
-    helm.sh/chart: airflow-operator-0.2.0
+    helm.sh/chart: airflow-operator-0.3.0-nightly
     app.kubernetes.io/name: airflow-operator
     app.kubernetes.io/instance: airflow-operator
-    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/version: "0.3.0-nightly"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -31,7 +31,7 @@ spec:
         - name: airflow-operator
           securityContext:
             {}
-          image: "docker.stackable.tech/stackable/airflow-operator:0.2.0"
+          image: "docker.stackable.tech/stackable/airflow-operator:0.3.0-nightly"
           imagePullPolicy: IfNotPresent
           resources:
             {}
