@@ -1,3 +1,29 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simple-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryBrokerUrl: redis://:redis@redis-master:6379/0
+---
+apiVersion: command.airflow.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: airflow-cluster-command-init
+spec:
+  clusterRef:
+    name: airflow
+  credentialsSecret: simple-airflow-credentials
+---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
