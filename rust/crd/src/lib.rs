@@ -36,6 +36,8 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statsd_exporter_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_examples: Option<bool>,

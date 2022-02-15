@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- BREAKING: Prometheus metrics enabled ([#51]); The `statsdExporterVersion` must
+  be set in the cluster specification.
+
+[#51]: https://github.com/stackabletech/airflow-operator/pull/51
+
 ## [0.2.0] - 2022-02-14
 
 ### Changed
