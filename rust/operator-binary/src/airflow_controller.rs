@@ -33,6 +33,9 @@ use strum::IntoEnumIterator;
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
+const METRICS_PORT_NAME: &str = "metrics";
+const METRICS_PORT: i32 = 9102;
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -43,6 +46,8 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
+    #[snafu(display("object defines no statsd exporter version"))]
+    ObjectHasNoStatsdExporterVersion,
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
     #[snafu(display("failed to apply global Service"))]
@@ -118,15 +123,13 @@ pub async fn reconcile_airflow(
                 role_group: rolegroup_name.into(),
             };
 
-            if let Some(resolved_port) = role_port(role_name) {
-                let rg_service = build_rolegroup_service(&rolegroup, &*airflow, resolved_port)?;
-                client
-                    .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
-                    .await
-                    .context(ApplyRoleGroupServiceSnafu {
-                        rolegroup: rolegroup.clone(),
-                    })?;
-            }
+            let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
+            client
+                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+                .await
+                .context(ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
 
             let rg_statefulset =
                 build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
@@ -171,9 +174,10 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
                 role_name,
                 "global",
             )
+            .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
             .build(),
         spec: Some(ServiceSpec {
-            ports,
+            ports: Some(ports),
             selector: Some(role_selector_labels(airflow, APP_NAME, role_name)),
             type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
@@ -182,13 +186,13 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
     })
 }
 
-fn role_ports(port: u16) -> Option<Vec<ServicePort>> {
-    Some(vec![ServicePort {
+fn role_ports(port: u16) -> Vec<ServicePort> {
+    vec![ServicePort {
         name: Some("airflow".to_string()),
         port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
-    }])
+    }]
 }
 
 fn role_port(role_name: &str) -> Option<u16> {
@@ -201,9 +205,17 @@ fn role_port(role_name: &str) -> Option<u16> {
 fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
-    port: u16,
 ) -> Result<Service> {
-    let ports = role_ports(port);
+    let mut ports = vec![ServicePort {
+        name: Some(METRICS_PORT_NAME.into()),
+        port: METRICS_PORT,
+        protocol: Some("TCP".to_string()),
+        ..Default::default()
+    }];
+
+    if let Some(http_port) = role_port(&rolegroup.role) {
+        ports.append(&mut role_ports(http_port));
+    }
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -218,10 +230,12 @@ fn build_rolegroup_service(
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
+            .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
+            .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),
-            ports,
+            ports: Some(ports),
             selector: Some(role_group_selector_labels(
                 airflow,
                 APP_NAME,
@@ -252,11 +266,12 @@ fn build_server_rolegroup_statefulset(
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
-    let image = format!(
-        "docker.stackable.tech/stackable/airflow:{}-stackable0",
-        airflow_version
-    );
+    let image = format!("docker.stackable.tech/stackable/airflow:{airflow_version}-stackable0",);
     tracing::info!("Using image {}", image);
+
+    let statsd_exporter_version = statsd_exporter_version(airflow)?;
+    let statsd_exporter_image =
+        format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     // mapped environment variables
     let env_mapped = build_mapped_envs(airflow, rolegroup_config);
@@ -284,6 +299,7 @@ fn build_server_rolegroup_statefulset(
 
     container_builder.add_env_vars(env_mapped);
     container_builder.add_env_vars(env_config);
+    container_builder.add_env_vars(build_static_envs());
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -300,6 +316,11 @@ fn build_server_rolegroup_statefulset(
 
     let container = container_builder.build();
 
+    let metrics_container = ContainerBuilder::new("metrics")
+        .image(statsd_exporter_image)
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .build();
+
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
@@ -313,6 +334,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
+            .with_label("statsd-exporter", statsd_exporter_version)
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -340,8 +362,10 @@ fn build_server_rolegroup_statefulset(
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )
+                    .with_label("statsd-exporter", statsd_exporter_version)
                 })
                 .add_container(container)
+                .add_container(metrics_container)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
@@ -408,12 +432,48 @@ fn build_mapped_envs(
     env
 }
 
+fn build_static_envs() -> Vec<EnvVar> {
+    [
+        EnvVar {
+            name: "AIRFLOW__METRICS__STATSD_ON".into(),
+            value: Some("True".into()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "AIRFLOW__METRICS__STATSD_HOST".into(),
+            value: Some("0.0.0.0".into()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "AIRFLOW__METRICS__STATSD_PORT".into(),
+            value: Some("9125".into()),
+            ..Default::default()
+        },
+        // Basic authentication is used by the integration tests.
+        // The default is to deny all requests to the API.
+        EnvVar {
+            name: "AIRFLOW__API__AUTH_BACKEND".into(),
+            value: Some("airflow.api.auth.backend.basic_auth".into()),
+            ..Default::default()
+        },
+    ]
+    .into()
+}
+
 pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str> {
     airflow
         .spec
         .version
         .as_deref()
         .context(ObjectHasNoVersionSnafu)
+}
+
+pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> {
+    airflow
+        .spec
+        .statsd_exporter_version
+        .as_deref()
+        .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {

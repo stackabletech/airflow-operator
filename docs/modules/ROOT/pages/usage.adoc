@@ -82,6 +82,7 @@ metadata:
   name: airflow
 spec:
   version: 2.2.3-python3.8
+  statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: false
@@ -107,6 +108,7 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
+- `spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
 - `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
 is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
 (whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
@@ -215,3 +217,8 @@ Click on an example DAG and then invoke the job: if the scheduler is correctly s
 will run and the job tree will update automatically:
 
 image::airflow_running.png[Airflow UI showing a running DAG]
+
+== Monitoring
+
+The managed Airflow instances are automatically configured to export Prometheus metrics. See
+xref:home::monitoring.adoc[] for more details

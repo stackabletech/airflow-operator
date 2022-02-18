@@ -13,7 +13,7 @@ stringData:
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
-  connections.celeryBrokerUrl: redis://:redis@redis-master:6379/0
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
 apiVersion: command.airflow.stackable.tech/v1alpha1
 kind: Init
@@ -30,6 +30,7 @@ metadata:
   name: airflow
 spec:
   version: 2.2.3-python3.8
+  statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: true
