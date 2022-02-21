@@ -69,12 +69,15 @@ rules:
     verbs:
       - get
   - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
       - command.{{ include "operator.name" . }}.stackable.tech
     resources:
       - inits
-      - restarts
-      - starts
-      - stops
     verbs:
       - get
       - list
