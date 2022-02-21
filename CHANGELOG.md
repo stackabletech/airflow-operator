@@ -6,8 +6,14 @@
 
 - BREAKING: Prometheus metrics enabled ([#51]); The `statsdExporterVersion` must
   be set in the cluster specification.
+- Reconciliation errors are now reported as Kubernetes events ([#53]). 
+
+### Changed
+
+- `operator-rs` `0.10.0` -> `0.12.0` ([#53]). 
 
 [#51]: https://github.com/stackabletech/airflow-operator/pull/51
+[#53]: https://github.com/stackabletech/airflow-operator/pull/53
 
 ## [0.2.0] - 2022-02-14
 

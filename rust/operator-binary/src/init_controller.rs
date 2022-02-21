@@ -43,14 +43,14 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object does not refer to AirflowCluster"))]
     InvalidAirflowReference,
-    #[snafu(display("could not find object"))]
+    #[snafu(display("could not find object {airflow}"))]
     FindAirflow {
         source: stackable_operator::error::Error,
         airflow: ObjectRef<AirflowCluster>,
     },
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
-    #[snafu(display("failed to apply Job for {}", airflow))]
+    #[snafu(display("failed to apply Job for {airflow}"))]
     ApplyJob {
         source: stackable_operator::error::Error,
         airflow: ObjectRef<AirflowCluster>,
