@@ -1,8 +1,5 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
-use std::sync::Arc;
-use std::time::Duration;
-
 use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -21,6 +18,7 @@ use stackable_operator::{
     },
     kube::{
         api::ListParams,
+        core::DynamicObject,
         runtime::{
             self,
             controller::{Context, ReconcilerAction},
@@ -28,7 +26,10 @@ use stackable_operator::{
         },
         ResourceExt,
     },
+    logging::controller::ReconcilerError,
 };
+use std::{sync::Arc, time::Duration};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
@@ -36,12 +37,13 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
 
-#[derive(Snafu, Debug)]
+#[derive(Snafu, Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object does not refer to AirflowCluster"))]
     InvalidAirflowReference,
-    #[snafu(display("could not find {}", airflow))]
+    #[snafu(display("could not find object"))]
     FindAirflow {
         source: stackable_operator::error::Error,
         airflow: ObjectRef<AirflowCluster>,
@@ -63,6 +65,23 @@ pub enum Error {
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
+        match self {
+            Error::InvalidAirflowReference => None,
+            Error::FindAirflow { airflow, .. } => Some(airflow.clone().erase()),
+            Error::ObjectHasNoVersion => None,
+            Error::ApplyJob { airflow, .. } => Some(airflow.clone().erase()),
+            Error::ApplyStatus { .. } => None,
+            Error::ObjectMissingMetadataForOwnerRef { .. } => None,
+        }
+    }
+}
 
 pub async fn reconcile_init(init: Arc<Init>, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");

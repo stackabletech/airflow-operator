@@ -70,12 +70,15 @@ rules:
     verbs:
       - get
   - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
       - command.airflow.stackable.tech
     resources:
       - inits
-      - restarts
-      - starts
-      - stops
     verbs:
       - get
       - list

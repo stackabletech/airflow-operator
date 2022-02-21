@@ -1,35 +1,36 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
-    time::Duration,
-};
-
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
-use stackable_operator::k8s_openapi::api::core::v1::{Probe, TCPSocketAction};
-use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                EnvVar, EnvVarSource, SecretKeySelector, Service, ServicePort, ServiceSpec,
+                EnvVar, EnvVarSource, Probe, SecretKeySelector, Service, ServicePort, ServiceSpec,
+                TCPSocketAction,
             },
         },
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::runtime::controller::{Context, ReconcilerAction},
+    kube::runtime::{
+        controller::{Context, ReconcilerAction},
+        reflector::ObjectRef,
+    },
     labels::{role_group_selector_labels, role_selector_labels},
+    logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
-use strum::IntoEnumIterator;
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
+use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
@@ -41,7 +42,8 @@ pub struct Ctx {
     pub product_config: ProductConfigManager,
 }
 
-#[derive(Snafu, Debug)]
+#[derive(Snafu, Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object defines no version"))]
@@ -77,7 +79,14 @@ pub enum Error {
         source: stackable_operator::product_config_utils::ConfigError,
     },
 }
+
 type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+}
 
 pub async fn reconcile_airflow(
     airflow: Arc<AirflowCluster>,

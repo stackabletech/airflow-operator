@@ -122,6 +122,11 @@ Each cluster requires 3 components:
 - `workers`: the nodes over which the job workload will be distributed by the scheduler
 - `schedulers`: responsible for triggering jobs and persisting their metadata to the backend database
 
+== Monitoring
+
+The managed Airflow instances are automatically configured to export Prometheus metrics. See
+xref:home::monitoring.adoc[] for more details.
+
 == Configuration & Environment Overrides
 
 The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
