@@ -1,0 +1,24 @@
+
+=== product-config
+
+*Default value*: `/etc/stackable/zookeeper-operator/config-spec/properties.yaml`
+
+*Required*: false
+
+*Multiple values:* false
+
+
+This file contains property definitions for the Apache Zookeeper configuration.
+
+=== watch-namespace
+
+*Required*: false
+
+*Multiple values:* false
+
+The operator will only watch for resources in the provided namespace `test`:
+
+[source]
+----
+cargo run -- run --watch-namespace=test
+----
