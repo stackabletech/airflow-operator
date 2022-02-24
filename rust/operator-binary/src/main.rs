@@ -60,16 +60,16 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
             let airflow_controller = Controller::new(
-                client.get_api::<AirflowCluster>(watch_namespace.as_deref()),
+                watch_namespace.get_api::<AirflowCluster>(&client),
                 ListParams::default(),
             )
             .shutdown_on_signal()
             .owns(
-                client.get_api::<Service>(watch_namespace.as_deref()),
+                watch_namespace.get_api::<Service>(&client),
                 ListParams::default(),
             )
             .owns(
-                client.get_api::<StatefulSet>(watch_namespace.as_deref()),
+                watch_namespace.get_api::<StatefulSet>(&client),
                 ListParams::default(),
             )
             .run(
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
             });
 
             let init_controller = Controller::new(
-                client.get_api::<Init>(watch_namespace.as_deref()),
+                watch_namespace.get_api::<Init>(&client),
                 ListParams::default(),
             )
             .shutdown_on_signal()
