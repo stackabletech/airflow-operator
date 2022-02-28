@@ -221,9 +221,7 @@ async fn find_airflow_cluster_of_init_command(
     } = &init.spec.cluster_ref
     {
         let init_ns = init.namespace().unwrap_or_else(|| "default".to_string());
-        let airflow_ns = maybe_airflow_ns
-            .as_deref()
-            .unwrap_or_else(|| init_ns.as_str());
+        let airflow_ns = maybe_airflow_ns.as_deref().unwrap_or(init_ns.as_str());
         client
             .get::<AirflowCluster>(airflow_name, Some(airflow_ns))
             .await
