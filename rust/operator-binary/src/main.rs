@@ -39,7 +39,10 @@ async fn main() -> anyhow::Result<()> {
             serde_yaml::to_string(&AirflowCluster::crd())?,
             serde_yaml::to_string(&Init::crd())?
         ),
-        Command::Run(ProductOperatorRun { product_config }) => {
+        Command::Run(ProductOperatorRun {
+            product_config,
+            watch_namespace,
+        }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -57,12 +60,18 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
             let airflow_controller = Controller::new(
-                client.get_all_api::<AirflowCluster>(),
+                watch_namespace.get_api::<AirflowCluster>(&client),
                 ListParams::default(),
             )
             .shutdown_on_signal()
-            .owns(client.get_all_api::<Service>(), ListParams::default())
-            .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+            .owns(
+                watch_namespace.get_api::<Service>(&client),
+                ListParams::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<StatefulSet>(&client),
+                ListParams::default(),
+            )
             .run(
                 airflow_controller::reconcile_airflow,
                 airflow_controller::error_policy,
@@ -79,23 +88,21 @@ async fn main() -> anyhow::Result<()> {
                 );
             });
 
-            let init_controller =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default())
-                    .shutdown_on_signal()
-                    .run(
-                        init_controller::reconcile_init,
-                        init_controller::error_policy,
-                        Context::new(init_controller::Ctx {
-                            client: client.clone(),
-                        }),
-                    )
-                    .map(|res| {
-                        report_controller_reconciled(
-                            &client,
-                            "inits.command.airflow.stackable.tech",
-                            &res,
-                        );
-                    });
+            let init_controller = Controller::new(
+                watch_namespace.get_api::<Init>(&client),
+                ListParams::default(),
+            )
+            .shutdown_on_signal()
+            .run(
+                init_controller::reconcile_init,
+                init_controller::error_policy,
+                Context::new(init_controller::Ctx {
+                    client: client.clone(),
+                }),
+            )
+            .map(|res| {
+                report_controller_reconciled(&client, "inits.command.airflow.stackable.tech", &res);
+            });
 
             futures::stream::select(airflow_controller, init_controller)
                 .collect::<()>()

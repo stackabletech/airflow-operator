@@ -7,9 +7,7 @@ use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::Role;
 use stackable_operator::schemars::{self, JsonSchema};
-use strum_macros::Display;
-use strum_macros::EnumIter;
-use strum_macros::EnumString;
+use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "airflow";
 

@@ -63,6 +63,6 @@ the time of writing).
 
 [source]
 ----
-cargo run -- crd | kubectl apply -f -
-cargo run -- run
+stackable-airflow-operator crd | kubectl apply -f -
+stackable-airflow-operator run
 ----

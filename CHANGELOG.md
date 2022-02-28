@@ -7,13 +7,16 @@
 - BREAKING: Prometheus metrics enabled ([#51]); The `statsdExporterVersion` must
   be set in the cluster specification.
 - Reconciliation errors are now reported as Kubernetes events ([#53]).
+- Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
+  a single namespace to watch ([#54]).
 
 ### Changed
 
-- `operator-rs` `0.10.0` -> `0.12.0` ([#53]).
+- `operator-rs` `0.10.0` -> `0.13.0` ([#53],[#54]).
 
 [#51]: https://github.com/stackabletech/airflow-operator/pull/51
 [#53]: https://github.com/stackabletech/airflow-operator/pull/53
+[#54]: https://github.com/stackabletech/airflow-operator/pull/54
 
 ## [0.2.0] - 2022-02-14
 
