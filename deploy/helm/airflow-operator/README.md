@@ -20,8 +20,9 @@ helm install airflow-operator deploy/helm/airflow-operator
 
 The usage of this operator and its CRDs is described in the [documentation](https://docs.stackable.tech/airflow/index.html)
 
-The operator has example requests included in the [`/examples`](https://github.com/stackabletech/airflow/operator/tree/main/examples) directory.
+The operator has example requests included in the [`/examples`](https://github.com/stackabletech/airflow-operator/tree/main/examples) directory.
 
 ## Links
 
 https://github.com/stackabletech/airflow-operator
+
