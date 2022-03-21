@@ -3,3 +3,4 @@
 // Stackable Platform documentation.
 
 - 2.2.3-python3.8
+- 2.2.4-python3.9
