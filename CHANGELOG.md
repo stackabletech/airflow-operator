@@ -9,6 +9,7 @@
 - Reconciliation errors are now reported as Kubernetes events ([#53]).
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#54]).
+- Support for Airflow 2.2.4 documented ([#68]).
 
 ### Changed
 
@@ -17,6 +18,7 @@
 [#51]: https://github.com/stackabletech/airflow-operator/pull/51
 [#53]: https://github.com/stackabletech/airflow-operator/pull/53
 [#54]: https://github.com/stackabletech/airflow-operator/pull/54
+[#68]: https://github.com/stackabletech/airflow-operator/pull/68
 
 ## [0.2.0] - 2022-02-14
 
