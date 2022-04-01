@@ -1,5 +1,4 @@
 ---
-# Source: airflow-operator/templates/configmap.yaml
 apiVersion: v1
 data:
   properties.yaml: |
@@ -23,8 +22,6 @@ kind: ConfigMap
 metadata:
   name: airflow-operator-configmap
   labels:
-    helm.sh/chart: airflow-operator-0.3.0-nightly
     app.kubernetes.io/name: airflow-operator
     app.kubernetes.io/instance: airflow-operator
     app.kubernetes.io/version: "0.3.0-nightly"
-    app.kubernetes.io/managed-by: Helm
