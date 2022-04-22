@@ -1,0 +1,11 @@
+---
+dimensions:
+  - name: airflow
+    values:
+      - 2.2.3-python38
+      - 2.2.4-python39
+      - 2.2.5-python39
+tests:
+  - name: smoke
+    dimensions:
+      - airflow
