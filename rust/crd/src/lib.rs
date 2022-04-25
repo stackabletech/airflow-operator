@@ -3,6 +3,7 @@ pub mod commands;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use stackable_operator::k8s_openapi::api::core::v1::{Volume, VolumeMount};
 use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::Role;
@@ -41,6 +42,10 @@ pub struct AirflowClusterSpec {
     pub load_examples: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volumes: Option<Vec<Volume>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_mounts: Option<Vec<VolumeMount>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,6 +128,16 @@ impl AirflowCluster {
             AirflowRole::Scheduler => &self.spec.schedulers,
             AirflowRole::Worker => &self.spec.workers,
         }
+    }
+
+    pub fn volumes(&self) -> Vec<Volume> {
+        let tmp = self.spec.volumes.as_ref();
+        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
+    }
+
+    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
+        let tmp = self.spec.volume_mounts.as_ref();
+        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
     }
 }
 

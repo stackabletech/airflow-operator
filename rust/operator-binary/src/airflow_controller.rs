@@ -310,6 +310,9 @@ fn build_server_rolegroup_statefulset(
     container_builder.add_env_vars(env_config);
     container_builder.add_env_vars(build_static_envs());
 
+    let volume_mounts = airflow.volume_mounts();
+    container_builder.add_volume_mounts(volume_mounts);
+
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
@@ -329,6 +332,8 @@ fn build_server_rolegroup_statefulset(
         .image(statsd_exporter_image)
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
+
+    let volumes = airflow.volumes();
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -375,6 +380,7 @@ fn build_server_rolegroup_statefulset(
                 })
                 .add_container(container)
                 .add_container(metrics_container)
+                .add_volumes(volumes)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
