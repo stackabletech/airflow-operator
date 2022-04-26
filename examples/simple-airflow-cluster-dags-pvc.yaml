@@ -34,19 +34,32 @@ spec:
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  volumes:
+  - name: external-dags
+    persistentVolumeClaim:
+      claimName: pvc-ksv
+  volumeMounts:
+    - name: external-dags
+      mountPath: /external-dags
   webservers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
   workers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
         replicas: 2
   schedulers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
