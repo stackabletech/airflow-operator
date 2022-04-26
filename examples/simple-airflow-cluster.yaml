@@ -100,23 +100,20 @@ spec:
         name: cm-dag
   volumeMounts:
     - name: cm-dag
-      mountPath: /dags
+      mountPath: /dags/test_airflow_dag.py
+      subPath: test_airflow_dag.py
   webservers:
     roleGroups:
       default:
         envOverrides:
-        #  AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-          AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE: "False"
-          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         config:
           credentialsSecret: simple-airflow-credentials
   workers:
     roleGroups:
       default:
         envOverrides:
-        #  AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-          AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE: "False"
-          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         config:
           credentialsSecret: simple-airflow-credentials
         replicas: 2
@@ -124,8 +121,6 @@ spec:
     roleGroups:
       default:
         envOverrides:
-        #  AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-          AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE: "False"
-          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         config:
           credentialsSecret: simple-airflow-credentials
