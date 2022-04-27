@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-ksv
+  name: pvc-airflow
 spec:
   accessModes:
     - ReadWriteOnce
@@ -21,7 +21,7 @@ spec:
       volumes:
         - name: external-dags
           persistentVolumeClaim:
-            claimName: pvc-ksv
+            claimName: pvc-airflow
       initContainers:
         - name: dest-dir
           image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
@@ -33,7 +33,7 @@ spec:
               "bash",
               "-x",
               "-c",
-              "mkdir -p $DEST_DIR && chown stackable:stackable ${DEST_DIR} && chmod -R a=,u=rwX ${DEST_DIR}",
+              "mkdir -p $DEST_DIR && chown stackable:stackable ${DEST_DIR} && chmod -R a=,u=rwX,g=rwX ${DEST_DIR}",
             ]
           securityContext:
             runAsUser: 0

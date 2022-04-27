@@ -10,9 +10,9 @@ spec:
       volumes:
         - name: external-dags
           persistentVolumeClaim:
-            claimName: pvc-ksv
+            claimName: pvc-airflow
       containers:
-        - name: assert-pvc-jars
+        - name: assert-dags
           image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
           env:
             - name: DEST_DIR

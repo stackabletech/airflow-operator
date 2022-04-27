@@ -37,22 +37,22 @@ spec:
   volumes:
   - name: external-dags
     persistentVolumeClaim:
-      claimName: pvc-ksv
+      claimName: pvc-airflow
   volumeMounts:
     - name: external-dags
-      mountPath: /external-dags
+      mountPath: /stackable/external-dags
   webservers:
     roleGroups:
       default:
         envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
   workers:
     roleGroups:
       default:
         envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
         replicas: 2
@@ -60,6 +60,6 @@ spec:
     roleGroups:
       default:
         envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/external-dags"
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         config:
           credentialsSecret: simple-airflow-credentials
