@@ -10,7 +10,7 @@
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#54]).
 - Support for Airflow 2.2.4 documented ([#68]).
-- Support for mounting DAGs via `ConfigMap` or `PersistentVolumeClaim` ([#XX]).
+- Support for mounting DAGs via `ConfigMap` or `PersistentVolumeClaim` ([#84]).
 
 ### Changed
 
@@ -20,7 +20,7 @@
 [#53]: https://github.com/stackabletech/airflow-operator/pull/53
 [#54]: https://github.com/stackabletech/airflow-operator/pull/54
 [#68]: https://github.com/stackabletech/airflow-operator/pull/68
-[#XX]: https://github.com/stackabletech/airflow-operator/pull/XX
+[#84]: https://github.com/stackabletech/airflow-operator/pull/84
 
 ## [0.2.0] - 2022-02-14
 
