@@ -1,0 +1,22 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-airflow-python
+  labels:
+    app: test-airflow-python
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-airflow-python
+  template:
+    metadata:
+      labels:
+        app: test-airflow-python
+    spec:
+      containers:
+        - name: test-airflow-python
+          image: python:3.10-slim
+          stdin: true
+          tty: true
