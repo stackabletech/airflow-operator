@@ -15,4 +15,3 @@ tests:
   - name: mount-dags-pvc
     dimensions:
       - airflow
-    
