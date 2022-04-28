@@ -29,10 +29,10 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: 2.2.4-python39
+  version: 2.2.3-python38
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
-  loadExamples: false
+  loadExamples: true
   exposeConfig: false
   webservers:
     roleGroups:

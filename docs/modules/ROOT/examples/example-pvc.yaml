@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-airflow # <1>
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: Job # <2>
+metadata:
+  name: airflow-dags
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: external-dags # <3>
+          persistentVolumeClaim:
+            claimName: pvc-airflow # <4>
+      initContainers:
+        - name: dest-dir
+          image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
+          env:
+            - name: DEST_DIR
+              value: "/stackable/externals"
+          command:
+            [
+              "bash",
+              "-x",
+              "-c",
+              "mkdir -p $DEST_DIR && chown stackable:stackable ${DEST_DIR} && chmod -R a=,u=rwX,g=rwX ${DEST_DIR}",
+            ]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: external-dags # <5>
+              mountPath: /stackable/externals # <6>
+      containers:
+        - name: airflow-dags
+          image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
+          env:
+            - name: DEST_DIR
+              value: "/stackable/externals"
+          command: # <7>
+            [
+              "bash",
+              "-x",
+              "-c",
+              "curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_bash_operator.py \
+              -o ${DEST_DIR}/example_bash_operator.py && \
+              curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_complex.py \
+              -o ${DEST_DIR}/example_complex.py && \
+              curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_branch_datetime_operator.py \
+              -o ${DEST_DIR}/example_branch_datetime_operator.py",
+            ]
+          volumeMounts:
+            - name: external-dags # <5>
+              mountPath: /stackable/externals # <6>

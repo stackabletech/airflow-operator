@@ -89,7 +89,7 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: 2.2.4-python39
+  version: 2.2.5-python39
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: false

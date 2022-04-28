@@ -1,0 +1,40 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  version: 2.2.4-python39
+  statsdExporterVersion: v0.22.4
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  volumes:
+  - name: external-dags # <8>
+    persistentVolumeClaim:
+      claimName: pvc-airflow # <9>
+  volumeMounts:
+    - name: external-dags # <10>
+      mountPath: /stackable/external-dags # <11>
+  webservers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
+        config:
+          credentialsSecret: simple-airflow-credentials
+  workers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
+        config:
+          credentialsSecret: simple-airflow-credentials
+        replicas: 2
+  schedulers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
+        config:
+          credentialsSecret: simple-airflow-credentials
