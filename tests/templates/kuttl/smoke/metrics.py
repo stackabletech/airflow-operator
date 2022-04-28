@@ -19,8 +19,8 @@ dag_conf = {'message': "Hello World"}
 rest_url = 'http://airflow-webserver-default:8080/api/v1'
 auth = ('airflow', 'airflow')
 
-response = requests.patch(f'{rest_url}/dags/{dag_id}', auth = auth, json = {'is_paused': False})
-response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth = auth, json = {'conf': dag_conf})
+response = requests.patch(f'{rest_url}/dags/{dag_id}', auth=auth, json={'is_paused': False})
+response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth=auth, json={'conf': dag_conf})
 
 assert response.status_code == 200, "DAG run could not be triggered."
 
