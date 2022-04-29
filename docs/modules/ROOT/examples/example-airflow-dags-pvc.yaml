@@ -10,9 +10,9 @@ spec:
   loadExamples: false
   exposeConfig: false
   volumes:
-  - name: external-dags # <8>
-    persistentVolumeClaim:
-      claimName: pvc-airflow # <9>
+    - name: external-dags # <8>
+      persistentVolumeClaim:
+        claimName: pvc-airflow # <9>
   volumeMounts:
     - name: external-dags # <10>
       mountPath: /stackable/external-dags # <11>
