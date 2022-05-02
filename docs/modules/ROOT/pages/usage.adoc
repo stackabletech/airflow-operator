@@ -227,3 +227,51 @@ image::airflow_running.png[Airflow UI showing a running DAG]
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See
 xref:home::monitoring.adoc[] for more details
+
+== Mounting DAGs
+
+DAGs can be mounted by using a `ConfigMap` or a `PersistentVolumeClaim`. This is best illustrated with an example of each, shown in the next section.
+
+=== via `ConfigMap`
+
+[source,python]
+----
+include::example$example-configmap.yaml[]
+----
+----
+include::example$example-airflow-dags-configmap.yaml[]
+----
+<1> The name of the configuration map
+<2> The name of the DAG (this is a renamed copy of the `example_bash_operator.py` from the Airflow examples)
+[source,yaml]
+<3> The volume backed by the configuration map
+<4> The name of the configuration map referenced by the Airflow cluster
+<5> The name of the mounted volume
+<6> The path of the mounted resource. Note that should map to a single DAG.
+<7> The resource has to be defined using `subPath`: this is to prevent the versioning of configuration map elements which may cause a conflict with how Airflow propagates DAGs between its components.
+<8> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.
+
+The advantage of this approach is that a DAG can be provided "in-line", as it were. This becomes cumbersome when multiple DAGs are to be made available in this way, as each one has to be mapped individually. For multiple DAGs it is probably easier to expose them all via a mounted volume, which is shown below.
+
+=== via `PersistentVolumeclaim`
+
+[source,yaml]
+----
+include::example$example-pvc.yaml[]
+----
+[source,yaml]
+----
+include::example$example-airflow-dags-pvc.yaml[]
+----
+<1> The name of the `PersistentVolumeClaim` that references the PV
+<2> Job used to populate the `PersistentVolumeClaim` with DAG files
+<3> The volume name that will be mounted as a target for the DAG files
+<4> Defines the `Volume` backed by the PVC, local to the Custom Resource
+<5> The `VolumeMount` used by the Custom Resource
+<6> The path for the `VolumeMount`
+<7> The command used to access/download the DAG files to a specified location
+<8> The `Volume` used by this Custom Resource
+<9> The `PersistentVolumeClaim` that backs this `Volume`
+<10> The `VolumeMount` referencing the `Volume` in the previous step
+<11> The path where this `Volume` is located for each role (webserver, worker, scheduler)
+<12> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.

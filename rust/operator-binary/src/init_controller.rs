@@ -149,7 +149,6 @@ fn build_init_job(init: &Init, airflow: &AirflowCluster) -> Result<Job> {
     ];
 
     let version = airflow_version(airflow)?;
-    tracing::info!("version {:?}", version);
     let secret = &init.spec.credentials_secret;
 
     let env = vec![

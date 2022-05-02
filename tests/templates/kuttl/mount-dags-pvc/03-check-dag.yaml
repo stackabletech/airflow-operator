@@ -1,0 +1,31 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: list-dags-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: external-dags
+          persistentVolumeClaim:
+            claimName: test-pvc-airflow
+      containers:
+        - name: airflow-dags
+          image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
+          env:
+            - name: DEST_DIR
+              value: "/stackable/externals"
+          command:
+            [
+              "bash",
+              "-x",
+              "-o",
+              "pipefail",
+              "-c",
+              "stat ${DEST_DIR}/example_trigger_target_dag.py",
+            ]
+          volumeMounts:
+            - name: external-dags
+              mountPath: /stackable/externals

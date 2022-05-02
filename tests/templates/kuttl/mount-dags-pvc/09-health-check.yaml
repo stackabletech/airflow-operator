@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: kubectl cp -n $NAMESPACE ./health.py  test-airflow-python-0:/tmp
+  - script: kubectl cp -n $NAMESPACE ./requirements.txt test-airflow-python-0:/tmp
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- pip install --user -r /tmp/requirements.txt

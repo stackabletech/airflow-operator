@@ -1,0 +1,41 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  version: 2.2.5-python39
+  statsdExporterVersion: v0.22.4
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  volumes:
+    - name: cm-dag # <3>
+      configMap:
+        name: cm-dag # <4>
+  volumeMounts:
+    - name: cm-dag # <5>
+      mountPath: /dags/test_airflow_dag.py # <6>
+      subPath: test_airflow_dag.py # <7>
+  webservers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
+        config:
+          credentialsSecret: simple-airflow-credentials
+  workers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
+        config:
+          credentialsSecret: simple-airflow-credentials
+        replicas: 2
+  schedulers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
+        config:
+          credentialsSecret: simple-airflow-credentials

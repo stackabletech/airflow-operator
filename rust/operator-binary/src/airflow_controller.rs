@@ -310,6 +310,9 @@ fn build_server_rolegroup_statefulset(
     container_builder.add_env_vars(env_config);
     container_builder.add_env_vars(build_static_envs());
 
+    let volume_mounts = airflow.volume_mounts();
+    container_builder.add_volume_mounts(volume_mounts);
+
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
@@ -329,6 +332,8 @@ fn build_server_rolegroup_statefulset(
         .image(statsd_exporter_image)
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
+
+    let volumes = airflow.volumes();
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -375,6 +380,7 @@ fn build_server_rolegroup_statefulset(
                 })
                 .add_container(container)
                 .add_container(metrics_container)
+                .add_volumes(volumes)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
@@ -415,28 +421,34 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
-    if airflow.spec.load_examples.unwrap_or_default() {
+    if let Some(true) = airflow.spec.load_examples {
         env.push(EnvVar {
-            name: String::from("AIRFLOW__CORE__LOAD_EXAMPLES"),
-            value: Some(String::from("true")),
-            value_from: None,
+            name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
+            value: Some("True".into()),
+            ..Default::default()
+        })
+    } else {
+        env.push(EnvVar {
+            name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
+            value: Some("False".into()),
+            ..Default::default()
         })
     }
 
-    if airflow.spec.expose_config.unwrap_or_default() {
+    if let Some(true) = airflow.spec.expose_config {
         env.push(EnvVar {
-            name: String::from("AIRFLOW__WEBSERVER__EXPOSE_CONFIG"),
-            value: Some(String::from("true")),
-            value_from: None,
+            name: "AIRFLOW__WEBSERVER__EXPOSE_CONFIG".into(),
+            value: Some("True".into()),
+            ..Default::default()
         })
     }
 
     let executor = airflow.spec.executor.clone();
 
     env.push(EnvVar {
-        name: String::from("AIRFLOW__CORE__EXECUTOR"),
+        name: "AIRFLOW__CORE__EXECUTOR".into(),
         value: executor,
-        value_from: None,
+        ..Default::default()
     });
     env
 }

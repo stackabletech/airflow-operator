@@ -1,0 +1,108 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow-db
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: command.airflow.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: airflow-cluster-command-init
+spec:
+  clusterRef:
+    name: airflow
+  credentialsSecret: test-airflow-credentials
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-cm-dag
+data:
+  example_trigger_target_dag.py: |
+    import pendulum
+    from airflow import DAG
+    from airflow.decorators import task
+    from airflow.operators.bash import BashOperator
+
+    @task(task_id="run_this")
+    def run_this_func(dag_run=None):
+        """
+        Print the payload "message" passed to the DagRun conf attribute.
+
+        :param dag_run: The DagRun object
+        :type dag_run: DagRun
+        """
+        print(f"Remotely received value of {dag_run.conf.get('message')} for key=message")
+
+    with DAG(
+        dag_id="example_trigger_target_dag",
+        start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+        catchup=False,
+        schedule_interval=None,
+        tags=['example'],
+    ) as dag:
+        run_this = run_this_func()
+
+        bash_task = BashOperator(
+            task_id="bash_task",
+            bash_command='echo "Here is the message: $message"',
+            env={'message': '{% raw %}{{ dag_run.conf.get("message") }}{% endraw %}'},
+        )
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  version: {{ test_scenario['values']['airflow'] }}
+  statsdExporterVersion: v0.22.4
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  volumes:
+    - name: test-cm-dag
+      configMap:
+        name: test-cm-dag
+  volumeMounts:
+    - name: test-cm-dag
+      mountPath: /dags/example_trigger_target_dag.py
+      subPath: example_trigger_target_dag.py
+  webservers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        config:
+          credentialsSecret: test-airflow-credentials
+  workers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        config:
+          credentialsSecret: test-airflow-credentials
+        replicas: 2
+  schedulers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        config:
+          credentialsSecret: test-airflow-credentials
+---
