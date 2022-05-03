@@ -125,7 +125,7 @@ Each cluster requires 3 components:
 == Monitoring
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See
-xref:home::monitoring.adoc[] for more details.
+xref:home:operators:monitoring.adoc[] for more details.
 
 == Configuration & Environment Overrides
 
