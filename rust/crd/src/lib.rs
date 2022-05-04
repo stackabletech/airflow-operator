@@ -1,4 +1,4 @@
-pub mod commands;
+pub mod airflowdb;
 
 use std::collections::BTreeMap;
 
@@ -34,6 +34,7 @@ pub struct AirflowClusterSpec {
     pub stopped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    pub credentials_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statsd_exporter_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -143,10 +144,7 @@ impl AirflowCluster {
 
 #[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowConfig {
-    #[serde(default)]
-    pub credentials_secret: String,
-}
+pub struct AirflowConfig {}
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
@@ -157,12 +155,12 @@ impl Configuration for AirflowConfig {
 
     fn compute_env(
         &self,
-        _resource: &Self::Configurable,
+        cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
             Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(self.credentials_secret.clone()),
+            Some(cluster.spec.credentials_secret.clone()),
         )]
         .into())
     }

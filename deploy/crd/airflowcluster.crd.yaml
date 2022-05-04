@@ -22,6 +22,8 @@ spec:
           properties:
             spec:
               properties:
+                credentialsSecret:
+                  type: string
                 executor:
                   nullable: true
                   type: string
@@ -41,10 +43,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -68,10 +66,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1184,10 +1178,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -1211,10 +1201,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1279,10 +1265,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -1306,10 +1288,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1364,6 +1342,8 @@ spec:
                   required:
                     - roleGroups
                   type: object
+              required:
+                - credentialsSecret
               type: object
             status:
               nullable: true
