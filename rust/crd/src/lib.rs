@@ -225,15 +225,15 @@ mod tests {
           webservers:
             roleGroups:
               default:
-                config:
+                config: {}
           workers:
             roleGroups:
               default:
-                config:
+                config: {}
           schedulers:
             roleGroups:
               default:
-                config:
+                config: {}
           ",
         )
         .unwrap();
