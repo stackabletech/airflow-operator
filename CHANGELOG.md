@@ -9,18 +9,20 @@
 - Reconciliation errors are now reported as Kubernetes events ([#53]).
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#54]).
-- Support for Airflow 2.2.4 documented ([#68]).
+- Support for Airflow 2.2.4, 2.2.5 documented ([#68], [#84]).
 - Support for mounting DAGs via `ConfigMap` or `PersistentVolumeClaim` ([#84]).
+- Init job replaced with an AirflowDB resource created by the operator  ([#xx]).
 
 ### Changed
 
-- `operator-rs` `0.10.0` -> `0.13.0` ([#53],[#54]).
+- `operator-rs` `0.10.0` -> `0.18.0` ([#53],[#54], [#xx]).
 
 [#51]: https://github.com/stackabletech/airflow-operator/pull/51
 [#53]: https://github.com/stackabletech/airflow-operator/pull/53
 [#54]: https://github.com/stackabletech/airflow-operator/pull/54
 [#68]: https://github.com/stackabletech/airflow-operator/pull/68
 [#84]: https://github.com/stackabletech/airflow-operator/pull/84
+[#xx]: https://github.com/stackabletech/airflow-operator/pull/xx
 
 ## [0.2.0] - 2022-02-14
 
