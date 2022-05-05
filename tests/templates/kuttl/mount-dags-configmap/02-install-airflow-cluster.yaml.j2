@@ -20,15 +20,6 @@ stringData:
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
-apiVersion: command.airflow.stackable.tech/v1alpha1
-kind: Init
-metadata:
-  name: airflow-cluster-command-init
-spec:
-  clusterRef:
-    name: airflow
-  credentialsSecret: test-airflow-credentials
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -75,6 +66,7 @@ spec:
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  credentialsSecret: test-airflow-credentials
   volumes:
     - name: test-cm-dag
       configMap:
@@ -88,21 +80,17 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-        config:
-          credentialsSecret: test-airflow-credentials
+        config: {}
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-        config:
-          credentialsSecret: test-airflow-credentials
+        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-        config:
-          credentialsSecret: test-airflow-credentials
----
+        config: {}
