@@ -51,11 +51,11 @@ impl AirflowDB {
             .context(NoAirflowVersionSnafu)?;
         Ok(Self {
             // The db is deliberately not owned by the cluster so it doesn't get deleted when the
-            // cluster gets deleted.  The schema etc. still exists in the postgres db and can be reused
+            // cluster gets deleted.  The schema etc. still exists in the database and can be reused
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
-                .with_recommended_labels(airflow, APP_NAME, version, "", "") // TODO fill in missing fields
+                .with_recommended_labels(airflow, APP_NAME, version, "db-initializer", "global")
                 .build(),
             spec: AirflowDBSpec {
                 airflow_version: version.to_string(),

@@ -221,21 +221,19 @@ mod tests {
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
+          credentialsSecret: simple-airflow-credentials
           webservers:
             roleGroups:
               default:
                 config:
-                  credentialsSecret: simple-airflow-credentials
           workers:
             roleGroups:
               default:
                 config:
-                  credentialsSecret: simple-airflow-credentials
           schedulers:
             roleGroups:
               default:
                 config:
-                  credentialsSecret: simple-airflow-credentials
           ",
         )
         .unwrap();
