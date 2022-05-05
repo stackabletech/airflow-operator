@@ -18,13 +18,14 @@ stringData:
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
-  name: airflow
+  name: airflow-dags-pvc
 spec:
   version: 2.2.4-python39
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   volumes:
     - name: external-dags
       persistentVolumeClaim:
@@ -37,20 +38,17 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}

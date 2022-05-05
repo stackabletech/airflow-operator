@@ -25,19 +25,17 @@ spec:
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
   workers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}

@@ -9,6 +9,7 @@ spec:
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   volumes:
     - name: external-dags # <8>
       persistentVolumeClaim:
@@ -21,20 +22,17 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags" # <12>
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}

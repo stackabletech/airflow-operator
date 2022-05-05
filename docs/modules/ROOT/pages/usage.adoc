@@ -86,22 +86,20 @@ spec:
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
   workers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
 ----
 
 Where:
@@ -152,8 +150,7 @@ These can be set - or overwritten - at either the role level:
       AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
 ----
 
 Or per role group:
@@ -165,36 +162,14 @@ Or per role group:
       default:
         envOverrides:
           AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        config: {}
 ----
 
 In both examples above we are replacing the default value of the UI DAG refresh (3s) with 8s. Note that all override property values must be strings.
 
 == Initializing the Airflow database
 
-If the database is not initialized yet for Airflow, the `init` command must be executed: the
-command initializes the database by creating the necessary database tables, creating the admin user
-account, and loading examples if desired. The webserver will not be available/ready until this initialization
-step has been completed.
-
-[source,yaml]
-----
-apiVersion: command.airflow.stackable.tech/v1alpha1
-kind: Init
-metadata:
-  name: airflow-cluster-command-init
-spec:
-  clusterRef:
-    name: airflow
-  credentialsSecret: simple-airflow-credentials
-----
-
-`spec.clusterRef.name` refers to the name of the Airflow cluster.
-
-The previously created secret must be referenced in `spec.credentialsSecret`.
-
-A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
+Airflow comes with a default embedded database (intended only for standalone mode): for cluster usage an external database is used such as PostgreSQL, described above. This database must be initialized with an airflow schema and the Admin user defined in the airflow credentials `Secret`. This is done the first time the cluster is created and can take a few moments.
 
 == Using Airflow
 
