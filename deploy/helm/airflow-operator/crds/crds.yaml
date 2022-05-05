@@ -24,6 +24,8 @@ spec:
           properties:
             spec:
               properties:
+                credentialsSecret:
+                  type: string
                 executor:
                   nullable: true
                   type: string
@@ -43,10 +45,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -70,10 +68,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1186,10 +1180,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -1213,10 +1203,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1281,10 +1267,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -1308,10 +1290,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -1366,6 +1344,8 @@ spec:
                   required:
                     - roleGroups
                   type: object
+              required:
+                - credentialsSecret
               type: object
             status:
               nullable: true
@@ -1382,60 +1362,56 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: inits.command.airflow.stackable.tech
+  name: airflowdbs.airflow.stackable.tech
   annotations:
     helm.sh/resource-policy: keep
 spec:
-  group: command.airflow.stackable.tech
+  group: airflow.stackable.tech
   names:
     categories: []
-    kind: Init
-    plural: inits
+    kind: AirflowDB
+    plural: airflowdbs
     shortNames: []
-    singular: init
+    singular: airflowdb
   scope: Namespaced
   versions:
     - additionalPrinterColumns: []
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for InitCommandSpec via `CustomResource`"
+          description: "Auto-generated derived type for AirflowDBSpec via `CustomResource`"
           properties:
             spec:
               properties:
-                clusterRef:
-                  description: "A reference to a [`AirflowCluster`]"
-                  properties:
-                    name:
-                      nullable: true
-                      type: string
-                    namespace:
-                      nullable: true
-                      type: string
-                  type: object
+                airflowVersion:
+                  type: string
                 credentialsSecret:
                   type: string
               required:
-                - clusterRef
+                - airflowVersion
                 - credentialsSecret
               type: object
             status:
               nullable: true
               properties:
-                finishedAt:
-                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
-                  format: date-time
-                  nullable: true
+                condition:
+                  enum:
+                    - Pending
+                    - Initializing
+                    - Ready
+                    - Failed
                   type: string
                 startedAt:
                   description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
                   format: date-time
                   nullable: true
                   type: string
+              required:
+                - condition
               type: object
           required:
             - spec
-          title: Init
+          title: AirflowDB
           type: object
       served: true
       storage: true
