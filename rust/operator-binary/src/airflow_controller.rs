@@ -100,7 +100,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
 
     let client = &ctx.get_ref().client;
 
-    // ensure admin user has been set up ion the airflow database
+    // ensure admin user has been set up on the airflow database
     let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowObjectSnafu)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &airflow_db, &airflow_db)
