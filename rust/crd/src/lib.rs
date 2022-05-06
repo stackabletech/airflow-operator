@@ -206,6 +206,7 @@ pub struct AirflowClusterRef {
 
 #[cfg(test)]
 mod tests {
+    use crate::airflowdb::AirflowDB;
     use crate::AirflowCluster;
 
     #[test]
@@ -238,6 +239,9 @@ mod tests {
         )
         .unwrap();
 
+        let airflow_db = AirflowDB::for_airflow(&cluster);
+
+        assert_eq!("2.2.4", airflow_db.unwrap().spec.airflow_version);
         assert_eq!("2.2.4", cluster.spec.version.unwrap_or_default());
         assert_eq!(
             "KubernetesExecutor",
