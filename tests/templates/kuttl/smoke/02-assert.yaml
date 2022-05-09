@@ -3,7 +3,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
   name: test-airflow-cluster
-timeout: 480
+timeout: 720
 ---
 apiVersion: apps/v1
 kind: StatefulSet
