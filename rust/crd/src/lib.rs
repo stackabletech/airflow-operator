@@ -140,6 +140,10 @@ impl AirflowCluster {
         let tmp = self.spec.volume_mounts.as_ref();
         tmp.iter().flat_map(|v| v.iter()).cloned().collect()
     }
+
+    pub fn version(&self) -> Option<&str> {
+        self.spec.version.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]

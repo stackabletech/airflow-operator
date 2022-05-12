@@ -1,5 +1,4 @@
-use snafu::{OptionExt, Snafu};
-use stackable_airflow_crd::AirflowCluster;
+use snafu::Snafu;
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
 use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector};
 
@@ -37,10 +36,6 @@ pub fn get_job_state(job: &Job) -> JobState {
     } else {
         JobState::InProgress
     }
-}
-
-pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str, Error> {
-    airflow.spec.version.as_deref().context(ObjectHasNoVersion)
 }
 
 pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {

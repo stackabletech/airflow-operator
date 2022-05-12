@@ -29,13 +29,12 @@ spec:
   webservers:
     roleGroups:
       default:
-        config: {}
+        replicas: 1
   workers:
     roleGroups:
       default:
-        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
-        config: {}
+        replicas: 1

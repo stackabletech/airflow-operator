@@ -90,16 +90,15 @@ spec:
   webservers:
     roleGroups:
       default:
-        config: {}
+        replicas: 1
   workers:
     roleGroups:
       default:
-        config: {}
         replicas: 2
   schedulers:
     roleGroups:
       default:
-        config: {}
+        replicas: 1
 ----
 
 Where:
@@ -150,7 +149,7 @@ These can be set - or overwritten - at either the role level:
       AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
     roleGroups:
       default:
-        config: {}
+        replicas: 1
 ----
 
 Or per role group:
@@ -162,7 +161,7 @@ Or per role group:
       default:
         envOverrides:
           AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
-        config: {}
+        replicas: 1
 ----
 
 In both examples above we are replacing the default value of the UI DAG refresh (3s) with 8s. Note that all override property values must be strings.

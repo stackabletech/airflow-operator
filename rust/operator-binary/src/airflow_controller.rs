@@ -1,6 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
-use crate::util::{airflow_version, env_var_from_secret};
+use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::AirflowDB;
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
@@ -46,7 +46,7 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object defines no version"))]
-    NoAirflowVersion { source: crate::util::Error },
+    NoAirflowVersion,
     #[snafu(display("object defines no statsd exporter version"))]
     ObjectHasNoStatsdExporterVersion,
     #[snafu(display("object defines no airflow config role"))]
@@ -119,7 +119,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     }
     let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
-        airflow_version(&airflow).context(NoAirflowVersionSnafu)?,
+        &*airflow.version().context(NoAirflowVersionSnafu)?,
         &role_config.context(ProductConfigTransformSnafu)?,
         &ctx.get_ref().product_config,
         false,
@@ -189,7 +189,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
-                airflow_version(airflow).context(NoAirflowVersionSnafu)?,
+                airflow.version().context(NoAirflowVersionSnafu)?,
                 role_name,
                 "global",
             )
@@ -245,7 +245,7 @@ fn build_rolegroup_service(
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
-                airflow_version(airflow).context(NoAirflowVersionSnafu)?,
+                airflow.version().context(NoAirflowVersionSnafu)?,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -277,7 +277,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
-    let airflow_version = airflow_version(airflow).context(NoAirflowVersionSnafu)?;
+    let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
     let role = airflow
         .get_role(airflow_role.clone())
         .as_ref()
