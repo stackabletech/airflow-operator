@@ -1,21 +1,20 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 
+use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::airflowdb::AirflowDB;
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                EnvVar, EnvVarSource, Probe, SecretKeySelector, Service, ServicePort, ServiceSpec,
-                TCPSocketAction,
-            },
+            core::v1::{EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::runtime::{
-        controller::{Context, ReconcilerAction},
+        controller::{Action, Context},
         reflector::ObjectRef,
     },
     labels::{role_group_selector_labels, role_selector_labels},
@@ -47,7 +46,7 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
+    NoAirflowVersion,
     #[snafu(display("object defines no statsd exporter version"))]
     ObjectHasNoStatsdExporterVersion,
     #[snafu(display("object defines no airflow config role"))]
@@ -78,6 +77,14 @@ pub enum Error {
     ProductConfigTransform {
         source: stackable_operator::product_config_utils::ConfigError,
     },
+    #[snafu(display("failed to apply Airflow DB"))]
+    CreateAirflowObject {
+        source: stackable_airflow_crd::airflowdb::Error,
+    },
+    #[snafu(display("failed to apply Airflow DB"))]
+    ApplyAirflowDB {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -88,13 +95,18 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_airflow(
-    airflow: Arc<AirflowCluster>,
-    ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
+
+    // ensure admin user has been set up on the airflow database
+    let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowObjectSnafu)?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &airflow_db, &airflow_db)
+        .await
+        .context(ApplyAirflowDBSnafu)?;
+
     let mut roles = HashMap::new();
 
     for role in AirflowRole::iter() {
@@ -107,7 +119,7 @@ pub async fn reconcile_airflow(
     }
     let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
-        airflow_version(&airflow)?,
+        &*airflow.version().context(NoAirflowVersionSnafu)?,
         &role_config.context(ProductConfigTransformSnafu)?,
         &ctx.get_ref().product_config,
         false,
@@ -151,9 +163,7 @@ pub async fn reconcile_airflow(
         }
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
@@ -179,7 +189,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
-                airflow_version(airflow)?,
+                airflow.version().context(NoAirflowVersionSnafu)?,
                 role_name,
                 "global",
             )
@@ -235,7 +245,7 @@ fn build_rolegroup_service(
             .with_recommended_labels(
                 airflow,
                 APP_NAME,
-                airflow_version(airflow)?,
+                airflow.version().context(NoAirflowVersionSnafu)?,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -267,7 +277,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
-    let airflow_version = airflow_version(airflow)?;
+    let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
     let role = airflow
         .get_role(airflow_role.clone())
         .as_ref()
@@ -481,14 +491,6 @@ fn build_static_envs() -> Vec<EnvVar> {
     .into()
 }
 
-pub fn airflow_version(airflow: &AirflowCluster) -> Result<&str> {
-    airflow
-        .spec
-        .version
-        .as_deref()
-        .context(ObjectHasNoVersionSnafu)
-}
-
 pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> {
     airflow
         .spec
@@ -497,23 +499,6 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
         .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
-}
-
-fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
-    EnvVar {
-        name: String::from(var_name),
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                name: Some(String::from(secret)),
-                key: String::from(secret_key),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }

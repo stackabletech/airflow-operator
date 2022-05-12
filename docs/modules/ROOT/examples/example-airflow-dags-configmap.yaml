@@ -9,6 +9,7 @@ spec:
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   volumes:
     - name: cm-dag # <3>
       configMap:
@@ -22,20 +23,16 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        config:
-          credentialsSecret: simple-airflow-credentials
         replicas: 2
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1

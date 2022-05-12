@@ -12,3 +12,10 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-db-check
+commands:
+  - script: kubectl exec -n $NAMESPACE -c airflow airflow-scheduler-default-0 -- airflow db check-migrations

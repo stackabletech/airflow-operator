@@ -1,4 +1,4 @@
-pub mod commands;
+pub mod airflowdb;
 
 use std::collections::BTreeMap;
 
@@ -34,6 +34,7 @@ pub struct AirflowClusterSpec {
     pub stopped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    pub credentials_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statsd_exporter_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -139,14 +140,15 @@ impl AirflowCluster {
         let tmp = self.spec.volume_mounts.as_ref();
         tmp.iter().flat_map(|v| v.iter()).cloned().collect()
     }
+
+    pub fn version(&self) -> Option<&str> {
+        self.spec.version.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowConfig {
-    #[serde(default)]
-    pub credentials_secret: String,
-}
+pub struct AirflowConfig {}
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
@@ -157,12 +159,12 @@ impl Configuration for AirflowConfig {
 
     fn compute_env(
         &self,
-        _resource: &Self::Configurable,
+        cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
             Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(self.credentials_secret.clone()),
+            Some(cluster.spec.credentials_secret.clone()),
         )]
         .into())
     }
@@ -208,6 +210,7 @@ pub struct AirflowClusterRef {
 
 #[cfg(test)]
 mod tests {
+    use crate::airflowdb::AirflowDB;
     use crate::AirflowCluster;
 
     #[test]
@@ -223,25 +226,26 @@ mod tests {
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
+          credentialsSecret: simple-airflow-credentials
           webservers:
             roleGroups:
               default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
+                config: {}
           workers:
             roleGroups:
               default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
+                config: {}
           schedulers:
             roleGroups:
               default:
-                config:
-                  credentialsSecret: simple-airflow-credentials
+                config: {}
           ",
         )
         .unwrap();
 
+        let airflow_db = AirflowDB::for_airflow(&cluster);
+
+        assert_eq!("2.2.4", airflow_db.unwrap().spec.airflow_version);
         assert_eq!("2.2.4", cluster.spec.version.unwrap_or_default());
         assert_eq!(
             "KubernetesExecutor",

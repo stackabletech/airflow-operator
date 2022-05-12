@@ -15,15 +15,6 @@ stringData:
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
-apiVersion: command.airflow.stackable.tech/v1alpha1
-kind: Init
-metadata:
-  name: airflow-cluster-command-init
-spec:
-  clusterRef:
-    name: airflow
-  credentialsSecret: simple-airflow-credentials
----
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
@@ -34,19 +25,16 @@ spec:
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1
   workers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
         replicas: 2
   schedulers:
     roleGroups:
       default:
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1

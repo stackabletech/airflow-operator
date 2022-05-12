@@ -69,30 +69,11 @@ rules:
     verbs:
       - get
   - apiGroups:
-      - events.k8s.io
-    resources:
-      - events
-    verbs:
-      - create
-  - apiGroups:
-      - command.{{ include "operator.name" . }}.stackable.tech
-    resources:
-      - inits
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - command.{{ include "operator.name" . }}.stackable.tech
-    resources:
-      - inits/status
-    verbs:
-      - patch
-  - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters
+      - airflowdbs
+      - airflowdbs/status
     verbs:
       - get
       - list
@@ -104,3 +85,10 @@ rules:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
+  # The operator creates the airflowdb resource for the cluster automatically
+  - apiGroups:
+      - {{ include "operator.name" . }}.stackable.tech
+    resources:
+      - airflowdbs
+    verbs:
+      - create

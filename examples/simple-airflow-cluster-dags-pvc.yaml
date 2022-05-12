@@ -15,25 +15,17 @@ stringData:
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
-apiVersion: command.airflow.stackable.tech/v1alpha1
-kind: Init
-metadata:
-  name: airflow-cluster-command-init
-spec:
-  clusterRef:
-    name: airflow
-  credentialsSecret: simple-airflow-credentials
----
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
-  name: airflow
+  name: airflow-dags-pvc
 spec:
   version: 2.2.4-python39
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
+  credentialsSecret: simple-airflow-credentials
   volumes:
     - name: external-dags
       persistentVolumeClaim:
@@ -46,20 +38,16 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
         replicas: 2
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        config:
-          credentialsSecret: simple-airflow-credentials
+        replicas: 1
