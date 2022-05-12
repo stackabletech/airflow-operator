@@ -17,7 +17,7 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{controller::Context, reflector::ObjectRef, Controller},
-        CustomResourceExt,
+        CustomResourceExt, ResourceExt,
     },
 };
 
@@ -135,9 +135,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow_db| {
-                                airflow_db.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &airflow_db.job_name() == job.metadata.name.as_ref().unwrap()
+                                airflow_db.name() == job.name()
+                                    && airflow_db.namespace() == job.namespace()
                             })
                             .map(|airflow_db| ObjectRef::from_obj(&*airflow_db))
                     },

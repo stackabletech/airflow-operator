@@ -45,7 +45,7 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object defines no version"))]
+    #[snafu(display("failed to retrieve airflow version"))]
     NoAirflowVersion,
     #[snafu(display("object defines no statsd exporter version"))]
     ObjectHasNoStatsdExporterVersion,
@@ -78,7 +78,7 @@ pub enum Error {
         source: stackable_operator::product_config_utils::ConfigError,
     },
     #[snafu(display("failed to apply Airflow DB"))]
-    CreateAirflowObject {
+    CreateAirflowDBObject {
         source: stackable_airflow_crd::airflowdb::Error,
     },
     #[snafu(display("failed to apply Airflow DB"))]
@@ -101,7 +101,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     let client = &ctx.get_ref().client;
 
     // ensure admin user has been set up on the airflow database
-    let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowObjectSnafu)?;
+    let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowDBObjectSnafu)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &airflow_db, &airflow_db)
         .await
@@ -119,7 +119,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     }
     let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
-        &*airflow.version().context(NoAirflowVersionSnafu)?,
+        airflow.version().context(NoAirflowVersionSnafu)?,
         &role_config.context(ProductConfigTransformSnafu)?,
         &ctx.get_ref().product_config,
         false,
