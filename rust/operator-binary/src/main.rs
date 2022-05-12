@@ -17,7 +17,7 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{controller::Context, reflector::ObjectRef, Controller},
-        CustomResourceExt,
+        CustomResourceExt, ResourceExt,
     },
 };
 
@@ -47,6 +47,11 @@ async fn main() -> anyhow::Result<()> {
             watch_namespace,
             tracing_target,
         }) => {
+            stackable_operator::logging::initialize_logging(
+                "AIRFLOW_OPERATOR_LOG",
+                APP_NAME,
+                tracing_target,
+            );
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -54,11 +59,6 @@ async fn main() -> anyhow::Result<()> {
                 built_info::TARGET,
                 built_info::BUILT_TIME_UTC,
                 built_info::RUSTC_VERSION,
-            );
-            stackable_operator::logging::initialize_logging(
-                "AIRFLOW_OPERATOR_LOG",
-                APP_NAME,
-                tracing_target,
             );
             let product_config = product_config.load(&[
                 "deploy/config-spec/properties.yaml",
@@ -135,9 +135,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow_db| {
-                                airflow_db.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &airflow_db.job_name() == job.metadata.name.as_ref().unwrap()
+                                airflow_db.name() == job.name()
+                                    && airflow_db.namespace() == job.namespace()
                             })
                             .map(|airflow_db| ObjectRef::from_obj(&*airflow_db))
                     },
