@@ -12,10 +12,11 @@
 - Support for Airflow 2.2.4, 2.2.5 documented ([#68],[#84]).
 - Support for mounting DAGs via `ConfigMap` or `PersistentVolumeClaim` ([#84]).
 - Init job replaced with an AirflowDB resource created by the operator  ([#89]).
+- Stabilize start-up by watching AirflowDB job ([#104]).
 
 ### Changed
 
-- `operator-rs` `0.10.0` -> `0.18.0` ([#53],[#54],[#89]).
+- `operator-rs` `0.10.0` -> `0.19.0` ([#53],[#54],[#89]).
 
 [#51]: https://github.com/stackabletech/airflow-operator/pull/51
 [#53]: https://github.com/stackabletech/airflow-operator/pull/53
@@ -23,6 +24,7 @@
 [#68]: https://github.com/stackabletech/airflow-operator/pull/68
 [#84]: https://github.com/stackabletech/airflow-operator/pull/84
 [#89]: https://github.com/stackabletech/airflow-operator/pull/89
+[#104]: https://github.com/stackabletech/airflow-operator/pull/104
 
 ## [0.2.0] - 2022-02-14
 
