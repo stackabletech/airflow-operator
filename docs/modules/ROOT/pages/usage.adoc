@@ -81,7 +81,7 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: 2.2.4-python3.9
+  version: 2.2.4-python3.9-stackable0.3.0
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
@@ -100,6 +100,11 @@ spec:
       default:
         replicas: 1
 ----
+
+Please note that the version you need to specify is not only the version of Airflow which you want to roll out, but has to be amended with a Stackable version as shown.
+This Stackable version is the version of the underlying container image which is used to execute the processes.
+For a list of available versions please check our https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fairflow%2Ftags[image registry].
+It should generally be safe to simply use the latest image version that is available.
 
 Where:
 
