@@ -28,18 +28,31 @@ spec:
   version: {{ test_scenario['values']['airflow'] }}
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
-  loadExamples: true
+  loadExamples: false
   exposeConfig: false
   credentialsSecret: test-airflow-credentials
+  volumes:
+    - name: external-dags
+      persistentVolumeClaim:
+        claimName: test-pvc-airflow
+  volumeMounts:
+    - name: external-dags
+      mountPath: /stackable/external-dags
   webservers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
   workers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 2
   schedulers:
     roleGroups:
       default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1

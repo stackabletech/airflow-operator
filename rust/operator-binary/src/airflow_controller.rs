@@ -2,7 +2,7 @@
 
 use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::airflowdb::AirflowDB;
+use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -13,9 +13,12 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::runtime::{
-        controller::{Action, Context},
-        reflector::ObjectRef,
+    kube::{
+        runtime::{
+            controller::{Action, Context},
+            reflector::ObjectRef,
+        },
+        ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
@@ -85,6 +88,10 @@ pub enum Error {
     ApplyAirflowDB {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to retrieve Airflow DB"))]
+    AirflowDBRetrieval {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -106,6 +113,26 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
         .apply_patch(FIELD_MANAGER_SCOPE, &airflow_db, &airflow_db)
         .await
         .context(ApplyAirflowDBSnafu)?;
+
+    let airflow_db = client
+        .get::<AirflowDB>(&airflow.name(), airflow.namespace().as_deref())
+        .await
+        .context(AirflowDBRetrievalSnafu)?;
+
+    if let Some(status) = airflow_db.status {
+        match status.condition {
+            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
+                tracing::debug!(
+                    "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
+                );
+                return Ok(Action::await_change());
+            }
+            AirflowDBStatusCondition::Ready | AirflowDBStatusCondition::Failed => (),
+        }
+    } else {
+        tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
+        return Ok(Action::await_change());
+    }
 
     let mut roles = HashMap::new();
 

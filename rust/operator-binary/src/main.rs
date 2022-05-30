@@ -70,34 +70,51 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
 
-            let airflow_controller = Controller::new(
+            let airflow_controller_builder = Controller::new(
                 watch_namespace.get_api::<AirflowCluster>(&client),
                 ListParams::default(),
-            )
-            .shutdown_on_signal()
-            .owns(
-                watch_namespace.get_api::<Service>(&client),
-                ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<StatefulSet>(&client),
-                ListParams::default(),
-            )
-            .run(
-                airflow_controller::reconcile_airflow,
-                airflow_controller::error_policy,
-                Context::new(airflow_controller::Ctx {
-                    client: client.clone(),
-                    product_config,
-                }),
-            )
-            .map(|res| {
-                report_controller_reconciled(
-                    &client,
-                    "airflowclusters.airflow.stackable.tech",
-                    &res,
-                );
-            });
+            );
+
+            let airflow_store = airflow_controller_builder.store();
+            let airflow_controller = airflow_controller_builder
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    ListParams::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    ListParams::default(),
+                )
+                .shutdown_on_signal()
+                .watches(
+                    watch_namespace.get_api::<AirflowDB>(&client),
+                    ListParams::default(),
+                    move |airflow_db| {
+                        airflow_store
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow| {
+                                airflow_db.name() == airflow.name()
+                                    && airflow_db.namespace() == airflow.namespace()
+                            })
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .run(
+                    airflow_controller::reconcile_airflow,
+                    airflow_controller::error_policy,
+                    Context::new(airflow_controller::Ctx {
+                        client: client.clone(),
+                        product_config,
+                    }),
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "airflowclusters.airflow.stackable.tech",
+                        &res,
+                    );
+                });
 
             let airflow_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<AirflowDB>(&client),
@@ -135,8 +152,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow_db| {
-                                airflow_db.name() == job.name()
-                                    && airflow_db.namespace() == job.namespace()
+                                job.name() == airflow_db.name()
+                                    && job.namespace() == airflow_db.namespace()
                             })
                             .map(|airflow_db| ObjectRef::from_obj(&*airflow_db))
                     },
