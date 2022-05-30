@@ -16,7 +16,6 @@
 
 ### Changed
 
-- `operator-rs` `0.10.0` -> `0.19.0` ([#53],[#54],[#89]).
 - `operator-rs` `0.10.0` -> `0.18.0` ([#53],[#54],[#89]).
 - [BREAKING] Specifying the product version has been changed to adhere to [ADR018](https://docs.stackable.tech/home/contributor/adr/ADR018-product_image_versioning.html) instead of just specifying the product version you will now have to add the Stackable image version as well, so `version: 3.5.8` becomes (for example) `version: 3.5.8-stackable0.1.0` ([#106])
 
@@ -26,8 +25,8 @@
 [#68]: https://github.com/stackabletech/airflow-operator/pull/68
 [#84]: https://github.com/stackabletech/airflow-operator/pull/84
 [#89]: https://github.com/stackabletech/airflow-operator/pull/89
-[#106]: https://github.com/stackabletech/airflow-operator/pull/106
 [#104]: https://github.com/stackabletech/airflow-operator/pull/104
+[#106]: https://github.com/stackabletech/airflow-operator/pull/106
 
 ## [0.2.0] - 2022-02-14
 
