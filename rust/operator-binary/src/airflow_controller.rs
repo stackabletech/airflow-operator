@@ -285,7 +285,7 @@ fn build_server_rolegroup_statefulset(
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
-    let image = format!("docker.stackable.tech/stackable/airflow:{airflow_version}-stackable0",);
+    let image = format!("docker.stackable.tech/stackable/airflow:{airflow_version}",);
     tracing::info!("Using image {}", image);
 
     let statsd_exporter_version = statsd_exporter_version(airflow)?;
