@@ -188,7 +188,7 @@ fn build_init_job(airflow_db: &AirflowDB) -> Result<Job> {
 
     let container = ContainerBuilder::new("airflow-init-db")
         .image(format!(
-            "docker.stackable.tech/stackable/airflow:{}-stackable0",
+            "docker.stackable.tech/stackable/airflow:{}",
             airflow_db.spec.airflow_version
         ))
         .command(vec!["/bin/bash".to_string()])

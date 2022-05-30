@@ -20,7 +20,7 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: 2.2.3-python38
+  version: 2.2.3-python38-stackable0.3.0
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
