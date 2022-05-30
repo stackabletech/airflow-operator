@@ -1,7 +1,7 @@
 ---
 apiVersion: v2
 name: airflow-operator
-version: 0.3.0-nightly
+version: "0.3.0-nightly"
 appVersion: "0.3.0-nightly"
 description: The Stackable Operator for Apache Airflow
 home: https://github.com/stackabletech/airflow-operator
