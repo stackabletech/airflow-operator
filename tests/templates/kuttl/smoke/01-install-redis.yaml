@@ -8,4 +8,4 @@ commands:
       --version 16.8.7
       --set replica.replicaCount=1
       --set auth.password=redis
-      --repo https://charts.bitnami.com/bitnami redis
+      bitnami/redis
