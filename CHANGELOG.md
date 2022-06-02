@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2022-05-31
+
 ### Added
 
 - BREAKING: Prometheus metrics enabled ([#51]); The `statsdExporterVersion` must
