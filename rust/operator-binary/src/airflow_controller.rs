@@ -351,7 +351,7 @@ fn build_server_rolegroup_statefulset(
     container_builder.add_volume_mounts(volume_mounts);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
-        let probe = Probe {
+        let _probe = Probe {
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(resolved_port.into()),
                 ..TCPSocketAction::default()
@@ -360,7 +360,7 @@ fn build_server_rolegroup_statefulset(
             period_seconds: Some(5),
             ..Probe::default()
         };
-        container_builder.readiness_probe(probe);
+        //container_builder.readiness_probe(probe);
     }
 
     let container = container_builder.build();
