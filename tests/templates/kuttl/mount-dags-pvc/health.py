@@ -13,5 +13,5 @@ if __name__ == "__main__":
 
     if http_code != 200:
         result = 1
-        
+
     sys.exit(result)
