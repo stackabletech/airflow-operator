@@ -6,7 +6,7 @@ dimensions:
       - 2.2.4-python39-stackable0.3.0
       - 2.2.5-python39-stackable0.3.0
 tests:
-  #- name: mount-dags-pvc
+  # - name: mount-dags-pvc
   #  dimensions:
   #    - airflow
   - name: smoke
@@ -15,4 +15,3 @@ tests:
   - name: mount-dags-configmap
     dimensions:
       - airflow
-
