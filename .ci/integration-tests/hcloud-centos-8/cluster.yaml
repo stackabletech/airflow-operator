@@ -16,4 +16,5 @@ spec:
     airflow-operator: "$AIRFLOW_OPERATOR_VERSION"
   nodes:
     main:
+      serverType: "cx41"
       numberOfNodes: 3

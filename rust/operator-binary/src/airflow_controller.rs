@@ -360,7 +360,8 @@ fn build_server_rolegroup_statefulset(
             period_seconds: Some(5),
             ..Probe::default()
         };
-        container_builder.readiness_probe(probe);
+        container_builder.readiness_probe(probe.clone());
+        container_builder.liveness_probe(probe);
     }
 
     let container = container_builder.build();

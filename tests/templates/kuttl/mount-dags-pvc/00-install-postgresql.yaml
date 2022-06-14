@@ -10,4 +10,4 @@ commands:
       --set auth.password=airflow
       --set auth.database=airflow
       --repo https://charts.bitnami.com/bitnami postgresql
-    timeout: 240
+    timeout: 600

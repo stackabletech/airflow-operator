@@ -15,6 +15,7 @@
 - Support for mounting DAGs via `ConfigMap` or `PersistentVolumeClaim` ([#84]).
 - Init job replaced with an AirflowDB resource created by the operator  ([#89]).
 - Stabilize start-up by watching AirflowDB job ([#104]).
+- Stabilize integration tests ([#109]).
 
 ### Changed
 
@@ -29,6 +30,7 @@
 [#89]: https://github.com/stackabletech/airflow-operator/pull/89
 [#104]: https://github.com/stackabletech/airflow-operator/pull/104
 [#106]: https://github.com/stackabletech/airflow-operator/pull/106
+[#109]: https://github.com/stackabletech/airflow-operator/pull/109
 
 ## [0.2.0] - 2022-02-14
 
