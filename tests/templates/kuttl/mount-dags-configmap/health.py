@@ -5,13 +5,11 @@ import sys
 import time
 
 if __name__ == "__main__":
-    result = 0
-
     log_level = 'DEBUG'
     logging.basicConfig(level=log_level, format='%(asctime)s %(levelname)s: %(message)s', stream=sys.stdout)
 
     url = "http://airflow-webserver-default:8080/api/v1/health"
-    count = 1
+    count = 0
 
     while True:
         try:
@@ -33,4 +31,4 @@ if __name__ == "__main__":
 
         # Wait a little bit before retrying
         time.sleep(1)
-    sys.exit(result)
+    sys.exit(0)
