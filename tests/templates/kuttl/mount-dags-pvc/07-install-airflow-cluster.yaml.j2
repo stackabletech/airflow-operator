@@ -51,7 +51,7 @@ spec:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        replicas: 2
+        replicas: 1
         nodeSelector:
           node: "1"
   schedulers:
