@@ -7,7 +7,7 @@ spec:
   template:
     spec:
       nodeSelector:
-        node: "1"
+        node: "2"
       restartPolicy: Never
       volumes:
         - name: external-dags

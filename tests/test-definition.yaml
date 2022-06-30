@@ -9,9 +9,9 @@ tests:
   - name: mount-dags-pvc
     dimensions:
       - airflow
-  - name: smoke
-    dimensions:
-      - airflow
-  - name: mount-dags-configmap
-    dimensions:
-      - airflow
+  #- name: smoke
+  #  dimensions:
+  #    - airflow
+  #- name: mount-dags-configmap
+  #  dimensions:
+  #    - airflow
