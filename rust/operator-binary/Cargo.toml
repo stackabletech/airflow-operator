@@ -3,7 +3,7 @@ name = "stackable-airflow-operator"
 authors = ["Stackable GmbH <info@stackable.de>"]
 description = "Stackable Operator for Apache Airflow"
 license = "OSL-3.0"
-version = "0.4.0"
+version = "0.5.0-nightly"
 edition = "2021"
 repository = "https://github.com/stackabletech/airflow-operator"
 
