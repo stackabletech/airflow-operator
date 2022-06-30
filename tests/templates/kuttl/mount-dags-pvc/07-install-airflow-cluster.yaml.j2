@@ -44,21 +44,24 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        nodeSelector:
-          node: "1"
+        selector:
+          matchLabels:
+            node: "1"
   workers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        nodeSelector:
-          node: "1"
+        selector:
+          matchLabels:
+            node: "1"
   schedulers:
     roleGroups:
       default:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        nodeSelector:
-          node: "1"
+        selector:
+          matchLabels:
+            node: "1"
