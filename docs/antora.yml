@@ -1,6 +1,6 @@
 name: airflow
-version: "nightly"
+version: "0.4"
 title: Stackable Operator for Apache Airflow
 nav:
   - modules/ROOT/nav.adoc
-prerelease: true
+prerelease: false
