@@ -4,6 +4,8 @@ use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
+use stackable_operator::k8s_openapi::api::core::v1::ServiceAccount;
+use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subject};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -38,6 +40,8 @@ const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+
+const SERVICE_ACCOUNT: &str = "airflow-serviceaccount";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -90,6 +94,14 @@ pub enum Error {
     },
     #[snafu(display("failed to retrieve Airflow DB"))]
     AirflowDBRetrieval {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to create RBAC service account: {source}"))]
+    ApplyServiceAccount {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to create RBAC role binding: {source}"))]
+    ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
 }
@@ -153,6 +165,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
+    let (rbac_sa, rbac_rolebinding) = build_zk_rbac_resources(&airflow)?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
+        .await
+        .with_context(|_| ApplyServiceAccountSnafu)?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
+        .await
+        .with_context(|_| ApplyRoleBindingSnafu)?;
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -529,4 +551,36 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+pub fn build_zk_rbac_resources(airflow: &AirflowCluster) -> Result<(ServiceAccount, RoleBinding)> {
+    let service_account = ServiceAccount {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(airflow)
+            .name(SERVICE_ACCOUNT.to_string())
+            .with_label("managed-by".to_string(), "zookeeper-operator".to_string())
+            .build(),
+        ..ServiceAccount::default()
+    };
+
+    let role_binding = RoleBinding {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(airflow)
+            .name("zookeeper-rolebinding".to_string())
+            .with_label("managed-by".to_string(), "zookeeper-operator".to_string())
+            .build(),
+        role_ref: RoleRef {
+            kind: "ClusterRole".to_string(),
+            name: "zookeeper-clusterrole".to_string(),
+            api_group: "rbac.authorization.k8s.io".to_string(),
+        },
+        subjects: Some(vec![Subject {
+            kind: "ServiceAccount".to_string(),
+            name: SERVICE_ACCOUNT.to_string(),
+            namespace: airflow.namespace(),
+            ..Subject::default()
+        }]),
+    };
+
+    Ok((service_account, role_binding))
 }
