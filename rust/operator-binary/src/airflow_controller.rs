@@ -6,6 +6,11 @@ use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        secret_class::SecretClassVolumeScope,
+        tls::{CaCert, TlsServerVerification, TlsVerification},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -58,12 +63,12 @@ pub enum Error {
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
@@ -91,6 +96,11 @@ pub enum Error {
     #[snafu(display("failed to retrieve Airflow DB"))]
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
+    AuthenticationClassRetrieval {
+        source: stackable_operator::error::Error,
+        authentication_class: ObjectRef<AuthenticationClass>,
     },
 }
 
@@ -154,6 +164,27 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     )
     .context(InvalidProductConfigSnafu)?;
 
+    let authentication_class = match &airflow.spec.authentication_config {
+        Some(authentication_config) => {
+            match &authentication_config.authentication_class {
+                Some(authentication_class) => {
+                    Some(
+                        client
+                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
+                            .await
+                            .context(AuthenticationClassRetrievalSnafu {
+                                authentication_class: ObjectRef::<AuthenticationClass>::new(
+                                    authentication_class,
+                                ),
+                            })?,
+                    )
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
+
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
@@ -180,7 +211,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                 })?;
 
             let rg_statefulset =
-                build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
+                build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config, authentication_class.as_ref(),)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
                 .await
@@ -195,7 +226,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
+fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
     let role_svc_name = format!(
         "{}-{}",
         airflow
@@ -302,6 +333,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -327,6 +359,12 @@ fn build_server_rolegroup_statefulset(
 
     // container
     let mut container_builder = ContainerBuilder::new(APP_NAME);
+    let mut pod_builder = PodBuilder::new();
+
+    if let Some(authentication_class) = authentication_class {
+        add_authentication_volumes_and_volume_mounts(authentication_class, &mut container_builder, &mut pod_builder)?;
+    }
+
     let container_builder = container_builder
         .image(image)
         .command(vec!["/bin/bash".to_string()])
@@ -405,7 +443,7 @@ fn build_server_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: PodBuilder::new()
+            template: pod_builder
                 .metadata_builder(|m| {
                     m.with_recommended_labels(
                         airflow,
@@ -419,6 +457,7 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
+                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
