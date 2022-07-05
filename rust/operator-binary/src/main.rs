@@ -1,5 +1,6 @@
 mod airflow_controller;
 mod airflow_db_controller;
+mod config;
 mod util;
 
 use clap::Parser;

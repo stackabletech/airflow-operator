@@ -1,11 +1,21 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
+use crate::config::{self, PYTHON_IMPORTS};
 
 use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
-use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
+use stackable_airflow_crd::{
+    AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AIRFLOW_CONFIG_FILENAME,
+    APP_NAME,
+};
+use stackable_operator::builder::{
+    ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+};
+use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
+use stackable_operator::product_config::flask_app_config_writer;
+use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder},
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         secret_class::SecretClassVolumeScope,
@@ -43,6 +53,9 @@ const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -101,6 +114,21 @@ pub enum Error {
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("Superset doesn't support the AuthenticationClass provider {authentication_class_provider} from AuthenticationClass {authentication_class}"))]
+    AuthenticationClassProviderNotSupported {
+        authentication_class_provider: String,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("failed to build config file for {rolegroup}"))]
+    BuildRoleGroupConfigFile {
+        source: FlaskAppConfigWriterError,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
+    BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<AirflowCluster>,
     },
 }
 
@@ -210,8 +238,19 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                     rolegroup: rolegroup.clone(),
                 })?;
 
-            let rg_statefulset =
-                build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config, authentication_class.as_ref(),)?;
+            let rg_configmap = build_rolegroup_config_map(
+                &airflow,
+                &rolegroup,
+                rolegroup_config,
+                authentication_class.as_ref(),
+            )?;
+
+            let rg_statefulset = build_server_rolegroup_statefulset(
+                &rolegroup,
+                &airflow,
+                rolegroup_config,
+                authentication_class.as_ref(),
+            )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
                 .await
@@ -222,6 +261,60 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     }
 
     Ok(Action::await_change())
+}
+
+/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+fn build_rolegroup_config_map(
+    airflow: &AirflowCluster,
+    rolegroup: &RoleGroupRef<AirflowCluster>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
+) -> Result<ConfigMap, Error> {
+    let mut config = rolegroup_config
+        .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
+        .cloned()
+        .unwrap_or_default();
+
+    config::add_airflow_config(
+        &mut config,
+        airflow.spec.authentication_config.as_ref(),
+        authentication_class,
+    );
+
+    let mut config_file = Vec::new();
+    flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        PYTHON_IMPORTS,
+    )
+    .with_context(|_| BuildRoleGroupConfigFileSnafu {
+        rolegroup: rolegroup.clone(),
+    })?;
+
+    ConfigMapBuilder::new()
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(airflow)
+                .name(rolegroup.object_name())
+                .ownerreference_from_resource(airflow, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(
+                    airflow,
+                    APP_NAME,
+                    airflow.version().context(NoAirflowVersionSnafu)?,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                )
+                .build(),
+        )
+        .add_data(
+            AIRFLOW_CONFIG_FILENAME,
+            String::from_utf8(config_file).unwrap(),
+        )
+        .build()
+        .with_context(|_| BuildRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
@@ -362,7 +455,11 @@ fn build_server_rolegroup_statefulset(
     let mut pod_builder = PodBuilder::new();
 
     if let Some(authentication_class) = authentication_class {
-        add_authentication_volumes_and_volume_mounts(authentication_class, &mut container_builder, &mut pod_builder)?;
+        add_authentication_volumes_and_volume_mounts(
+            authentication_class,
+            &mut container_builder,
+            &mut pod_builder,
+        )?;
     }
 
     let container_builder = container_builder
@@ -425,6 +522,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role_group,
             )
             .with_label("statsd-exporter", statsd_exporter_version)
+            .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -568,4 +666,81 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+fn add_authentication_volumes_and_volume_mounts(
+    authentication_class: &AuthenticationClass,
+    cb: &mut ContainerBuilder,
+    pb: &mut PodBuilder,
+) -> Result<()> {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
+            if let Some(bind_credentials) = &ldap.bind_credentials {
+                let volume_name = format!("{authentication_class_name}-bind-credentials");
+
+                pb.add_volume(build_secret_operator_volume(
+                    &volume_name,
+                    &bind_credentials.secret_class,
+                    bind_credentials.scope.as_ref(),
+                ));
+                cb.add_volume_mount(&volume_name, format!("{SECRETS_DIR}{volume_name}"));
+            }
+
+            if let Some(tls) = &ldap.tls {
+                match &tls.verification {
+                    TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::SecretClass(cert_secret_class),
+                    }) => {
+                        let volume_name = format!("{authentication_class_name}-tls-certificate");
+
+                        pb.add_volume(build_secret_operator_volume(
+                            &volume_name,
+                            cert_secret_class,
+                            None,
+                        ));
+                        cb.add_volume_mount(&volume_name, format!("{CERTS_DIR}{volume_name}"));
+                    }
+                    // Explicitly listing other possibilities to not oversee new enum variants in the future
+                    TlsVerification::None {}
+                    | TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }) => {}
+                }
+            }
+
+            Ok(())
+        }
+        _ => AuthenticationClassProviderNotSupportedSnafu {
+            authentication_class_provider: authentication_class.spec.provider.to_string(),
+            authentication_class: ObjectRef::<AuthenticationClass>::new(authentication_class_name),
+        }
+        .fail(),
+    }
+}
+
+fn build_secret_operator_volume(
+    volume_name: &str,
+    secret_class_name: &str,
+    scope: Option<&SecretClassVolumeScope>,
+) -> Volume {
+    let mut secret_operator_volume_source_builder =
+        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+    if let Some(scope) = scope {
+        if scope.pod {
+            secret_operator_volume_source_builder.with_pod_scope();
+        }
+        if scope.node {
+            secret_operator_volume_source_builder.with_node_scope();
+        }
+        for service in &scope.services {
+            secret_operator_volume_source_builder.with_service_scope(service);
+        }
+    }
+
+    VolumeBuilder::new(volume_name)
+        .csi(secret_operator_volume_source_builder.build())
+        .build()
 }

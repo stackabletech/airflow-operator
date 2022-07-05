@@ -1,11 +1,11 @@
 use crate::airflow_controller::{CERTS_DIR, SECRETS_DIR};
+use stackable_airflow_crd::{
+    AirflowClusterAuthenticationConfig, AirflowConfigOptions, LdapRolesSyncMoment,
+};
 use stackable_operator::commons::{
     authentication::{AuthenticationClass, AuthenticationClassProvider},
     ldap::LdapAuthenticationProvider,
     tls::{CaCert, TlsVerification},
-};
-use stackable_airflow_crd::{
-    LdapRolesSyncMoment, AirflowClusterAuthenticationConfig, AirflowConfigOptions,
 };
 use std::collections::BTreeMap;
 
@@ -90,10 +90,6 @@ fn append_ldap_config(
         ldap.search_base.clone(),
     );
     config.insert(
-        AirflowConfigOptions::AuthLdapSearchFilter.to_string(),
-        ldap.search_filter.clone(),
-    );
-    config.insert(
         AirflowConfigOptions::AuthLdapUidField.to_string(),
         ldap.ldap_field_names.uid.clone(),
     );
@@ -122,10 +118,6 @@ fn append_ldap_config(
             TlsVerification::None {} => {
                 config.insert(
                     AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
-                    true.to_string(),
-                );
-                config.insert(
-                    AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
                     true.to_string(),
                 );
             }
@@ -163,10 +155,6 @@ fn append_server_ca_cert(
     config.insert(
         AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
         true.to_string(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-        false.to_string(),
     );
     match server_ca_cert {
         CaCert::SecretClass(..) => {
