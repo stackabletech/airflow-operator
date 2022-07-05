@@ -2,6 +2,8 @@ mod airflow_controller;
 mod airflow_db_controller;
 mod util;
 
+use std::sync::Arc;
+
 use clap::Parser;
 use futures::StreamExt;
 use stackable_airflow_crd::{airflowdb::AirflowDB, AirflowCluster, APP_NAME};
@@ -16,7 +18,7 @@ use stackable_operator::{
     },
     kube::{
         api::ListParams,
-        runtime::{controller::Context, reflector::ObjectRef, Controller},
+        runtime::{reflector::ObjectRef, Controller},
         CustomResourceExt, ResourceExt,
     },
 };
@@ -103,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     airflow_controller::reconcile_airflow,
                     airflow_controller::error_policy,
-                    Context::new(airflow_controller::Ctx {
+                    Arc::new(airflow_controller::Ctx {
                         client: client.clone(),
                         product_config,
                     }),
@@ -161,7 +163,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     airflow_db_controller::reconcile_airflow_db,
                     airflow_db_controller::error_policy,
-                    Context::new(airflow_db_controller::Ctx {
+                    Arc::new(airflow_db_controller::Ctx {
                         client: client.clone(),
                     }),
                 )
