@@ -20,9 +20,6 @@ pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 #[derive(Display, EnumIter, EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum AirflowConfigOptions {
-    SecretKey,
-    SqlalchemyDatabaseUri,
-    StatsLogger,
     AuthType,
     AuthLdapSearch,
     AuthLdapServer,
@@ -47,9 +44,6 @@ pub enum AirflowConfigOptions {
 impl FlaskAppConfigOptions for AirflowConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
-            AirflowConfigOptions::SecretKey => PythonType::Expression,
-            AirflowConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
-            AirflowConfigOptions::StatsLogger => PythonType::Expression,
             AirflowConfigOptions::AuthType => PythonType::Expression,
             AirflowConfigOptions::AuthLdapUseTls => PythonType::BoolLiteral,
             AirflowConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,

@@ -217,11 +217,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     )
     .context(InvalidProductConfigSnafu)?;
 
-    tracing::debug!(
-        "{}",
-        format!("Validated_role_config: {:#?}", validated_role_config)
-    );
-
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => {
             match &authentication_config.authentication_class {
@@ -490,23 +485,6 @@ fn build_server_rolegroup_statefulset(
     let mut cb = ContainerBuilder::new(APP_NAME);
     let mut pb = PodBuilder::new();
 
-    for (name, value) in rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .cloned()
-        .unwrap_or_default()
-    {
-        if name == AirflowConfig::CREDENTIALS_SECRET_PROPERTY {
-            cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
-            cb.add_env_var_from_secret(
-                "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
-                &value,
-                "connections.sqlalchemyDatabaseUri",
-            );
-        } else {
-            cb.add_env_var(name, value);
-        };
-    }
-
     if let Some(authentication_class) = authentication_class {
         add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
     }
@@ -623,6 +601,12 @@ fn build_mapped_envs(
     let mut env = secret_prop
         .map(|secret| {
             vec![
+                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                env_var_from_secret(
+                    "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
+                    secret,
+                    "connections.sqlalchemyDatabaseUri",
+                ),
                 env_var_from_secret(
                     "AIRFLOW__CELERY__RESULT_BACKEND",
                     secret,

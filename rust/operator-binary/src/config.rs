@@ -11,12 +11,9 @@ use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
-    //"from airflow.stats_logger import StatsdStatsLogger",
     "from airflow.www.fab_security.manager  (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
-    //"from airflow.www.fab_security.manager import AUTH_DB",
     "basedir = os.path.abspath(os.path.dirname(__file__))",
     "WTF_CSRF_ENABLED = True",
-    "AUTH_TYPE = AUTH_DB",
 ];
 
 pub fn add_airflow_config(
@@ -24,19 +21,6 @@ pub fn add_airflow_config(
     authentication_config: Option<&AirflowClusterAuthenticationConfig>,
     authentication_class: Option<&AuthenticationClass>,
 ) {
-    config.insert(
-        AirflowConfigOptions::SecretKey.to_string(),
-        "os.environ.get('SECRET_KEY')".into(),
-    );
-    config.insert(
-        AirflowConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('AIRFLOW__CORE__SQL_ALCHEMY_CONN')".into(),
-    );
-    config.insert(
-        AirflowConfigOptions::StatsLogger.to_string(),
-        "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
-    );
-
     if let Some(authentication_config) = authentication_config {
         if let Some(authentication_class) = authentication_class {
             append_authentication_config(config, authentication_config, authentication_class);
