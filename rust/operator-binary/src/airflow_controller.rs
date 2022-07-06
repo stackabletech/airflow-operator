@@ -11,7 +11,7 @@ use stackable_airflow_crd::{
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
 };
-use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
+use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, ConfigMapVolumeSource, Volume};
 use stackable_operator::product_config::flask_app_config_writer;
 use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
@@ -167,6 +167,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
         .await
         .context(AirflowDBRetrievalSnafu)?;
 
+    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
+
     if let Some(ref status) = airflow_db.status {
         match status.condition {
             AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
@@ -204,6 +206,9 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
             );
         }
     }
+
+    tracing::debug!("{}", format!("Roles: {:#?}", roles));
+
     let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow.version().context(NoAirflowVersionSnafu)?,
@@ -213,6 +218,11 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
+    tracing::debug!(
+        "{}",
+        format!("Validated_role_config: {:#?}", validated_role_config)
+    );
 
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => {
@@ -236,14 +246,20 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     };
 
     for (role_name, role_config) in validated_role_config.iter() {
+        tracing::debug!("{}", format!("role_name: {:#?}", role_name));
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
+            tracing::debug!("{}", format!("role_name with port: {:#?}", role_name));
             let role_service = build_role_service(role_name, &airflow, resolved_port)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
                 .await
                 .context(ApplyRoleServiceSnafu)?;
         }
+        tracing::debug!(
+            "{}",
+            format!("role_name - after services: {:#?}", role_name)
+        );
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
@@ -252,6 +268,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                 role_group: rolegroup_name.into(),
             };
 
+            tracing::debug!("{}", format!("rolegroup: {:#?}", rolegroup));
+
             let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
@@ -259,6 +277,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                 .context(ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+
+            tracing::debug!("{}", format!("rg_service: {:#?}", rg_service));
 
             let rg_configmap = build_rolegroup_config_map(
                 &airflow,
@@ -273,6 +293,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                     rolegroup: rolegroup.clone(),
                 })?;
 
+            tracing::debug!("{}", format!("rg_configmap: {:#?}", rg_configmap));
+
             let rg_statefulset = build_server_rolegroup_statefulset(
                 &rolegroup,
                 &airflow,
@@ -285,6 +307,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
                 .context(ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+
+            tracing::debug!("{}", format!("rg_statefulset: {:#?}", rg_statefulset));
         }
     }
 
@@ -527,6 +551,7 @@ fn build_server_rolegroup_statefulset(
         };
         cb.readiness_probe(probe.clone());
         cb.liveness_probe(probe);
+        cb.add_container_port("http", resolved_port.into());
     }
 
     let container = cb.build();
@@ -585,6 +610,14 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
+                .add_volume(Volume {
+                    name: "config".to_string(),
+                    config_map: Some(ConfigMapVolumeSource {
+                        name: Some(rolegroup_ref.object_name()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
                 .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
@@ -606,12 +639,6 @@ fn build_mapped_envs(
     let mut env = secret_prop
         .map(|secret| {
             vec![
-                //env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-                env_var_from_secret(
-                    "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
-                    secret,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
                 env_var_from_secret(
                     "AIRFLOW__CELERY__RESULT_BACKEND",
                     secret,
@@ -655,6 +682,13 @@ fn build_mapped_envs(
         value: executor,
         ..Default::default()
     });
+
+    env.push(EnvVar {
+        name: "PYTHONPATH".into(),
+        value: Some("/stackable/app/pythonpath".into()),
+        ..Default::default()
+    });
+
     env
 }
 

@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
                 ListParams::default(),
             );
 
-            //let airflow_store_1 = airflow_controller_builder.store();
+            let airflow_store_1 = airflow_controller_builder.store();
             let airflow_store_2 = airflow_controller_builder.store();
             let airflow_controller = airflow_controller_builder
                 .owns(
@@ -92,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
                     ListParams::default(),
                 )
                 .shutdown_on_signal()
-                /*.watches(
+                .watches(
                     watch_namespace.get_api::<AuthenticationClass>(&client),
                     ListParams::default(),
                     move |authentication_class| {
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
                             })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
-                )*/
+                )
                 .watches(
                     watch_namespace.get_api::<AirflowDB>(&client),
                     ListParams::default(),

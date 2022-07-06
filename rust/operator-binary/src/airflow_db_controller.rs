@@ -2,7 +2,7 @@ use crate::util::{env_var_from_secret, get_job_state, JobState};
 
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
-use stackable_airflow_crd::{AirflowCluster, PYTHONPATH, AIRFLOW_CONFIG_FILENAME};
+use stackable_airflow_crd::{AirflowCluster, AIRFLOW_CONFIG_FILENAME, PYTHONPATH};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::api::{

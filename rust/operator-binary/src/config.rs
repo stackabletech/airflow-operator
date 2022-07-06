@@ -11,9 +11,13 @@ use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
-    "from airflow.stats_logger import StatsdStatsLogger",
-    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
-    ];
+    //"from airflow.stats_logger import StatsdStatsLogger",
+    "from airflow.www.fab_security.manager  (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    //"from airflow.www.fab_security.manager import AUTH_DB",
+    "basedir = os.path.abspath(os.path.dirname(__file__))",
+    "WTF_CSRF_ENABLED = True",
+    "AUTH_TYPE = AUTH_DB",
+];
 
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
