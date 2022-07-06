@@ -490,7 +490,7 @@ fn build_server_rolegroup_statefulset(
         if name == AirflowConfig::CREDENTIALS_SECRET_PROPERTY {
             cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
             cb.add_env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
+                "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
@@ -606,7 +606,7 @@ fn build_mapped_envs(
     let mut env = secret_prop
         .map(|secret| {
             vec![
-                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                //env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
                 env_var_from_secret(
                     "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
                     secret,

@@ -26,7 +26,7 @@ pub fn add_airflow_config(
     );
     config.insert(
         AirflowConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('SQLALCHEMY_DATABASE_URI')".into(),
+        "os.environ.get('AIRFLOW__CORE__SQL_ALCHEMY_CONN')".into(),
     );
     config.insert(
         AirflowConfigOptions::StatsLogger.to_string(),
