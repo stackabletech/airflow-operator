@@ -184,18 +184,6 @@ mod tests {
           loadExamples: true
           exposeConfig: true
           credentialsSecret: simple-airflow-credentials
-          webservers:
-            roleGroups:
-              default:
-                replicas: 1
-          workers:
-            roleGroups:
-              default:
-                replicas: 1
-          schedulers:
-            roleGroups:
-              default:
-                replicas: 1
           ",
         )
         .unwrap();
@@ -230,18 +218,6 @@ mod tests {
           authenticationConfig:
             authenticationClass: airflow-with-ldap-server-veri-tls-ldap
             userRegistrationRole: Admin
-          webservers:
-            roleGroups:
-              default:
-                replicas: 1
-          workers:
-            roleGroups:
-              default:
-                replicas: 1
-          schedulers:
-            roleGroups:
-              default:
-                replicas: 1
           ",
         )
         .unwrap();
@@ -293,5 +269,6 @@ mod tests {
                 .get(&AirflowConfigOptions::AuthType.to_string())
                 .unwrap()
         );
+        println!("{:#?}", result);
     }
 }
