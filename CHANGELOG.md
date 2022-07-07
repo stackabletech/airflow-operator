@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Include chart name when installing with a custom release name ([#131], [#132]).
+
+[#131]: https://github.com/stackabletech/airflow-operator/pull/131
+[#132]: https://github.com/stackabletech/airflow-operator/pull/132
+
 ## [0.4.0] - 2022-06-30
 
 ## [0.3.0] - 2022-05-31
