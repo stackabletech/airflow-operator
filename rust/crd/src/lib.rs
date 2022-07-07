@@ -205,7 +205,8 @@ impl AirflowRole {
     /// Returns the start commands for the different server types.
     pub fn get_commands(&self) -> Vec<String> {
         match &self {
-            AirflowRole::Webserver => vec!["airflow webserver".to_string()],
+            AirflowRole::Webserver => vec!["cp -RL /stackable/app/pythonpath/webserver_config.py /stackable/airflow/webserver_config.py".to_string(), 
+            "airflow webserver".to_string()],
             AirflowRole::Scheduler => vec!["airflow scheduler".to_string()],
             AirflowRole::Worker => vec!["airflow celery worker".to_string()],
         }

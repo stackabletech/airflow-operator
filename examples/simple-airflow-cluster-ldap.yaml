@@ -55,8 +55,6 @@ spec:
             - name: LDAP_TLS_CA_FILE
               value: /tls/ca.crt
           ports:
-            # - name: ldap
-            #   containerPort: 1389
             - name: tls-ldap
               containerPort: 1636
           volumeMounts:
@@ -79,9 +77,6 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # - name: ldap
-    #   port: 389
-    #   targetPort: ldap
     - name: tls-ldap
       port: 636
       targetPort: tls-ldap
@@ -153,7 +148,7 @@ spec:
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
-  exposeConfig: false
+  exposeConfig: true
   credentialsSecret: airflow-with-ldap-server-veri-tls-credentials
   authenticationConfig:
     authenticationClass: airflow-with-ldap-server-veri-tls-ldap
