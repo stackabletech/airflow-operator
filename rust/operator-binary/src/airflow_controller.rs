@@ -475,9 +475,6 @@ fn build_server_rolegroup_statefulset(
     let statsd_exporter_image =
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
-    // mapped environment variables
-    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
-
     // initialising commands
     let commands = airflow_role.get_commands();
 
@@ -494,6 +491,22 @@ fn build_server_rolegroup_statefulset(
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
 
+    // environment variables
+    let env_config = rolegroup_config
+        .get(&PropertyNameKind::Env)
+        .iter()
+        .flat_map(|env_vars| env_vars.iter())
+        .map(|(k, v)| EnvVar {
+            name: k.clone(),
+            value: Some(v.clone()),
+            ..EnvVar::default()
+        })
+        .collect::<Vec<_>>();
+
+    // mapped environment variables
+    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
+
+    cb.add_env_vars(env_config);
     cb.add_env_vars(env_mapped);
     cb.add_env_vars(build_static_envs());
 
