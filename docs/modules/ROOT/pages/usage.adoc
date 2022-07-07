@@ -232,7 +232,7 @@ include::example$example-airflow-dags-configmap.yaml[]
 
 The advantage of this approach is that a DAG can be provided "in-line", as it were. This becomes cumbersome when multiple DAGs are to be made available in this way, as each one has to be mapped individually. For multiple DAGs it is probably easier to expose them all via a mounted volume, which is shown below.
 
-=== via `PersistentVolumeclaim`
+=== via PersistentVolumeclaim
 
 [source,yaml]
 ----
@@ -254,3 +254,21 @@ include::example$example-airflow-dags-pvc.yaml[]
 <10> The `VolumeMount` referencing the `Volume` in the previous step
 <11> The path where this `Volume` is located for each role (webserver, worker, scheduler)
 <12> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.
+
+== Node selection
+
+Airflow expects that all its components (webserver, scheduler, workers etc.) have access to the DAG folder. If this is mounted via a PersistentVolumeClaim, then the permissible https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes[access modes] on that claim may require that a specific node is selected. This can be done by providing a label-match as shown below:
+
+[source,yaml]
+----
+  workers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
+        replicas: 1
+        selector:
+          matchLabels:
+            node: "2"
+----
+
