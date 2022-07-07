@@ -25,6 +25,12 @@ pub fn add_airflow_config(
         if let Some(authentication_class) = authentication_class {
             append_authentication_config(config, authentication_config, authentication_class);
         }
+    } else {
+        config.insert(
+            // should default to AUTH_TYPE = AUTH_DB
+            AirflowConfigOptions::AuthType.to_string(),
+            "AUTH_DB".into(),
+        );
     }
 }
 
@@ -152,5 +158,65 @@ fn append_server_ca_cert(
             );
         }
         CaCert::WebPki {} => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::AirflowCluster;
+    use std::collections::BTreeMap;
+    use crate::config::add_airflow_config;
+
+    #[test]
+    fn test_ldap_config() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          version: 2.2.4
+          executor: KubernetesExecutor
+          loadExamples: true
+          exposeConfig: true
+          credentialsSecret: simple-airflow-credentials
+          authenticationConfig:
+            authenticationClass: airflow-with-ldap-server-veri-tls-ldap
+            userRegistrationRole: Admin
+          webservers:
+            roleGroups:
+              default:
+                config: {}
+          workers:
+            roleGroups:
+              default:
+                config: {}
+          schedulers:
+            roleGroups:
+              default:
+                config: {}
+          ",
+        )
+        .unwrap();
+
+        assert_eq!("2.2.4", cluster.spec.version.unwrap_or_default());
+        assert_eq!(
+            "KubernetesExecutor",
+            cluster.spec.executor.unwrap_or_default()
+        );
+        assert!(cluster.spec.load_examples.unwrap_or(false));
+        assert!(cluster.spec.expose_config.unwrap_or(false));
+
+        let mut result = BTreeMap::new();
+        println!("Authentication: {:#?}", cluster.spec.authentication_config.as_ref());
+
+        add_airflow_config(
+            &mut result,
+            cluster.spec.authentication_config.as_ref(),
+            None,
+        );
+
+        println!("Config: {:#?}", result);
     }
 }
