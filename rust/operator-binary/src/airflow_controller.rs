@@ -778,6 +778,6 @@ fn build_secret_operator_volume(
     }
 
     VolumeBuilder::new(volume_name)
-        .csi(secret_operator_volume_source_builder.build())
+        .ephemeral(secret_operator_volume_source_builder.build())
         .build()
 }
