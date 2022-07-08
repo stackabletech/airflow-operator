@@ -29,10 +29,7 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{
-        runtime::{
-            controller::{Action, Context},
-            reflector::ObjectRef,
-        },
+        runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
@@ -150,10 +147,10 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) -> Result<Action> {
+pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
-    let client = &ctx.get_ref().client;
+    let client = &ctx.client;
 
     // ensure admin user has been set up on the airflow database
     let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowDBObjectSnafu)?;
@@ -211,7 +208,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Context<Ctx>) 
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow.version().context(NoAirflowVersionSnafu)?,
         &role_config.context(ProductConfigTransformSnafu)?,
-        &ctx.get_ref().product_config,
+        &ctx.product_config,
         false,
         false,
     )
@@ -704,7 +701,7 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
         .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
 
