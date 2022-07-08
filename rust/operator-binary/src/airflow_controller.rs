@@ -6,7 +6,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{
     AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AIRFLOW_CONFIG_FILENAME,
-    APP_NAME, PYTHONPATH,
+    APP_NAME, CONFIG_PATH,
 };
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
@@ -121,7 +121,7 @@ pub enum Error {
         authentication_class: ObjectRef<AuthenticationClass>,
     },
     #[snafu(display(
-        "Superset doesn't support the AuthenticationClass provider 
+        "Airflow doesn't support the AuthenticationClass provider
     {authentication_class_provider} from AuthenticationClass {authentication_class}"
     ))]
     AuthenticationClassProviderNotSupported {
@@ -138,7 +138,7 @@ pub enum Error {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
-    #[snafu(display("superset db {airflow_db} initialization failed, not starting airflow"))]
+    #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
     AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
 }
 
@@ -303,7 +303,7 @@ fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> R
             .metadata
             .name
             .as_ref()
-            .unwrap_or(&"airflow".to_string()),
+            .unwrap_or(&APP_NAME.to_string()),
         role_name
     );
     let ports = role_ports(port);
@@ -335,7 +335,7 @@ fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> R
 
 fn role_ports(port: u16) -> Vec<ServicePort> {
     vec![ServicePort {
-        name: Some("airflow".to_string()),
+        name: Some(APP_NAME.to_string()),
         port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
@@ -512,7 +512,7 @@ fn build_server_rolegroup_statefulset(
 
     let volume_mounts = airflow.volume_mounts();
     cb.add_volume_mounts(volume_mounts);
-    cb.add_volume_mount("config", PYTHONPATH);
+    cb.add_volume_mount("config", CONFIG_PATH);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -536,7 +536,15 @@ fn build_server_rolegroup_statefulset(
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
 
-    let volumes = airflow.volumes();
+    let mut volumes = airflow.volumes();
+    volumes.push(Volume {
+        name: "config".to_string(),
+        config_map: Some(ConfigMapVolumeSource {
+            name: Some(rolegroup_ref.object_name()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -585,14 +593,6 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
-                .add_volume(Volume {
-                    name: "config".to_string(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: Some(rolegroup_ref.object_name()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
                 .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
@@ -664,12 +664,6 @@ fn build_mapped_envs(
         ..Default::default()
     });
 
-    env.push(EnvVar {
-        name: "PYTHONPATH".into(),
-        value: Some("/stackable/app/pythonpath".into()),
-        ..Default::default()
-    });
-
     env
 }
 
@@ -690,6 +684,7 @@ fn build_static_envs() -> Vec<EnvVar> {
             value: Some("9125".into()),
             ..Default::default()
         },
+        // Authentication for the API is handled separately to the Web Authentication.
         // Basic authentication is used by the integration tests.
         // The default is to deny all requests to the API.
         EnvVar {

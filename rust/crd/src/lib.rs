@@ -14,7 +14,8 @@ use stackable_operator::schemars::{self, JsonSchema};
 use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "airflow";
-pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
+pub const CONFIG_PATH: &str = "/stackable/app/config";
+pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 
 #[derive(Display, EnumIter, EnumString)]
@@ -202,13 +203,19 @@ pub enum AirflowRole {
 }
 
 impl AirflowRole {
-    /// Returns the start commands for the different server types.
+    /// Returns the start commands for the different airflow components. Airflow expects all
+    /// components to have the same image/configuration (e.g. DAG folder location), even if not all
+    /// configuration settings are used everywhere. For this reason we ensure that the webserver
+    /// config file is in the Airflow home directory on all pods.
     pub fn get_commands(&self) -> Vec<String> {
+        let copy_config = format!(
+            "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
+            {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
+        );
         match &self {
-            AirflowRole::Webserver => vec!["cp -RL /stackable/app/pythonpath/webserver_config.py /stackable/airflow/webserver_config.py".to_string(), 
-            "airflow webserver".to_string()],
-            AirflowRole::Scheduler => vec!["airflow scheduler".to_string()],
-            AirflowRole::Worker => vec!["airflow celery worker".to_string()],
+            AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
+            AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
+            AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
 

@@ -25,7 +25,8 @@ pub fn add_airflow_config(
         if let Some(authentication_class) = authentication_class {
             append_authentication_config(config, authentication_config, authentication_class);
         }
-    } else {
+    }
+    if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
             // should default to AUTH_TYPE = AUTH_DB
             AirflowConfigOptions::AuthType.to_string(),
