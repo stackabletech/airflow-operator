@@ -1,0 +1,55 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow-db
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  version: {{ test_scenario['values']['airflow'] }}
+  statsdExporterVersion: v0.22.4
+  executor: CeleryExecutor
+  loadExamples: true
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials
+  authenticationConfig:
+    authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
+        airflow-with-ldap-no-tls-ldap
+      {%- elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' -%}
+        airflow-with-ldap-insecure-tls-ldap
+      {%- elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' -%}
+        airflow-with-ldap-server-veri-tls-ldap
+      {%- endif %}
+
+    userRegistrationRole: Admin
+  webservers:
+    roleGroups:
+      default:
+        replicas: 1
+  workers:
+    roleGroups:
+      default:
+        replicas: 1
+  schedulers:
+    roleGroups:
+      default:
+        replicas: 1
