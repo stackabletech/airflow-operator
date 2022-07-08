@@ -20,6 +20,16 @@ stringData:
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-with-ldap-bind
+  labels:
+    secrets.stackable.tech/class: airflow-with-ldap-bind
+stringData:
+  user: cn=admin,dc=example,dc=org
+  password: admin
+---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
