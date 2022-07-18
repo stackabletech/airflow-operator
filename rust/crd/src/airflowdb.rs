@@ -55,7 +55,7 @@ impl AirflowDB {
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
-                .with_recommended_labels(airflow, APP_NAME, version, "db-initializer", "global")
+                .with_recommended_labels(airflow, APP_NAME, version, "", "db-initializer", "global")
                 .build(),
             spec: AirflowDBSpec {
                 airflow_version: version.to_string(),

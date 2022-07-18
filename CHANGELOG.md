@@ -5,6 +5,7 @@
 ### Changed
 
 - Include chart name when installing with a custom release name ([#131], [#132]).
+- Orphaned resources are deleted
 
 [#131]: https://github.com/stackabletech/airflow-operator/pull/131
 [#132]: https://github.com/stackabletech/airflow-operator/pull/132

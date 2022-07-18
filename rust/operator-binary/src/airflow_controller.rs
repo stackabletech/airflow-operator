@@ -4,6 +4,8 @@ use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
+use stackable_operator::cluster_resources::ClusterResources;
+use stackable_operator::kube::Resource;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -31,6 +33,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
+const CONTROLLER_NAME: &str = "airflow-operator";
 const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
@@ -51,6 +54,14 @@ pub enum Error {
     ObjectHasNoStatsdExporterVersion,
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
+    #[snafu(display("failed to create cluster resources"))]
+    CreateClusterResources {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to delete orphaned resources"))]
+    FinalizeClusterResources {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
@@ -151,12 +162,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(InvalidProductConfigSnafu)?;
 
+    let mut cluster_resources =
+        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &airflow.object_ref(&()))
+            .context(CreateClusterResourcesSnafu)?;
+
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service = build_role_service(role_name, &airflow, resolved_port)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
+            cluster_resources
+                .add(client, &role_service)
                 .await
                 .context(ApplyRoleServiceSnafu)?;
         }
@@ -169,23 +184,27 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             };
 
             let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
-                .await
-                .context(ApplyRoleGroupServiceSnafu {
+            cluster_resources.add(client, &rg_service).await.context(
+                ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
-                })?;
+                },
+            )?;
 
             let rg_statefulset =
                 build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
+            cluster_resources
+                .add(client, &rg_statefulset)
                 .await
                 .context(ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
         }
     }
+
+    cluster_resources
+        .finalize(client)
+        .await
+        .context(FinalizeClusterResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -214,6 +233,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
                 airflow,
                 APP_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
+                CONTROLLER_NAME,
                 role_name,
                 "global",
             )
@@ -270,6 +290,7 @@ fn build_rolegroup_service(
                 airflow,
                 APP_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
+                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -380,6 +401,7 @@ fn build_server_rolegroup_statefulset(
                 airflow,
                 APP_NAME,
                 airflow_version,
+                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -408,6 +430,7 @@ fn build_server_rolegroup_statefulset(
                         airflow,
                         APP_NAME,
                         airflow_version,
+                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )
