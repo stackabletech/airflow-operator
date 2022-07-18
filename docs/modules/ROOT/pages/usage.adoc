@@ -206,7 +206,9 @@ image::airflow_running.png[Airflow UI showing a running DAG]
 Every user has to authenticate themselves before using Airflow and there are several ways of doing this.
 
 === Webinterface
-The default setting is to manually set up users via the Webserver UI.
+The default setting is to view and manually set up users via the Webserver UI. Note the blue "+" button where users can be added directly:
+
+image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 Airflow supports authentication of users against an LDAP server.
@@ -226,6 +228,10 @@ spec:
     authenticationClass: airflow-with-ldap-server-veri-tls-ldap
     userRegistrationRole: Admin
 ----
+
+The users and roles can be viewed as before in the Webserver UI, but note that the blue "+" button is not available when authenticating against LDAP:
+
+image::airflow_security_ldap.png[Airflow Security menu]
 
 == Authorization
 The Airflow Webserver delegates the https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
