@@ -23,8 +23,8 @@ pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 pub enum AirflowConfigOptions {
     AuthType,
     AuthLdapSearch,
+    AuthLdapSearchFilter,
     AuthLdapServer,
-    AuthLdapUseTls,
     AuthLdapUidField,
     AuthLdapBindUser,
     AuthLdapBindPassword,
@@ -35,18 +35,17 @@ pub enum AirflowConfigOptions {
     AuthLdapEmailField,
     AuthLdapGroupField,
     AuthRolesSyncAtLogin,
-    PermanentSessionLifetime,
     AuthLdapTlsDemand,
     AuthLdapTlsCertfile,
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
+    AuthLdapAllowSelfSigned,
 }
 
 impl FlaskAppConfigOptions for AirflowConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
             AirflowConfigOptions::AuthType => PythonType::Expression,
-            AirflowConfigOptions::AuthLdapUseTls => PythonType::BoolLiteral,
             AirflowConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
             AirflowConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
             AirflowConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
@@ -54,6 +53,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
             AirflowConfigOptions::AuthLdapBindUser => PythonType::Expression,
             AirflowConfigOptions::AuthLdapBindPassword => PythonType::Expression,
             AirflowConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
@@ -63,7 +63,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
             AirflowConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
-            AirflowConfigOptions::PermanentSessionLifetime => PythonType::IntLiteral,
+            AirflowConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
         }
     }
 }
