@@ -220,7 +220,7 @@ In general, it requires you to specify a xref:commons-operator::authenticationcl
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
-  name: airflow-with-ldap-server-veri-tls
+  name: airflow-with-ldap
 spec:
   version: 2.2.5-python39-stackable0.3.0
   [...]
