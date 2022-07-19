@@ -11,7 +11,7 @@ use stackable_airflow_crd::{
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
 };
-use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, ConfigMapVolumeSource, Volume};
+use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
 use stackable_operator::product_config::flask_app_config_writer;
 use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
