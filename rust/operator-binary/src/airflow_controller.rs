@@ -219,6 +219,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             match &authentication_config.authentication_class {
                 Some(authentication_class) => {
                     Some(
+                        // TODO see https://github.com/stackabletech/operator-rs/commit/8c573874474d7f4b21719955844eb460d1f82d42
+                        // for a cleaner way of doing this once this change is avalable in operator-rs
                         client
                             .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
                             .await
