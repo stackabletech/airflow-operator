@@ -536,14 +536,15 @@ fn build_server_rolegroup_statefulset(
         .build();
 
     let mut volumes = airflow.volumes();
-    volumes.push(Volume {
-        name: "config".to_string(),
-        config_map: Some(ConfigMapVolumeSource {
-            name: Some(rolegroup_ref.object_name()),
-            ..Default::default()
-        }),
-        ..Default::default()
-    });
+
+    volumes.push(
+        VolumeBuilder::new("config".to_string())
+            .config_map(ConfigMapVolumeSource {
+                name: Some(rolegroup_ref.object_name()),
+                ..Default::default()
+            })
+            .build(),
+    );
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
