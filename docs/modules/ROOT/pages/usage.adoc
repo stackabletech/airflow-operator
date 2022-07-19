@@ -225,7 +225,7 @@ spec:
   version: 2.2.5-python39-stackable0.3.0
   [...]
   authenticationConfig:
-    authenticationClass: airflow-with-ldap-server-veri-tls-ldap
+    authenticationClass: airflow-with-ldap-ldap
     userRegistrationRole: Admin
 ----
 
