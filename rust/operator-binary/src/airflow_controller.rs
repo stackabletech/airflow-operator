@@ -1,11 +1,26 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
-
+use crate::config::{self, PYTHON_IMPORTS};
 use crate::util::env_var_from_secret;
+
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
-use stackable_airflow_crd::{AirflowCluster, AirflowConfig, AirflowRole, APP_NAME};
+use stackable_airflow_crd::{
+    AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AIRFLOW_CONFIG_FILENAME,
+    APP_NAME, CONFIG_PATH,
+};
+use stackable_operator::builder::{
+    ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+};
+use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
+use stackable_operator::product_config::flask_app_config_writer;
+use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder},
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        secret_class::SecretClassVolumeScope,
+        tls::{CaCert, TlsServerVerification, TlsVerification},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -36,6 +51,9 @@ const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
 
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -55,12 +73,17 @@ pub enum Error {
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
+    ApplyRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
@@ -89,6 +112,31 @@ pub enum Error {
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
+    AuthenticationClassRetrieval {
+        source: stackable_operator::error::Error,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display(
+        "Airflow doesn't support the AuthenticationClass provider
+    {authentication_class_provider} from AuthenticationClass {authentication_class}"
+    ))]
+    AuthenticationClassProviderNotSupported {
+        authentication_class_provider: String,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("failed to build config file for {rolegroup}"))]
+    BuildRoleGroupConfigFile {
+        source: FlaskAppConfigWriterError,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
+    BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<AirflowCluster>,
+    },
+    #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
+    AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -116,7 +164,9 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .await
         .context(AirflowDBRetrievalSnafu)?;
 
-    if let Some(status) = airflow_db.status {
+    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
+
+    if let Some(ref status) = airflow_db.status {
         match status.condition {
             AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
                 tracing::debug!(
@@ -124,7 +174,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 );
                 return Ok(Action::await_change());
             }
-            AirflowDBStatusCondition::Ready | AirflowDBStatusCondition::Failed => (),
+            AirflowDBStatusCondition::Failed => {
+                return AirflowDBFailedSnafu {
+                    airflow_db: ObjectRef::from_obj(&airflow_db),
+                }
+                .fail();
+            }
+            AirflowDBStatusCondition::Ready => (), // Continue starting Airflow
         }
     } else {
         tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
@@ -137,10 +193,17 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         if let Some(resolved_role) = airflow.get_role(role.clone()).clone() {
             roles.insert(
                 role.to_string(),
-                (vec![PropertyNameKind::Env], resolved_role),
+                (
+                    vec![
+                        PropertyNameKind::Env,
+                        PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
+                    ],
+                    resolved_role,
+                ),
             );
         }
     }
+
     let role_config = transform_all_roles_to_config(&*airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow.version().context(NoAirflowVersionSnafu)?,
@@ -150,6 +213,29 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
+    let authentication_class = match &airflow.spec.authentication_config {
+        Some(authentication_config) => {
+            match &authentication_config.authentication_class {
+                Some(authentication_class) => {
+                    Some(
+                        // TODO see https://github.com/stackabletech/operator-rs/commit/8c573874474d7f4b21719955844eb460d1f82d42
+                        // for a cleaner way of doing this once this change is avalable in operator-rs
+                        client
+                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
+                            .await
+                            .context(AuthenticationClassRetrievalSnafu {
+                                authentication_class: ObjectRef::<AuthenticationClass>::new(
+                                    authentication_class,
+                                ),
+                            })?,
+                    )
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -176,8 +262,25 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                     rolegroup: rolegroup.clone(),
                 })?;
 
-            let rg_statefulset =
-                build_server_rolegroup_statefulset(&rolegroup, &airflow, rolegroup_config)?;
+            let rg_configmap = build_rolegroup_config_map(
+                &airflow,
+                &rolegroup,
+                rolegroup_config,
+                authentication_class.as_ref(),
+            )?;
+            client
+                .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+                .await
+                .with_context(|_| ApplyRoleGroupConfigSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+
+            let rg_statefulset = build_server_rolegroup_statefulset(
+                &rolegroup,
+                &airflow,
+                rolegroup_config,
+                authentication_class.as_ref(),
+            )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
                 .await
@@ -192,14 +295,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
+fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
     let role_svc_name = format!(
         "{}-{}",
         airflow
             .metadata
             .name
             .as_ref()
-            .unwrap_or(&"airflow".to_string()),
+            .unwrap_or(&APP_NAME.to_string()),
         role_name
     );
     let ports = role_ports(port);
@@ -231,7 +334,7 @@ pub fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) 
 
 fn role_ports(port: u16) -> Vec<ServicePort> {
     vec![ServicePort {
-        name: Some("airflow".to_string()),
+        name: Some(APP_NAME.to_string()),
         port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
@@ -240,6 +343,60 @@ fn role_ports(port: u16) -> Vec<ServicePort> {
 
 fn role_port(role_name: &str) -> Option<u16> {
     AirflowRole::from_str(role_name).unwrap().get_http_port()
+}
+
+/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+fn build_rolegroup_config_map(
+    airflow: &AirflowCluster,
+    rolegroup: &RoleGroupRef<AirflowCluster>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
+) -> Result<ConfigMap, Error> {
+    let mut config = rolegroup_config
+        .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
+        .cloned()
+        .unwrap_or_default();
+
+    config::add_airflow_config(
+        &mut config,
+        airflow.spec.authentication_config.as_ref(),
+        authentication_class,
+    );
+
+    let mut config_file = Vec::new();
+    flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        PYTHON_IMPORTS,
+    )
+    .with_context(|_| BuildRoleGroupConfigFileSnafu {
+        rolegroup: rolegroup.clone(),
+    })?;
+
+    ConfigMapBuilder::new()
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(airflow)
+                .name(rolegroup.object_name())
+                .ownerreference_from_resource(airflow, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(
+                    airflow,
+                    APP_NAME,
+                    airflow.version().context(NoAirflowVersionSnafu)?,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                )
+                .build(),
+        )
+        .add_data(
+            AIRFLOW_CONFIG_FILENAME,
+            String::from_utf8(config_file).unwrap(),
+        )
+        .build()
+        .with_context(|_| BuildRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -299,6 +456,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -316,19 +474,23 @@ fn build_server_rolegroup_statefulset(
     let statsd_exporter_image =
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
-    // mapped environment variables
-    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
-
     // initialising commands
     let commands = airflow_role.get_commands();
 
     // container
-    let mut container_builder = ContainerBuilder::new(APP_NAME);
-    let container_builder = container_builder
+    let mut cb = ContainerBuilder::new(APP_NAME);
+    let mut pb = PodBuilder::new();
+
+    if let Some(authentication_class) = authentication_class {
+        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
+    }
+
+    let cb = cb
         .image(image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
 
+    // environment variables
     let env_config = rolegroup_config
         .get(&PropertyNameKind::Env)
         .iter()
@@ -340,12 +502,16 @@ fn build_server_rolegroup_statefulset(
         })
         .collect::<Vec<_>>();
 
-    container_builder.add_env_vars(env_mapped);
-    container_builder.add_env_vars(env_config);
-    container_builder.add_env_vars(build_static_envs());
+    // mapped environment variables
+    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
+
+    cb.add_env_vars(env_config);
+    cb.add_env_vars(env_mapped);
+    cb.add_env_vars(build_static_envs());
 
     let volume_mounts = airflow.volume_mounts();
-    container_builder.add_volume_mounts(volume_mounts);
+    cb.add_volume_mounts(volume_mounts);
+    cb.add_volume_mount("config", CONFIG_PATH);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -357,18 +523,25 @@ fn build_server_rolegroup_statefulset(
             period_seconds: Some(5),
             ..Probe::default()
         };
-        container_builder.readiness_probe(probe.clone());
-        container_builder.liveness_probe(probe);
+        cb.readiness_probe(probe.clone());
+        cb.liveness_probe(probe);
+        cb.add_container_port("http", resolved_port.into());
     }
 
-    let container = container_builder.build();
+    let container = cb.build();
 
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
 
-    let volumes = airflow.volumes();
+    let mut volumes = airflow.volumes();
+
+    volumes.push(
+        VolumeBuilder::new("config")
+            .with_config_map(rolegroup_ref.object_name())
+            .build(),
+    );
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -384,6 +557,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role_group,
             )
             .with_label("statsd-exporter", statsd_exporter_version)
+            .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -402,7 +576,7 @@ fn build_server_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: PodBuilder::new()
+            template: pb
                 .metadata_builder(|m| {
                     m.with_recommended_labels(
                         airflow,
@@ -416,6 +590,7 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
+                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
@@ -485,6 +660,7 @@ fn build_mapped_envs(
         value: executor,
         ..Default::default()
     });
+
     env
 }
 
@@ -505,6 +681,7 @@ fn build_static_envs() -> Vec<EnvVar> {
             value: Some("9125".into()),
             ..Default::default()
         },
+        // Authentication for the API is handled separately to the Web Authentication.
         // Basic authentication is used by the integration tests.
         // The default is to deny all requests to the API.
         EnvVar {
@@ -526,4 +703,81 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
 
 pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+fn add_authentication_volumes_and_volume_mounts(
+    authentication_class: &AuthenticationClass,
+    cb: &mut ContainerBuilder,
+    pb: &mut PodBuilder,
+) -> Result<()> {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
+            if let Some(bind_credentials) = &ldap.bind_credentials {
+                let volume_name = format!("{authentication_class_name}-bind-credentials");
+
+                pb.add_volume(build_secret_operator_volume(
+                    &volume_name,
+                    &bind_credentials.secret_class,
+                    bind_credentials.scope.as_ref(),
+                ));
+                cb.add_volume_mount(&volume_name, format!("{SECRETS_DIR}{volume_name}"));
+            }
+
+            if let Some(tls) = &ldap.tls {
+                match &tls.verification {
+                    TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::SecretClass(cert_secret_class),
+                    }) => {
+                        let volume_name = format!("{authentication_class_name}-tls-certificate");
+
+                        pb.add_volume(build_secret_operator_volume(
+                            &volume_name,
+                            cert_secret_class,
+                            None,
+                        ));
+                        cb.add_volume_mount(&volume_name, format!("{CERTS_DIR}{volume_name}"));
+                    }
+                    // Explicitly listing other possibilities to not oversee new enum variants in the future
+                    TlsVerification::None {}
+                    | TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }) => {}
+                }
+            }
+
+            Ok(())
+        }
+        _ => AuthenticationClassProviderNotSupportedSnafu {
+            authentication_class_provider: authentication_class.spec.provider.to_string(),
+            authentication_class: ObjectRef::<AuthenticationClass>::new(authentication_class_name),
+        }
+        .fail(),
+    }
+}
+
+fn build_secret_operator_volume(
+    volume_name: &str,
+    secret_class_name: &str,
+    scope: Option<&SecretClassVolumeScope>,
+) -> Volume {
+    let mut secret_operator_volume_source_builder =
+        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+    if let Some(scope) = scope {
+        if scope.pod {
+            secret_operator_volume_source_builder.with_pod_scope();
+        }
+        if scope.node {
+            secret_operator_volume_source_builder.with_node_scope();
+        }
+        for service in &scope.services {
+            secret_operator_volume_source_builder.with_service_scope(service);
+        }
+    }
+
+    VolumeBuilder::new(volume_name)
+        .ephemeral(secret_operator_volume_source_builder.build())
+        .build()
 }

@@ -5,6 +5,11 @@ dimensions:
       - 2.2.3-python38-stackable0.3.0
       - 2.2.4-python39-stackable0.3.0
       - 2.2.5-python39-stackable0.3.0
+  - name: ldap-authentication
+    values:
+      - no-tls
+      - insecure-tls
+      - server-verification-tls
 tests:
   - name: mount-dags-pvc
     dimensions:
@@ -15,3 +20,7 @@ tests:
   - name: mount-dags-configmap
     dimensions:
       - airflow
+  - name: ldap
+    dimensions:
+      - airflow
+      - ldap-authentication

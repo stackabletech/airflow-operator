@@ -202,6 +202,47 @@ will run and the job tree will update automatically:
 
 image::airflow_running.png[Airflow UI showing a running DAG]
 
+== Authentication
+Every user has to authenticate themselves before using Airflow and there are several ways of doing this.
+
+=== Webinterface
+The default setting is to view and manually set up users via the Webserver UI. Note the blue "+" button where users can be added directly:
+
+image::airflow_security.png[Airflow Security menu]
+
+=== LDAP
+Airflow supports authentication of users against an LDAP server.
+Have a look at https://github.com/stackabletech/airflow-operator/blob/main/examples/simple-airflow-cluster-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
+In general, it requires you to specify a xref:commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In the example below we assign all the users the `Admin` role once they log into Airflow:
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-with-ldap
+spec:
+  version: 2.2.5-python39-stackable0.3.0
+  [...]
+  authenticationConfig:
+    authenticationClass: airflow-with-ldap-ldap
+    userRegistrationRole: Admin
+----
+
+The users and roles can be viewed as before in the Webserver UI, but note that the blue "+" button is not available when authenticating against LDAP:
+
+image::airflow_security_ldap.png[Airflow Security menu]
+
+== Authorization
+The Airflow Webserver delegates the https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
+
+=== Webinterface
+You can view, add to, and assign the roles displayed in the Airflow Webserver UI to existing users.
+
+=== LDAP
+Airflow supports assigning roles to users based on their LDAP group membership
+, though this is not yet supported by the Stackable operator. Currently, all the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `AirflowCluster` object.
+
 == Monitoring
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See

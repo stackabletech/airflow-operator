@@ -2,12 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- LDAP user authentication ([#133]).
+
 ### Changed
 
 - Include chart name when installing with a custom release name ([#131], [#132]).
 
 [#131]: https://github.com/stackabletech/airflow-operator/pull/131
 [#132]: https://github.com/stackabletech/airflow-operator/pull/132
+[#133]: https://github.com/stackabletech/airflow-operator/pull/133
 
 ## [0.4.0] - 2022-06-30
 
