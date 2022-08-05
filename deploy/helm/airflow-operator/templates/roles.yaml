@@ -105,10 +105,10 @@ rules:
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
-  name: zookeeper-scc
+  name: airflow-scc
   annotations:
     kubernetes.io/description: |-
-      zookeeper-scc is derived from hostmount-anyuid. It provides all the features of the
+      This resource is derived from hostmount-anyuid. It provides all the features of the
       restricted SCC but allows host mounts and any UID by a pod.  This is primarily
       used by the persistent volume recycler. WARNING: this SCC allows host file
       system access as any UID, including UID 0.  Grant with caution.
@@ -172,7 +172,7 @@ rules:
     resources:
       - securitycontextconstraints
     resourceNames:
-      - zookeeper-scc
+      - airflow-scc
     verbs:
       - use
 {{ end }}
