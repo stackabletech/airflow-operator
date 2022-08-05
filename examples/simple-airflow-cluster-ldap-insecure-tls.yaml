@@ -1,0 +1,169 @@
+# helm install --repo https://repo.stackable.tech/repository/helm-stable/ secret-operator secret-operator
+# helm install --repo https://repo.stackable.tech/repository/helm-stable/ commons-operator commons-operator
+# helm install --repo https://charts.bitnami.com/bitnami --version 11.0.0 --set auth.username=airflow --set auth.password=airflow --set auth.database=airflow airflow-postgresql postgresql
+# helm install --repo https://charts.bitnami.com/bitnami --version 16.8.7 --set auth.password=redis --set replica.replicaCount=1 airflow-redis redis
+# Log in with user01/user01 or user02/user02
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: openldap-tls
+spec:
+  backend:
+    autoTls:
+      ca:
+        autoGenerate: true
+        secret:
+          name: openldap-tls-ca
+          namespace: default
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openldap
+  serviceName: openldap
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openldap
+    spec:
+      containers:
+        - name: openldap
+          image: docker.io/bitnami/openldap:2.5
+          env:
+            - name: LDAP_ADMIN_USERNAME
+              value: admin
+            - name: LDAP_ADMIN_PASSWORD
+              value: admin
+            - name: LDAP_USERS
+              value: user01,user02
+            - name: LDAP_PASSWORDS
+              value: user01,user02
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            - name: LDAP_TLS_CERT_FILE
+              value: /tls/tls.crt
+            - name: LDAP_TLS_KEY_FILE
+              value: /tls/tls.key
+            - name: LDAP_TLS_CA_FILE
+              value: /tls/ca.crt
+          ports:
+            - name: tls-ldap
+              containerPort: 1636
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+      volumes:
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: openldap-tls
+              secrets.stackable.tech/scope: pod
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  type: ClusterIP
+  ports:
+    - name: tls-ldap
+      port: 1636
+      targetPort: tls-ldap
+  selector:
+    app.kubernetes.io/name: openldap
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: airflow-with-ldap-insecure-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: openldap.default.svc.cluster.local
+      port: 1636
+      searchBase: ou=users,dc=example,dc=org
+      ldapFieldNames:
+        uid: uid
+        group: memberof
+        givenName: givenName
+        surname: sn
+        email: mail
+      bindCredentials:
+        secretClass: airflow-with-ldap-bind
+      tls:
+        verification:
+          none: {}
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: airflow-with-ldap-bind
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-with-ldap-bind
+  labels:
+    secrets.stackable.tech/class: airflow-with-ldap-bind
+stringData:
+  user: cn=admin,dc=example,dc=org
+  password: admin
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-with-ldap-server-veri-tls-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-insecure-tls
+spec:
+  version: 2.2.5-python39-stackable0.3.0
+  statsdExporterVersion: v0.22.4
+  executor: CeleryExecutor
+  loadExamples: true
+  exposeConfig: true
+  credentialsSecret: airflow-with-ldap-server-veri-tls-credentials
+  authenticationConfig:
+    authenticationClass: airflow-with-ldap-insecure-tls-ldap
+    userRegistrationRole: Admin
+  webservers:
+    roleGroups:
+      default:
+        replicas: 1
+  workers:
+    roleGroups:
+      default:
+        replicas: 1
+  schedulers:
+    roleGroups:
+      default:
+        replicas: 1

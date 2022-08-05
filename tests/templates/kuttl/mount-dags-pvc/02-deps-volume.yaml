@@ -17,6 +17,8 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        node: "2"
       restartPolicy: Never
       volumes:
         - name: external-dags

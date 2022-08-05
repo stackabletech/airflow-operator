@@ -5,12 +5,68 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use stackable_operator::k8s_openapi::api::core::v1::{Volume, VolumeMount};
 use stackable_operator::kube::CustomResource;
+use stackable_operator::product_config::flask_app_config_writer::{
+    FlaskAppConfigOptions, PythonType,
+};
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::Role;
 use stackable_operator::schemars::{self, JsonSchema};
 use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "airflow";
+pub const CONFIG_PATH: &str = "/stackable/app/config";
+pub const AIRFLOW_HOME: &str = "/stackable/airflow";
+pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+
+#[derive(Display, EnumIter, EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum AirflowConfigOptions {
+    AuthType,
+    AuthLdapSearch,
+    AuthLdapSearchFilter,
+    AuthLdapServer,
+    AuthLdapUidField,
+    AuthLdapBindUser,
+    AuthLdapBindPassword,
+    AuthUserRegistration,
+    AuthUserRegistrationRole,
+    AuthLdapFirstnameField,
+    AuthLdapLastnameField,
+    AuthLdapEmailField,
+    AuthLdapGroupField,
+    AuthRolesSyncAtLogin,
+    AuthLdapTlsDemand,
+    AuthLdapTlsCertfile,
+    AuthLdapTlsKeyfile,
+    AuthLdapTlsCacertfile,
+    AuthLdapAllowSelfSigned,
+}
+
+impl FlaskAppConfigOptions for AirflowConfigOptions {
+    fn python_type(&self) -> PythonType {
+        match self {
+            AirflowConfigOptions::AuthType => PythonType::Expression,
+            AirflowConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
+            AirflowConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
+            AirflowConfigOptions::AuthLdapServer => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapBindUser => PythonType::Expression,
+            AirflowConfigOptions::AuthLdapBindPassword => PythonType::Expression,
+            AirflowConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapLastnameField => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapEmailField => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapTlsDemand => PythonType::BoolLiteral,
+            AirflowConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
+        }
+    }
+}
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -48,11 +104,56 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volume_mounts: Option<Vec<VolumeMount>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_config: Option<AirflowClusterAuthenticationConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workers: Option<Role<AirflowConfig>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowClusterAuthenticationConfig {
+    /// Name of the AuthenticationClass used to authenticate the users.
+    /// At the moment only LDAP is supported.
+    /// If not specified the default authentication (AUTH_DB) will be used.
+    pub authentication_class: Option<String>,
+
+    /// Allow users who are not already in the FAB DB.
+    /// Gets mapped to `AUTH_USER_REGISTRATION`
+    #[serde(default = "default_user_registration")]
+    pub user_registration: bool,
+
+    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
+    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+    #[serde(default = "default_user_registration_role")]
+    pub user_registration_role: String,
+
+    /// If we should replace ALL the user's roles each login, or only on registration.
+    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+    #[serde(default = "default_sync_roles_at")]
+    pub sync_roles_at: LdapRolesSyncMoment,
+}
+
+pub fn default_user_registration() -> bool {
+    true
+}
+
+pub fn default_user_registration_role() -> String {
+    "Public".to_string()
+}
+
+/// Matches Flask's default mode of syncing at registration
+pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
+    LdapRolesSyncMoment::Registration
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum LdapRolesSyncMoment {
+    Registration,
+    Login,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -102,12 +203,19 @@ pub enum AirflowRole {
 }
 
 impl AirflowRole {
-    /// Returns the start commands for the different server types.
+    /// Returns the start commands for the different airflow components. Airflow expects all
+    /// components to have the same image/configuration (e.g. DAG folder location), even if not all
+    /// configuration settings are used everywhere. For this reason we ensure that the webserver
+    /// config file is in the Airflow home directory on all pods.
     pub fn get_commands(&self) -> Vec<String> {
+        let copy_config = format!(
+            "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
+            {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
+        );
         match &self {
-            AirflowRole::Webserver => vec!["airflow webserver".to_string()],
-            AirflowRole::Scheduler => vec!["airflow scheduler".to_string()],
-            AirflowRole::Worker => vec!["airflow celery worker".to_string()],
+            AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
+            AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
+            AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
 
@@ -171,7 +279,7 @@ impl Configuration for AirflowConfig {
 
     fn compute_cli(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok(BTreeMap::new())
@@ -179,7 +287,7 @@ impl Configuration for AirflowConfig {
 
     fn compute_files(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
         _file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {

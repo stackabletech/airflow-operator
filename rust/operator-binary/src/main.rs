@@ -1,14 +1,20 @@
 mod airflow_controller;
 mod airflow_db_controller;
+mod config;
 mod util;
+
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::StreamExt;
-use stackable_airflow_crd::{airflowdb::AirflowDB, AirflowCluster, APP_NAME};
+use stackable_airflow_crd::{
+    airflowdb::AirflowDB, AirflowCluster, AirflowClusterAuthenticationConfig, APP_NAME,
+};
 use stackable_operator::cli::ProductOperatorRun;
 use stackable_operator::logging::controller::report_controller_reconciled;
 use stackable_operator::{
     cli::Command,
+    commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
@@ -16,7 +22,7 @@ use stackable_operator::{
     },
     kube::{
         api::ListParams,
-        runtime::{controller::Context, reflector::ObjectRef, Controller},
+        runtime::{reflector::ObjectRef, Controller},
         CustomResourceExt, ResourceExt,
     },
 };
@@ -75,7 +81,8 @@ async fn main() -> anyhow::Result<()> {
                 ListParams::default(),
             );
 
-            let airflow_store = airflow_controller_builder.store();
+            let airflow_store_1 = airflow_controller_builder.store();
+            let airflow_store_2 = airflow_controller_builder.store();
             let airflow_controller = airflow_controller_builder
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -87,10 +94,26 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .shutdown_on_signal()
                 .watches(
+                    watch_namespace.get_api::<AuthenticationClass>(&client),
+                    ListParams::default(),
+                    move |authentication_class| {
+                        airflow_store_1
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow: &Arc<AirflowCluster>| {
+                                references_authentication_class(
+                                    &airflow.spec.authentication_config,
+                                    &authentication_class,
+                                )
+                            })
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .watches(
                     watch_namespace.get_api::<AirflowDB>(&client),
                     ListParams::default(),
                     move |airflow_db| {
-                        airflow_store
+                        airflow_store_2
                             .state()
                             .into_iter()
                             .filter(move |airflow| {
@@ -103,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     airflow_controller::reconcile_airflow,
                     airflow_controller::error_policy,
-                    Context::new(airflow_controller::Ctx {
+                    Arc::new(airflow_controller::Ctx {
                         client: client.clone(),
                         product_config,
                     }),
@@ -161,7 +184,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     airflow_db_controller::reconcile_airflow_db,
                     airflow_db_controller::error_policy,
-                    Context::new(airflow_db_controller::Ctx {
+                    Arc::new(airflow_db_controller::Ctx {
                         client: client.clone(),
                     }),
                 )
@@ -180,4 +203,16 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn references_authentication_class(
+    authentication_config: &Option<AirflowClusterAuthenticationConfig>,
+    authentication_class: &AuthenticationClass,
+) -> bool {
+    assert!(authentication_class.metadata.name.is_some());
+
+    authentication_config
+        .as_ref()
+        .and_then(|c| c.authentication_class.as_ref())
+        == authentication_class.metadata.name.as_ref()
 }

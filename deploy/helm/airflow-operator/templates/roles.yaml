@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Release.Name }}-clusterrole
+  name: {{ include "operator.fullname" . }}-clusterrole
 rules:
   - apiGroups:
       - ""
@@ -92,6 +92,14 @@ rules:
       - airflowdbs
     verbs:
       - create
+  - apiGroups:
+      - authentication.stackable.tech
+    resources:
+      - authenticationclasses
+    verbs:
+      - get
+      - list
+      - watch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
 ---
 apiVersion: security.openshift.io/v1

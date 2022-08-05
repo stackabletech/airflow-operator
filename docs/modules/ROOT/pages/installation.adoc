@@ -17,6 +17,13 @@ installation method. First ensure that you have installed the Stackable Operator
 $ helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
 ----
 
+We also need some additional components of the Stackable Data Platform (if not installed already):
+[source,bash]
+----
+$ helm install commons-operator stackable/commons-operator
+$ helm install secret-operator stackable/secret-operator
+----
+
 Then install the Stackable Operator for Apache Airflow
 [source,bash]
 ----
@@ -42,7 +49,7 @@ for this operator.
 [source]
 ----
 $ kubectl apply -f airflowcluster.crd.yaml
-$ kubectl apply -f init.crd.yaml
+$ kubectl apply -f airflowdb.crd.yaml
 ----
 
 To run it straight from Docker you can use this command:
@@ -58,11 +65,10 @@ docker run \
 
 == Building the operator from source
 
-This operator is written in Rust and is developed against the latest stable Rust release (1.58 at
-the time of writing).
+This operator is written in Rust and is developed against the latest stable Rust release.
 
 [source]
 ----
-stackable-airflow-operator crd | kubectl apply -f -
-stackable-airflow-operator run
+cargo run -- crd | kubectl apply -f -
+cargo run -- run
 ----
