@@ -100,6 +100,12 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
 ---
 apiVersion: security.openshift.io/v1
