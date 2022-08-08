@@ -731,7 +731,7 @@ pub fn build_zk_rbac_resources(airflow: &AirflowCluster) -> Result<(ServiceAccou
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
             .name(SERVICE_ACCOUNT.to_string())
-            .with_label("managed-by".to_string(), "zookeeper-operator".to_string())
+            .with_label("managed-by".to_string(), "airflow-operator".to_string())
             .build(),
         ..ServiceAccount::default()
     };
@@ -739,12 +739,12 @@ pub fn build_zk_rbac_resources(airflow: &AirflowCluster) -> Result<(ServiceAccou
     let role_binding = RoleBinding {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
-            .name("zookeeper-rolebinding".to_string())
-            .with_label("managed-by".to_string(), "zookeeper-operator".to_string())
+            .name("airflow-rolebinding".to_string())
+            .with_label("managed-by".to_string(), "airflow-operator".to_string())
             .build(),
         role_ref: RoleRef {
             kind: "ClusterRole".to_string(),
-            name: "zookeeper-clusterrole".to_string(),
+            name: "airflow-clusterrole".to_string(),
             api_group: "rbac.authorization.k8s.io".to_string(),
         },
         subjects: Some(vec![Subject {
