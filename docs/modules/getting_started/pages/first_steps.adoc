@@ -106,6 +106,10 @@ airflow-webserver-default   1/1     11m
 airflow-worker-default      2/2     11m
 ----
 
+The completed set of pods for the Airflow cluster will look something like this:
+
+image::airflow_pods.png[Airflow pods]
+
 Then, create a port-forward for the Airflow webserver:
 
 ----

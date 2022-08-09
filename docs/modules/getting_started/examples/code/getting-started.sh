@@ -20,11 +20,11 @@ fi
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
 # tag::helm-add-bitnami-deps[]
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install airflow-postgresql bitnami/postgresql --version 11.0.0 \
+helm install --wait airflow-postgresql bitnami/postgresql --version 11.0.0 \
     --set auth.username=airflow \
     --set auth.password=airflow \
     --set auth.database=airflow
-helm install airflow-redis bitnami/redis \
+helm install --wait airflow-redis bitnami/redis \
     --set auth.password=redis \
     --version 16.8.7 \
     --set replica.replicaCount=1
@@ -70,7 +70,7 @@ kubectl apply -f airflow.yaml
 
 echo "Waiting on AirflowDB ..."
 # tag::wait-airflowdb[]
-kubectl wait airflowdb/simple-airflow \
+kubectl wait airflowdb/airflow \
   --for jsonpath='{.status.condition}'=Ready \
   --timeout 300s
 # end::wait-airflowdb[]
