@@ -29,8 +29,10 @@ A Redis instance can be setup in a similar way:
 
 [source,bash]
 ----
-helm install redis bitnami/redis \
-    --set auth.password=redis
+helm install airflow-redis bitnami/redis \
+    --set auth.password=redis \
+    --version 16.8.7 \
+    --set replica.replicaCount=1
 ----
 
 == Secret with Airflow credentials
@@ -53,7 +55,7 @@ stringData:
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
-  connections.celeryBrokerUrl: redis://:redis@redis-master:6379/0
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ----
 
 The `connections.secretKey` will be used for securely signing the session cookies and can be used
