@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The getting started guide script
-# It uses tagged regions which are included in the documentation
-# https://docs.asciidoctor.org/asciidoc/latest/directives/include-tagged-regions/
-#
-# There are two variants to go through the guide - using stackablectl or helm
-# The script takes either 'stackablectl' or 'helm' as an argument
-#
-# The script can be run as a test as well, to make sure that the tutorial works
-# It includes some assertions throughout, and at the end especially.
+# This script contains all the code snippets from the guide, as well as some assert tests
+# to test if the instructions in the guide work. The user *could* use it, but it is intended
+# for testing only.
+# The script will install the operators, create a superset instance and briefly open a port
+# forward and connect to the superset instance to make sure it is up and running.
+# No running processes are left behind (i.e. the port-forwarding is closed at the end)
 
 if [ $# -eq 0 ]
 then
@@ -18,38 +15,42 @@ then
 fi
 
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
-# tag::helm-add-bitnami-deps[]
+# tag::helm-add-bitnami-repo[]
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install --wait airflow-postgresql bitnami/postgresql --version 11.0.0 \
+# end::helm-add-bitnami-repo[]
+# tag::helm-add-bitnami-pgs[]
+helm install --wait airflow-postgresql bitnami/postgresql --version {{ versions.postgresql }} \
     --set auth.username=airflow \
     --set auth.password=airflow \
     --set auth.database=airflow
+# end::helm-add-bitnami-pgs[]
+# tag::helm-add-bitnami-redis[]
 helm install --wait airflow-redis bitnami/redis \
     --set auth.password=redis \
-    --version 16.8.7 \
+    --version {{ versions.redis }} \
     --set replica.replicaCount=1
-# end::helm-add-bitnami-deps[]
+# end::helm-add-bitnami-redis[]
 
 case "$1" in
 "helm")
 echo "Adding 'stackable-dev' Helm Chart repository"
 # tag::helm-add-repo[]
-helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
+helm repo add {{ helm.repo_name }} {{ helm.repo_url }}
 # end::helm-add-repo[]
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.3.0-nightly
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.6.0-nightly
-helm install --wait airflow-operator stackable-dev/airflow-operator --version 0.5.0-nightly
+helm install --wait commons-operator {{ helm.repo_name }}/commons-operator --version {{ versions.commons }}
+helm install --wait secret-operator {{ helm.repo_name }}/secret-operator --version {{ versions.secret }}
+helm install --wait airflow-operator {{ helm.repo_name }}/airflow-operator --version {{ versions.airflow }}
 # end::helm-install-operators[]
 ;;
 "stackablectl")
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.3.0-nightly \
-  secret=0.6.0-nightly \
-  airflow=0.5.0-nightly
+  commons={{ versions.commons }} \
+  secret={{ versions.secret }} \
+  airflow={{ versions.airflow }}
 # end::stackablectl-install-operators[]
 ;;
 *)
