@@ -1,5 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
+use crate::rbac;
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -11,9 +12,7 @@ use stackable_airflow_crd::{
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
 };
-use stackable_operator::k8s_openapi::api::core::v1::ServiceAccount;
 use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
-use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subject};
 use stackable_operator::product_config::flask_app_config_writer;
 use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
@@ -53,7 +52,6 @@ const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
 
-const SERVICE_ACCOUNT: &str = "airflow-serviceaccount";
 pub const SECRETS_DIR: &str = "/stackable/secrets/";
 pub const CERTS_DIR: &str = "/stackable/certificates/";
 
@@ -115,12 +113,14 @@ pub enum Error {
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to create RBAC service account: {source}"))]
+    #[snafu(display("failed to patch service account: {source}"))]
     ApplyServiceAccount {
+        name: String,
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to create RBAC role binding: {source}"))]
+    #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
+        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
@@ -225,15 +225,19 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = build_zk_rbac_resources(&airflow)?;
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu)?;
+        .with_context(|_| ApplyServiceAccountSnafu {
+            name: rbac_sa.name(),
+        })?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
         .await
-        .with_context(|_| ApplyRoleBindingSnafu)?;
+        .with_context(|_| ApplyRoleBindingSnafu {
+            name: rbac_rolebinding.name(),
+        })?;
 
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => {
@@ -724,38 +728,6 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
 
 pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
-}
-
-pub fn build_zk_rbac_resources(airflow: &AirflowCluster) -> Result<(ServiceAccount, RoleBinding)> {
-    let service_account = ServiceAccount {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
-            .name(SERVICE_ACCOUNT.to_string())
-            .with_label("managed-by".to_string(), "airflow-operator".to_string())
-            .build(),
-        ..ServiceAccount::default()
-    };
-
-    let role_binding = RoleBinding {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
-            .name("airflow-rolebinding".to_string())
-            .with_label("managed-by".to_string(), "airflow-operator".to_string())
-            .build(),
-        role_ref: RoleRef {
-            kind: "ClusterRole".to_string(),
-            name: "airflow-clusterrole".to_string(),
-            api_group: "rbac.authorization.k8s.io".to_string(),
-        },
-        subjects: Some(vec![Subject {
-            kind: "ServiceAccount".to_string(),
-            name: SERVICE_ACCOUNT.to_string(),
-            namespace: airflow.namespace(),
-            ..Subject::default()
-        }]),
-    };
-
-    Ok((service_account, role_binding))
 }
 
 fn add_authentication_volumes_and_volume_mounts(

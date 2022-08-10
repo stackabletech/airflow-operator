@@ -1,3 +1,4 @@
+use crate::rbac;
 use crate::util::{env_var_from_secret, get_job_state, JobState};
 
 use snafu::{ResultExt, Snafu};
@@ -60,6 +61,16 @@ pub enum Error {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
     },
+    #[snafu(display("failed to patch service account: {source}"))]
+    ApplyServiceAccount {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding: {source}"))]
+    ApplyRoleBinding {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -74,6 +85,19 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
 
     let client = &ctx.client;
 
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
+        .await
+        .with_context(|_| ApplyServiceAccountSnafu {
+            name: rbac_sa.name(),
+        })?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
+        .await
+        .with_context(|_| ApplyRoleBindingSnafu {
+            name: rbac_rolebinding.name(),
+        })?;
     if let Some(ref s) = airflow_db.status {
         match s.condition {
             AirflowDBStatusCondition::Pending => {
@@ -92,7 +116,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         SecretCheckSnafu { secret: secret_ref }
                     })?;
                 if secret_exists {
-                    let job = build_init_job(&airflow_db)?;
+                    let job = build_init_job(&airflow_db, &rbac_sa.name())?;
                     client
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
@@ -147,7 +171,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     Ok(Action::await_change())
 }
 
-fn build_init_job(airflow_db: &AirflowDB) -> Result<Job> {
+fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
     let commands = vec![
         String::from("airflow db init"),
         String::from("airflow db upgrade"),
@@ -202,6 +226,7 @@ fn build_init_job(airflow_db: &AirflowDB) -> Result<Job> {
         spec: Some(PodSpec {
             containers: vec![container],
             restart_policy: Some("Never".to_string()),
+            service_account: Some(sa_name.to_string()),
             ..Default::default()
         }),
     };
