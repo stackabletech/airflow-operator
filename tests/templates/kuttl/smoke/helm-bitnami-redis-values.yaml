@@ -19,4 +19,3 @@ replica:
 
 auth:
   password: redis
-
