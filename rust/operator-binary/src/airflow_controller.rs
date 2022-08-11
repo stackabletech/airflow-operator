@@ -505,12 +505,6 @@ fn build_server_rolegroup_statefulset(
     // container
     let mut cb = ContainerBuilder::new(APP_NAME);
     let mut pb = PodBuilder::new();
-    pb.security_context(
-        PodSecurityContextBuilder::new()
-            .run_as_user(rbac::AIRFLOW_UID)
-            .run_as_group(0)
-            .build(),
-    );
 
     if let Some(authentication_class) = authentication_class {
         add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
@@ -621,7 +615,13 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
-                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
+                .security_context(
+                    PodSecurityContextBuilder::new()
+                        .run_as_user(rbac::AIRFLOW_UID)
+                        .run_as_group(0)
+                        .fs_group(1000) // Needed for secret-operator
+                        .build(),
+                )
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
