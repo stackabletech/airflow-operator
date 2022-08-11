@@ -101,3 +101,44 @@ else
   echo "Could not reach Webserver UI."
   exit 1
 fi
+
+sleep 5
+
+echo "Checking webserver health ..."
+health=$(curl -s -XGET http://localhost:8080/api/v1/health | jq -r '.scheduler.status')
+if [ "$health" == "healthy" ]; then
+  echo "We have a healthy webserver!"
+else
+  echo "Webserver does not have the expected status. Detected status: " "$health"
+  exit 1
+fi
+
+echo "Triggering a DAG run. Enable DAG..."
+curl -s --user airflow:airflow -H 'Content-Type:application/json' \
+  -XPATCH http://localhost:8080/api/v1/dags/example_complex \
+  -d '{"is_paused": false}'
+
+dag_id=$(curl -s --user airflow:airflow -H 'Content-Type:application/json' \
+  -XPOST http://localhost:8080/api/v1/dags/example_complex/dagRuns \
+  -d '{}' | jq -r '.dag_run_id')
+
+request_dag_status() {
+  curl -s --user airflow:airflow -H 'Content-Type:application/json' \
+    -XGET http://localhost:8080/api/v1/dags/example_complex/dagRuns/$dag_id | jq -r '.state'
+}
+
+while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
+  echo "Awaiting DAG completion ..."
+  sleep 5
+done
+
+dag_state=$(request_dag_status)
+
+echo "Checking DAG result ..."
+if [ "$dag_state" == "success" ]; then
+  echo "DAG run successful for ID: " "$dag_id"
+else
+  echo "The DAG was not successful. State: " "$dag_state"
+  exit 1
+fi
+
