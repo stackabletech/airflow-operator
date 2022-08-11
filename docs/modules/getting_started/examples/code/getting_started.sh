@@ -124,7 +124,7 @@ dag_id=$(curl -s --user airflow:airflow -H 'Content-Type:application/json' \
 
 request_dag_status() {
   curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XGET http://localhost:8080/api/v1/dags/example_complex/dagRuns/$dag_id | jq -r '.state'
+    -XGET http://localhost:8080/api/v1/dags/example_complex/dagRuns/"$dag_id" | jq -r '.state'
 }
 
 while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
