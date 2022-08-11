@@ -69,7 +69,7 @@ It should generally be safe to simply use the latest image version that is avail
 
 This will create the actual Airflow cluster.
 
-=== Initialization of the Airflow database
+== Initialization of the Airflow database
 
 When creating an Airflow cluster, a database-initialization job is first started to ensure that the database schema is present and correct (i.e. populated with an admin user). A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
 
