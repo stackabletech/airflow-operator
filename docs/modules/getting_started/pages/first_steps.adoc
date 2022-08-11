@@ -29,7 +29,7 @@ The `connections.secretKey` will be used for securely signing the session cookie
 The `adminUser` fields are used to create an admin user.
 Please note that the admin user will be disabled if you use a non-default authentication mechanism like LDAP.
 
-=== Airflow
+== Airflow
 
 An Airflow cluster is made of up three components:
 
