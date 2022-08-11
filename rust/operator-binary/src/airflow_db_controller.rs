@@ -4,6 +4,7 @@ use crate::util::{env_var_from_secret, get_job_state, JobState};
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
 use stackable_airflow_crd::AirflowCluster;
+use stackable_operator::builder::PodSecurityContextBuilder;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::api::{
@@ -227,6 +228,12 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
             containers: vec![container],
             restart_policy: Some("Never".to_string()),
             service_account: Some(sa_name.to_string()),
+            security_context: Some(
+                PodSecurityContextBuilder::new()
+                    .run_as_user(rbac::AIRFLOW_UID)
+                    .run_as_group(0)
+                    .build(),
+            ),
             ..Default::default()
         }),
     };
