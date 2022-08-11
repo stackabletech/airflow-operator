@@ -305,6 +305,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &airflow,
                 rolegroup_config,
                 authentication_class.as_ref(),
+                &rbac_sa.name(),
             )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
@@ -482,6 +483,7 @@ fn build_server_rolegroup_statefulset(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    sa_name: &str,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -615,6 +617,7 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
+                .service_account_name(sa_name)
                 .security_context(
                     PodSecurityContextBuilder::new()
                         .run_as_user(rbac::AIRFLOW_UID)
