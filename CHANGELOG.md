@@ -8,8 +8,10 @@
 
 ### Changed
 
+- OpenShift compatibility ([#127])
 - Include chart name when installing with a custom release name ([#131], [#132]).
 
+[#127]: https://github.com/stackabletech/airflow-operator/pull/127
 [#131]: https://github.com/stackabletech/airflow-operator/pull/131
 [#132]: https://github.com/stackabletech/airflow-operator/pull/132
 [#133]: https://github.com/stackabletech/airflow-operator/pull/133
