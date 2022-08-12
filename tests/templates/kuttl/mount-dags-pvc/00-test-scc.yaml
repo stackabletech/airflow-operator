@@ -1,0 +1,58 @@
+---
+kind: SecurityContextConstraints
+apiVersion: security.openshift.io/v1
+metadata:
+  name: integration-tests-scc
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+readOnlyRootFilesystem: false
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMin: 1000
+  uidRangeMax: 10000
+seLinuxContext:
+  type: RunAsAny
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 0
+    max: 50000
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+  - min: 0
+    max: 50000
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: use-integration-tests-scc
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["integration-tests-scc"]
+    verbs: ["use"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: integration-tests-sa
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: use-integration-tests-scc
+subjects:
+  - kind: ServiceAccount
+    name: integration-tests-sa
+roleRef:
+  kind: Role
+  name: use-integration-tests-scc
+  apiGroup: rbac.authorization.k8s.io
