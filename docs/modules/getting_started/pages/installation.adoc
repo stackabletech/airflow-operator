@@ -1,0 +1,70 @@
+= Installation
+
+On this page you will install the Stackable Airflow Operator and its dependencies - Postgresql and Redis - as well as the commons and secret operator which are required by all Stackable Operators.
+
+== Dependencies
+
+Postgresql and Redis are required by Airflow: Postgresql to store metadata about DAG runs, and Redis to schedule and/or queue DAG jobs. They are components that may well already be available for customers, in which case we treat them here as pre-requisites for an airflow cluster and hence as part of the installation process. These components will be installed using Helm. Note that specific versions are declared:
+
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=helm-add-bitnami-repo]
+----
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=helm-add-bitnami-pgs]
+----
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=helm-add-bitnami-redis]
+----
+
+== Stackable Operators
+
+There are 2 ways to run Stackable Operators
+
+1. Using xref:stackablectl::index.adoc[]
+
+1. Using Helm
+
+=== stackablectl
+
+stackablectl is the command line tool to interact with Stackable operators and our recommended way to install Operators.
+Follow the xref:stackablectl::installation.adoc[installation steps] for your platform.
+
+After you have installed stackablectl run the following command to install all Operators necessary for Airflow:
+
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=stackablectl-install-operators]
+----
+
+The tool will show
+
+----
+[INFO ] Installing commons operator
+[INFO ] Installing secret operator
+[INFO ] Installing airflow operator
+----
+
+TIP: Consult the xref:stackablectl::quickstart.adoc[] to learn more about how to use stackablectl. For example, you can use the `-k` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+
+=== Helm
+
+You can also use Helm to install the Operators. Add the Stackable Helm repository:
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=helm-add-repo]
+----
+
+Then install the Stackable Operators:
+[source,bash]
+----
+include::example$code/getting_started.sh[tag=helm-install-operators]
+----
+
+Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Airflow cluster (as well as the CRDs for the required operators). You are now ready to deploy Apache Airflow in Kubernetes.
+
+== What's next
+
+xref:first_steps.adoc[Set up an Airflow cluster] and its dependencies and xref:first_steps.adoc#_verify_that_it_works[verify that it works] by inspecting and running an example DAG.
