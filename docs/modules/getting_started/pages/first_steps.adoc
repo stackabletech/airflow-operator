@@ -138,6 +138,23 @@ image::airflow_running.png[Airflow DAG in action]
 
 Great! You have set up an Airflow cluster, connected to it and run your first DAG!
 
+[#ingest-cmd-line]
+.Alternative: Using the command line
+[%collapsible]
+====
+If you prefer to interact directly with the API instead of using the web interface, you can use the following commands. The DAG is one of the example DAGs named `example_complex`. To trigger a DAG run via the API requires an initial extra step to ensure that the DAG is not in a paused state:
+[source,bash]
+include::example$code/getting_started.sh[tag=enable-dag]
+
+A DAG can then be triggered by providing the DAG name (in this case, `example_complex`). The response identifies the DAG identifier, which we can parse out of the JSON like this:
+[source,bash]
+include::example$code/getting_started.sh[tag=run-dag]
+
+If we read this identifier into a variable such as `dag_id` (or replace it manually in the command) we can run this command to access the status of the DAG run:
+[source,bash]
+include::example$code/getting_started.sh[tag=check-dag]
+====
+
 == What's next
 
 Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your Airflow cluster and loading your own DAG files.
