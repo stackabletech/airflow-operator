@@ -10,10 +10,14 @@ dimensions:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  - name: openshift
+    values:
+      - "false"
 tests:
   - name: mount-dags-pvc
     dimensions:
       - airflow
+      - openshift
   - name: smoke
     dimensions:
       - airflow
