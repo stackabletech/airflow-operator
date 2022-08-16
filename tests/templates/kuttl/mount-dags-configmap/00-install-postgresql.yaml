@@ -6,8 +6,6 @@ commands:
       helm install airflow-postgresql
       --namespace $NAMESPACE
       --version 11.0.0
-      --set auth.username=airflow
-      --set auth.password=airflow
-      --set auth.database=airflow
+      -f helm-bitnami-postgresql-values.yaml
       --repo https://charts.bitnami.com/bitnami postgresql
     timeout: 600

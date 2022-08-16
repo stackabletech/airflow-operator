@@ -1,5 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
+use crate::rbac;
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -112,6 +113,16 @@ pub enum Error {
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to patch service account: {source}"))]
+    ApplyServiceAccount {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding: {source}"))]
+    ApplyRoleBinding {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
@@ -214,6 +225,20 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(InvalidProductConfigSnafu)?;
 
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
+        .await
+        .with_context(|_| ApplyServiceAccountSnafu {
+            name: rbac_sa.name(),
+        })?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
+        .await
+        .with_context(|_| ApplyRoleBindingSnafu {
+            name: rbac_rolebinding.name(),
+        })?;
+
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => {
             match &authentication_config.authentication_class {
@@ -280,6 +305,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &airflow,
                 rolegroup_config,
                 authentication_class.as_ref(),
+                &rbac_sa.name(),
             )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
@@ -457,6 +483,7 @@ fn build_server_rolegroup_statefulset(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    sa_name: &str,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -590,7 +617,14 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
-                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
+                .service_account_name(sa_name)
+                .security_context(
+                    PodSecurityContextBuilder::new()
+                        .run_as_user(rbac::AIRFLOW_UID)
+                        .run_as_group(0)
+                        .fs_group(1000) // Needed for secret-operator
+                        .build(),
+                )
                 .build_template(),
             ..StatefulSetSpec::default()
         }),

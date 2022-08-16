@@ -5,7 +5,3 @@ timeout: 480
 commands:
   - script: kubectl cp -n $NAMESPACE ./health.py test-airflow-python-0:/tmp
     timeout: 240
-  - script: kubectl cp -n $NAMESPACE ./requirements.txt test-airflow-python-0:/tmp
-    timeout: 240
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- pip install --user -r /tmp/requirements.txt
-    timeout: 240

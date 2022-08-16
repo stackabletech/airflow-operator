@@ -13,6 +13,9 @@ spec:
         - name: external-dags
           persistentVolumeClaim:
             claimName: test-pvc-airflow
+      serviceAccountName: integration-tests-sa
+      securityContext:
+        fsGroup: 50000
       containers:
         - name: airflow-dags
           image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
