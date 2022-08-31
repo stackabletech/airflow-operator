@@ -5,8 +5,8 @@
 ### Added
 
 - LDAP user authentication ([#133]).
-- Documentation for calling custom resources ([#xxx]).
-- Addition of webserver key to allow access to DAG logs from the Webserver UI ([#xxx]).
+- Documentation for calling custom resources ([#155]).
+- Addition of webserver key to allow access to DAG logs from the Webserver UI ([#155]).
 
 ### Changed
 
@@ -17,6 +17,7 @@
 [#131]: https://github.com/stackabletech/airflow-operator/pull/131
 [#132]: https://github.com/stackabletech/airflow-operator/pull/132
 [#133]: https://github.com/stackabletech/airflow-operator/pull/133
+[#155]: https://github.com/stackabletech/airflow-operator/pull/155
 
 ## [0.4.0] - 2022-06-30
 
