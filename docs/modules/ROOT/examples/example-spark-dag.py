@@ -19,15 +19,9 @@
 """Example DAG demonstrating how to apply a Kubernetes Resource from Airflow running in-cluster"""
 
 from datetime import datetime, timedelta
-
 from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
-
 from typing import TYPE_CHECKING, Optional, Sequence, Dict
-
 from kubernetes import client
-
 from airflow.exceptions import AirflowException
 from airflow.sensors.base import BaseSensorOperator
 from airflow.models import BaseOperator
@@ -37,7 +31,7 @@ if TYPE_CHECKING:
     from airflow.utils.context import Context
 
 
-class SparkKubernetesOperator(BaseOperator): # <1>
+class SparkKubernetesOperator(BaseOperator):  # <1>
     """
     Creates a SparkApplication resource in kubernetes:
     :param application_file: Defines a 'SparkApplication' custom resource as either a
@@ -58,7 +52,7 @@ class SparkKubernetesOperator(BaseOperator): # <1>
         *,
         application_file: str,
         namespace: Optional[str] = None,
-        kubernetes_conn_id: str = 'kubernetes_in_cluster', # <2>
+        kubernetes_conn_id: str = 'kubernetes_in_cluster',  # <2>
         api_group: str = 'spark.stackable.tech',
         api_version: str = 'v1alpha1',
         **kwargs,
@@ -83,7 +77,8 @@ class SparkKubernetesOperator(BaseOperator): # <1>
         )
         return response
 
-class SparkKubernetesSensor(BaseSensorOperator): # <3>
+
+class SparkKubernetesSensor(BaseSensorOperator):  # <3>
     """
     Monitors a SparkApplication resource in kubernetes:
     :param application_name: SparkApplication resource name
@@ -105,7 +100,7 @@ class SparkKubernetesSensor(BaseSensorOperator): # <3>
             application_name: str,
             attach_log: bool = False,
             namespace: Optional[str] = None,
-            kubernetes_conn_id: str = 'kubernetes_in_cluster', # <2>
+            kubernetes_conn_id: str = 'kubernetes_in_cluster',  # <2>
             api_group: str = 'spark.stackable.tech',
             api_version: str = 'v1alpha1',
             poke_interval: float = 60,
@@ -172,7 +167,8 @@ class SparkKubernetesSensor(BaseSensorOperator): # <3>
             self.log.info("SparkApplication is still in state: %s", application_state)
             return False
 
-with DAG( # <4>
+
+with DAG(  # <4>
     dag_id='sparkapp_dag',
     schedule_interval='0 0 * * *',
     start_date=datetime(2021, 1, 1),
@@ -182,7 +178,7 @@ with DAG( # <4>
     params={"example_key": "example_value"},
 ) as dag:
 
-    t1 = SparkKubernetesOperator( # <5>
+    t1 = SparkKubernetesOperator(  # <5>
         task_id='spark_pi_submit',
         namespace="default",
         application_file="pyspark-pi.yaml",
@@ -190,7 +186,7 @@ with DAG( # <4>
         dag=dag,
     )
 
-    t2 = SparkKubernetesSensor( # <6>
+    t2 = SparkKubernetesSensor(  # <6>
         task_id='spark_pi_monitor',
         namespace="default",
         application_name="{{ task_instance.xcom_pull(task_ids='spark_pi_submit')['metadata']['name'] }}",
