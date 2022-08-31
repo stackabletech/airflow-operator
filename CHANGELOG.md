@@ -5,6 +5,8 @@
 ### Added
 
 - LDAP user authentication ([#133]).
+- Documentation for calling custom resources ([#xxx]).
+- Addition of webserver key to allow access to DAG logs from the Webserver UI ([#xxx]).
 
 ### Changed
 

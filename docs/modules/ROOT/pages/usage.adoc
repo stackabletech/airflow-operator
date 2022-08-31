@@ -241,12 +241,19 @@ This will called from within a DAG by using the connection that was defined earl
 - start the job
 - monitor the status of the job
 
-These are written in-line in the python code below, though this is just to make it clear how the code is used (since these classes will be used for any and all custom resources that would be external to but in the same folder as the DAG files):
+These are written in-line in the python code below, though this is just to make it clear how the code is used (the classes `SparkKubernetesOperator` and `SparkKubernetesSensor` will be used for all custom resources and thus are best defined as separate python files that the DAG would reference).
 
 [source,python]
 ----
 include::example$example-spark-dag.py[]
 ----
+<1> the wrapper class used for calling the job via `KubernetesHook`
+<2> the connection that created for in-cluster usage
+<3> the wrapper class used for monitoring the job via `KubernetesHook`
+<4> the start of the DAG code
+<5> the initial task to invoke the job
+<6> the subsequent task to monitor the job
+<7> the jobs are chained together in the correct order
 
 Once this DAG is mounted in the DAG folder it can be called and its progress viewed from within the Webserver UI:
 
