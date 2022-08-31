@@ -3,6 +3,9 @@ use crate::config::{self, PYTHON_IMPORTS};
 use crate::rbac;
 use crate::util::env_var_from_secret;
 
+use lazy_static::lazy_static;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{
@@ -58,6 +61,14 @@ pub const CERTS_DIR: &str = "/stackable/certificates/";
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
+}
+
+lazy_static! {
+    pub static ref WEBSERVER_SECRET_KEY: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(15)
+        .map(char::from)
+        .collect();
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -306,6 +317,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_class.as_ref(),
                 &rbac_sa.name(),
+                &WEBSERVER_SECRET_KEY,
             )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
@@ -484,6 +496,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     sa_name: &str,
+    webserver_key: &str,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -534,7 +547,7 @@ fn build_server_rolegroup_statefulset(
 
     cb.add_env_vars(env_config);
     cb.add_env_vars(env_mapped);
-    cb.add_env_vars(build_static_envs());
+    cb.add_env_vars(build_static_envs(webserver_key));
 
     let volume_mounts = airflow.volume_mounts();
     cb.add_volume_mounts(volume_mounts);
@@ -698,7 +711,7 @@ fn build_mapped_envs(
     env
 }
 
-fn build_static_envs() -> Vec<EnvVar> {
+fn build_static_envs(webserver_key: &str) -> Vec<EnvVar> {
     [
         EnvVar {
             name: "AIRFLOW__METRICS__STATSD_ON".into(),
@@ -721,6 +734,13 @@ fn build_static_envs() -> Vec<EnvVar> {
         EnvVar {
             name: "AIRFLOW__API__AUTH_BACKEND".into(),
             value: Some("airflow.api.auth.backend.basic_auth".into()),
+            ..Default::default()
+        },
+        // The secret key is used to run the webserver flask app and also used to authorize
+        // requests to Celery workers when logs are retrieved.
+        EnvVar {
+            name: "AIRFLOW__WEBSERVER__SECRET_KEY".into(),
+            value: Some(webserver_key.into()),
             ..Default::default()
         },
     ]
