@@ -255,7 +255,7 @@ include::example$example-spark-dag.py[]
 <6> the subsequent task to monitor the job
 <7> the jobs are chained together in the correct order
 
-Once this DAG is mounted in the DAG folder it can be called and its progress viewed from within the Webserver UI:
+Once this DAG is xref:usage.adoc#_mounting_dags[mounted] in the DAG folder it can be called and its progress viewed from within the Webserver UI:
 
 image::airflow_dag_graph.png[Airflow Connections]
 
