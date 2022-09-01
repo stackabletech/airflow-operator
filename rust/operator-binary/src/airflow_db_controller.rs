@@ -190,7 +190,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
     let secret = &airflow_db.spec.credentials_secret;
 
     let env = vec![
-        env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+        env_var_from_secret("AIRFLOW__WEBSERVER__SECRET_KEY", secret, "connections.secretKey"),
         env_var_from_secret(
             "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
             secret,

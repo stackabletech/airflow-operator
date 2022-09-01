@@ -12,8 +12,6 @@ anyhow = "1.0"
 clap = "3.2"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
-lazy_static = "1.4"
-rand = "0.8"
 serde = "1.0"
 serde_yaml = "0.8"
 snafu = "0.7"

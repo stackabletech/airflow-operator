@@ -1674,8 +1674,6 @@ dependencies = [
  "clap",
  "fnv",
  "futures 0.3.21",
- "lazy_static",
- "rand",
  "serde",
  "serde_yaml",
  "snafu",
