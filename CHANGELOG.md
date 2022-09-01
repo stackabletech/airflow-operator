@@ -6,12 +6,12 @@
 
 - LDAP user authentication ([#133]).
 - Documentation for calling custom resources ([#155]).
-- Add webserver key to allow access to DAG logs from the Webserver UI ([#155]).
 
 ### Changed
 
 - OpenShift compatibility ([#127])
 - Include chart name when installing with a custom release name ([#131], [#132]).
+- Use correct webserver key to allow access to DAG logs from the Webserver UI ([#155]).
 - Add LDAP readiness probe for tests ([#155]).
 
 [#127]: https://github.com/stackabletech/airflow-operator/pull/127
