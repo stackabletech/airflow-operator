@@ -645,7 +645,13 @@ fn build_mapped_envs(
     let mut env = secret_prop
         .map(|secret| {
             vec![
-                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                // The secret key is used to run the webserver flask app and also used to authorize
+                // requests to Celery workers when logs are retrieved.
+                env_var_from_secret(
+                    "AIRFLOW__WEBSERVER__SECRET_KEY",
+                    secret,
+                    "connections.secretKey",
+                ),
                 env_var_from_secret(
                     "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
                     secret,

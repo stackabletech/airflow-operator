@@ -5,16 +5,20 @@
 ### Added
 
 - LDAP user authentication ([#133]).
+- Documentation for calling custom resources ([#155]).
 
 ### Changed
 
 - OpenShift compatibility ([#127])
 - Include chart name when installing with a custom release name ([#131], [#132]).
+- Use correct webserver key to allow access to DAG logs from the Webserver UI ([#155]).
+- Add LDAP readiness probe for tests ([#155]).
 
 [#127]: https://github.com/stackabletech/airflow-operator/pull/127
 [#131]: https://github.com/stackabletech/airflow-operator/pull/131
 [#132]: https://github.com/stackabletech/airflow-operator/pull/132
 [#133]: https://github.com/stackabletech/airflow-operator/pull/133
+[#155]: https://github.com/stackabletech/airflow-operator/pull/155
 
 ## [0.4.0] - 2022-06-30
 

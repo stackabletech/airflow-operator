@@ -189,3 +189,76 @@ Airflow expects that all its components (webserver, scheduler, workers etc.) hav
             node: "2"
 ----
 
+== Applying Custom Resources
+
+Airflow can be used to apply custom resources from within a cluster. An example of this could be a SparkApplication job that is to be triggered by Airflow. The steps below describe how this can be done.
+
+=== Define an in-cluster Kubernetes connection
+
+An in-cluster connection can either be created from within the Webserver UI (note that the "in cluster configuration" box is ticked):
+
+image::airflow_connection_ui.png[Airflow Connections]
+
+Alternatively, the connection can be https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html[defined] by an environment variable in URI format:
+
+[source]
+AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: "kubernetes://?__extra__=%7B%22extra__kubernetes__in_cluster%22%3A+true%2C+%22extra__kubernetes__kube_config%22%3A+%22%22%2C+%22extra__kubernetes__kube_config_path%22%3A+%22%22%2C+%22extra__kubernetes__namespace%22%3A+%22%22%7D"
+
+This can be supplied directly in the custom resource for all roles (Airflow expects configuration to be common across components):
+
+[source,yaml]
+----
+include::example$example-airflow-incluster.yaml[]
+----
+
+=== Define a cluster role for Airflow to create SparkApplication resources
+
+Airflow cannot create or access SparkApplication resources by default - a cluster role is required for this:
+
+[source,yaml]
+----
+include::example$example-airflow-spark-clusterrole.yaml[]
+----
+
+and a corresponding cluster role binding:
+
+[source,yaml]
+----
+include::example$example-airflow-spark-clusterrolebinding.yaml[]
+----
+
+=== DAG code
+
+Now for the DAG itself. The job to be started is a simple Spark job that calculates the value of pi:
+
+[source,yaml]
+----
+include::example$example-pyspark-pi.yaml[]
+----
+
+This will called from within a DAG by using the connection that was defined earlier. It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available. There are two classes that are used to:
+
+- start the job
+- monitor the status of the job
+
+These are written in-line in the python code below, though this is just to make it clear how the code is used (the classes `SparkKubernetesOperator` and `SparkKubernetesSensor` will be used for all custom resources and thus are best defined as separate python files that the DAG would reference).
+
+[source,python]
+----
+include::example$example-spark-dag.py[]
+----
+<1> the wrapper class used for calling the job via `KubernetesHook`
+<2> the connection that created for in-cluster usage
+<3> the wrapper class used for monitoring the job via `KubernetesHook`
+<4> the start of the DAG code
+<5> the initial task to invoke the job
+<6> the subsequent task to monitor the job
+<7> the jobs are chained together in the correct order
+
+Once this DAG is xref:usage.adoc#_mounting_dags[mounted] in the DAG folder it can be called and its progress viewed from within the Webserver UI:
+
+image::airflow_dag_graph.png[Airflow Connections]
+
+Clicking on the "spark_pi_monitor" task and selecting the logs shows that the status of the job has been tracked by Airflow:
+
+image::airflow_dag_log.png[Airflow Connections]
