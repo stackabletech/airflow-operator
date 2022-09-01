@@ -647,7 +647,11 @@ fn build_mapped_envs(
             vec![
                 // The secret key is used to run the webserver flask app and also used to authorize
                 // requests to Celery workers when logs are retrieved.
-                env_var_from_secret("AIRFLOW__WEBSERVER__SECRET_KEY", secret, "connections.secretKey"),
+                env_var_from_secret(
+                    "AIRFLOW__WEBSERVER__SECRET_KEY",
+                    secret,
+                    "connections.secretKey",
+                ),
                 env_var_from_secret(
                     "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
                     secret,
