@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2022-09-06
+
 ### Added
 
 - LDAP user authentication ([#133]).
