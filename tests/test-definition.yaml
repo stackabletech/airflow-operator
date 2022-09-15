@@ -37,3 +37,6 @@ tests:
     dimensions:
       - airflow
       - ldap-authentication
+  - name: resources
+    dimensions:
+      - airflow
