@@ -4,9 +4,9 @@
 
 ### Added
 
-- Cpu and memory limits are now configurable ([#xxx]).
+- Cpu and memory limits are now configurable ([#167]).
 
-[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+[#167]: https://github.com/stackabletech/airflow-operator/pull/167
 
 ## [0.5.0] - 2022-09-06
 
