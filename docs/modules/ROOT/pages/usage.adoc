@@ -83,7 +83,7 @@ webservers:
       config:
         resources:
           cpu:
-            max: '1Gi'
+            max: '1'
             min: '500m'
 ----
 
