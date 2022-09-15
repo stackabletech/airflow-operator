@@ -3,13 +3,16 @@ pub mod airflowdb;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use stackable_operator::commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources};
+use stackable_operator::config::merge::Merge;
 use stackable_operator::k8s_openapi::api::core::v1::{Volume, VolumeMount};
+use stackable_operator::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config::flask_app_config_writer::{
     FlaskAppConfigOptions, PythonType,
 };
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::Role;
+use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
 use strum::{Display, EnumIter, EnumString};
 
@@ -254,12 +257,32 @@ impl AirflowCluster {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Merge, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowConfig {}
+pub struct AirflowStorageConfig {}
+
+#[derive(Clone, Debug, Deserialize, Default, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowConfig {
+    pub resources: Option<Resources<AirflowStorageConfig, NoRuntimeLimits>>,
+}
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
+
+    fn default_resources() -> Resources<AirflowStorageConfig, NoRuntimeLimits> {
+        Resources {
+            cpu: CpuLimits {
+                min: Some(Quantity("200m".to_owned())),
+                max: Some(Quantity("4".to_owned())),
+            },
+            memory: MemoryLimits {
+                limit: Some(Quantity("2Gi".to_owned())),
+                runtime_limits: NoRuntimeLimits {},
+            },
+            storage: AirflowStorageConfig {},
+        }
+    }
 }
 
 impl Configuration for AirflowConfig {
@@ -303,6 +326,44 @@ impl AirflowCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`
     pub fn node_role_service_name(&self) -> Option<String> {
         self.metadata.name.clone()
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn resolve_resource_config_for_role_and_rolegroup(
+        &self,
+        role: &AirflowRole,
+        rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+    ) -> Option<Resources<AirflowStorageConfig, NoRuntimeLimits>> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = AirflowConfig::default_resources();
+
+        let role = match role {
+            AirflowRole::Webserver => self.spec.webservers.as_ref()?,
+            AirflowRole::Worker => self.spec.workers.as_ref()?,
+            AirflowRole::Scheduler => self.spec.schedulers.as_ref()?,
+        };
+
+        // Retrieve role resource config
+        let mut conf_role: Resources<AirflowStorageConfig, NoRuntimeLimits> =
+            role.config.config.resources.clone().unwrap_or_default();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup: Resources<AirflowStorageConfig, NoRuntimeLimits> = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .and_then(|rg| rg.config.config.resources.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        Some(conf_rolegroup)
     }
 }
 

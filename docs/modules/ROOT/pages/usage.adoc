@@ -9,12 +9,12 @@ xref:home:operators:monitoring.adoc[] for more details.
 
 The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
 
-IMPORTANT: Overriding certain properties which are set by operator (such as the HTTP port) can interfere with the operator and can lead to problems. Additionally for Airflow it is recommended
+IMPORTANT: Overriding certain properties which are set by operator (such as the HTTP port) can interfere with the operator and can lead to problems. Additionally, for Airflow it is recommended
 that each component has the same configuration: not all components use each setting, but some things - such as external end-points - need to be consistent for things to work as expected.
 
 === Configuration Properties
 
-Airflow exposes an environment variable for every configuration setting, a list of which can be found in the https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html[Configuration Reference].
+Airflow exposes an environment variable for every Airflow configuration setting, a list of which can be found in the https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html[Configuration Reference].
 
 Although Kubernetes can override these settings in one of two ways (Configuration overrides, or Environment Variable overrides), the affect is the same
 and currently only the latter is implemented. This is described in the following section.
@@ -25,27 +25,113 @@ These can be set - or overwritten - at either the role level:
 
 [source,yaml]
 ----
-  webservers:
-    envOverrides:
-      AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
-    roleGroups:
-      default:
-        replicas: 1
+webservers:
+  envOverrides:
+    AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
+  roleGroups:
+    default:
+      replicas: 1
 ----
 
 Or per role group:
 
 [source,yaml]
 ----
-  webservers:
-    roleGroups:
-      default:
-        envOverrides:
-          AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
-        replicas: 1
+webservers:
+  roleGroups:
+    default:
+      envOverrides:
+        AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: "8"
+      replicas: 1
 ----
 
 In both examples above we are replacing the default value of the UI DAG refresh (3s) with 8s. Note that all override property values must be strings.
+
+=== Storage for data volumes
+
+The Airflow Operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
+
+=== Memory requests
+
+You can request a certain amount of memory for each individual role group as shown below:
+
+[source,yaml]
+----
+workers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          memory:
+            limit: 2Gi
+      replicas: 1
+----
+
+In this example, each Airflow worker in the `default` group will have a maximum of 2 gigabytes of memory. This memory limit applies to the container running Airflow but not to any other containers, such as the one used for collecting metrics.
+
+For more details regarding Kubernetes memory requests and limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/[Assign Memory Resources to Containers and Pods].
+
+=== CPU requests
+
+Similarly to memory resources, you can also configure CPU limits, as shown below:
+
+[source,yaml]
+----
+webservers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            max: '1Gi'
+            min: '500m'
+----
+
+=== Defaults
+
+In the example below, each Airflow worker in the `resources-from-role-group` role group will have a maximum of `2Gi` (gigabytes) of memory. The worker in role group `resources-from-role` does not have a specified memory/cpu limit and will therefore use the defaults (`1Gi` etc.) provided from the role.
+
+[source,yaml]
+----
+workers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: "1"
+        memory:
+          limit: 1Gi
+    roleGroups:
+      resources-from-role:
+        replicas: 1
+      resources-from-role-group:
+        config:
+          resources:
+            cpu:
+              min: 200m
+              max: "2"
+            memory:
+              limit: 2Gi
+        replicas: 1
+----
+
+If nothing is specified, the operator will automatically set the following default values for resources:
+
+[source,yaml]
+----
+workers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            min: '200m'
+            max: "4"
+          memory:
+            limit: '2Gi'
+----
+
+For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].
 
 == Initializing the Airflow database
 

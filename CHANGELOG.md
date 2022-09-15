@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Cpu and memory limits are now configurable ([#xxx]).
+
+[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+
 ## [0.5.0] - 2022-09-06
 
 ### Added

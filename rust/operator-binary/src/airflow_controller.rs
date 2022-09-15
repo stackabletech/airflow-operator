@@ -6,12 +6,13 @@ use crate::util::env_var_from_secret;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{
-    AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AIRFLOW_CONFIG_FILENAME,
-    APP_NAME, CONFIG_PATH,
+    AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AirflowStorageConfig,
+    AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
 };
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
 };
+use stackable_operator::commons::resources::{NoRuntimeLimits, Resources};
 use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
 use stackable_operator::product_config::flask_app_config_writer;
 use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
@@ -148,6 +149,13 @@ pub enum Error {
     },
     #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
     AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
+    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
+    FailedToResolveResourceConfig,
+    #[snafu(display("could not parse Airflow role [{role}]"))]
+    UnidentifiedAirflowRole {
+        source: strum::ParseError,
+        role: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -245,7 +253,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 Some(authentication_class) => {
                     Some(
                         // TODO see https://github.com/stackabletech/operator-rs/commit/8c573874474d7f4b21719955844eb460d1f82d42
-                        // for a cleaner way of doing this once this change is avalable in operator-rs
+                        // for a cleaner way of doing this once this change is available in operator-rs
                         client
                             .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
                             .await
@@ -279,6 +287,15 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 role_group: rolegroup_name.into(),
             };
 
+            let airflow_role =
+                AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
+                    role: role_name.to_string(),
+                })?;
+
+            let resources = airflow
+                .resolve_resource_config_for_role_and_rolegroup(&airflow_role, &rolegroup)
+                .context(FailedToResolveResourceConfigSnafu)?;
+
             let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
@@ -306,6 +323,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_class.as_ref(),
                 &rbac_sa.name(),
+                &resources,
             )?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
@@ -484,6 +502,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     sa_name: &str,
+    resources: &Resources<AirflowStorageConfig, NoRuntimeLimits>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
@@ -514,6 +533,7 @@ fn build_server_rolegroup_statefulset(
 
     let cb = cb
         .image(image)
+        .resources(resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
 
