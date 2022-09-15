@@ -257,7 +257,7 @@ impl AirflowCluster {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Merge, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Merge, JsonSchema, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowStorageConfig {}
 
