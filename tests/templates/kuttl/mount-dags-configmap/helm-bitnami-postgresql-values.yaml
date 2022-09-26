@@ -6,7 +6,7 @@ volumePermissions:
 
 primary:
   podSecurityContext:
-    enabled: false
+    enabled: true
   containerSecurityContext:
     enabled: false
 
