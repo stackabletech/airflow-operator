@@ -30,13 +30,17 @@ tests:
   - name: smoke
     dimensions:
       - airflow
+      - openshift
   - name: mount-dags-configmap
     dimensions:
       - airflow
+      - openshift
   - name: ldap
     dimensions:
       - airflow
+      - openshift
       - ldap-authentication
   - name: resources
     dimensions:
       - airflow
+      - openshift
