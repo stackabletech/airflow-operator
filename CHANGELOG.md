@@ -6,7 +6,12 @@
 
 - Cpu and memory limits are now configurable ([#167]).
 
+### Changed
+
+- Toggle podSecurityContext for Openshift/Non-Openshift test scenarios ([#171])
+
 [#167]: https://github.com/stackabletech/airflow-operator/pull/167
+[#171]: https://github.com/stackabletech/airflow-operator/pull/171
 
 ## [0.5.0] - 2022-09-06
 
