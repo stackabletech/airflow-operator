@@ -131,7 +131,7 @@ workers:
             limit: '2Gi'
 ----
 
-For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].
+For more details on how to specify resources in general for products running on the Stackable Data Platform see: xref:concepts:resources.adoc[Resource management].
 
 == Initializing the Airflow database
 
