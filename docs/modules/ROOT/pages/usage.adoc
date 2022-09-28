@@ -51,71 +51,11 @@ In both examples above we are replacing the default value of the UI DAG refresh 
 
 The Airflow Operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
 
-=== Memory requests
+=== Resource Requests
 
-You can request a certain amount of memory for each individual role group as shown below:
+include::home:concepts:stackable_resource_requests.adoc[]
 
-[source,yaml]
-----
-workers:
-  roleGroups:
-    default:
-      config:
-        resources:
-          memory:
-            limit: 2Gi
-      replicas: 1
-----
-
-In this example, each Airflow worker in the `default` group will have a maximum of 2 gigabytes of memory. This memory limit applies to the container running Airflow but not to any other containers, such as the one used for collecting metrics.
-
-For more details regarding Kubernetes memory requests and limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/[Assign Memory Resources to Containers and Pods].
-
-=== CPU requests
-
-Similarly to memory resources, you can also configure CPU limits, as shown below:
-
-[source,yaml]
-----
-webservers:
-  roleGroups:
-    default:
-      config:
-        resources:
-          cpu:
-            max: '1'
-            min: '500m'
-----
-
-=== Defaults
-
-In the example below, each Airflow worker in the `resources-from-role-group` role group will have a maximum of `2Gi` (gigabytes) of memory. The worker in role group `resources-from-role` does not have a specified memory/cpu limit and will therefore use the defaults (`1Gi` etc.) provided from the role.
-
-[source,yaml]
-----
-workers:
-    config:
-      resources:
-        cpu:
-          min: 100m
-          max: "1"
-        memory:
-          limit: 1Gi
-    roleGroups:
-      resources-from-role:
-        replicas: 1
-      resources-from-role-group:
-        config:
-          resources:
-            cpu:
-              min: 200m
-              max: "2"
-            memory:
-              limit: 2Gi
-        replicas: 1
-----
-
-If nothing is specified, the operator will automatically set the following default values for resources:
+If no resource requests are configured explicitely, the operator uses the following defaults:
 
 [source,yaml]
 ----
@@ -130,8 +70,6 @@ workers:
           memory:
             limit: '2Gi'
 ----
-
-For more details on how to specify resources in general for products running on the Stackable Data Platform see: xref:home:concepts:resources.adoc[Resource management].
 
 == Initializing the Airflow database
 
