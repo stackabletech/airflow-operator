@@ -131,7 +131,7 @@ workers:
             limit: '2Gi'
 ----
 
-For more details on how to specify resources in general for products running on the Stackable Data Platform see: xref:concepts:resources.adoc[Resource management].
+For more details on how to specify resources in general for products running on the Stackable Data Platform see: xref:home:concepts:resources.adoc[Resource management].
 
 == Initializing the Airflow database
 
