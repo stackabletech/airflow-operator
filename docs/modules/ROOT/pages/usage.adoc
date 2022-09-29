@@ -53,7 +53,7 @@ The Airflow Operator currently does not support using https://kubernetes.io/docs
 
 === Resource Requests
 
-include::home:concepts:stackable_resource_requests.adoc[]
+include::nightly@home:concepts:stackable_resource_requests.adoc[]
 
 If no resource requests are configured explicitely, the operator uses the following defaults:
 
