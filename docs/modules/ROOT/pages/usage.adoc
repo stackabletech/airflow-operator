@@ -53,6 +53,9 @@ The Airflow Operator currently does not support using https://kubernetes.io/docs
 
 === Resource Requests
 
+// The "nightly" version is needed because the "include" directive searches for
+// files in the "stable" version by default.
+// TODO: remove the "nightly" version after the next platform release (current: 22.09)
 include::nightly@home:concepts:stackable_resource_requests.adoc[]
 
 If no resource requests are configured explicitely, the operator uses the following defaults:
