@@ -91,19 +91,19 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name(),
+            name: rbac_sa.name_unchecked(),
         })?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name(),
+            name: rbac_rolebinding.name_unchecked(),
         })?;
     if let Some(ref s) = airflow_db.status {
         match s.condition {
             AirflowDBStatusCondition::Pending => {
-                let secret_exists = client
-                    .exists::<Secret>(
+                let secret = client
+                    .get_opt::<Secret>(
                         &airflow_db.spec.credentials_secret,
                         airflow_db.namespace().as_deref(),
                     )
@@ -116,8 +116,8 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         }
                         SecretCheckSnafu { secret: secret_ref }
                     })?;
-                if secret_exists {
-                    let job = build_init_job(&airflow_db, &rbac_sa.name())?;
+                if secret.is_some() {
+                    let job = build_init_job(&airflow_db, &rbac_sa.name_unchecked())?;
                     client
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
@@ -213,6 +213,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
     ];
 
     let container = ContainerBuilder::new("airflow-init-db")
+        .expect("ContainerBuilder not created")
         .image(format!(
             "docker.stackable.tech/stackable/airflow:{}",
             airflow_db.spec.airflow_version
@@ -225,7 +226,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
     let pod = PodTemplateSpec {
         metadata: Some(
             ObjectMetaBuilder::new()
-                .name(format!("{}-init", airflow_db.name()))
+                .name(format!("{}-init", airflow_db.name_unchecked()))
                 .build(),
         ),
         spec: Some(PodSpec {
@@ -244,7 +245,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(airflow_db.name())
+            .name(airflow_db.name_unchecked())
             .namespace_opt(airflow_db.namespace())
             .ownerreference_from_resource(airflow_db, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?

@@ -5,13 +5,16 @@
 ### Added
 
 - Cpu and memory limits are now configurable ([#167]).
+- Stale resources are now deleted ([#xxx]).
 
 ### Changed
 
 - Toggle podSecurityContext for Openshift/Non-Openshift test scenarios ([#171])
+- `operator-rs` `0.22.0` -> `0.25.2` ([#xxx])
 
 [#167]: https://github.com/stackabletech/airflow-operator/pull/167
 [#171]: https://github.com/stackabletech/airflow-operator/pull/171
+[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
 
 ## [0.5.0] - 2022-09-06
 

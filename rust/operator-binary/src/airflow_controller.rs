@@ -7,13 +7,15 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{
     AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AirflowStorageConfig,
-    AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
+    AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH, CONTROLLER_NAME,
 };
 use stackable_operator::builder::{
     ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
 };
+use stackable_operator::cluster_resources::ClusterResources;
 use stackable_operator::commons::resources::{NoRuntimeLimits, Resources};
 use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
+use stackable_operator::kube::Resource;
 use stackable_operator::product_config::flask_app_config_writer;
 use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
@@ -156,6 +158,14 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+    #[snafu(display("failed to create cluster resources"))]
+    CreateClusterResources {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to delete orphaned resources"))]
+    DeleteOrphanedResources {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -179,7 +189,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(ApplyAirflowDBSnafu)?;
 
     let airflow_db = client
-        .get::<AirflowDB>(&airflow.name(), airflow.namespace().as_deref())
+        .get::<AirflowDB>(&airflow.name_unchecked(), airflow.namespace().as_deref())
         .await
         .context(AirflowDBRetrievalSnafu)?;
 
@@ -238,44 +248,41 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name(),
+            name: rbac_sa.name_unchecked(),
         })?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name(),
+            name: rbac_rolebinding.name_unchecked(),
         })?;
 
     let authentication_class = match &airflow.spec.authentication_config {
-        Some(authentication_config) => {
-            match &authentication_config.authentication_class {
-                Some(authentication_class) => {
-                    Some(
-                        // TODO see https://github.com/stackabletech/operator-rs/commit/8c573874474d7f4b21719955844eb460d1f82d42
-                        // for a cleaner way of doing this once this change is available in operator-rs
-                        client
-                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
-                            .await
-                            .context(AuthenticationClassRetrievalSnafu {
-                                authentication_class: ObjectRef::<AuthenticationClass>::new(
-                                    authentication_class,
-                                ),
-                            })?,
-                    )
-                }
-                None => None,
-            }
-        }
+        Some(authentication_config) => match &authentication_config.authentication_class {
+            Some(authentication_class) => Some(
+                AuthenticationClass::resolve(client, authentication_class)
+                    .await
+                    .context(AuthenticationClassRetrievalSnafu {
+                        authentication_class: ObjectRef::<AuthenticationClass>::new(
+                            authentication_class,
+                        ),
+                    })?,
+            ),
+            None => None,
+        },
         None => None,
     };
+
+    let mut cluster_resources =
+        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &airflow.object_ref(&()))
+            .context(CreateClusterResourcesSnafu)?;
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service = build_role_service(role_name, &airflow, resolved_port)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &role_service, &role_service)
+            cluster_resources
+                .add(client, &role_service)
                 .await
                 .context(ApplyRoleServiceSnafu)?;
         }
@@ -297,12 +304,11 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .context(FailedToResolveResourceConfigSnafu)?;
 
             let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
-                .await
-                .context(ApplyRoleGroupServiceSnafu {
+            cluster_resources.add(client, &rg_service).await.context(
+                ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
-                })?;
+                },
+            )?;
 
             let rg_configmap = build_rolegroup_config_map(
                 &airflow,
@@ -310,8 +316,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_class.as_ref(),
             )?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+            cluster_resources
+                .add(client, &rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
@@ -322,17 +328,22 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &airflow,
                 rolegroup_config,
                 authentication_class.as_ref(),
-                &rbac_sa.name(),
+                &rbac_sa.name_unchecked(),
                 &resources,
             )?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
+            cluster_resources
+                .add(client, &rg_statefulset)
                 .await
                 .context(ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
         }
     }
+
+    cluster_resources
+        .delete_orphaned_resources(client)
+        .await
+        .context(DeleteOrphanedResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -361,6 +372,7 @@ fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> R
                 airflow,
                 APP_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
+                CONTROLLER_NAME,
                 role_name,
                 "global",
             )
@@ -428,6 +440,7 @@ fn build_rolegroup_config_map(
                     airflow,
                     APP_NAME,
                     airflow.version().context(NoAirflowVersionSnafu)?,
+                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 )
@@ -471,6 +484,7 @@ fn build_rolegroup_service(
                 airflow,
                 APP_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
+                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -524,7 +538,7 @@ fn build_server_rolegroup_statefulset(
     let commands = airflow_role.get_commands();
 
     // container
-    let mut cb = ContainerBuilder::new(APP_NAME);
+    let mut cb = ContainerBuilder::new(APP_NAME).expect("ContainerBuilder not created");
     let mut pb = PodBuilder::new();
 
     if let Some(authentication_class) = authentication_class {
@@ -578,6 +592,7 @@ fn build_server_rolegroup_statefulset(
     let container = cb.build();
 
     let metrics_container = ContainerBuilder::new("metrics")
+        .expect("ContainerBuilder not created")
         .image(statsd_exporter_image)
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
@@ -600,6 +615,7 @@ fn build_server_rolegroup_statefulset(
                 airflow,
                 APP_NAME,
                 airflow_version,
+                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -629,6 +645,7 @@ fn build_server_rolegroup_statefulset(
                         airflow,
                         APP_NAME,
                         airflow_version,
+                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )

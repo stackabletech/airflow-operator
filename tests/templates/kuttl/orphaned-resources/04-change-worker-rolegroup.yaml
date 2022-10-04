@@ -1,0 +1,11 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  workers:
+    roleGroups:
+      default: null
+      newrolegroup:
+        replicas: 1
