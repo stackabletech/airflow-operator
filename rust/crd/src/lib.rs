@@ -17,6 +17,7 @@ use stackable_operator::schemars::{self, JsonSchema};
 use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "airflow";
+pub const CONTROLLER_NAME: &str = "airflow-controller";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";

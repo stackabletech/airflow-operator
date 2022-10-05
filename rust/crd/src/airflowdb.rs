@@ -1,4 +1,4 @@
-use crate::{AirflowCluster, APP_NAME};
+use crate::{AirflowCluster, APP_NAME, CONTROLLER_NAME};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::builder::ObjectMetaBuilder;
@@ -55,7 +55,14 @@ impl AirflowDB {
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
-                .with_recommended_labels(airflow, APP_NAME, version, "db-initializer", "global")
+                .with_recommended_labels(
+                    airflow,
+                    APP_NAME,
+                    version,
+                    CONTROLLER_NAME,
+                    "db-initializer",
+                    "global",
+                )
                 .build(),
             spec: AirflowDBSpec {
                 airflow_version: version.to_string(),
@@ -66,7 +73,7 @@ impl AirflowDB {
     }
 
     pub fn job_name(&self) -> String {
-        self.name()
+        self.name_unchecked()
     }
 }
 

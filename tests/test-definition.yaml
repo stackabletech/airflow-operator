@@ -44,3 +44,7 @@ tests:
     dimensions:
       - airflow
       - openshift
+  - name: orphaned-resources
+    dimensions:
+      - airflow
+      - openshift

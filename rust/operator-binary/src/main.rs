@@ -118,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow| {
-                                airflow_db.name() == airflow.name()
+                                airflow_db.name_unchecked() == airflow.name_unchecked()
                                     && airflow_db.namespace() == airflow.namespace()
                             })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
@@ -176,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow_db| {
-                                job.name() == airflow_db.name()
+                                job.name_unchecked() == airflow_db.name_unchecked()
                                     && job.namespace() == airflow_db.namespace()
                             })
                             .map(|airflow_db| ObjectRef::from_obj(&*airflow_db))

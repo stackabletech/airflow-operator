@@ -1,0 +1,20 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: airflow-webserver-default-0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-webserver-default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-default
