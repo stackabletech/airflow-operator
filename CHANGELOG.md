@@ -6,6 +6,7 @@
 
 - Cpu and memory limits are now configurable ([#167]).
 - Stale resources are now deleted ([#174]).
+- Support for Airflow 2.4.1 ([#xxx]).
 
 ### Changed
 
@@ -15,6 +16,7 @@
 [#167]: https://github.com/stackabletech/airflow-operator/pull/167
 [#171]: https://github.com/stackabletech/airflow-operator/pull/171
 [#174]: https://github.com/stackabletech/airflow-operator/pull/174
+[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
 
 ## [0.5.0] - 2022-09-06
 

@@ -14,6 +14,7 @@ dimensions:
       - 2.2.3-python38-stackable0.3.0
       - 2.2.4-python39-stackable0.3.0
       - 2.2.5-python39-stackable0.3.0
+      - 2.4.1-stackable0.4.0
   - name: ldap-authentication
     values:
       - no-tls

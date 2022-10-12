@@ -51,11 +51,11 @@ spec:
               "bash",
               "-x",
               "-c",
-              "curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_bash_operator.py \
+              "curl -L  https://raw.githubusercontent.com/apache/airflow/2.4.1/airflow/example_dags/example_bash_operator.py \
               -o ${DEST_DIR}/example_bash_operator.py && \
-              curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_complex.py \
+              curl -L  https://raw.githubusercontent.com/apache/airflow/2.4.1/airflow/example_dags/example_complex.py \
               -o ${DEST_DIR}/example_complex.py && \
-              curl -L  https://raw.githubusercontent.com/apache/airflow/2.2.5/airflow/example_dags/example_branch_datetime_operator.py \
+              curl -L  https://raw.githubusercontent.com/apache/airflow/2.4.1/airflow/example_dags/example_branch_datetime_operator.py \
               -o ${DEST_DIR}/example_branch_datetime_operator.py",
             ]
           volumeMounts:
