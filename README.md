@@ -3,10 +3,6 @@
 </p>
 
 <h1 align="center">Stackable Operator for Apache Airflow</h1>
-[![Build Actions Status](https://ci.stackable.tech/job/airflow%2doperator%2dit%2dnightly/badge/icon?subject=Integration%20Tests)](https://ci.stackable.tech/job/airflow%2doperator%2dit%2dnightly)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/stackabletech/airflow-operator/graphs/commit-activity)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
-[![License OSL3.0](https://img.shields.io/badge/license-OSL3.0-green)](./LICENSE)
 
 [Documentation](https://docs.stackable.tech/airflow-operator/stable/index.html) | [Stackable Data Platform](https://stackable.tech/) | [Platform Docs](https://docs.stackable.tech/)
 
