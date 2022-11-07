@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2022-11-07
+
 ### Added
 
 - Cpu and memory limits are now configurable ([#167]).

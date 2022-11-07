@@ -5,7 +5,7 @@ edition = "2021"
 license = "OSL-3.0"
 name = "stackable-airflow-crd"
 repository = "https://github.com/stackabletech/airflow-operator"
-version = "0.6.0-nightly"
+version = "0.6.0"
 publish = false
 
 [dependencies]
