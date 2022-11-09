@@ -4,9 +4,9 @@
 
 ### Changed
 
-- Updated stackable image versions ([#xxx]).
+- Updated stackable image versions ([#193]).
 
-[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+[#193]: https://github.com/stackabletech/airflow-operator/pull/193
 
 ## [0.6.0] - 2022-11-07
 
