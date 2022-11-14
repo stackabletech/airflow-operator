@@ -18,7 +18,7 @@ spec:
         fsGroup: 50000
       containers:
         - name: airflow-dags
-          image: docker.stackable.tech/stackable/tools:0.2.0-stackable0
+          image: docker.stackable.tech/stackable/tools:0.2.0-stackable0.4.0
           env:
             - name: DEST_DIR
               value: "/stackable/externals"

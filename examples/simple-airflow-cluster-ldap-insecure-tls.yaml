@@ -146,7 +146,7 @@ kind: AirflowCluster
 metadata:
   name: airflow-insecure-tls
 spec:
-  version: 2.4.1-stackable0.4.0
+  version: 2.4.1-stackable0.5.0
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
