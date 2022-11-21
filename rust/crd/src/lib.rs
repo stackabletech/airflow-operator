@@ -1,26 +1,40 @@
 pub mod airflowdb;
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-use stackable_operator::commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources};
-use stackable_operator::config::merge::Merge;
-use stackable_operator::k8s_openapi::api::core::v1::{Volume, VolumeMount};
-use stackable_operator::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::product_config::flask_app_config_writer::{
-    FlaskAppConfigOptions, PythonType,
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::{
+    commons::resources::{
+        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+        Resources, ResourcesFragment,
+    },
+    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
+    k8s_openapi::{
+        api::core::v1::{Volume, VolumeMount},
+        apimachinery::pkg::api::resource::Quantity,
+    },
+    kube::CustomResource,
+    labels::ObjectLabels,
+    product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
+    product_config_utils::{ConfigError, Configuration},
+    role_utils::{Role, RoleGroupRef},
+    schemars::{self, JsonSchema},
 };
-use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::{Role, RoleGroupRef};
-use stackable_operator::schemars::{self, JsonSchema};
-use strum::{Display, EnumIter, EnumString};
+use std::collections::BTreeMap;
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "airflow";
-pub const CONTROLLER_NAME: &str = "airflow-controller";
+pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
+    UnknownAirflowRole { role: String, roles: Vec<String> },
+    #[snafu(display("fragment validation failure"))]
+    FragmentValidationFailure { source: ValidationError },
+}
 
 #[derive(Display, EnumIter, EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
@@ -232,6 +246,14 @@ impl AirflowRole {
             AirflowRole::Worker => None,
         }
     }
+
+    pub fn roles() -> Vec<String> {
+        let mut roles = vec![];
+        for role in Self::iter() {
+            roles.push(role.to_string())
+        }
+        roles
+    }
 }
 
 impl AirflowCluster {
@@ -258,30 +280,44 @@ impl AirflowCluster {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Merge, JsonSchema, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
+#[fragment_attrs(
+    allow(clippy::derive_partial_eq_without_eq),
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct AirflowStorageConfig {}
 
 #[derive(Clone, Debug, Deserialize, Default, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfig {
-    pub resources: Option<Resources<AirflowStorageConfig, NoRuntimeLimits>>,
+    pub resources: Option<ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits>>,
 }
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
 
-    fn default_resources() -> Resources<AirflowStorageConfig, NoRuntimeLimits> {
-        Resources {
-            cpu: CpuLimits {
+    fn default_resources() -> ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> {
+        ResourcesFragment {
+            cpu: CpuLimitsFragment {
                 min: Some(Quantity("200m".to_owned())),
                 max: Some(Quantity("4".to_owned())),
             },
-            memory: MemoryLimits {
+            memory: MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimits {},
+                runtime_limits: NoRuntimeLimitsFragment {},
             },
-            storage: AirflowStorageConfig {},
+            storage: AirflowStorageConfigFragment {},
         }
     }
 }
@@ -334,22 +370,45 @@ impl AirflowCluster {
         &self,
         role: &AirflowRole,
         rolegroup_ref: &RoleGroupRef<AirflowCluster>,
-    ) -> Option<Resources<AirflowStorageConfig, NoRuntimeLimits>> {
+    ) -> Result<Resources<AirflowStorageConfig, NoRuntimeLimits>, Error> {
         // Initialize the result with all default values as baseline
         let conf_defaults = AirflowConfig::default_resources();
 
         let role = match role {
-            AirflowRole::Webserver => self.spec.webservers.as_ref()?,
-            AirflowRole::Worker => self.spec.workers.as_ref()?,
-            AirflowRole::Scheduler => self.spec.schedulers.as_ref()?,
+            AirflowRole::Webserver => {
+                self.spec
+                    .webservers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Worker => self
+                .spec
+                .workers
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu {
+                    role: role.to_string(),
+                    roles: AirflowRole::roles(),
+                })?,
+            AirflowRole::Scheduler => {
+                self.spec
+                    .schedulers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
         };
 
         // Retrieve role resource config
-        let mut conf_role: Resources<AirflowStorageConfig, NoRuntimeLimits> =
+        let mut conf_role: ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> =
             role.config.config.resources.clone().unwrap_or_default();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: Resources<AirflowStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup: ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> = role
             .role_groups
             .get(&rolegroup_ref.role_group)
             .and_then(|rg| rg.config.config.resources.clone())
@@ -364,7 +423,26 @@ impl AirflowCluster {
         conf_rolegroup.merge(&conf_role);
 
         tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
-        Some(conf_rolegroup)
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+}
+
+/// Creates recommended `ObjectLabels` to be used in deployed resources
+pub fn build_recommended_labels<'a, T>(
+    owner: &'a T,
+    controller_name: &'a str,
+    app_version: &'a str,
+    role: &'a str,
+    role_group: &'a str,
+) -> ObjectLabels<'a, T> {
+    ObjectLabels {
+        owner,
+        app_name: APP_NAME,
+        app_version,
+        operator_name: OPERATOR_NAME,
+        controller_name,
+        role,
+        role_group,
     }
 }
 

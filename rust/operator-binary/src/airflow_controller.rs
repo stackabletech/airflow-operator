@@ -4,41 +4,43 @@ use crate::rbac;
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatusCondition};
 use stackable_airflow_crd::{
-    AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole, AirflowStorageConfig,
-    AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH, CONTROLLER_NAME,
+    airflowdb::{AirflowDB, AirflowDBStatusCondition},
+    build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole,
+    AirflowStorageConfig, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH, OPERATOR_NAME,
 };
-use stackable_operator::builder::{
-    ConfigMapBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
-};
-use stackable_operator::cluster_resources::ClusterResources;
-use stackable_operator::commons::resources::{NoRuntimeLimits, Resources};
-use stackable_operator::k8s_openapi::api::core::v1::{ConfigMap, Volume};
-use stackable_operator::kube::Resource;
-use stackable_operator::product_config::flask_app_config_writer;
-use stackable_operator::product_config::flask_app_config_writer::FlaskAppConfigWriterError;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+    },
+    cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
+        resources::{NoRuntimeLimits, Resources},
         secret_class::SecretClassVolumeScope,
         tls::{CaCert, TlsServerVerification, TlsVerification},
     },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction},
+            core::v1::{
+                ConfigMap, EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction,
+                Volume,
+            },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
-        ResourceExt,
+        Resource, ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
-    product_config::{types::PropertyNameKind, ProductConfigManager},
+    product_config::{
+        flask_app_config_writer, flask_app_config_writer::FlaskAppConfigWriterError,
+        types::PropertyNameKind, ProductConfigManager,
+    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
@@ -50,7 +52,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
+pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
@@ -67,6 +69,8 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve airflow version"))]
     NoAirflowVersion,
     #[snafu(display("object defines no statsd exporter version"))]
@@ -152,7 +156,9 @@ pub enum Error {
     #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
     AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
     #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig,
+    FailedToResolveResourceConfig {
+        source: stackable_airflow_crd::Error,
+    },
     #[snafu(display("could not parse Airflow role [{role}]"))]
     UnidentifiedAirflowRole {
         source: strum::ParseError,
@@ -184,12 +190,18 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     // ensure admin user has been set up on the airflow database
     let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowDBObjectSnafu)?;
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &airflow_db, &airflow_db)
+        .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
         .await
         .context(ApplyAirflowDBSnafu)?;
 
     let airflow_db = client
-        .get::<AirflowDB>(&airflow.name_unchecked(), airflow.namespace().as_deref())
+        .get::<AirflowDB>(
+            &airflow.name_unchecked(),
+            airflow
+                .namespace()
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?,
+        )
         .await
         .context(AirflowDBRetrievalSnafu)?;
 
@@ -245,13 +257,17 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
+        .apply_patch(AIRFLOW_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
             name: rbac_sa.name_unchecked(),
         })?;
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
+        .apply_patch(
+            AIRFLOW_CONTROLLER_NAME,
+            &rbac_rolebinding,
+            &rbac_rolebinding,
+        )
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
             name: rbac_rolebinding.name_unchecked(),
@@ -273,9 +289,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         None => None,
     };
 
-    let mut cluster_resources =
-        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &airflow.object_ref(&()))
-            .context(CreateClusterResourcesSnafu)?;
+    let mut cluster_resources = ClusterResources::new(
+        APP_NAME,
+        OPERATOR_NAME,
+        AIRFLOW_CONTROLLER_NAME,
+        &airflow.object_ref(&()),
+    )
+    .context(CreateClusterResourcesSnafu)?;
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -368,14 +388,13 @@ fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> R
             .name(&role_svc_name)
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 airflow,
-                APP_NAME,
+                AIRFLOW_CONTROLLER_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
-                CONTROLLER_NAME,
                 role_name,
                 "global",
-            )
+            ))
             .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
             .build(),
         spec: Some(ServiceSpec {
@@ -436,14 +455,13 @@ fn build_rolegroup_config_map(
                 .name(rolegroup.object_name())
                 .ownerreference_from_resource(airflow, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(
+                .with_recommended_labels(build_recommended_labels(
                     airflow,
-                    APP_NAME,
+                    AIRFLOW_CONTROLLER_NAME,
                     airflow.version().context(NoAirflowVersionSnafu)?,
-                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
-                )
+                ))
                 .build(),
         )
         .add_data(
@@ -480,14 +498,13 @@ fn build_rolegroup_service(
             .name(&rolegroup.object_name())
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 airflow,
-                APP_NAME,
+                AIRFLOW_CONTROLLER_NAME,
                 airflow.version().context(NoAirflowVersionSnafu)?,
-                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
-            )
+            ))
             .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
             .with_label("prometheus.io/scrape", "true")
             .build(),
@@ -611,14 +628,13 @@ fn build_server_rolegroup_statefulset(
             .name(&rolegroup_ref.object_name())
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 airflow,
-                APP_NAME,
-                airflow_version,
-                CONTROLLER_NAME,
+                AIRFLOW_CONTROLLER_NAME,
+                airflow.version().context(NoAirflowVersionSnafu)?,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
-            )
+            ))
             .with_label("statsd-exporter", statsd_exporter_version)
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
@@ -641,14 +657,13 @@ fn build_server_rolegroup_statefulset(
             service_name: rolegroup_ref.object_name(),
             template: pb
                 .metadata_builder(|m| {
-                    m.with_recommended_labels(
+                    m.with_recommended_labels(build_recommended_labels(
                         airflow,
-                        APP_NAME,
+                        AIRFLOW_CONTROLLER_NAME,
                         airflow_version,
-                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
-                    )
+                    ))
                     .with_label("statsd-exporter", statsd_exporter_version)
                 })
                 .add_container(container)
@@ -778,7 +793,7 @@ pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> 
         .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
 

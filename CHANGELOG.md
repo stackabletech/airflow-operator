@@ -5,8 +5,9 @@
 ### Changed
 
 - Updated stackable image versions ([#193]).
+- `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
 
-[#193]: https://github.com/stackabletech/airflow-operator/pull/193
+[#197]: https://github.com/stackabletech/airflow-operator/pull/197
 
 ## [0.6.0] - 2022-11-07
 
