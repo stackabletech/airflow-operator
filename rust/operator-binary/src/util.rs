@@ -1,6 +1,8 @@
 use snafu::Snafu;
-use stackable_operator::k8s_openapi::api::batch::v1::Job;
-use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector};
+use stackable_operator::k8s_openapi::api::{
+    batch::v1::Job,
+    core::v1::{EnvVar, EnvVarSource, SecretKeySelector},
+};
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]

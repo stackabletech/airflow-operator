@@ -10,19 +10,21 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
-clap = "3.2"
+clap = "4.0"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
 serde = "1.0"
-serde_yaml = "0.8"
 snafu = "0.7"
 stackable-airflow-crd = { path = "../crd" }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.25.2" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.27.1" }
 strum = { version = "0.24", features = ["derive"] }
-tokio = { version = "1.21", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.22", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 
 [build-dependencies]
 built = { version =  "0.5", features = ["chrono", "git2"] }
 stackable-airflow-crd = { path = "../crd" }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.25.2" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.27.1" }
+
+[dev-dependencies]
+serde_yaml = "0.8"

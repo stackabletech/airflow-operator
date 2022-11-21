@@ -1,12 +1,13 @@
 use crate::rbac;
 use crate::util::{env_var_from_secret, get_job_state, JobState};
 
-use snafu::{ResultExt, Snafu};
-use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
-use stackable_airflow_crd::AirflowCluster;
-use stackable_operator::builder::PodSecurityContextBuilder;
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::{
+    airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AIRFLOW_DB_CONTROLLER_NAME},
+    AirflowCluster,
+};
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder},
+    builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{PodSpec, PodTemplateSpec, Secret},
@@ -20,8 +21,6 @@ use stackable_operator::{
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "airflowcluster";
-
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
@@ -30,6 +29,8 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("object does not refer to AirflowCluster"))]
     InvalidAirflowReference,
     #[snafu(display("could not find object {airflow}"))]
@@ -88,13 +89,17 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_sa, &rbac_sa)
+        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
             name: rbac_sa.name_unchecked(),
         })?;
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &rbac_rolebinding, &rbac_rolebinding)
+        .apply_patch(
+            AIRFLOW_DB_CONTROLLER_NAME,
+            &rbac_rolebinding,
+            &rbac_rolebinding,
+        )
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
             name: rbac_rolebinding.name_unchecked(),
@@ -105,7 +110,10 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                 let secret = client
                     .get_opt::<Secret>(
                         &airflow_db.spec.credentials_secret,
-                        airflow_db.namespace().as_deref(),
+                        airflow_db
+                            .namespace()
+                            .as_deref()
+                            .context(ObjectHasNoNamespaceSnafu)?,
                     )
                     .await
                     .with_context(|_| {
@@ -119,14 +127,18 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                 if secret.is_some() {
                     let job = build_init_job(&airflow_db, &rbac_sa.name_unchecked())?;
                     client
-                        .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
                         .await
                         .context(ApplyJobSnafu {
                             airflow_db: ObjectRef::from_obj(&*airflow_db),
                         })?;
                     // The job is started, update status to reflect new state
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*airflow_db, &s.initializing())
+                        .apply_patch_status(
+                            AIRFLOW_DB_CONTROLLER_NAME,
+                            &*airflow_db,
+                            &s.initializing(),
+                        )
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -138,11 +150,13 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = airflow_db.job_name();
-                let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
-                    GetInitializationJobSnafu {
-                        init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                    },
-                )?;
+                let job =
+                    client
+                        .get::<Job>(&job_name, &ns)
+                        .await
+                        .context(GetInitializationJobSnafu {
+                            init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
+                        })?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Complete => Some(s.ready()),
@@ -152,7 +166,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*airflow_db, &ns)
+                        .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME, &*airflow_db, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -164,7 +178,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
         // Status is none => initialize the status object as "Provisioned"
         let new_status = AirflowDBStatus::new();
         client
-            .apply_patch_status(FIELD_MANAGER_SCOPE, &*airflow_db, &new_status)
+            .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME, &*airflow_db, &new_status)
             .await
             .context(ApplyStatusSnafu)?;
     }
@@ -260,6 +274,6 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<AirflowDB>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }

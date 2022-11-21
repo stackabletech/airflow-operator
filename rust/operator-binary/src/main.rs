@@ -4,17 +4,16 @@ mod config;
 mod rbac;
 mod util;
 
-use std::sync::Arc;
+use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 
 use clap::Parser;
 use futures::StreamExt;
 use stackable_airflow_crd::{
-    airflowdb::AirflowDB, AirflowCluster, AirflowClusterAuthenticationConfig, APP_NAME,
+    airflowdb::{AirflowDB, AIRFLOW_DB_CONTROLLER_NAME},
+    AirflowCluster, AirflowClusterAuthenticationConfig, APP_NAME, OPERATOR_NAME,
 };
-use stackable_operator::cli::ProductOperatorRun;
-use stackable_operator::logging::controller::report_controller_reconciled;
 use stackable_operator::{
-    cli::Command,
+    cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -24,9 +23,12 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{reflector::ObjectRef, Controller},
-        CustomResourceExt, ResourceExt,
+        ResourceExt,
     },
+    logging::controller::report_controller_reconciled,
+    CustomResourceExt,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -44,11 +46,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
 
     match opts.cmd {
-        Command::Crd => println!(
-            "{}{}",
-            serde_yaml::to_string(&AirflowCluster::crd())?,
-            serde_yaml::to_string(&AirflowDB::crd())?
-        ),
+        Command::Crd => {
+            AirflowCluster::print_yaml_schema()?;
+            AirflowDB::print_yaml_schema()?;
+        }
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
@@ -72,10 +73,8 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/airflow-operator/config-spec/properties.yaml",
             ])?;
 
-            let client = stackable_operator::client::create_client(Some(
-                "airflow.stackable.tech".to_string(),
-            ))
-            .await?;
+            let client =
+                stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
 
             let airflow_controller_builder = Controller::new(
                 watch_namespace.get_api::<AirflowCluster>(&client),
@@ -95,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .shutdown_on_signal()
                 .watches(
-                    watch_namespace.get_api::<AuthenticationClass>(&client),
+                    client.get_api::<AuthenticationClass>(&()),
                     ListParams::default(),
                     move |authentication_class| {
                         airflow_store_1
@@ -135,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|res| {
                     report_controller_reconciled(
                         &client,
-                        "airflowclusters.airflow.stackable.tech",
+                        &format!("{AIRFLOW_CONTROLLER_NAME}.{OPERATOR_NAME}"),
                         &res,
                     );
                 });
@@ -192,7 +191,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|res| {
                     report_controller_reconciled(
                         &client,
-                        "airflowdbclusters.airflow.stackable.tech",
+                        &format!("{AIRFLOW_DB_CONTROLLER_NAME}.{OPERATOR_NAME}"),
                         &res,
                     )
                 });

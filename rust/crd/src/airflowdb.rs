@@ -1,12 +1,15 @@
-use crate::{AirflowCluster, APP_NAME, CONTROLLER_NAME};
+use crate::{build_recommended_labels, AirflowCluster};
+
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, Snafu};
-use stackable_operator::builder::ObjectMetaBuilder;
-use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
-use stackable_operator::k8s_openapi::chrono::Utc;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::schemars::{self, JsonSchema};
+use stackable_operator::{
+    builder::ObjectMetaBuilder,
+    k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
+    kube::{CustomResource, ResourceExt},
+    schemars::{self, JsonSchema},
+};
+
+pub const AIRFLOW_DB_CONTROLLER_NAME: &str = "airflow-db";
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -55,14 +58,13 @@ impl AirflowDB {
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
-                .with_recommended_labels(
+                .with_recommended_labels(build_recommended_labels(
                     airflow,
-                    APP_NAME,
+                    AIRFLOW_DB_CONTROLLER_NAME,
                     version,
-                    CONTROLLER_NAME,
                     "db-initializer",
                     "global",
-                )
+                ))
                 .build(),
             spec: AirflowDBSpec {
                 airflow_version: version.to_string(),
