@@ -245,7 +245,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
     }
 
-    let role_config = transform_all_roles_to_config(&*airflow, roles);
+    let role_config = transform_all_roles_to_config::<AirflowConfig>(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         airflow.version().context(NoAirflowVersionSnafu)?,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -323,7 +323,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .resolve_resource_config_for_role_and_rolegroup(&airflow_role, &rolegroup)
                 .context(FailedToResolveResourceConfigSnafu)?;
 
-            let rg_service = build_rolegroup_service(&rolegroup, &*airflow)?;
+            let rg_service = build_rolegroup_service(&rolegroup, &airflow)?;
             cluster_resources.add(client, &rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
