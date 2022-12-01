@@ -13,7 +13,7 @@ dimensions:
     values:
       - 2.2.4-stackable0.4.0
       - 2.2.5-stackable0.4.0
-      - 2.4.1-stackable0.5.0
+      - 2.4.1-stackable0.6.0
   - name: ldap-authentication
     values:
       - no-tls
