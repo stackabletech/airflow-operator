@@ -55,6 +55,49 @@ spec:
                 exposeConfig:
                   nullable: true
                   type: boolean
+                image:
+                  anyOf:
+                    - required:
+                        - custom
+                        - productVersion
+                    - required:
+                        - productVersion
+                        - stackableVersion
+                  description: The Airflow image version to use
+                  properties:
+                    custom:
+                      description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
+                      type: string
+                    productVersion:
+                      description: Version of the product, e.g. `1.4.1`.
+                      type: string
+                    pullPolicy:
+                      default: IfNotPresent
+                      description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the Images'
+                      enum:
+                        - IfNotPresent
+                        - Always
+                        - Never
+                      type: string
+                    pullSecrets:
+                      description: '[Image pull secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod) to pull images from a private registry'
+                      items:
+                        description: LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                        type: object
+                      nullable: true
+                      type: array
+                    repo:
+                      description: Name of the docker repo, e.g. `docker.stackable.tech/stackable`
+                      nullable: true
+                      type: string
+                    stackableVersion:
+                      description: Stackable version of the product, e.g. 2.1.0
+                      type: string
+                  type: object
                 loadExamples:
                   nullable: true
                   type: boolean
@@ -391,16 +434,10 @@ spec:
                   required:
                     - roleGroups
                   type: object
-                statsdExporterVersion:
-                  nullable: true
-                  type: string
                 stopped:
                   description: Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
                   nullable: true
                   type: boolean
-                version:
-                  nullable: true
-                  type: string
                 volumeMounts:
                   items:
                     description: VolumeMount describes a mounting of a Volume within a container.
@@ -2219,6 +2256,7 @@ spec:
                   type: object
               required:
                 - credentialsSecret
+                - image
               type: object
             status:
               nullable: true
@@ -2256,13 +2294,54 @@ spec:
           properties:
             spec:
               properties:
-                airflowVersion:
-                  type: string
                 credentialsSecret:
                   type: string
+                image:
+                  anyOf:
+                    - required:
+                        - custom
+                        - productVersion
+                    - required:
+                        - productVersion
+                        - stackableVersion
+                  description: The Airflow image version to use
+                  properties:
+                    custom:
+                      description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
+                      type: string
+                    productVersion:
+                      description: Version of the product, e.g. `1.4.1`.
+                      type: string
+                    pullPolicy:
+                      default: IfNotPresent
+                      description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the Images'
+                      enum:
+                        - IfNotPresent
+                        - Always
+                        - Never
+                      type: string
+                    pullSecrets:
+                      description: '[Image pull secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod) to pull images from a private registry'
+                      items:
+                        description: LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                        type: object
+                      nullable: true
+                      type: array
+                    repo:
+                      description: Name of the docker repo, e.g. `docker.stackable.tech/stackable`
+                      nullable: true
+                      type: string
+                    stackableVersion:
+                      description: Stackable version of the product, e.g. 2.1.0
+                      type: string
+                  type: object
               required:
-                - airflowVersion
                 - credentialsSecret
+                - image
               type: object
             status:
               nullable: true
