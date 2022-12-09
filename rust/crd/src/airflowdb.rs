@@ -2,6 +2,7 @@ use crate::{build_recommended_labels, AirflowCluster};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use stackable_operator::labels::APP_VERSION_LABEL;
 use stackable_operator::{
     builder::ObjectMetaBuilder,
     commons::product_image_selection::{ProductImage, ResolvedProductImage},
@@ -65,6 +66,7 @@ impl AirflowDB {
                     "db-initializer",
                     "global",
                 ))
+                .with_label(APP_VERSION_LABEL, &resolved_product_image.app_version_label)
                 .build(),
             spec: AirflowDBSpec {
                 image: airflow.spec.image.clone(),
