@@ -455,6 +455,7 @@ pub struct AirflowClusterRef {
 mod tests {
     use crate::airflowdb::AirflowDB;
     use crate::AirflowCluster;
+    use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
     #[test]
     fn test_cluster_config() {
@@ -465,7 +466,9 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 2.2.4
+          image:
+            productVersion: 2.2.4
+            stackableVersion: 0.5.0
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -486,10 +489,14 @@ mod tests {
         )
         .unwrap();
 
-        let airflow_db = AirflowDB::for_airflow(&cluster);
+        let resolved_airflow_image: ResolvedProductImage = cluster.spec.image.resolve("airflow");
 
-        assert_eq!("2.2.4", airflow_db.unwrap().spec.airflow_version);
-        assert_eq!("2.2.4", cluster.spec.version.unwrap_or_default());
+        let airflow_db = AirflowDB::for_airflow(&cluster, &resolved_airflow_image).unwrap();
+        let resolved_airflow_db_image: ResolvedProductImage =
+            airflow_db.spec.image.resolve("airflow");
+
+        assert_eq!("2.2.4", &resolved_airflow_db_image.product_version);
+        assert_eq!("2.2.4", &resolved_airflow_image.product_version);
         assert_eq!(
             "KubernetesExecutor",
             cluster.spec.executor.unwrap_or_default()
