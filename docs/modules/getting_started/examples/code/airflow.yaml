@@ -4,8 +4,9 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: 2.4.1-stackable0.6.0
-  statsdExporterVersion: v0.22.4
+  image:
+    productVersion: 2.4.1
+    stackableVersion: 0.7.0
   executor: CeleryExecutor
   loadExamples: true
   exposeConfig: false
