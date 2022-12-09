@@ -6,7 +6,7 @@
 
 - Updated stackable image versions ([#193]).
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
-- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206).
+- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
 
 [#197]: https://github.com/stackabletech/airflow-operator/pull/197
 [#206]: https://github.com/stackabletech/airflow-operator/pull/206
