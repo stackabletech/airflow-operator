@@ -35,7 +35,9 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  version: {{ test_scenario['values']['airflow'] }}
+  image:
+    productVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[1] }}"
   statsdExporterVersion: v0.22.4
   executor: CeleryExecutor
   loadExamples: true
