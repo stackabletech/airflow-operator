@@ -2,6 +2,7 @@ pub mod airflowdb;
 
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -106,11 +107,9 @@ pub struct AirflowClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
+    /// The Airflow image version to use
+    pub image: ProductImage,
     pub credentials_secret: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub statsd_exporter_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -273,10 +272,6 @@ impl AirflowCluster {
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
         tmp.iter().flat_map(|v| v.iter()).cloned().collect()
-    }
-
-    pub fn version(&self) -> Option<&str> {
-        self.spec.version.as_deref()
     }
 }
 
