@@ -42,7 +42,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowDBSpec {
-    /// The Airflow image version to use
+    /// The Airflow image to use
     pub image: ProductImage,
     pub credentials_secret: String,
 }
@@ -66,7 +66,6 @@ impl AirflowDB {
                     "db-initializer",
                     "global",
                 ))
-                .with_label(APP_VERSION_LABEL, &resolved_product_image.app_version_label)
                 .build(),
             spec: AirflowDBSpec {
                 image: airflow.spec.image.clone(),

@@ -107,7 +107,7 @@ pub struct AirflowClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// The Airflow image version to use
+    /// The Airflow image to use
     pub image: ProductImage,
     pub credentials_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
