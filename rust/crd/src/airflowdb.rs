@@ -2,7 +2,6 @@ use crate::{build_recommended_labels, AirflowCluster};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use stackable_operator::labels::APP_VERSION_LABEL;
 use stackable_operator::{
     builder::ObjectMetaBuilder,
     commons::product_image_selection::{ProductImage, ResolvedProductImage},
