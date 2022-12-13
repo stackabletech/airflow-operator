@@ -192,7 +192,9 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 2.2.4
+          image:
+            productVersion: 2.2.4
+            stackableVersion: 0.5.0
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -223,7 +225,9 @@ mod tests {
         metadata:
           name: airflow
         spec:
-          version: 2.2.4
+          image:
+            productVersion: 2.2.4
+            stackableVersion: 0.5.0
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true

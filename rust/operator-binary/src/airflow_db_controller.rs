@@ -1,3 +1,4 @@
+use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
 use crate::rbac;
 use crate::util::{env_var_from_secret, get_job_state, JobState};
 
@@ -8,6 +9,7 @@ use stackable_airflow_crd::{
 };
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
+    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{PodSpec, PodTemplateSpec, Secret},
@@ -86,6 +88,8 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let resolved_product_image: ResolvedProductImage =
+        airflow_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
     client
@@ -125,7 +129,11 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         SecretCheckSnafu { secret: secret_ref }
                     })?;
                 if secret.is_some() {
-                    let job = build_init_job(&airflow_db, &rbac_sa.name_unchecked())?;
+                    let job = build_init_job(
+                        &airflow_db,
+                        &resolved_product_image,
+                        &rbac_sa.name_unchecked(),
+                    )?;
                     client
                         .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
                         .await
@@ -186,7 +194,11 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     Ok(Action::await_change())
 }
 
-fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
+fn build_init_job(
+    airflow_db: &AirflowDB,
+    resolved_product_image: &ResolvedProductImage,
+    sa_name: &str,
+) -> Result<Job> {
     let commands = vec![
         String::from("airflow db init"),
         String::from("airflow db upgrade"),
@@ -228,10 +240,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
 
     let container = ContainerBuilder::new("airflow-init-db")
         .expect("ContainerBuilder not created")
-        .image(format!(
-            "docker.stackable.tech/stackable/airflow:{}",
-            airflow_db.spec.airflow_version
-        ))
+        .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
@@ -247,6 +256,7 @@ fn build_init_job(airflow_db: &AirflowDB, sa_name: &str) -> Result<Job> {
             containers: vec![container],
             restart_policy: Some("Never".to_string()),
             service_account: Some(sa_name.to_string()),
+            image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             security_context: Some(
                 PodSecurityContextBuilder::new()
                     .run_as_user(rbac::AIRFLOW_UID)

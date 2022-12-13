@@ -9,6 +9,7 @@ use stackable_airflow_crd::{
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole,
     AirflowStorageConfig, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH, OPERATOR_NAME,
 };
+use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
@@ -53,12 +54,12 @@ use std::{
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
+pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
-
-pub const SECRETS_DIR: &str = "/stackable/secrets/";
-pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -186,9 +187,12 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let resolved_product_image: ResolvedProductImage =
+        airflow.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
     // ensure admin user has been set up on the airflow database
-    let airflow_db = AirflowDB::for_airflow(&airflow).context(CreateAirflowDBObjectSnafu)?;
+    let airflow_db = AirflowDB::for_airflow(&airflow, &resolved_product_image)
+        .context(CreateAirflowDBObjectSnafu)?;
     client
         .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
         .await
@@ -247,7 +251,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let role_config = transform_all_roles_to_config::<AirflowConfig>(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
-        airflow.version().context(NoAirflowVersionSnafu)?,
+        &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
         &ctx.product_config,
         false,
@@ -300,7 +304,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
-            let role_service = build_role_service(role_name, &airflow, resolved_port)?;
+            let role_service =
+                build_role_service(&airflow, &resolved_product_image, role_name, resolved_port)?;
             cluster_resources
                 .add(client, &role_service)
                 .await
@@ -323,7 +328,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .resolve_resource_config_for_role_and_rolegroup(&airflow_role, &rolegroup)
                 .context(FailedToResolveResourceConfigSnafu)?;
 
-            let rg_service = build_rolegroup_service(&rolegroup, &airflow)?;
+            let rg_service =
+                build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
             cluster_resources.add(client, &rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -332,6 +338,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
             let rg_configmap = build_rolegroup_config_map(
                 &airflow,
+                &resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
                 authentication_class.as_ref(),
@@ -344,8 +351,9 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 })?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
-                &rolegroup,
                 &airflow,
+                &resolved_product_image,
+                &rolegroup,
                 rolegroup_config,
                 authentication_class.as_ref(),
                 &rbac_sa.name_unchecked(),
@@ -370,7 +378,12 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> Result<Service> {
+fn build_role_service(
+    airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    role_name: &str,
+    port: u16,
+) -> Result<Service> {
     let role_svc_name = format!(
         "{}-{}",
         airflow
@@ -391,11 +404,10 @@ fn build_role_service(role_name: &str, airflow: &AirflowCluster, port: u16) -> R
             .with_recommended_labels(build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                airflow.version().context(NoAirflowVersionSnafu)?,
+                &resolved_product_image.app_version_label,
                 role_name,
                 "global",
             ))
-            .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(ports),
@@ -423,6 +435,7 @@ fn role_port(role_name: &str) -> Option<u16> {
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 fn build_rolegroup_config_map(
     airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
@@ -458,7 +471,7 @@ fn build_rolegroup_config_map(
                 .with_recommended_labels(build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
-                    airflow.version().context(NoAirflowVersionSnafu)?,
+                    &resolved_product_image.app_version_label,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
@@ -478,8 +491,9 @@ fn build_rolegroup_config_map(
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
-    rolegroup: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup: &RoleGroupRef<AirflowCluster>,
 ) -> Result<Service> {
     let mut ports = vec![ServicePort {
         name: Some(METRICS_PORT_NAME.into()),
@@ -501,11 +515,10 @@ fn build_rolegroup_service(
             .with_recommended_labels(build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                airflow.version().context(NoAirflowVersionSnafu)?,
+                &resolved_product_image.app_version_label,
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))
-            .with_label("statsd-exporter", statsd_exporter_version(airflow)?)
             .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
@@ -528,28 +541,21 @@ fn build_rolegroup_service(
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_server_rolegroup_statefulset(
-    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     sa_name: &str,
     resources: &Resources<AirflowStorageConfig, NoRuntimeLimits>,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
-    let airflow_version = airflow.version().context(NoAirflowVersionSnafu)?;
     let role = airflow
         .get_role(airflow_role.clone())
         .as_ref()
         .context(NoAirflowRoleSnafu)?;
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
-
-    let image = format!("docker.stackable.tech/stackable/airflow:{airflow_version}",);
-    tracing::info!("Using image {}", image);
-
-    let statsd_exporter_version = statsd_exporter_version(airflow)?;
-    let statsd_exporter_image =
-        format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     // initialising commands
     let commands = airflow_role.get_commands();
@@ -563,7 +569,7 @@ fn build_server_rolegroup_statefulset(
     }
 
     let cb = cb
-        .image(image)
+        .image_from_product_image(resolved_product_image)
         .resources(resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
@@ -610,7 +616,9 @@ fn build_server_rolegroup_statefulset(
 
     let metrics_container = ContainerBuilder::new("metrics")
         .expect("ContainerBuilder not created")
-        .image(statsd_exporter_image)
+        .image_from_product_image(resolved_product_image)
+        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+        .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
 
@@ -631,11 +639,10 @@ fn build_server_rolegroup_statefulset(
             .with_recommended_labels(build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                airflow.version().context(NoAirflowVersionSnafu)?,
+                &resolved_product_image.app_version_label,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
-            .with_label("statsd-exporter", statsd_exporter_version)
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
@@ -660,12 +667,12 @@ fn build_server_rolegroup_statefulset(
                     m.with_recommended_labels(build_recommended_labels(
                         airflow,
                         AIRFLOW_CONTROLLER_NAME,
-                        airflow_version,
+                        &resolved_product_image.app_version_label,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     ))
-                    .with_label("statsd-exporter", statsd_exporter_version)
                 })
+                .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
@@ -783,14 +790,6 @@ fn build_static_envs() -> Vec<EnvVar> {
         },
     ]
     .into()
-}
-
-pub fn statsd_exporter_version(airflow: &AirflowCluster) -> Result<&str, Error> {
-    airflow
-        .spec
-        .statsd_exporter_version
-        .as_deref()
-        .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

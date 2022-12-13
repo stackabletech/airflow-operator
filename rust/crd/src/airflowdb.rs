@@ -1,9 +1,10 @@
 use crate::{build_recommended_labels, AirflowCluster};
 
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::{
     builder::ObjectMetaBuilder,
+    commons::product_image_selection::{ProductImage, ResolvedProductImage},
     k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
     kube::{CustomResource, ResourceExt},
     schemars::{self, JsonSchema},
@@ -24,7 +25,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
     version = "v1alpha1",
@@ -40,18 +41,17 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowDBSpec {
-    pub airflow_version: String,
+    /// The Airflow image to use
+    pub image: ProductImage,
     pub credentials_secret: String,
 }
 
 impl AirflowDB {
     /// Returns an AirflowDB resource with the same name, namespace and Airflow version as the cluster.
-    pub fn for_airflow(airflow: &AirflowCluster) -> Result<Self> {
-        let version = airflow
-            .spec
-            .version
-            .as_deref()
-            .context(NoAirflowVersionSnafu)?;
+    pub fn for_airflow(
+        airflow: &AirflowCluster,
+        resolved_product_image: &ResolvedProductImage,
+    ) -> Result<Self> {
         Ok(Self {
             // The db is deliberately not owned by the cluster so it doesn't get deleted when the
             // cluster gets deleted.  The schema etc. still exists in the database and can be reused
@@ -61,13 +61,13 @@ impl AirflowDB {
                 .with_recommended_labels(build_recommended_labels(
                     airflow,
                     AIRFLOW_DB_CONTROLLER_NAME,
-                    version,
+                    &resolved_product_image.product_version,
                     "db-initializer",
                     "global",
                 ))
                 .build(),
             spec: AirflowDBSpec {
-                airflow_version: version.to_string(),
+                image: airflow.spec.image.clone(),
                 credentials_secret: airflow.spec.credentials_secret.clone(),
             },
             status: None,
