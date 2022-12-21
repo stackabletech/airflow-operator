@@ -676,6 +676,7 @@ fn build_server_rolegroup_statefulset(
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volumes(volumes)
+                .node_selector_opt(rolegroup.and_then(|rg| rg.selector.clone()))
                 .service_account_name(sa_name)
                 .security_context(
                     PodSecurityContextBuilder::new()
