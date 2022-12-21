@@ -27,7 +27,7 @@ helm install --wait airflow-postgresql bitnami/postgresql --version 12.1.5 \
 # tag::helm-add-bitnami-redis[]
 helm install --wait airflow-redis bitnami/redis \
     --set auth.password=redis \
-    --version 16.8.7 \
+    --version 17.3.7 \
     --set replica.replicaCount=1
 # end::helm-add-bitnami-redis[]
 
