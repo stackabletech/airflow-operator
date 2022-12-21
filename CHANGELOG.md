@@ -10,9 +10,9 @@
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
 
-[#208]: https://github.com/stackabletech/airflow-operator/pull/208
 [#197]: https://github.com/stackabletech/airflow-operator/pull/197
 [#206]: https://github.com/stackabletech/airflow-operator/pull/206
+[#208]: https://github.com/stackabletech/airflow-operator/pull/208
 
 ## [0.6.0] - 2022-11-07
 
