@@ -4,10 +4,13 @@
 
 ### Changed
 
+- Fixed the RoleGroup `selector`. It was not used before. ([#208])
+- `operator-rs` `0.27.1` -> `0.30.1` ([#208])
 - Updated stackable image versions ([#193]).
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
 
+[#208]: https://github.com/stackabletech/airflow-operator/pull/208
 [#197]: https://github.com/stackabletech/airflow-operator/pull/197
 [#206]: https://github.com/stackabletech/airflow-operator/pull/206
 
