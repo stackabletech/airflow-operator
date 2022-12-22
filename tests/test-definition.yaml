@@ -14,6 +14,9 @@ dimensions:
       - 2.2.4-stackable0.5.0
       - 2.2.5-stackable0.5.0
       - 2.4.1-stackable0.7.0
+  - name: airflow-latest
+    values:
+      - 2.4.1-stackable0.7.0
   - name: ldap-authentication
     values:
       - no-tls
@@ -25,7 +28,7 @@ dimensions:
 tests:
   - name: mount-dags-pvc
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
   - name: smoke
     dimensions:
@@ -33,18 +36,18 @@ tests:
       - openshift
   - name: mount-dags-configmap
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
   - name: ldap
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
       - ldap-authentication
   - name: resources
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
   - name: orphaned-resources
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
