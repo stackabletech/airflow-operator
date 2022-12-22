@@ -19,7 +19,7 @@ echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redi
 helm repo add bitnami https://charts.bitnami.com/bitnami
 # end::helm-add-bitnami-repo[]
 # tag::helm-add-bitnami-pgs[]
-helm install --wait airflow-postgresql bitnami/postgresql --version 11.0.0 \
+helm install --wait airflow-postgresql bitnami/postgresql --version 12.1.5 \
     --set auth.username=airflow \
     --set auth.password=airflow \
     --set auth.database=airflow
@@ -27,7 +27,7 @@ helm install --wait airflow-postgresql bitnami/postgresql --version 11.0.0 \
 # tag::helm-add-bitnami-redis[]
 helm install --wait airflow-redis bitnami/redis \
     --set auth.password=redis \
-    --version 16.8.7 \
+    --version 17.3.7 \
     --set replica.replicaCount=1
 # end::helm-add-bitnami-redis[]
 

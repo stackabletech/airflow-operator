@@ -6,5 +6,5 @@ versions:
   commons: 0.5.0-nightly
   secret: 0.7.0-nightly
   airflow: 0.7.0-nightly
-  postgresql: 11.0.0
-  redis: 16.8.7
+  postgresql: 12.1.5
+  redis: 17.3.7

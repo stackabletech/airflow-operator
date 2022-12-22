@@ -38,7 +38,7 @@ spec:
               "bash",
               "-x",
               "-c",
-              "curl -L  https://raw.githubusercontent.com/apache/airflow/{{ test_scenario['values']['airflow'].split('-').0 }}/airflow/example_dags/example_trigger_target_dag.py \
+              "curl -L  https://raw.githubusercontent.com/apache/airflow/{{ test_scenario['values']['airflow-latest'].split('-').0 }}/airflow/example_dags/example_trigger_target_dag.py \
               -o ${DEST_DIR}/example_trigger_target_dag.py",
             ]
           volumeMounts:
