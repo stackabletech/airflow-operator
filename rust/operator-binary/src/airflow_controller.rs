@@ -4,6 +4,7 @@ use crate::rbac;
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::AirflowConfigFragment;
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole,
@@ -156,8 +157,8 @@ pub enum Error {
     },
     #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
     AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
-    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig {
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig {
         source: stackable_airflow_crd::Error,
     },
     #[snafu(display("could not parse Airflow role [{role}]"))]
@@ -249,7 +250,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
     }
 
-    let role_config = transform_all_roles_to_config::<AirflowConfig>(&airflow, roles);
+    let role_config = transform_all_roles_to_config::<AirflowConfigFragment>(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -324,9 +325,9 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                     role: role_name.to_string(),
                 })?;
 
-            let resources = airflow
-                .resolve_resource_config_for_role_and_rolegroup(&airflow_role, &rolegroup)
-                .context(FailedToResolveResourceConfigSnafu)?;
+            let config = airflow
+                .merged_config(&airflow_role, &rolegroup)
+                .context(FailedToResolveConfigSnafu)?;
 
             let rg_service =
                 build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
@@ -357,7 +358,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_class.as_ref(),
                 &rbac_sa.name_unchecked(),
-                &resources,
+                &config.resources,
             )?;
             cluster_resources
                 .add(client, &rg_statefulset)
