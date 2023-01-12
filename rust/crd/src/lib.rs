@@ -123,11 +123,11 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authentication_config: Option<AirflowClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub webservers: Option<Role<AirflowConfig>>,
+    pub webservers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedulers: Option<Role<AirflowConfig>>,
+    pub schedulers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workers: Option<Role<AirflowConfig>>,
+    pub workers: Option<Role<AirflowConfigFragment>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -256,7 +256,7 @@ impl AirflowRole {
 }
 
 impl AirflowCluster {
-    pub fn get_role(&self, role: AirflowRole) -> &Option<Role<AirflowConfig>> {
+    pub fn get_role(&self, role: AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
@@ -293,31 +293,46 @@ impl AirflowCluster {
 )]
 pub struct AirflowStorageConfig {}
 
-#[derive(Clone, Debug, Deserialize, Default, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct AirflowConfig {
-    pub resources: Option<ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits>>,
+    #[fragment_attrs(serde(default))]
+    pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
 }
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
 
-    fn default_resources() -> ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> {
-        ResourcesFragment {
-            cpu: CpuLimitsFragment {
-                min: Some(Quantity("200m".to_owned())),
-                max: Some(Quantity("4".to_owned())),
+    fn default_config() -> AirflowConfigFragment {
+        AirflowConfigFragment {
+            resources: ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("200m".to_owned())),
+                    max: Some(Quantity("4".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("2Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: AirflowStorageConfigFragment {},
             },
-            memory: MemoryLimitsFragment {
-                limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimitsFragment {},
-            },
-            storage: AirflowStorageConfigFragment {},
         }
     }
 }
 
-impl Configuration for AirflowConfig {
+impl Configuration for AirflowConfigFragment {
     type Configurable = AirflowCluster;
 
     fn compute_env(
@@ -326,7 +341,7 @@ impl Configuration for AirflowConfig {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
-            Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.credentials_secret.clone()),
         )]
         .into())
@@ -361,13 +376,13 @@ impl AirflowCluster {
     }
 
     /// Retrieve and merge resource configs for role and role groups
-    pub fn resolve_resource_config_for_role_and_rolegroup(
+    pub fn merged_config(
         &self,
         role: &AirflowRole,
         rolegroup_ref: &RoleGroupRef<AirflowCluster>,
-    ) -> Result<Resources<AirflowStorageConfig, NoRuntimeLimits>, Error> {
+    ) -> Result<AirflowConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_resources();
+        let conf_defaults = AirflowConfig::default_config();
 
         let role = match role {
             AirflowRole::Webserver => {
@@ -399,14 +414,13 @@ impl AirflowCluster {
         };
 
         // Retrieve role resource config
-        let mut conf_role: ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> =
-            role.config.config.resources.clone().unwrap_or_default();
+        let mut conf_role = role.config.config.to_owned();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: ResourcesFragment<AirflowStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup = role
             .role_groups
             .get(&rolegroup_ref.role_group)
-            .and_then(|rg| rg.config.config.resources.clone())
+            .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
 
         // Merge more specific configs into default config
@@ -417,7 +431,7 @@ impl AirflowCluster {
         conf_role.merge(&conf_defaults);
         conf_rolegroup.merge(&conf_role);
 
-        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
