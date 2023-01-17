@@ -6,7 +6,7 @@
 
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
 - `operator-rs` `0.27.1` -> `0.30.1` ([#208])
-- `operator-rs` `0.30.1` -> `0.23.0` ([#216]).
+- `operator-rs` `0.30.1` -> `0.31.0` ([#216]).
 - Updated stackable image versions ([#193]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
 - Fixed the RoleGroup `selector`. It was not used before. ([#208])
