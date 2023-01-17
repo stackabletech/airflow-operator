@@ -53,8 +53,6 @@ use std::{
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
-pub const SECRETS_DIR: &str = "/stackable/secrets/";
-pub const CERTS_DIR: &str = "/stackable/certificates/";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 const METRICS_PORT_NAME: &str = "metrics";
