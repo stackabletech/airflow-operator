@@ -807,7 +807,7 @@ fn add_authentication_volumes_and_volume_mounts(
         _ => AuthenticationClassProviderNotSupportedSnafu {
             authentication_class_provider: authentication_class.spec.provider.to_string(),
             authentication_class: ObjectRef::<AuthenticationClass>::new(
-                authentication_class.metadata.name.as_ref().unwrap(),
+                &authentication_class.name_unchecked(),
             ),
         }
         .fail(),
