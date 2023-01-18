@@ -4,15 +4,18 @@
 
 ### Changed
 
-- Fixed the RoleGroup `selector`. It was not used before. ([#208])
-- `operator-rs` `0.27.1` -> `0.30.1` ([#208])
-- Updated stackable image versions ([#193]).
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
+- `operator-rs` `0.27.1` -> `0.30.1` ([#208])
+- `operator-rs` `0.30.1` -> `0.31.0` ([#216]).
+- Updated stackable image versions ([#193]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
+- Fixed the RoleGroup `selector`. It was not used before. ([#208])
+- Refactored LDAP related code to use new `LdapAuthenticationProvider` functionality ([#216])
 
 [#197]: https://github.com/stackabletech/airflow-operator/pull/197
 [#206]: https://github.com/stackabletech/airflow-operator/pull/206
 [#208]: https://github.com/stackabletech/airflow-operator/pull/208
+[#216]: https://github.com/stackabletech/airflow-operator/pull/216
 
 ## [0.6.0] - 2022-11-07
 

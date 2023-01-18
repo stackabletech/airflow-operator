@@ -1,11 +1,10 @@
-use crate::airflow_controller::{CERTS_DIR, SECRETS_DIR};
 use stackable_airflow_crd::{
     AirflowClusterAuthenticationConfig, AirflowConfigOptions, LdapRolesSyncMoment,
 };
 use stackable_operator::commons::{
     authentication::{AuthenticationClass, AuthenticationClassProvider},
     ldap::LdapAuthenticationProvider,
-    tls::{CaCert, TlsVerification},
+    tls::TlsVerification,
 };
 use std::collections::BTreeMap;
 
@@ -40,9 +39,8 @@ fn append_authentication_config(
     authentication_config: &AirflowClusterAuthenticationConfig,
     authentication_class: &AuthenticationClass,
 ) {
-    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
     if let AuthenticationClassProvider::Ldap(ldap) = &authentication_class.spec.provider {
-        append_ldap_config(config, ldap, authentication_class_name);
+        append_ldap_config(config, ldap);
     }
 
     config.insert(
@@ -59,11 +57,7 @@ fn append_authentication_config(
     );
 }
 
-fn append_ldap_config(
-    config: &mut BTreeMap<String, String>,
-    ldap: &LdapAuthenticationProvider,
-    authentication_class_name: &str,
-) {
+fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
@@ -113,64 +107,43 @@ fn append_ldap_config(
                 false.to_string(),
             );
         }
-        Some(tls) => match &tls.verification {
-            TlsVerification::None {} => {
-                config.insert(
-                    AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
-                    true.to_string(),
-                );
-                config.insert(
-                    AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-                    true.to_string(),
-                );
+        Some(tls) => {
+            config.insert(
+                AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
+                true.to_string(),
+            );
+            match &tls.verification {
+                TlsVerification::None {} => {
+                    config.insert(
+                        AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
+                        true.to_string(),
+                    );
+                }
+                TlsVerification::Server(_) => {
+                    config.insert(
+                        AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
+                        false.to_string(),
+                    );
+                    if let Some(ca_path) = ldap.tls_ca_cert_mount_path() {
+                        config.insert(
+                            AirflowConfigOptions::AuthLdapTlsCacertfile.to_string(),
+                            ca_path,
+                        );
+                    }
+                }
             }
-            TlsVerification::Server(server_verification) => {
-                append_server_ca_cert(
-                    config,
-                    authentication_class_name,
-                    &server_verification.ca_cert,
-                );
-            }
-        },
+        }
     }
 
-    if ldap.bind_credentials.is_some() {
+    if let Some((username_path, password_path)) = ldap.bind_credentials_mount_paths() {
         config.insert(
             AirflowConfigOptions::AuthLdapBindUser.to_string(),
-            format!(
-                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/user').read()"
-            ),
+            format!("open('{username_path}').read()"),
         );
         config.insert(
             AirflowConfigOptions::AuthLdapBindPassword.to_string(),
-            format!(
-                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/password').read()"
-            ),
+            format!("open('{password_path}').read()"),
         );
-    }
-}
-
-fn append_server_ca_cert(
-    config: &mut BTreeMap<String, String>,
-    authentication_class_name: &str,
-    server_ca_cert: &CaCert,
-) {
-    config.insert(
-        AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
-        true.to_string(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-        false.to_string(),
-    );
-    match server_ca_cert {
-        CaCert::SecretClass(..) => {
-            config.insert(
-                AirflowConfigOptions::AuthLdapTlsCacertfile.to_string(),
-                format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/ca.crt"),
-            );
-        }
-        CaCert::WebPki {} => {}
     }
 }
 
