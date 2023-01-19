@@ -1,35 +1,37 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
+use crate::product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address};
 use crate::rbac;
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::AirflowConfigFragment;
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
-    build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigOptions, AirflowRole,
-    AirflowStorageConfig, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH, OPERATOR_NAME,
+    build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
+    AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
+    OPERATOR_NAME,
 };
-use stackable_operator::builder::VolumeBuilder;
-use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder,
+        PodSecurityContextBuilder, VolumeBuilder,
     },
     cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
-        resources::{NoRuntimeLimits, Resources},
+        product_image_selection::ResolvedProductImage,
     },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction,
+                ConfigMap, ConfigMapVolumeSource, EmptyDirVolumeSource, EnvVar, Probe, Service,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
-        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        apimachinery::pkg::{
+            api::resource::Quantity, apis::meta::v1::LabelSelector, util::intstr::IntOrString,
+        },
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
@@ -42,6 +44,13 @@ use stackable_operator::{
         types::PropertyNameKind, ProductConfigManager,
     },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_logging::{
+        self,
+        spec::{
+            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+            CustomContainerLogConfig, Logging,
+        },
+    },
     role_utils::RoleGroupRef,
 };
 use std::{
@@ -54,9 +63,12 @@ use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
+const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -170,6 +182,15 @@ pub enum Error {
     DeleteOrphanedResources {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::product_logging::Error,
+    },
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
+    InvalidLoggingConfig {
+        source: crate::product_logging::Error,
+        cm_name: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -274,6 +295,10 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             name: rbac_rolebinding.name_unchecked(),
         })?;
 
+    let vector_aggregator_address = resolve_vector_aggregator_address(&airflow, client)
+        .await
+        .context(ResolveVectorAggregatorAddressSnafu)?;
+
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => match &authentication_config.authentication_class {
             Some(authentication_class) => Some(
@@ -339,6 +364,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &rolegroup,
                 rolegroup_config,
                 authentication_class.as_ref(),
+                &config.logging,
+                vector_aggregator_address.as_deref(),
             )?;
             cluster_resources
                 .add(client, &rg_configmap)
@@ -354,7 +381,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_class.as_ref(),
                 &rbac_sa.name_unchecked(),
-                &config.resources,
+                &config,
             )?;
             cluster_resources
                 .add(client, &rg_statefulset)
@@ -436,6 +463,8 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    logging: &Logging<Container>,
+    vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
@@ -458,7 +487,9 @@ fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
-    ConfigMapBuilder::new()
+    let mut cm_builder = ConfigMapBuilder::new();
+
+    cm_builder
         .metadata(
             ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
@@ -477,7 +508,19 @@ fn build_rolegroup_config_map(
         .add_data(
             AIRFLOW_CONFIG_FILENAME,
             String::from_utf8(config_file).unwrap(),
-        )
+        );
+
+    extend_role_group_config_map(
+        rolegroup,
+        vector_aggregator_address,
+        logging,
+        &mut cm_builder,
+    )
+    .context(InvalidLoggingConfigSnafu {
+        cm_name: rolegroup.object_name(),
+    })?;
+
+    cm_builder
         .build()
         .with_context(|_| BuildRoleGroupConfigSnafu {
             rolegroup: rolegroup.clone(),
@@ -544,7 +587,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     sa_name: &str,
-    resources: &Resources<AirflowStorageConfig, NoRuntimeLimits>,
+    config: &AirflowConfig,
 ) -> Result<StatefulSet> {
     let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let role = airflow
@@ -567,7 +610,7 @@ fn build_server_rolegroup_statefulset(
 
     let cb = cb
         .image_from_product_image(resolved_product_image)
-        .resources(resources.clone().into())
+        .resources(config.resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
 
@@ -593,6 +636,8 @@ fn build_server_rolegroup_statefulset(
     let volume_mounts = airflow.volume_mounts();
     cb.add_volume_mounts(volume_mounts);
     cb.add_volume_mount("config", CONFIG_PATH);
+    cb.add_volume_mount("log-config", LOG_CONFIG_DIR);
+    cb.add_volume_mount("log", STACKABLE_LOG_DIR);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -626,6 +671,52 @@ fn build_server_rolegroup_statefulset(
             .with_config_map(rolegroup_ref.object_name())
             .build(),
     );
+    volumes.push(Volume {
+        name: "log".to_string(),
+        empty_dir: Some(EmptyDirVolumeSource {
+            medium: None,
+            size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
+        }),
+        ..Volume::default()
+    });
+
+    if let Some(ContainerLogConfig {
+        choice:
+            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
+                custom: ConfigMapLogConfig { config_map },
+            })),
+    }) = config.logging.containers.get(&Container::Airflow)
+    {
+        volumes.push(Volume {
+            name: "log-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(config_map.into()),
+                ..ConfigMapVolumeSource::default()
+            }),
+            ..Volume::default()
+        });
+    } else {
+        volumes.push(Volume {
+            name: "log-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(rolegroup_ref.object_name()),
+                ..ConfigMapVolumeSource::default()
+            }),
+            ..Volume::default()
+        });
+    }
+
+    pb.add_container(container);
+    pb.add_container(metrics_container);
+
+    if config.logging.enable_vector_agent {
+        pb.add_container(product_logging::framework::vector_container(
+            resolved_product_image,
+            "config",
+            "log",
+            config.logging.containers.get(&Container::Vector),
+        ));
+    }
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -640,7 +731,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
-            .with_label("restarter.stackable.tech/enabled", "true")
+            // .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -670,8 +761,6 @@ fn build_server_rolegroup_statefulset(
                     ))
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
-                .add_container(container)
-                .add_container(metrics_container)
                 .add_volumes(volumes)
                 .node_selector_opt(rolegroup.and_then(|rg| rg.selector.clone()))
                 .service_account_name(sa_name)
@@ -763,6 +852,16 @@ fn build_mapped_envs(
 
 fn build_static_envs() -> Vec<EnvVar> {
     [
+        EnvVar {
+            name: "PYTHONPATH".into(),
+            value: Some(LOG_CONFIG_DIR.into()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
+            value: Some("log_config.LOGGING_CONFIG".into()),
+            ..Default::default()
+        },
         EnvVar {
             name: "AIRFLOW__METRICS__STATSD_ON".into(),
             value: Some("True".into()),

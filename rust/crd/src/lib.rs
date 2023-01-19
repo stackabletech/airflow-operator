@@ -17,6 +17,7 @@ use stackable_operator::{
     labels::ObjectLabels,
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
+    product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
@@ -109,6 +110,10 @@ pub struct AirflowClusterSpec {
     pub stopped: Option<bool>,
     /// The Airflow image to use
     pub image: ProductImage,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
     pub credentials_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor: Option<String>,
@@ -230,8 +235,12 @@ impl AirflowRole {
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
         );
         match &self {
-            AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
-            AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
+            AirflowRole::Webserver => {
+                vec![copy_config, "airflow webserver".to_string()]
+            }
+            AirflowRole::Scheduler => {
+                vec![copy_config, "airflow scheduler".to_string()]
+            }
             AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
@@ -293,6 +302,28 @@ impl AirflowCluster {
 )]
 pub struct AirflowStorageConfig {}
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+pub enum Container {
+    Airflow,
+    AirflowInitDb,
+    Metrics,
+    Vector,
+}
+
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -310,6 +341,8 @@ pub struct AirflowStorageConfig {}
 pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
 }
 
 impl AirflowConfig {
@@ -328,6 +361,7 @@ impl AirflowConfig {
                 },
                 storage: AirflowStorageConfigFragment {},
             },
+            logging: product_logging::spec::default_logging(),
         }
     }
 }

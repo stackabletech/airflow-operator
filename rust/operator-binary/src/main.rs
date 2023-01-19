@@ -1,6 +1,7 @@
 mod airflow_controller;
 mod airflow_db_controller;
 mod config;
+mod product_logging;
 mod rbac;
 mod util;
 
