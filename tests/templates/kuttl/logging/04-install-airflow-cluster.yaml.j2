@@ -1,0 +1,166 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-log-config
+data:
+  log_config.py: |
+    import logging
+    import os
+    from copy import deepcopy
+    from airflow.config_templates.airflow_local_settings import DEFAULT_LOGGING_CONFIG
+
+    os.makedirs('/stackable/log/airflow', exist_ok=True)
+
+    LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
+
+    LOGGING_CONFIG['formatters']['json'] = {
+        '()': 'airflow.utils.log.json_formatter.JSONFormatter',
+        'json_fields': ['asctime', 'levelname', 'message', 'name']
+    }
+
+    LOGGING_CONFIG['handlers']['file'] = {
+        'class': 'logging.FileHandler',
+        'formatter': 'json',
+        'filename': '/stackable/log/airflow/airflow.py.json',
+    }
+
+    LOGGING_CONFIG['root'] = {
+        'level': logging.DEBUG,
+        'handlers': ['file'],
+    }
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[1] }}"
+    repo: docker.stackable.tech/sandbox/logging
+  vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials
+  webservers:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                custom:
+                  configMap: airflow-log-config
+  workers:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                console:
+                  level: INFO
+                file:
+                  level: DEBUG
+                loggers:
+                  ROOT:
+                    level: DEBUG
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                custom:
+                  configMap: airflow-log-config
+  schedulers:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                custom:
+                  configMap: airflow-log-config
