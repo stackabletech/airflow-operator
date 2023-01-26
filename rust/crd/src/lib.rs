@@ -235,12 +235,8 @@ impl AirflowRole {
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
         );
         match &self {
-            AirflowRole::Webserver => {
-                vec![copy_config, "airflow webserver".to_string()]
-            }
-            AirflowRole::Scheduler => {
-                vec![copy_config, "airflow scheduler".to_string()]
-            }
+            AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
+            AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
             AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
