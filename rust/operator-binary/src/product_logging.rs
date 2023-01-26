@@ -129,7 +129,7 @@ fn create_airflow_config(log_config: &AutomaticContainerLogConfig, log_dir: &str
             format!(
                 "
 LOGGING_CONFIG['loggers'].setdefault('{name}', {{ 'propagate': True }})
-LOGGING_CONFIG['loggers'][{name}]['level'] = {level}
+LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
 ",
                 level = config.level.to_python_expression()
             )
