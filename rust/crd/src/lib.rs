@@ -512,7 +512,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.5.0
+            stackableVersion: 0.prerelease
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
