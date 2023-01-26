@@ -1,7 +1,13 @@
 ---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-airflow-pvc-job
+timeout: 180
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: list-dags-job
+  name: test-airflow-pvc-job
 status:
   succeeded: 1
