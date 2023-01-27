@@ -29,6 +29,9 @@ spec:
     productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
     repo: docker.stackable.tech/sandbox/logging
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
   executor: CeleryExecutor
   loadExamples: false
   exposeConfig: false
@@ -41,6 +44,9 @@ spec:
     - name: external-dags
       mountPath: /stackable/external-dags
   webservers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         envOverrides:
@@ -50,6 +56,9 @@ spec:
           matchLabels:
             node: "2"
   workers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         envOverrides:
@@ -59,6 +68,9 @@ spec:
           matchLabels:
             node: "2"
   schedulers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         envOverrides:
