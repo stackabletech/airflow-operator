@@ -146,15 +146,23 @@ from airflow.config_templates.airflow_local_settings import DEFAULT_LOGGING_CONF
 os.makedirs('{log_dir}', exist_ok=True)
 
 LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
-for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
-    logger_config['propagate'] = True
-    logger_config['level'] = logging.NOTSET
 
+LOGGING_CONFIG.setdefault('loggers', {{}})
+for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
+    logger_config['level'] = logging.NOTSET
+    # Do not change the setting of the airflow.task logger because
+    # otherwise DAGs cannot be loaded anymore.
+    if logger_name != 'airflow.task':
+        logger_config['propagate'] == True
+
+LOGGING_CONFIG.setdefault('formatters', {{}})
 LOGGING_CONFIG['formatters']['json'] = {{
     '()': 'airflow.utils.log.json_formatter.JSONFormatter',
     'json_fields': ['asctime', 'levelname', 'message', 'name']
 }}
 
+LOGGING_CONFIG.setdefault('handlers', {{}})
+LOGGING_CONFIG['handlers'].setdefault('console', {{}})
 LOGGING_CONFIG['handlers']['console']['level'] = {console_log_level}
 LOGGING_CONFIG['handlers']['file'] = {{
     'class': 'logging.handlers.RotatingFileHandler',
