@@ -6,7 +6,7 @@ volumePermissions:
 
 master:
   podSecurityContext:
-{% if test_scenario['values']['openshift'] == 'true' -%}
+    {% if test_scenario['values']['openshift'] == 'true' -%}
     enabled: false
 {% else %}
     enabled: true
@@ -17,7 +17,7 @@ master:
 replica:
   replicaCount: 1
   podSecurityContext:
-{% if test_scenario['values']['openshift'] == 'true' -%}
+    {% if test_scenario['values']['openshift'] == 'true' -%}
     enabled: false
 {% else %}
     enabled: true
