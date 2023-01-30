@@ -26,11 +26,13 @@ securityContext:
   capabilities:
     drop:
     - ALL
-  runAsNonRoot: true
   allowPrivilegeEscalation: false
   seccompProfile:
     type: RuntimeDefault
   # readOnlyRootFilesystem: true
+  # openshift requires a UID if one is not given in the image definition (e.g. "stackable")
+  # to verify that the user is non-root
+  runAsNonRoot: true
   runAsUser: 1000
 
 resources: {}
