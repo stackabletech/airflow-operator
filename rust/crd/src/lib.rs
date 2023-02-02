@@ -27,8 +27,12 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 pub const APP_NAME: &str = "airflow";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+
+pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -133,6 +137,8 @@ pub struct AirflowClusterSpec {
     pub schedulers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workers: Option<Role<AirflowConfigFragment>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<airflowdb::AirflowConfigFragment>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -315,8 +321,6 @@ pub struct AirflowStorageConfig {}
 #[strum(serialize_all = "kebab-case")]
 pub enum Container {
     Airflow,
-    AirflowInitDb,
-    Metrics,
     Vector,
 }
 

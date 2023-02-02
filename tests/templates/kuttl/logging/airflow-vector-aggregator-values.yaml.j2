@@ -92,6 +92,10 @@ customConfig:
       condition: >-
         .pod == "airflow-scheduler-custom-log-config-0" &&
         .container == "vector"
+    automaticLogConfigInitDb:
+      type: filter
+      inputs: [vector]
+      condition: .container == "airflow-init-db"
   sinks:
     out:
       inputs: [automaticLogConfig*, customLogConfig*]

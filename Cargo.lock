@@ -1798,8 +1798,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.32.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=airflow-logging#60f79d35d8dfd3db1deb010fc4dfe8b3d32c4d83"
+version = "0.33.0"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=airflow-logging#9668f2b692c96ff05dff931483c5bdbf5785a54d"
 dependencies = [
  "chrono",
  "clap",
@@ -1832,8 +1832,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator-derive"
-version = "0.32.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=airflow-logging#60f79d35d8dfd3db1deb010fc4dfe8b3d32c4d83"
+version = "0.33.0"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=airflow-logging#9668f2b692c96ff05dff931483c5bdbf5785a54d"
 dependencies = [
  "darling",
  "proc-macro2",

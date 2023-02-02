@@ -259,6 +259,6 @@ mod tests {
                 .get(&AirflowConfigOptions::AuthType.to_string())
                 .unwrap()
         );
-        println!("{:#?}", result);
+        println!("{result:#?}");
     }
 }

@@ -1,14 +1,20 @@
 use crate::{build_recommended_labels, AirflowCluster};
 
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::ObjectMetaBuilder,
     commons::product_image_selection::{ProductImage, ResolvedProductImage},
+    config::{
+        fragment::{self, Fragment, ValidationError},
+        merge::Merge,
+    },
     k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
     kube::{CustomResource, ResourceExt},
+    product_logging::{self, spec::Logging},
     schemars::{self, JsonSchema},
 };
+use strum::{Display, EnumIter};
 
 pub const AIRFLOW_DB_CONTROLLER_NAME: &str = "airflow-db";
 
@@ -21,9 +27,58 @@ pub enum Error {
     },
     #[snafu(display("failed to retrieve airflow version"))]
     NoAirflowVersion,
+    #[snafu(display("fragment validation failure"))]
+    FragmentValidationFailure { source: ValidationError },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+pub enum Container {
+    AirflowInitDb,
+    Vector,
+}
+
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct AirflowConfig {
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
+}
+
+impl AirflowConfig {
+    fn default_config() -> AirflowConfigFragment {
+        AirflowConfigFragment {
+            logging: product_logging::spec::default_logging(),
+        }
+    }
+}
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -44,6 +99,9 @@ pub struct AirflowDBSpec {
     /// The Airflow image to use
     pub image: ProductImage,
     pub credentials_secret: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
+    pub config: AirflowConfigFragment,
 }
 
 impl AirflowDB {
@@ -69,6 +127,18 @@ impl AirflowDB {
             spec: AirflowDBSpec {
                 image: airflow.spec.image.clone(),
                 credentials_secret: airflow.spec.credentials_secret.clone(),
+                vector_aggregator_config_map_name: airflow
+                    .spec
+                    .vector_aggregator_config_map_name
+                    .clone(),
+                config: AirflowConfigFragment {
+                    logging: airflow
+                        .spec
+                        .database_initialization
+                        .clone()
+                        .unwrap_or_default()
+                        .logging,
+                },
             },
             status: None,
         })
@@ -76,6 +146,13 @@ impl AirflowDB {
 
     pub fn job_name(&self) -> String {
         self.name_unchecked()
+    }
+
+    pub fn merged_config(&self) -> Result<AirflowConfig, Error> {
+        let defaults = AirflowConfig::default_config();
+        let mut config = self.spec.config.to_owned();
+        config.merge(&defaults);
+        fragment::validate(config).context(FragmentValidationFailureSnafu)
     }
 }
 

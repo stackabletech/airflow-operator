@@ -1,10 +1,12 @@
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{AirflowCluster, Container};
+use stackable_airflow_crd::{
+    airflowdb::{self, AirflowDB},
+    AirflowCluster, Container, STACKABLE_LOG_DIR,
+};
 use stackable_operator::{
     builder::ConfigMapBuilder,
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
-    kube::ResourceExt,
     product_logging::{
         self,
         spec::{
@@ -13,8 +15,6 @@ use stackable_operator::{
     },
     role_utils::RoleGroupRef,
 };
-
-use crate::airflow_controller::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -47,35 +47,22 @@ const LOG_FILE: &str = "airflow.py.json";
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec
 pub async fn resolve_vector_aggregator_address(
-    airflow: &AirflowCluster,
+    vector_aggregator_config_map_name: &str,
+    namespace: &str,
     client: &Client,
-) -> Result<Option<String>> {
-    let vector_aggregator_address = if let Some(vector_aggregator_config_map_name) =
-        &airflow.spec.vector_aggregator_config_map_name
-    {
-        let vector_aggregator_address = client
-            .get::<ConfigMap>(
-                vector_aggregator_config_map_name,
-                airflow
-                    .namespace()
-                    .as_deref()
-                    .context(ObjectHasNoNamespaceSnafu)?,
-            )
-            .await
-            .context(ConfigMapNotFoundSnafu {
-                cm_name: vector_aggregator_config_map_name.to_string(),
-            })?
-            .data
-            .and_then(|mut data| data.remove(VECTOR_AGGREGATOR_CM_ENTRY))
-            .context(MissingConfigMapEntrySnafu {
-                entry: VECTOR_AGGREGATOR_CM_ENTRY,
-                cm_name: vector_aggregator_config_map_name.to_string(),
-            })?;
-        Some(vector_aggregator_address)
-    } else {
-        None
-    };
-
+) -> Result<String> {
+    let vector_aggregator_address = client
+        .get::<ConfigMap>(vector_aggregator_config_map_name, namespace)
+        .await
+        .context(ConfigMapNotFoundSnafu {
+            cm_name: vector_aggregator_config_map_name.to_string(),
+        })?
+        .data
+        .and_then(|mut data| data.remove(VECTOR_AGGREGATOR_CM_ENTRY))
+        .context(MissingConfigMapEntrySnafu {
+            entry: VECTOR_AGGREGATOR_CM_ENTRY,
+            cm_name: vector_aggregator_config_map_name.to_string(),
+        })?;
     Ok(vector_aggregator_address)
 }
 
@@ -100,6 +87,47 @@ pub fn extend_role_group_config_map(
     let vector_log_config = if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(&Container::Vector)
+    {
+        Some(log_config)
+    } else {
+        None
+    };
+
+    if logging.enable_vector_agent {
+        cm_builder.add_data(
+            product_logging::framework::VECTOR_CONFIG_FILE,
+            product_logging::framework::create_vector_config(
+                rolegroup,
+                vector_aggregator_address.context(MissingVectorAggregatorAddressSnafu)?,
+                vector_log_config,
+            ),
+        );
+    }
+
+    Ok(())
+}
+
+/// Extend the ConfigMap with logging and Vector configurations
+pub fn extend_init_db_config_map(
+    rolegroup: &RoleGroupRef<AirflowDB>,
+    vector_aggregator_address: Option<&str>,
+    logging: &Logging<airflowdb::Container>,
+    cm_builder: &mut ConfigMapBuilder,
+) -> Result<()> {
+    if let Some(ContainerLogConfig {
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = logging.containers.get(&airflowdb::Container::AirflowInitDb)
+    {
+        let log_dir = format!(
+            "{STACKABLE_LOG_DIR}/{container}",
+            container = airflowdb::Container::AirflowInitDb
+        );
+        cm_builder.add_data(LOG_CONFIG_FILE, create_airflow_config(log_config, &log_dir));
+    }
+
+    let vector_log_config = if let Some(ContainerLogConfig {
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = logging.containers.get(&airflowdb::Container::Vector)
     {
         Some(log_config)
     } else {

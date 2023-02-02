@@ -41,6 +41,9 @@ spec:
             loggers:
               "airflow.processor_manager":
                 level: INFO
+  databaseInitialization:
+    logging:
+      enableVectorAgent: true
 ----
 
 Further information on how to configure logging, can be found in
