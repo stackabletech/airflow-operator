@@ -12,6 +12,15 @@
 
 ### Changed
 
+- Specified security context settings needed for OpenShift ([#222]).
+- Fixed template parsing for OpenShift tests ([#222]).
+
+[#222]: https://github.com/stackabletech/airflow-operator/pull/222
+
+## [23.1.0] - 2023-01-23
+
+### Changed
+
 - `operator-rs` `0.25.2` -> `0.27.1` ([#197]).
 - `operator-rs` `0.27.1` -> `0.30.1` ([#208])
 - `operator-rs` `0.30.1` -> `0.31.0` ([#216]).
