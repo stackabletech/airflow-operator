@@ -167,7 +167,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.prerelease
+            stackableVersion: 23.4.0-rc1
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -200,7 +200,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.prerelease
+            stackableVersion: 23.4.0-rc1
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
