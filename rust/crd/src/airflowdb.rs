@@ -53,7 +53,7 @@ pub enum Container {
     Vector,
 }
 
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
         Clone,
