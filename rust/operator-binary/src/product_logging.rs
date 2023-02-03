@@ -18,8 +18,6 @@ use stackable_operator::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
     ConfigMapNotFound {
         source: stackable_operator::error::Error,
@@ -29,10 +27,6 @@ pub enum Error {
     MissingConfigMapEntry {
         entry: &'static str,
         cm_name: String,
-    },
-    #[snafu(display("crd validation failure"))]
-    CrdValidationFailure {
-        source: stackable_airflow_crd::Error,
     },
     #[snafu(display("vectorAggregatorConfigMapName must be set"))]
     MissingVectorAggregatorAddress,

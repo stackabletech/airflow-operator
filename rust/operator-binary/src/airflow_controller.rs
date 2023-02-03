@@ -78,10 +78,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
-    #[snafu(display("failed to retrieve airflow version"))]
-    NoAirflowVersion,
-    #[snafu(display("object defines no statsd exporter version"))]
-    ObjectHasNoStatsdExporterVersion,
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
     #[snafu(display("failed to apply global Service"))]

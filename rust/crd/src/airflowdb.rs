@@ -21,12 +21,6 @@ pub const AIRFLOW_DB_CONTROLLER_NAME: &str = "airflow-db";
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to retrieve airflow version"))]
-    NoAirflowVersion,
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }

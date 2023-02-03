@@ -9,7 +9,7 @@ use stackable_airflow_crd::{
         AirflowConfig, AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, Container,
         AIRFLOW_DB_CONTROLLER_NAME,
     },
-    AirflowCluster, LOG_CONFIG_DIR, LOG_VOLUME_SIZE_IN_MIB, STACKABLE_LOG_DIR,
+    LOG_CONFIG_DIR, LOG_VOLUME_SIZE_IN_MIB, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
@@ -51,15 +51,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
-    #[snafu(display("object does not refer to AirflowCluster"))]
-    InvalidAirflowReference,
-    #[snafu(display("could not find object {airflow}"))]
-    FindAirflow {
-        source: stackable_operator::error::Error,
-        airflow: ObjectRef<AirflowCluster>,
-    },
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
     #[snafu(display("failed to apply Job for {}", airflow_db))]
     ApplyJob {
         source: stackable_operator::error::Error,
