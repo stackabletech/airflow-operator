@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{Container, STACKABLE_LOG_DIR};
+use stackable_airflow_crd::STACKABLE_LOG_DIR;
 use stackable_operator::{
     builder::ConfigMapBuilder,
     client::Client,
@@ -90,10 +90,7 @@ where
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(main_container)
     {
-        let log_dir = format!(
-            "{STACKABLE_LOG_DIR}/{container}",
-            container = Container::Airflow
-        );
+        let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
         cm_builder.add_data(LOG_CONFIG_FILE, create_airflow_config(log_config, &log_dir));
     }
 
