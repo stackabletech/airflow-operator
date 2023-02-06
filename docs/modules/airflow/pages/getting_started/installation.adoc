@@ -67,4 +67,4 @@ Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for
 
 == What's next
 
-xref:first_steps.adoc[Set up an Airflow cluster] and its dependencies and xref:first_steps.adoc#_verify_that_it_works[verify that it works] by inspecting and running an example DAG.
+xref:getting_started/first_steps.adoc[Set up an Airflow cluster] and its dependencies and xref:getting_started/first_steps.adoc#_verify_that_it_works[verify that it works] by inspecting and running an example DAG.

@@ -1,6 +1,6 @@
 = First steps
 
-Once you have followed the steps in the xref:installation.adoc[] section to install the Operator and its dependencies, you will now deploy a Airflow cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by running and tracking an example DAG.
+Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the Operator and its dependencies, you will now deploy a Airflow cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by running and tracking an example DAG.
 
 == Setup
 
