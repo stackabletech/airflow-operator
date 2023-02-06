@@ -161,24 +161,13 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         SecretCheckSnafu { secret: secret_ref }
                     })?;
                 if secret.is_some() {
-                    let vector_aggregator_address = if let Some(vector_aggregator_config_map_name) =
-                        &airflow_db.spec.vector_aggregator_config_map_name
-                    {
-                        Some(
-                            resolve_vector_aggregator_address(
-                                vector_aggregator_config_map_name,
-                                airflow_db
-                                    .namespace()
-                                    .as_deref()
-                                    .context(ObjectHasNoNamespaceSnafu)?,
-                                client,
-                            )
-                            .await
-                            .context(ResolveVectorAggregatorAddressSnafu)?,
-                        )
-                    } else {
-                        None
-                    };
+                    let vector_aggregator_address = resolve_vector_aggregator_address(
+                        client,
+                        airflow_db.as_ref(),
+                        airflow_db.spec.vector_aggregator_config_map_name.as_deref(),
+                    )
+                    .await
+                    .context(ResolveVectorAggregatorAddressSnafu)?;
 
                     let config = airflow_db
                         .merged_config()

@@ -288,24 +288,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             name: rbac_rolebinding.name_unchecked(),
         })?;
 
-    let vector_aggregator_address = if let Some(vector_aggregator_config_map_name) =
-        &airflow.spec.vector_aggregator_config_map_name
-    {
-        Some(
-            resolve_vector_aggregator_address(
-                vector_aggregator_config_map_name,
-                airflow
-                    .namespace()
-                    .as_deref()
-                    .context(ObjectHasNoNamespaceSnafu)?,
-                client,
-            )
-            .await
-            .context(ResolveVectorAggregatorAddressSnafu)?,
-        )
-    } else {
-        None
-    };
+    let vector_aggregator_address = resolve_vector_aggregator_address(
+        client,
+        airflow.as_ref(),
+        airflow.spec.vector_aggregator_config_map_name.as_deref(),
+    )
+    .await
+    .context(ResolveVectorAggregatorAddressSnafu)?;
 
     let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => match &authentication_config.authentication_class {

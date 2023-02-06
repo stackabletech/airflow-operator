@@ -7,6 +7,7 @@ use stackable_operator::{
     builder::ConfigMapBuilder,
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
+    kube::Resource,
     product_logging::{
         self,
         spec::{
@@ -18,6 +19,8 @@ use stackable_operator::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
     ConfigMapNotFound {
         source: stackable_operator::error::Error,
@@ -40,23 +43,34 @@ const LOG_FILE: &str = "airflow.py.json";
 
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec
-pub async fn resolve_vector_aggregator_address(
-    vector_aggregator_config_map_name: &str,
-    namespace: &str,
+pub async fn resolve_vector_aggregator_address<T: Resource>(
     client: &Client,
-) -> Result<String> {
-    let vector_aggregator_address = client
-        .get::<ConfigMap>(vector_aggregator_config_map_name, namespace)
-        .await
-        .context(ConfigMapNotFoundSnafu {
-            cm_name: vector_aggregator_config_map_name.to_string(),
-        })?
-        .data
-        .and_then(|mut data| data.remove(VECTOR_AGGREGATOR_CM_ENTRY))
-        .context(MissingConfigMapEntrySnafu {
-            entry: VECTOR_AGGREGATOR_CM_ENTRY,
-            cm_name: vector_aggregator_config_map_name.to_string(),
-        })?;
+    cluster: &T,
+    vector_aggregator_config_map_name: Option<&str>,
+) -> Result<Option<String>> {
+    let vector_aggregator_address =
+        if let Some(vector_aggregator_config_map_name) = vector_aggregator_config_map_name {
+            let namespace = cluster
+                .meta()
+                .namespace
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?;
+            let vector_aggregator_address = client
+                .get::<ConfigMap>(vector_aggregator_config_map_name, namespace)
+                .await
+                .context(ConfigMapNotFoundSnafu {
+                    cm_name: vector_aggregator_config_map_name.to_string(),
+                })?
+                .data
+                .and_then(|mut data| data.remove(VECTOR_AGGREGATOR_CM_ENTRY))
+                .context(MissingConfigMapEntrySnafu {
+                    entry: VECTOR_AGGREGATOR_CM_ENTRY,
+                    cm_name: vector_aggregator_config_map_name.to_string(),
+                })?;
+            Some(vector_aggregator_address)
+        } else {
+            None
+        };
     Ok(vector_aggregator_address)
 }
 
