@@ -6,6 +6,10 @@
 
 - Log aggregation added ([#219]).
 
+### Changed
+
+- `operator-rs` `0.31.0` -> `0.34.0` ([#219]).
+
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 
 ## [23.1.0] - 2023-01-23
