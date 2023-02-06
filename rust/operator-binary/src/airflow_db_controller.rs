@@ -1,7 +1,10 @@
 use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
-use crate::product_logging::{extend_init_db_config_map, resolve_vector_aggregator_address};
-use crate::rbac;
+use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
+use crate::product_logging::{
+    extend_config_map_with_log_config, resolve_vector_aggregator_address,
+};
 use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -9,33 +12,21 @@ use stackable_airflow_crd::{
         AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
         AIRFLOW_DB_CONTROLLER_NAME,
     },
-    LOG_CONFIG_DIR, LOG_VOLUME_SIZE_IN_MIB, STACKABLE_LOG_DIR,
+    LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
-    k8s_openapi::{
-        api::{
-            batch::v1::{Job, JobSpec},
-            core::v1::{
-                ConfigMap, ConfigMapVolumeSource, EmptyDirVolumeSource, EnvVar, PodSpec,
-                PodTemplateSpec, Secret, Volume,
-            },
-        },
-        apimachinery::pkg::api::resource::Quantity,
+    k8s_openapi::api::{
+        batch::v1::{Job, JobSpec},
+        core::v1::{ConfigMap, EnvVar, PodSpec, PodTemplateSpec, Secret},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     logging::controller::ReconcilerError,
-    product_logging::{
-        self,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig, Logging,
-        },
-    },
+    product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
 };
 use std::{sync::Arc, time::Duration};
@@ -321,61 +312,21 @@ fn build_init_job(
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
-        .add_volume_mount("log-config", LOG_CONFIG_DIR)
-        .add_volume_mount("log", STACKABLE_LOG_DIR);
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
-    let mut volumes = Vec::new();
-
-    volumes.push(Volume {
-        name: "config".to_string(),
-        config_map: Some(ConfigMapVolumeSource {
-            name: Some(config_map_name.into()),
-            ..ConfigMapVolumeSource::default()
-        }),
-        ..Volume::default()
-    });
-    volumes.push(Volume {
-        name: "log".to_string(),
-        empty_dir: Some(EmptyDirVolumeSource {
-            medium: None,
-            size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
-        }),
-        ..Volume::default()
-    });
-
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = config.logging.containers.get(&Container::AirflowInitDb)
-    {
-        volumes.push(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map.into()),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    } else {
-        volumes.push(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map_name.into()),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    }
+    let volumes = controller_commons::create_volumes(
+        config_map_name,
+        config.logging.containers.get(&Container::AirflowInitDb),
+    );
 
     containers.push(cb.build());
 
     if config.logging.enable_vector_agent {
         containers.push(product_logging::framework::vector_container(
             resolved_product_image,
-            "config",
-            "log",
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
         ));
     }
@@ -437,7 +388,7 @@ fn build_config_map(
             .build(),
     );
 
-    extend_init_db_config_map(
+    extend_config_map_with_log_config(
         &RoleGroupRef {
             cluster: ObjectRef::from_obj(airflow_db),
             role: String::new(),
@@ -445,6 +396,8 @@ fn build_config_map(
         },
         vector_aggregator_address,
         logging,
+        &Container::AirflowInitDb,
+        &Container::Vector,
         &mut cm_builder,
     )
     .context(InvalidLoggingConfigSnafu {

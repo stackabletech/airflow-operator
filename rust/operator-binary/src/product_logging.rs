@@ -1,8 +1,7 @@
+use std::fmt::Display;
+
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{
-    airflowdb::{self, AirflowDB},
-    AirflowCluster, Container, STACKABLE_LOG_DIR,
-};
+use stackable_airflow_crd::{Container, STACKABLE_LOG_DIR};
 use stackable_operator::{
     builder::ConfigMapBuilder,
     client::Client,
@@ -74,16 +73,22 @@ pub async fn resolve_vector_aggregator_address<T: Resource>(
     Ok(vector_aggregator_address)
 }
 
-/// Extend the role group ConfigMap with logging and Vector configurations
-pub fn extend_role_group_config_map(
-    rolegroup: &RoleGroupRef<AirflowCluster>,
+/// Extend the ConfigMap with logging and Vector configurations
+pub fn extend_config_map_with_log_config<C, K>(
+    rolegroup: &RoleGroupRef<K>,
     vector_aggregator_address: Option<&str>,
-    logging: &Logging<Container>,
+    logging: &Logging<C>,
+    main_container: &C,
+    vector_container: &C,
     cm_builder: &mut ConfigMapBuilder,
-) -> Result<()> {
+) -> Result<()>
+where
+    C: Clone + Ord + Display,
+    K: Resource,
+{
     if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Airflow)
+    }) = logging.containers.get(main_container)
     {
         let log_dir = format!(
             "{STACKABLE_LOG_DIR}/{container}",
@@ -94,48 +99,7 @@ pub fn extend_role_group_config_map(
 
     let vector_log_config = if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Vector)
-    {
-        Some(log_config)
-    } else {
-        None
-    };
-
-    if logging.enable_vector_agent {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(
-                rolegroup,
-                vector_aggregator_address.context(MissingVectorAggregatorAddressSnafu)?,
-                vector_log_config,
-            ),
-        );
-    }
-
-    Ok(())
-}
-
-/// Extend the ConfigMap with logging and Vector configurations
-pub fn extend_init_db_config_map(
-    rolegroup: &RoleGroupRef<AirflowDB>,
-    vector_aggregator_address: Option<&str>,
-    logging: &Logging<airflowdb::Container>,
-    cm_builder: &mut ConfigMapBuilder,
-) -> Result<()> {
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&airflowdb::Container::AirflowInitDb)
-    {
-        let log_dir = format!(
-            "{STACKABLE_LOG_DIR}/{container}",
-            container = airflowdb::Container::AirflowInitDb
-        );
-        cm_builder.add_data(LOG_CONFIG_FILE, create_airflow_config(log_config, &log_dir));
-    }
-
-    let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&airflowdb::Container::Vector)
+    }) = logging.containers.get(vector_container)
     {
         Some(log_config)
     } else {

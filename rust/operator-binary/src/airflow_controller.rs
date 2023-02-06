@@ -1,20 +1,23 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
-use crate::product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address};
-use crate::rbac;
+use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
+use crate::product_logging::{
+    extend_config_map_with_log_config, resolve_vector_aggregator_address,
+};
 use crate::util::env_var_from_secret;
+use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
-    LOG_CONFIG_DIR, LOG_VOLUME_SIZE_IN_MIB, OPERATOR_NAME, STACKABLE_LOG_DIR,
+    LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder, VolumeBuilder,
+        PodSecurityContextBuilder,
     },
     cluster_resources::ClusterResources,
     commons::{
@@ -25,13 +28,10 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, EmptyDirVolumeSource, EnvVar, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ConfigMap, EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction,
             },
         },
-        apimachinery::pkg::{
-            api::resource::Quantity, apis::meta::v1::LabelSelector, util::intstr::IntOrString,
-        },
+        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
@@ -44,13 +44,7 @@ use stackable_operator::{
         types::PropertyNameKind, ProductConfigManager,
     },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    product_logging::{
-        self,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig, Logging,
-        },
-    },
+    product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
 };
 use std::{
@@ -511,10 +505,12 @@ fn build_rolegroup_config_map(
             String::from_utf8(config_file).unwrap(),
         );
 
-    extend_role_group_config_map(
+    extend_config_map_with_log_config(
         rolegroup,
         vector_aggregator_address,
         logging,
+        &Container::Airflow,
+        &Container::Vector,
         &mut cm_builder,
     )
     .context(InvalidLoggingConfigSnafu {
@@ -636,9 +632,9 @@ fn build_server_rolegroup_statefulset(
 
     let volume_mounts = airflow.volume_mounts();
     cb.add_volume_mounts(volume_mounts);
-    cb.add_volume_mount("config", CONFIG_PATH);
-    cb.add_volume_mount("log-config", LOG_CONFIG_DIR);
-    cb.add_volume_mount("log", STACKABLE_LOG_DIR);
+    cb.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
+    cb.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
+    cb.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -666,46 +662,10 @@ fn build_server_rolegroup_statefulset(
         .build();
 
     let mut volumes = airflow.volumes();
-
-    volumes.push(
-        VolumeBuilder::new("config")
-            .with_config_map(rolegroup_ref.object_name())
-            .build(),
-    );
-    volumes.push(Volume {
-        name: "log".to_string(),
-        empty_dir: Some(EmptyDirVolumeSource {
-            medium: None,
-            size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
-        }),
-        ..Volume::default()
-    });
-
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = config.logging.containers.get(&Container::Airflow)
-    {
-        volumes.push(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map.into()),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    } else {
-        volumes.push(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(rolegroup_ref.object_name()),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    }
+    volumes.extend(controller_commons::create_volumes(
+        &rolegroup_ref.object_name(),
+        config.logging.containers.get(&Container::Airflow),
+    ));
 
     pb.add_container(container);
     pb.add_container(metrics_container);
@@ -713,8 +673,8 @@ fn build_server_rolegroup_statefulset(
     if config.logging.enable_vector_agent {
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
-            "config",
-            "log",
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
         ));
     }
