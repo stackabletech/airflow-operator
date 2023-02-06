@@ -598,7 +598,8 @@ fn build_server_rolegroup_statefulset(
     let commands = airflow_role.get_commands();
 
     // container
-    let mut cb = ContainerBuilder::new(APP_NAME).context(InvalidContainerNameSnafu)?;
+    let mut cb = ContainerBuilder::new(&Container::Airflow.to_string())
+        .context(InvalidContainerNameSnafu)?;
     let mut pb = PodBuilder::new();
 
     if let Some(authentication_class) = authentication_class {

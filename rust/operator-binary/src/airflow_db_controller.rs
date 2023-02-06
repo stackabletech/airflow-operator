@@ -306,7 +306,8 @@ fn build_init_job(
 
     let mut containers = Vec::new();
 
-    let mut cb = ContainerBuilder::new("airflow-init-db").context(InvalidContainerNameSnafu)?;
+    let mut cb = ContainerBuilder::new(&Container::AirflowInitDb.to_string())
+        .context(InvalidContainerNameSnafu)?;
 
     cb.image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
