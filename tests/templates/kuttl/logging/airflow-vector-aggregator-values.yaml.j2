@@ -1,0 +1,107 @@
+---
+role: Aggregator
+service:
+  ports:
+  - name: api
+    port: 8686
+    protocol: TCP
+    targetPort: 8686
+  - name: vector
+    port: 6123
+    protocol: TCP
+    targetPort: 6000
+customConfig:
+  api:
+    address: 0.0.0.0:8686
+    enabled: true
+  sources:
+    vector:
+      address: 0.0.0.0:6000
+      type: vector
+      version: "2"
+  transforms:
+    automaticLogConfigWebserverAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .container == "airflow"
+    automaticLogConfigWebserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigWebserverAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-webserver-custom-log-config-0" &&
+        .container == "airflow"
+    customLogConfigWebserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-webserver-custom-log-config-0" &&
+        .container == "vector"
+    automaticLogConfigWorkerAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "airflow"
+    automaticLogConfigWorkerVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigWorkerAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-worker-custom-log-config-0" &&
+        .container == "airflow"
+    customLogConfigWorkerVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-worker-custom-log-config-0" &&
+        .container == "vector"
+    automaticLogConfigSchedulerAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .container == "airflow"
+    automaticLogConfigSchedulerVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigSchedulerAirflow:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-scheduler-custom-log-config-0" &&
+        .container == "airflow"
+    customLogConfigSchedulerVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "airflow-scheduler-custom-log-config-0" &&
+        .container == "vector"
+    automaticLogConfigInitDb:
+      type: filter
+      inputs: [vector]
+      condition: .container == "airflow-init-db"
+  sinks:
+    out:
+      inputs: [automaticLogConfig*, customLogConfig*]
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      type: vector
+      address: {{ lookup('env', 'VECTOR_AGGREGATOR') }}
+{% else %}
+      type: blackhole
+{% endif %}

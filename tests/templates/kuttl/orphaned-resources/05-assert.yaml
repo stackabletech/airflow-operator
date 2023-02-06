@@ -1,0 +1,26 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: change-worker-rolegroup
+timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-newrolegroup
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: airflow-worker-newrolegroup-0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-worker-newrolegroup
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-worker-newrolegroup

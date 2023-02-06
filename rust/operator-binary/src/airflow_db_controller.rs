@@ -1,24 +1,33 @@
 use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
-use crate::rbac;
+use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
+use crate::product_logging::{
+    extend_config_map_with_log_config, resolve_vector_aggregator_address,
+};
 use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
-    airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AIRFLOW_DB_CONTROLLER_NAME},
-    AirflowCluster,
+    airflowdb::{
+        AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
+        AIRFLOW_DB_CONTROLLER_NAME,
+    },
+    LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
-        core::v1::{PodSpec, PodTemplateSpec, Secret},
+        core::v1::{ConfigMap, EnvVar, PodSpec, PodTemplateSpec, Secret},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     logging::controller::ReconcilerError,
+    product_logging::{self, spec::Logging},
+    role_utils::RoleGroupRef,
 };
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -33,15 +42,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
-    #[snafu(display("object does not refer to AirflowCluster"))]
-    InvalidAirflowReference,
-    #[snafu(display("could not find object {airflow}"))]
-    FindAirflow {
-        source: stackable_operator::error::Error,
-        airflow: ObjectRef<AirflowCluster>,
-    },
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
     #[snafu(display("failed to apply Job for {}", airflow_db))]
     ApplyJob {
         source: stackable_operator::error::Error,
@@ -74,6 +74,33 @@ pub enum Error {
     ApplyRoleBinding {
         name: String,
         source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build ConfigMap [{name}]"))]
+    BuildConfig {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch ConfigMap [{name}]"))]
+    ApplyConfigMap {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to resolve and merge config"))]
+    FailedToResolveConfig {
+        source: stackable_airflow_crd::airflowdb::Error,
+    },
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::product_logging::Error,
+    },
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
+    InvalidLoggingConfig {
+        source: crate::product_logging::Error,
+        cm_name: String,
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -129,10 +156,36 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         SecretCheckSnafu { secret: secret_ref }
                     })?;
                 if secret.is_some() {
+                    let vector_aggregator_address = resolve_vector_aggregator_address(
+                        client,
+                        airflow_db.as_ref(),
+                        airflow_db.spec.vector_aggregator_config_map_name.as_deref(),
+                    )
+                    .await
+                    .context(ResolveVectorAggregatorAddressSnafu)?;
+
+                    let config = airflow_db
+                        .merged_config()
+                        .context(FailedToResolveConfigSnafu)?;
+
+                    let config_map = build_config_map(
+                        &airflow_db,
+                        &config.logging,
+                        vector_aggregator_address.as_deref(),
+                    )?;
+                    client
+                        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &config_map, &config_map)
+                        .await
+                        .context(ApplyConfigMapSnafu {
+                            name: config_map.name_any(),
+                        })?;
+
                     let job = build_init_job(
                         &airflow_db,
                         &resolved_product_image,
                         &rbac_sa.name_unchecked(),
+                        &config,
+                        &config_map.name_unchecked(),
                     )?;
                     client
                         .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
@@ -198,6 +251,8 @@ fn build_init_job(
     airflow_db: &AirflowDB,
     resolved_product_image: &ResolvedProductImage,
     sa_name: &str,
+    config: &AirflowDbConfig,
+    config_map_name: &str,
 ) -> Result<Job> {
     let commands = vec![
         String::from("airflow db init"),
@@ -211,6 +266,7 @@ fn build_init_job(
                     --password \"$ADMIN_PASSWORD\" \
                     --role \"Admin\"",
         ),
+        product_logging::framework::shutdown_vector_command(STACKABLE_LOG_DIR),
     ];
 
     let secret = &airflow_db.spec.credentials_secret;
@@ -236,15 +292,45 @@ fn build_init_job(
         env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
         env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
         env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
+        EnvVar {
+            name: "PYTHONPATH".into(),
+            value: Some(LOG_CONFIG_DIR.into()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
+            value: Some("log_config.LOGGING_CONFIG".into()),
+            ..Default::default()
+        },
     ];
 
-    let container = ContainerBuilder::new("airflow-init-db")
-        .expect("ContainerBuilder not created")
-        .image_from_product_image(resolved_product_image)
+    let mut containers = Vec::new();
+
+    let mut cb = ContainerBuilder::new(&Container::AirflowInitDb.to_string())
+        .context(InvalidContainerNameSnafu)?;
+
+    cb.image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_vars(env)
-        .build();
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+
+    let volumes = controller_commons::create_volumes(
+        config_map_name,
+        config.logging.containers.get(&Container::AirflowInitDb),
+    );
+
+    containers.push(cb.build());
+
+    if config.logging.enable_vector_agent {
+        containers.push(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            config.logging.containers.get(&Container::Vector),
+        ));
+    }
 
     let pod = PodTemplateSpec {
         metadata: Some(
@@ -253,7 +339,7 @@ fn build_init_job(
                 .build(),
         ),
         spec: Some(PodSpec {
-            containers: vec![container],
+            containers,
             restart_policy: Some("Never".to_string()),
             service_account: Some(sa_name.to_string()),
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
@@ -263,6 +349,7 @@ fn build_init_job(
                     .run_as_group(0)
                     .build(),
             ),
+            volumes: Some(volumes),
             ..Default::default()
         }),
     };
@@ -282,6 +369,45 @@ fn build_init_job(
     };
 
     Ok(job)
+}
+
+fn build_config_map(
+    airflow_db: &AirflowDB,
+    logging: &Logging<Container>,
+    vector_aggregator_address: Option<&str>,
+) -> Result<ConfigMap> {
+    let mut cm_builder = ConfigMapBuilder::new();
+
+    let cm_name = format!("{cluster}-init-db", cluster = airflow_db.name_unchecked());
+
+    cm_builder.metadata(
+        ObjectMetaBuilder::new()
+            .name(&cm_name)
+            .namespace_opt(airflow_db.namespace())
+            .ownerreference_from_resource(airflow_db, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .build(),
+    );
+
+    extend_config_map_with_log_config(
+        &RoleGroupRef {
+            cluster: ObjectRef::from_obj(airflow_db),
+            role: String::new(),
+            role_group: String::new(),
+        },
+        vector_aggregator_address,
+        logging,
+        &Container::AirflowInitDb,
+        &Container::Vector,
+        &mut cm_builder,
+    )
+    .context(InvalidLoggingConfigSnafu {
+        cm_name: cm_name.to_owned(),
+    })?;
+
+    cm_builder
+        .build()
+        .context(BuildConfigSnafu { name: cm_name })
 }
 
 pub fn error_policy(_obj: Arc<AirflowDB>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

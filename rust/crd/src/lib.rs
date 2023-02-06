@@ -17,6 +17,7 @@ use stackable_operator::{
     labels::ObjectLabels,
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
+    product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
@@ -26,8 +27,12 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 pub const APP_NAME: &str = "airflow";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+
+pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -109,6 +114,10 @@ pub struct AirflowClusterSpec {
     pub stopped: Option<bool>,
     /// The Airflow image to use
     pub image: ProductImage,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
     pub credentials_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor: Option<String>,
@@ -128,6 +137,8 @@ pub struct AirflowClusterSpec {
     pub schedulers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workers: Option<Role<AirflowConfigFragment>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -293,6 +304,26 @@ impl AirflowCluster {
 )]
 pub struct AirflowStorageConfig {}
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+pub enum Container {
+    Airflow,
+    Vector,
+}
+
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -310,6 +341,8 @@ pub struct AirflowStorageConfig {}
 pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
 }
 
 impl AirflowConfig {
@@ -328,6 +361,7 @@ impl AirflowConfig {
                 },
                 storage: AirflowStorageConfigFragment {},
             },
+            logging: product_logging::spec::default_logging(),
         }
     }
 }
@@ -482,7 +516,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.5.0
+            stackableVersion: 23.4.0-rc2
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
