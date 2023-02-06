@@ -167,6 +167,10 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::error::Error,
@@ -598,7 +602,7 @@ fn build_server_rolegroup_statefulset(
     let commands = airflow_role.get_commands();
 
     // container
-    let mut cb = ContainerBuilder::new(APP_NAME).expect("ContainerBuilder not created");
+    let mut cb = ContainerBuilder::new(APP_NAME).context(InvalidContainerNameSnafu)?;
     let mut pb = PodBuilder::new();
 
     if let Some(authentication_class) = authentication_class {
@@ -654,7 +658,7 @@ fn build_server_rolegroup_statefulset(
     let container = cb.build();
 
     let metrics_container = ContainerBuilder::new("metrics")
-        .expect("ContainerBuilder not created")
+        .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])

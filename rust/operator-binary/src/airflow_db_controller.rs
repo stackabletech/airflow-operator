@@ -98,6 +98,10 @@ pub enum Error {
     FailedToResolveConfig {
         source: stackable_airflow_crd::airflowdb::Error,
     },
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
@@ -311,7 +315,7 @@ fn build_init_job(
 
     let mut containers = Vec::new();
 
-    let mut cb = ContainerBuilder::new("airflow-init-db").expect("ContainerBuilder not created");
+    let mut cb = ContainerBuilder::new("airflow-init-db").context(InvalidContainerNameSnafu)?;
 
     cb.image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
