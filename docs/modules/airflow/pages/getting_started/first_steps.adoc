@@ -11,12 +11,12 @@ As we have installed the external dependencies required by Airflow (Postgresql a
 A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Airflow itself. Create a file called `airflow-credentials.yaml`:
 
 [source,yaml]
-include::example$code/airflow-credentials.yaml[]
+include::example$getting_started/code/airflow-credentials.yaml[]
 
 And apply it:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=apply-airflow-credentials]
+include::example$getting_started/code/getting_started.sh[tag=apply-airflow-credentials]
 
 The `connections.secretKey` will be used for securely signing the session cookies and can be used for any other security related needs by extensions. It should be a long random string of bytes.
 
@@ -41,13 +41,13 @@ Create a file named `airflow.yaml` with the following contents:
 
 [source,yaml]
 ----
-include::example$code/airflow.yaml[]
+include::example$getting_started/code/airflow.yaml[]
 ----
 
 And apply it:
 
 ----
-include::example$code/getting_started.sh[tag=install-airflow]
+include::example$getting_started/code/getting_started.sh[tag=install-airflow]
 ----
 
 Where:
@@ -76,7 +76,7 @@ When creating an Airflow cluster, a database-initialization job is first started
 You can use kubectl to wait on the resource, although the cluster itself will not be created until this step is complete.:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=wait-airflowdb]
+include::example$getting_started/code/getting_started.sh[tag=wait-airflowdb]
 
 The job status can be inspected and verified like this:
 
@@ -113,28 +113,28 @@ airflow-worker-default      2/2     11m
 
 The completed set of pods for the Airflow cluster will look something like this:
 
-image::airflow_pods.png[Airflow pods]
+image::getting_started/airflow_pods.png[Airflow pods]
 
 When the Airflow cluster has been created and the database is initialized, Airflow can be opened in the
 browser: the webserver UI port defaults to `8080` can be forwarded to the local host:
 
 ----
-include::example$code/getting_started.sh[tag=port-forwarding]
+include::example$getting_started/code/getting_started.sh[tag=port-forwarding]
 ----
 
 == Verify that it works
 
 The Webserver UI can now be opened in the browser with `http://localhost:8080`. Enter the admin credentials from the Kubernetes secret:
 
-image::airflow_login.png[Airflow login screen]
+image::getting_started/airflow_login.png[Airflow login screen]
 
 Since the examples were loaded in the cluster definition, they will appear under the DAGs tabs:
 
-image::airflow_dags.png[Example Airflow DAGs]
+image::getting_started/airflow_dags.png[Example Airflow DAGs]
 
 Select one of these DAGs by clicking on the name in the left-hand column e.g. `example_complex`. Click on the arrow in the top right of the screen, select "Trigger DAG" and the DAG nodes will be automatically highlighted as the job works through its phases.
 
-image::airflow_running.png[Airflow DAG in action]
+image::getting_started/airflow_running.png[Airflow DAG in action]
 
 Great! You have set up an Airflow cluster, connected to it and run your first DAG!
 
@@ -144,17 +144,17 @@ Great! You have set up an Airflow cluster, connected to it and run your first DA
 ====
 If you prefer to interact directly with the API instead of using the web interface, you can use the following commands. The DAG is one of the example DAGs named `example_complex`. To trigger a DAG run via the API requires an initial extra step to ensure that the DAG is not in a paused state:
 [source,bash]
-include::example$code/getting_started.sh[tag=enable-dag]
+include::example$getting_started/code/getting_started.sh[tag=enable-dag]
 
 A DAG can then be triggered by providing the DAG name (in this case, `example_complex`). The response identifies the DAG identifier, which we can parse out of the JSON like this:
 [source,bash]
-include::example$code/getting_started.sh[tag=run-dag]
+include::example$getting_started/code/getting_started.sh[tag=run-dag]
 
 If we read this identifier into a variable such as `dag_id` (or replace it manually in the command) we can run this command to access the status of the DAG run:
 [source,bash]
-include::example$code/getting_started.sh[tag=check-dag]
+include::example$getting_started/code/getting_started.sh[tag=check-dag]
 ====
 
 == What's next
 
-Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your Airflow cluster and loading your own DAG files.
+Look at the xref:usage.adoc[Usage page] to find out more about configuring your Airflow cluster and loading your own DAG files.

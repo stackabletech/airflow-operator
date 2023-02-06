@@ -8,15 +8,15 @@ Postgresql and Redis are required by Airflow: Postgresql to store metadata about
 
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=helm-add-bitnami-repo]
+include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-repo]
 ----
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=helm-add-bitnami-pgs]
+include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-pgs]
 ----
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=helm-add-bitnami-redis]
+include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-redis]
 ----
 
 == Stackable Operators
@@ -36,7 +36,7 @@ After you have installed stackablectl run the following command to install all O
 
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=stackablectl-install-operators]
+include::example$getting_started/code/getting_started.sh[tag=stackablectl-install-operators]
 ----
 
 The tool will show
@@ -54,13 +54,13 @@ TIP: Consult the xref:stackablectl::quickstart.adoc[] to learn more about how to
 You can also use Helm to install the Operators. Add the Stackable Helm repository:
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=helm-add-repo]
+include::example$getting_started/code/getting_started.sh[tag=helm-add-repo]
 ----
 
 Then install the Stackable Operators:
 [source,bash]
 ----
-include::example$code/getting_started.sh[tag=helm-install-operators]
+include::example$getting_started/code/getting_started.sh[tag=helm-install-operators]
 ----
 
 Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Airflow cluster (as well as the CRDs for the required operators). You are now ready to deploy Apache Airflow in Kubernetes.
