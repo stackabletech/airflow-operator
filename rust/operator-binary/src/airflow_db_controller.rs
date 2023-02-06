@@ -6,7 +6,7 @@ use crate::util::{env_var_from_secret, get_job_state, JobState};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
     airflowdb::{
-        AirflowConfig, AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, Container,
+        AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
         AIRFLOW_DB_CONTROLLER_NAME,
     },
     LOG_CONFIG_DIR, LOG_VOLUME_SIZE_IN_MIB, STACKABLE_LOG_DIR,
@@ -267,7 +267,7 @@ fn build_init_job(
     airflow_db: &AirflowDB,
     resolved_product_image: &ResolvedProductImage,
     sa_name: &str,
-    config: &AirflowConfig,
+    config: &AirflowDbConfig,
     config_map_name: &str,
 ) -> Result<Job> {
     let commands = vec![

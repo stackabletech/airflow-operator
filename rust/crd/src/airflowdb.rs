@@ -61,14 +61,14 @@ pub enum Container {
     ),
     serde(rename_all = "camelCase")
 )]
-pub struct AirflowConfig {
+pub struct AirflowDbConfig {
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
 }
 
-impl AirflowConfig {
-    fn default_config() -> AirflowConfigFragment {
-        AirflowConfigFragment {
+impl AirflowDbConfig {
+    fn default_config() -> AirflowDbConfigFragment {
+        AirflowDbConfigFragment {
             logging: product_logging::spec::default_logging(),
         }
     }
@@ -95,7 +95,7 @@ pub struct AirflowDBSpec {
     pub credentials_secret: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
-    pub config: AirflowConfigFragment,
+    pub config: AirflowDbConfigFragment,
 }
 
 impl AirflowDB {
@@ -125,7 +125,7 @@ impl AirflowDB {
                     .spec
                     .vector_aggregator_config_map_name
                     .clone(),
-                config: AirflowConfigFragment {
+                config: AirflowDbConfigFragment {
                     logging: airflow
                         .spec
                         .database_initialization
@@ -142,8 +142,8 @@ impl AirflowDB {
         self.name_unchecked()
     }
 
-    pub fn merged_config(&self) -> Result<AirflowConfig, Error> {
-        let defaults = AirflowConfig::default_config();
+    pub fn merged_config(&self) -> Result<AirflowDbConfig, Error> {
+        let defaults = AirflowDbConfig::default_config();
         let mut config = self.spec.config.to_owned();
         config.merge(&defaults);
         fragment::validate(config).context(FragmentValidationFailureSnafu)

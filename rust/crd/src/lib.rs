@@ -138,7 +138,7 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<airflowdb::AirflowConfigFragment>,
+    pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
