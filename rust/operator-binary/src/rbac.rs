@@ -4,7 +4,7 @@ use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subje
 use stackable_operator::kube::{Resource, ResourceExt};
 
 /// Used as runAsUser in the pod security context. This is specified in the Airflow image file
-pub const AIRFLOW_UID: i64 = 50000;
+pub const AIRFLOW_UID: i64 = 1000;
 
 /// Build RBAC objects for the product workloads.
 /// The `rbac_prefix` is meant to be the product name, for example: zookeeper, airflow, etc.

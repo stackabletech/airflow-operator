@@ -167,7 +167,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.5.0
+            stackableVersion: 23.4.0-rc2
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -200,7 +200,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.2.4
-            stackableVersion: 0.5.0
+            stackableVersion: 23.4.0-rc2
           executor: KubernetesExecutor
           loadExamples: true
           exposeConfig: true
@@ -259,6 +259,6 @@ mod tests {
                 .get(&AirflowConfigOptions::AuthType.to_string())
                 .unwrap()
         );
-        println!("{:#?}", result);
+        println!("{result:#?}");
     }
 }

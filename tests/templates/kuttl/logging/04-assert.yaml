@@ -1,0 +1,54 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-airflow-cluster
+timeout: 1200
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-automatic-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-custom-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-automatic-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-custom-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-automatic-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-custom-log-config
+status:
+  readyReplicas: 1
+  replicas: 1

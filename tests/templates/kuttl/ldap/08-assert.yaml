@@ -2,7 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: metrics
-timeout: 180
+  name: test-airflow-webserver-health-check
+timeout: 480
 commands:
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/metrics.py
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py
