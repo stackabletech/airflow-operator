@@ -69,10 +69,17 @@ echo "Creating Airflow cluster"
 kubectl apply -f airflow.yaml
 # end::install-airflow[]
 
-# wait a bit for resources to appear
-sleep 3
+for (( i=1; i<=15; i++ ))
+do
+  echo "Waiting for AirflowDB to appear ..."
+  if eval kubectl get airflowdb airflow; then
+    break
+  fi
 
-echo "Waiting on AirflowDB ..."
+  sleep 1
+done
+
+echo "Waiting on AirflowDB to become ready ..."
 # tag::wait-airflowdb[]
 kubectl wait airflowdb/airflow \
   --for jsonpath='{.status.condition}'=Ready \
@@ -81,7 +88,7 @@ kubectl wait airflowdb/airflow \
 
 sleep 5
 
-echo "Awaiting Airflow rollout finish"
+echo "Awaiting Airflow rollout finish ..."
 # tag::watch-airflow-rollout[]
 kubectl rollout status --watch statefulset/airflow-webserver-default
 kubectl rollout status --watch statefulset/airflow-worker-default
