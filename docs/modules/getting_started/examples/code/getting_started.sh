@@ -14,8 +14,6 @@ then
   exit 1
 fi
 
-cd "$(dirname "$0")"
-
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
 # tag::helm-add-bitnami-repo[]
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -71,6 +69,9 @@ echo "Creating Airflow cluster"
 kubectl apply -f airflow.yaml
 # end::install-airflow[]
 
+# wait a bit for resources to appear
+sleep 3
+
 echo "Waiting on AirflowDB ..."
 # tag::wait-airflowdb[]
 kubectl wait airflowdb/airflow \
@@ -89,7 +90,7 @@ kubectl rollout status --watch statefulset/airflow-scheduler-default
 
 echo "Starting port-forwarding of port 8080"
 # tag::port-forwarding[]
-kubectl port-forward svc/airflow-webserver 8080 > /dev/null 2>&1 &
+kubectl port-forward svc/airflow-webserver 8080 2>&1 >/dev/null &
 # end::port-forwarding[]
 PORT_FORWARD_PID=$!
 trap "kill $PORT_FORWARD_PID" EXIT

@@ -69,6 +69,9 @@ echo "Creating Airflow cluster"
 kubectl apply -f airflow.yaml
 # end::install-airflow[]
 
+# wait a bit for resources to appear
+sleep 3
+
 echo "Waiting on AirflowDB ..."
 # tag::wait-airflowdb[]
 kubectl wait airflowdb/airflow \
