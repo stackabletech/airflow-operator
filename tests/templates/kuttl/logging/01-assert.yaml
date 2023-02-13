@@ -2,13 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: test-airflow-cluster
-timeout: 1200
+  name: test-airflow-redis
+timeout: 360
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-webserver-default
+  name: airflow-redis-master
 status:
   readyReplicas: 1
   replicas: 1
@@ -16,15 +16,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-default
-status:
-  readyReplicas: 2
-  replicas: 2
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: airflow-scheduler-default
+  name: airflow-redis-replicas
 status:
   readyReplicas: 1
   replicas: 1

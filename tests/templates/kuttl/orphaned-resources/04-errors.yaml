@@ -2,24 +2,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-default
+  name: airflow-webserver-default
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: airflow-worker-default-0
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: airflow-worker-default-1
+  name: airflow-webserver-default-0
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: airflow-worker-default
+  name: airflow-webserver-default
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-worker-default
+  name: airflow-webserver-default

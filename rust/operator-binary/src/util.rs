@@ -1,16 +1,7 @@
-use snafu::Snafu;
 use stackable_operator::k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{EnvVar, EnvVarSource, SecretKeySelector},
 };
-
-#[derive(Snafu, Debug)]
-#[allow(clippy::enum_variant_names)]
-#[snafu(context(suffix(false)))]
-pub enum Error {
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
-}
 
 pub enum JobState {
     InProgress,
