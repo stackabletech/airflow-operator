@@ -22,18 +22,7 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext:
-  capabilities:
-    drop:
-    - ALL
-  allowPrivilegeEscalation: false
-  seccompProfile:
-    type: RuntimeDefault
-  # readOnlyRootFilesystem: true
-  # openshift requires a UID if one is not given in the image definition (e.g. "stackable")
-  # to verify that the user is non-root
-  runAsNonRoot: true
-  runAsUser: 1000
+securityContext: {}
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
