@@ -9,8 +9,10 @@
 ### Changed
 
 - `operator-rs` `0.31.0` -> `0.34.0` ([#219]).
+- Revert openshift settings ([#233])
 
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
+[#233]: https://github.com/stackabletech/spark-k8s-operator/pull/233
 
 ## [23.1.0] - 2023-01-23
 
