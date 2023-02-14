@@ -1,0 +1,3 @@
+= Stackable Operator for Apache Airflow
+
+The docs are now at xref:home:airflow:index.adoc[]
