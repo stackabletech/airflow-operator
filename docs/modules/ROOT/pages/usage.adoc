@@ -88,8 +88,8 @@ image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 Airflow supports authentication of users against an LDAP server.
-Have a look at https://github.com/stackabletech/airflow-operator/blob/main/examples/simple-airflow-cluster-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
-In general, it requires you to specify a xref:commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In the example below we assign all the users the `Admin` role once they log into Airflow:
+Have a look at https://github.com/stackabletech/airflow-operator/blob/main/examples/simple-airflow-cluster-ldap.yaml[the LDAP example] and the general xref:0.3@commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
+In general, it requires you to specify a xref:0.3@commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In the example below we assign all the users the `Admin` role once they log into Airflow:
 
 [source,yaml]
 ----
