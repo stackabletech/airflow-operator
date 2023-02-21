@@ -1,8 +1,12 @@
+pub mod affinity;
 pub mod airflowdb;
 
+use crate::affinity::get_affinity;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::affinity::StackableAffinity;
 use stackable_operator::commons::product_image_selection::ProductImage;
+use stackable_operator::kube::ResourceExt;
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -343,12 +347,14 @@ pub struct AirflowConfig {
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+    #[fragment_attrs(serde(default))]
+    pub affinity: StackableAffinity,
 }
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
 
-    fn default_config() -> AirflowConfigFragment {
+    fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: ResourcesFragment {
                 cpu: CpuLimitsFragment {
@@ -362,6 +368,7 @@ impl AirflowConfig {
                 storage: AirflowStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
+            affinity: get_affinity(cluster_name, role),
         }
     }
 }
@@ -416,7 +423,7 @@ impl AirflowCluster {
         rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     ) -> Result<AirflowConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config();
+        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
 
         let role = match role {
             AirflowRole::Webserver => {
