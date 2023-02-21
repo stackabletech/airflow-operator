@@ -22,8 +22,11 @@
 
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
+- Revert openshift settings ([#233])
 
+[#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
+[#233]: https://github.com/stackabletech/spark-k8s-operator/pull/233
 
 ## [23.1.0] - 2023-01-23
 
