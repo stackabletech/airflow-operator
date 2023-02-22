@@ -32,6 +32,9 @@ pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
+pub const GIT_CONTENT: &str = "content-from-git";
+pub const GIT_ROOT: &str = "/git";
+pub const GIT_LINK: &str = "current";
 
 pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
@@ -168,8 +171,8 @@ impl GitSync {
             ),
             format!("-depth={}", self.depth.unwrap_or(1u8)),
             format!("-wait={}", self.wait.unwrap_or(20u8)),
-            "-dest=current".to_string(),
-            "-root=/git".to_string(),
+            format!("-dest={GIT_LINK}"),
+            format!("-root={GIT_ROOT}"),
         ]);
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
