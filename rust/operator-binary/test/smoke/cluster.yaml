@@ -1,0 +1,34 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: 24.0.0
+    stackableVersion: 0.3.0
+  executor: CeleryExecutor
+  loadExamples: true
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials
+  webservers:
+    config:
+      logging:
+        enableVectorAgent: false
+    roleGroups:
+      default:
+        replicas: 1
+  workers:
+    config:
+      logging:
+        enableVectorAgent: false
+    roleGroups:
+      default:
+        replicas: 2
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: false
+    roleGroups:
+      default:
+        replicas: 1

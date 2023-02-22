@@ -1787,7 +1787,7 @@ dependencies = [
  "fnv",
  "futures 0.3.26",
  "serde",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.17",
  "snafu",
  "stackable-airflow-crd",
  "stackable-operator",

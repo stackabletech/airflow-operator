@@ -24,3 +24,34 @@ pub fn build_cluster_resources(
 ) -> Result<Vec<BuiltClusterResource>> {
     Ok(vec![])
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::super::types::{BuiltClusterResource, FetchedAdditionalData};
+
+    use super::build_cluster_resources;
+    //use assert_json_diff::{assert_json_matches_no_panic, CompareMode, Config};
+    use stackable_airflow_crd::AirflowCluster;
+    use stackable_operator::product_config::ProductConfigManager;
+
+    #[test]
+    fn test_build_step_just_runs() {
+        let cluster_cr = std::fs::File::open("test/smoke/cluster.yaml").unwrap();
+        let deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
+        let druid_cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let product_config_manager =
+            ProductConfigManager::from_yaml_file("test/smoke/properties.yaml").unwrap();
+
+        let result = build_cluster_resources(
+            Arc::new(druid_cluster),
+            FetchedAdditionalData {},
+            &product_config_manager,
+        );
+
+        assert!(result.is_ok(), "we want an ok, instead we got {:?}", result);
+    }
+}
+
