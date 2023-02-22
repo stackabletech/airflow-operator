@@ -147,17 +147,16 @@ pub struct AirflowClusterSpec {
     pub git_sync: Option<GitSync>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitSync {
-    pub name: String,  // git-sync
-    pub image: String, // k8s.gcr.io/git-sync/git-sync:v3.2.2
-    pub repo: String,  //https://github.com/kubernetes/git-sync
+    pub name: String,
+    pub image: String,
+    pub repo: String,
     pub branch: Option<String>,
     pub depth: Option<u8>,
     pub wait: Option<u8>,
     pub git_sync_conf: Option<BTreeMap<String, String>>,
-    pub volume_mount: VolumeMount,
 }
 
 impl GitSync {
@@ -325,9 +324,9 @@ impl AirflowCluster {
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
         let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.iter()).cloned().collect();
-        if let Some(gitsync) = &self.spec.git_sync.clone() {
+        if self.spec.git_sync.is_some() {
             mounts.push(VolumeMount {
-                name: gitsync.volume_mount.name.clone(),
+                name: GIT_CONTENT.into(),
                 mount_path: GIT_SYNC_DIR.into(),
                 ..VolumeMount::default()
             });

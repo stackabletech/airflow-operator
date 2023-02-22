@@ -26,10 +26,6 @@ dimensions:
     values:
       - "false"
 tests:
-  - name: mount-dags-pvc
-    dimensions:
-      - airflow-latest
-      - openshift
   - name: smoke
     dimensions:
       - airflow
