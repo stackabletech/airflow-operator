@@ -7,6 +7,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::commons::affinity::StackableAffinity;
 use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::kube::ResourceExt;
+use stackable_operator::role_utils::RoleGroup;
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -463,6 +464,17 @@ impl AirflowCluster {
             .get(&rolegroup_ref.role_group)
             .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
+
+        if let Some(RoleGroup {
+            selector: Some(selector),
+            ..
+        }) = role.role_groups.get(&rolegroup_ref.role_group)
+        {
+            // Migrate old `selector` attribute, see ADR 26 affinities.
+            // TODO Can be removed after support for the old `selector` field is dropped.
+            #[allow(deprecated)]
+            conf_rolegroup.affinity.add_legacy_selector(selector);
+        }
 
         // Merge more specific configs into default config
         // Hierarchy is:
