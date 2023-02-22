@@ -5,6 +5,7 @@
 ### Added
 
 - Log aggregation added ([#219]).
+- DAG loading via git-sync ([#xxx]).
 
 ### Changed
 
@@ -16,6 +17,7 @@
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
 [#233]: https://github.com/stackabletech/spark-k8s-operator/pull/233
+[#xxx]: https://github.com/stackabletech/spark-k8s-operator/pull/xxx
 
 ## [23.1.0] - 2023-01-23
 

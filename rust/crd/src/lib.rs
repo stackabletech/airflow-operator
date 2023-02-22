@@ -139,6 +139,44 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_sync: Option<GitSync>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSync {
+    pub name: String,  // git-sync
+    pub image: String, // k8s.gcr.io/git-sync/git-sync:v3.2.2
+    pub repo: String,  //https://github.com/kubernetes/git-sync
+    pub branch: Option<String>,
+    pub depth: Option<u8>,
+    pub wait: Option<u8>,
+    pub git_sync_conf: Option<BTreeMap<String, String>>,
+    pub volume_mount: VolumeMount,
+}
+
+impl GitSync {
+    pub fn get_args(&self) -> Vec<String> {
+        let mut args: Vec<String> = vec![];
+        args.extend(vec![
+            format!("-repo={}", self.repo.clone()),
+            format!(
+                "-branch={}",
+                self.branch.clone().unwrap_or_else(|| "master".to_string())
+            ),
+            format!("-depth={}", self.depth.unwrap_or(1u8)),
+            format!("-wait={}", self.wait.unwrap_or(20u8)),
+            "-dest=current".to_string(),
+            "-root=/git".to_string(),
+        ]);
+        if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
+            for (key, value) in git_sync_conf {
+                args.push(format!("{key}={value}"));
+            }
+        }
+        args
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

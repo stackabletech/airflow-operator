@@ -14,6 +14,8 @@ use stackable_airflow_crd::{
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
+use stackable_operator::builder::VolumeBuilder;
+use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
@@ -637,6 +639,10 @@ fn build_server_rolegroup_statefulset(
     cb.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     cb.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
+    if let Some(gitsync) = airflow.spec.git_sync.clone() {
+        cb.add_volume_mount(gitsync.volume_mount.name, "/stackable/app/git");
+    }
+
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
@@ -670,6 +676,25 @@ fn build_server_rolegroup_statefulset(
 
     pb.add_container(container);
     pb.add_container(metrics_container);
+
+    if let Some(gitsync) = airflow.spec.git_sync.clone() {
+        let gitsync_container = ContainerBuilder::new(gitsync.name.as_ref())
+            .context(InvalidContainerNameSnafu)?
+            .image(gitsync.image.clone())
+            .args(gitsync.get_args())
+            .add_volume_mount(
+                gitsync.volume_mount.name.clone(),
+                gitsync.volume_mount.mount_path,
+            )
+            .build();
+
+        volumes.push(
+            VolumeBuilder::new(gitsync.volume_mount.name)
+                .empty_dir(EmptyDirVolumeSource::default())
+                .build(),
+        );
+        pb.add_container(gitsync_container);
+    }
 
     if config.logging.enable_vector_agent {
         pb.add_container(product_logging::framework::vector_container(
