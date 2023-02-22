@@ -639,10 +639,6 @@ fn build_server_rolegroup_statefulset(
     cb.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     cb.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
-    if let Some(gitsync) = airflow.spec.git_sync.clone() {
-        cb.add_volume_mount(gitsync.volume_mount.name, "/stackable/app/git");
-    }
-
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {

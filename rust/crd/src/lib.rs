@@ -31,6 +31,7 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
 
 pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
@@ -320,7 +321,15 @@ impl AirflowCluster {
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
-        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.iter()).cloned().collect();
+        if let Some(gitsync) = &self.spec.git_sync.clone() {
+            mounts.push(VolumeMount {
+                name: gitsync.volume_mount.name.clone(),
+                mount_path: GIT_SYNC_DIR.into(),
+                ..VolumeMount::default()
+            });
+        }
+        mounts
     }
 }
 
