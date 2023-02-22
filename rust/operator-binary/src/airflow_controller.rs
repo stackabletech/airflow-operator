@@ -1,11 +1,13 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
-use crate::config::{self, PYTHON_IMPORTS};
-use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
-use crate::product_logging::{
+use crate::common::config::{self, PYTHON_IMPORTS};
+use crate::common::controller_commons::{
+    CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+};
+use crate::common::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
 };
-use crate::util::env_var_from_secret;
-use crate::{controller_commons, rbac};
+use crate::common::util::env_var_from_secret;
+use crate::common::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -175,11 +177,11 @@ pub enum Error {
     },
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
-        source: crate::product_logging::Error,
+        source: crate::common::product_logging::Error,
     },
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
-        source: crate::product_logging::Error,
+        source: crate::common::product_logging::Error,
         cm_name: String,
     },
 }

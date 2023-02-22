@@ -149,7 +149,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 
 #[cfg(test)]
 mod tests {
-    use crate::config::add_airflow_config;
+    use super::add_airflow_config;
     use crate::AirflowCluster;
     use stackable_airflow_crd::LdapRolesSyncMoment::Registration;
     use stackable_airflow_crd::{AirflowClusterAuthenticationConfig, AirflowConfigOptions};
