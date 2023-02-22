@@ -683,7 +683,7 @@ fn build_server_rolegroup_statefulset(
             .build();
 
         volumes.push(
-            VolumeBuilder::new(GIT_ROOT)
+            VolumeBuilder::new(GIT_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         );
