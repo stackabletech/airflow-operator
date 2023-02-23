@@ -37,17 +37,18 @@ mod tests {
 
     use stackable_operator::{
         commons::affinity::{StackableAffinity, StackableNodeSelector},
-        config::fragment::validate,
-        k8s_openapi::api::core::v1::{
-            NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm,
+        k8s_openapi::{
+            api::core::v1::{
+                NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, PodAffinity,
+                PodAffinityTerm, PodAntiAffinity, WeightedPodAffinityTerm,
+            },
+            apimachinery::pkg::apis::meta::v1::LabelSelector,
         },
         kube::runtime::reflector::ObjectRef,
         role_utils::RoleGroupRef,
     };
 
     use crate::{AirflowCluster, AirflowRole};
-
-    use super::get_affinity;
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -88,7 +89,57 @@ mod tests {
             role_group: "default".to_string(),
         };
 
-        let expected: StackableAffinity = validate(get_affinity("airflow", &role)).unwrap();
+        let expected: StackableAffinity = StackableAffinity {
+            node_affinity: None,
+            node_selector: None,
+            pod_affinity: Some(PodAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 20,
+                    },
+                ]),
+            }),
+            pod_anti_affinity: Some(PodAntiAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                    ("app.kubernetes.io/component".to_string(), role.to_string()),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 70,
+                    },
+                ]),
+            }),
+        };
 
         let affinity = airflow
             .merged_config(&role, &rolegroup_ref)
@@ -158,7 +209,56 @@ mod tests {
             node_selector: Some(StackableNodeSelector {
                 node_selector: BTreeMap::from([("disktype".to_string(), "ssd".to_string())]),
             }),
-            ..validate(get_affinity("airflow", &AirflowRole::Scheduler)).unwrap()
+            pod_affinity: Some(PodAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 20,
+                    },
+                ]),
+            }),
+            pod_anti_affinity: Some(PodAntiAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                    (
+                                        "app.kubernetes.io/component".to_string(),
+                                        AirflowRole::Scheduler.to_string(),
+                                    ),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 70,
+                    },
+                ]),
+            }),
         };
 
         let rolegroup_ref = RoleGroupRef {
