@@ -212,29 +212,13 @@ mod tests {
         )
         .unwrap();
 
+        let authentication_class_cr =
+            std::fs::File::open("test/ldap/authentication_class.yaml").unwrap();
+        let authentication_class_deserializer =
+            serde_yaml::Deserializer::from_reader(&authentication_class_cr);
         let authentication_class: AuthenticationClass =
-            serde_yaml::from_str::<AuthenticationClass>(
-                "
-            apiVersion: authentication.stackable.tech/v1alpha1
-            kind: AuthenticationClass
-            metadata:
-              name: airflow-with-ldap-server-veri-tls-ldap
-            spec:
-              provider:
-                ldap:
-                  hostname: openldap.default.svc.cluster.local
-                  port: 636
-                  searchBase: ou=users,dc=example,dc=org
-                  ldapFieldNames:
-                    uid: uid
-                  bindCredentials:
-                    secretClass: airflow-with-ldap-server-veri-tls-ldap-bind
-                  tls:
-                    verification:
-                      server:
-                        caCert:
-                          secretClass: openldap-tls
-          ",
+            serde_yaml::with::singleton_map_recursive::deserialize(
+                authentication_class_deserializer,
             )
             .unwrap();
 
