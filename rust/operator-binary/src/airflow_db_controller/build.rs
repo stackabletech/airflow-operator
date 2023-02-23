@@ -342,11 +342,11 @@ mod tests {
     fn test_build_step_just_runs() {
         let cluster_cr = std::fs::File::open("test/smoke/db.yaml").unwrap();
         let deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
-        let druid_cluster: AirflowDB =
+        let airflow_db: AirflowDB =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let result =
-            build_cluster_resources(Arc::new(druid_cluster), FetchedAdditionalData::default());
+            build_cluster_resources(Arc::new(airflow_db), FetchedAdditionalData::default());
 
         assert!(result.is_ok(), "we want an ok, instead we got {:?}", result);
     }
