@@ -58,7 +58,6 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
-pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
@@ -83,6 +82,7 @@ use crate::airflow_controller::{
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
+pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
