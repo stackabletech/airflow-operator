@@ -1,39 +1,15 @@
 mod misc;
 
 use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
-use crate::common::controller_commons::{
-    CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
-};
-use crate::common::product_logging::{
-    extend_config_map_with_log_config, resolve_vector_aggregator_address,
-};
-use crate::common::util::{env_var_from_secret, get_job_state, JobState};
-use crate::common::{controller_commons, rbac};
+use crate::common::rbac;
+use crate::common::util::{get_job_state, JobState};
 
-use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{
-    airflowdb::{
-        AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
-        AIRFLOW_DB_CONTROLLER_NAME,
-    },
-    LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-};
+use snafu::{ResultExt, Snafu};
+use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
-    commons::product_image_selection::ResolvedProductImage,
-    k8s_openapi::api::{
-        batch::v1::{Job, JobSpec},
-        core::v1::{ConfigMap, EnvVar, PodSpec, PodTemplateSpec, Secret},
-    },
-    kube::{
-        runtime::{controller::Action, reflector::ObjectRef},
-        ResourceExt,
-    },
-    logging::controller::ReconcilerError,
-    product_logging::{self, spec::Logging},
-    role_utils::RoleGroupRef,
+    commons::product_image_selection::ResolvedProductImage, kube::ResourceExt,
 };
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use self::misc::{build_config_map, build_init_job};
@@ -44,45 +20,9 @@ use super::types::{BuiltClusterResource, FetchedAdditionalData};
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("database state is 'initializing' but failed to find job {}", init_job))]
-    GetInitializationJob {
-        source: stackable_operator::error::Error,
-        init_job: ObjectRef<Job>,
-    },
-    #[snafu(display("Failed to check whether the secret ({}) exists", secret))]
-    SecretCheck {
-        source: stackable_operator::error::Error,
-        secret: ObjectRef<Secret>,
-    },
-
-    #[snafu(display("failed to build ConfigMap [{name}]"))]
-    BuildConfig {
-        name: String,
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("failed to resolve and merge config"))]
     FailedToResolveConfig {
         source: stackable_airflow_crd::airflowdb::Error,
-    },
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to resolve the Vector aggregator address"))]
-    ResolveVectorAggregatorAddress {
-        source: crate::common::product_logging::Error,
-    },
-    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
-    InvalidLoggingConfig {
-        source: crate::common::product_logging::Error,
-        cm_name: String,
     },
     #[snafu(display("failed to build"))]
     BuildingFailure { source: misc::Error },

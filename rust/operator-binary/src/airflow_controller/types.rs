@@ -2,7 +2,7 @@ use stackable_airflow_crd::{airflowdb::AirflowDB, AirflowCluster};
 use stackable_operator::{
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
-        apps::v1::{StatefulSet, StatefulSetSpec},
+        apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service},
     },
     role_utils::RoleGroupRef,
