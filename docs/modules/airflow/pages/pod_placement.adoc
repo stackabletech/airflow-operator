@@ -1,83 +1,8 @@
 = Pod Placement
 
-You can configure the Pod placement of Airflow instances as described in xref:concepts:pod_placement.adoc[].
+You can configure the Pod placement of the Airflow pods as described in xref:concepts:pod_placement.adoc[].
 
-Default Pod placement constraints for worker Pods:
+The default affinities created by the operator are:
 
-[source,yaml]
-----
-  affinity:
-    podAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/instance: cluster_name
-              app.kubernetes.io/name: airflow
-          topologyKey: kubernetes.io/hostname
-        weight: 20
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/component: worker
-              app.kubernetes.io/instance: cluster-name
-              app.kubernetes.io/name: airflow
-          topologyKey: kubernetes.io/hostname
-        weight: 70
-----
-
-Default Pod placement constraints for web server Pods:
-
-[source,yaml]
-----
-  affinity:
-    podAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/instance: airflow
-              app.kubernetes.io/name: cluster_name
-          topologyKey: kubernetes.io/hostname
-        weight: 20
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/component: webserver
-              app.kubernetes.io/instance: cluster_name
-              app.kubernetes.io/name: airflow
-          topologyKey: kubernetes.io/hostname
-        weight: 70
-----
-
-Default Pod placement constraints for scheduler Pods:
-
-[source,yaml]
-----
-  affinity:
-    podAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/instance: airflow
-              app.kubernetes.io/name: cluster_name
-          topologyKey: kubernetes.io/hostname
-        weight: 20
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/component: scheduler
-              app.kubernetes.io/instance: cluster_name
-              app.kubernetes.io/name: airflow
-          topologyKey: kubernetes.io/hostname
-        weight: 70
-----
-
-In the examples above `cluster-name` is the name of the Airflow custom resource that owns these Pods.
+1. Co-locate all the Airflow Pods (weight 20)
+2. Distribute all Pods within the same role (worker, webserver, scheduler) (weight 70)
