@@ -121,13 +121,13 @@ pub fn build_cluster_resources(
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
-        &product_config,
+        product_config,
         false,
         false,
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
+    let (rbac_sa, _) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
     built_cluster_resources.push(BuiltClusterResource::PatchRBAC);
 
     let vector_aggregator_address = additional_data.aggregator_address;
@@ -210,7 +210,7 @@ pub fn build_cluster_resources(
 mod tests {
     use std::sync::Arc;
 
-    use super::super::types::{BuiltClusterResource, FetchedAdditionalData};
+    use super::super::types::FetchedAdditionalData;
 
     use super::build_cluster_resources;
     //use assert_json_diff::{assert_json_matches_no_panic, CompareMode, Config};
