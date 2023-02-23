@@ -1,9 +1,15 @@
-use snafu::Snafu;
-use stackable_airflow_crd::AirflowCluster;
-use stackable_operator::client::Client;
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::{airflowdb::AirflowDB, AirflowCluster};
+use stackable_operator::{
+    client::Client,
+    commons::authentication::AuthenticationClass,
+    kube::{runtime::reflector::ObjectRef, ResourceExt},
+};
 
 use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::common::product_logging::resolve_vector_aggregator_address;
 
 use super::types::FetchedAdditionalData;
 
@@ -11,21 +17,30 @@ use super::types::FetchedAdditionalData;
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("placeholder"))]
-    Placeholder,
+    #[snafu(display("failed to retrieve Airflow DB"))]
+    AirflowDBRetrieval {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
+    AuthenticationClassRetrieval {
+        source: stackable_operator::error::Error,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::common::product_logging::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn fetch_additional_data(
-    airflow_db: &Arc<AirflowCluster>,
+    airflow: &Arc<AirflowCluster>,
     client: &Client,
 ) -> Result<FetchedAdditionalData> {
-    Err(Error::Placeholder)
-}
-
-/* airflow_db
-client
+    let airflow_db = client
         .get::<AirflowDB>(
             &airflow.name_unchecked(),
             airflow
@@ -35,21 +50,16 @@ client
         )
         .await
         .context(AirflowDBRetrievalSnafu)?;
- */
 
-/* aggregator_address
-
-resolve_vector_aggregator_address(
+    let aggregator_address = resolve_vector_aggregator_address(
         client,
         airflow.as_ref(),
         airflow.spec.vector_aggregator_config_map_name.as_deref(),
     )
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
- */
 
-/*
-authentication_class = match &airflow.spec.authentication_config {
+    let authentication_class = match &airflow.spec.authentication_config {
         Some(authentication_config) => match &authentication_config.authentication_class {
             Some(authentication_class) => Some(
                 AuthenticationClass::resolve(client, authentication_class)
@@ -63,4 +73,11 @@ authentication_class = match &airflow.spec.authentication_config {
             None => None,
         },
         None => None,
- */
+    };
+
+    Ok(FetchedAdditionalData {
+        airflow_db,
+        authentication_class,
+        aggregator_address,
+    })
+}
