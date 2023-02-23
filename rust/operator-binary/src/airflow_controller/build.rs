@@ -72,25 +72,7 @@ pub enum Error {
     ObjectHasNoNamespace,
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
-    #[snafu(display("failed to apply global Service"))]
-    ApplyRoleService {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to apply Service for {rolegroup}"))]
-    ApplyRoleGroupService {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
-    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
-    ApplyRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
-    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
-    ApplyRoleGroupStatefulSet {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
+
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
         source: stackable_operator::error::Error,
@@ -107,24 +89,11 @@ pub enum Error {
     CreateAirflowDBObject {
         source: stackable_airflow_crd::airflowdb::Error,
     },
-    #[snafu(display("failed to apply Airflow DB"))]
-    ApplyAirflowDB {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("failed to retrieve Airflow DB"))]
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch service account: {source}"))]
-    ApplyServiceAccount {
-        name: String,
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to patch role binding: {source}"))]
-    ApplyRoleBinding {
-        name: String,
-        source: stackable_operator::error::Error,
-    },
+
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
@@ -163,14 +132,6 @@ pub enum Error {
     InvalidContainerName {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::common::product_logging::Error,
@@ -198,13 +159,6 @@ pub fn build_cluster_resources(
         .context(CreateAirflowDBObjectSnafu)?;
 
     built_cluster_resources.push(BuiltClusterResource::PatchAirflowDB(airflow_db));
-    // TODO apply
-    /*
-       client
-           .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
-           .await
-           .context(ApplyAirflowDBSnafu)?;
-    */
 
     let airflow_db = additional_data.airflow_db;
 
@@ -216,7 +170,7 @@ pub fn build_cluster_resources(
                 tracing::debug!(
                     "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
                 );
-                return Ok(vec![]);
+                return Ok(built_cluster_resources);
             }
             AirflowDBStatusCondition::Failed => {
                 return AirflowDBFailedSnafu {
@@ -228,7 +182,7 @@ pub fn build_cluster_resources(
         }
     } else {
         tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
-        return Ok(vec![]);
+        return Ok(built_cluster_resources);
     }
 
     let mut roles = HashMap::new();
@@ -260,26 +214,6 @@ pub fn build_cluster_resources(
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
     built_cluster_resources.push(BuiltClusterResource::PatchRBAC);
-    /*
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
-       // TODO: apply
-       client
-           .apply_patch(AIRFLOW_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
-           .await
-           .with_context(|_| ApplyServiceAccountSnafu {
-               name: rbac_sa.name_unchecked(),
-           })?;
-       client
-           .apply_patch(
-               AIRFLOW_CONTROLLER_NAME,
-               &rbac_rolebinding,
-               &rbac_rolebinding,
-           )
-           .await
-           .with_context(|_| ApplyRoleBindingSnafu {
-               name: rbac_rolebinding.name_unchecked(),
-           })?;
-    */
 
     let vector_aggregator_address = additional_data.aggregator_address;
 
@@ -291,13 +225,6 @@ pub fn build_cluster_resources(
             let role_service =
                 build_role_service(&airflow, &resolved_product_image, role_name, resolved_port)?;
             built_cluster_resources.push(BuiltClusterResource::RoleService(role_service));
-            // TODO: apply
-            /*
-            cluster_resources
-                .add(client, &role_service)
-                .await
-                .context(ApplyRoleServiceSnafu)?;
-             */
         }
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
@@ -323,14 +250,6 @@ pub fn build_cluster_resources(
                 rg_service,
                 rolegroup.clone(),
             ));
-            // TODO apply
-            /*
-            cluster_resources.add(client, &rg_service).await.context(
-                ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
-                },
-            )?;
-            */
 
             let rg_configmap = build_rolegroup_config_map(
                 &airflow,
@@ -346,15 +265,6 @@ pub fn build_cluster_resources(
                 rg_configmap,
                 rolegroup.clone(),
             ));
-            // TODO apply
-            /*
-            cluster_resources
-                .add(client, &rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-            */
 
             let rg_statefulset = build_server_rolegroup_statefulset(
                 &airflow,
@@ -370,17 +280,10 @@ pub fn build_cluster_resources(
                 rg_statefulset,
                 rolegroup.clone(),
             ));
-            // TODO apply
-            /*
-            cluster_resources
-                .add(client, &rg_statefulset)
-                .await
-                .context(ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-              */
         }
     }
+
+    built_cluster_resources.push(BuiltClusterResource::DeleteOrphaned);
 
     Ok(built_cluster_resources)
 }

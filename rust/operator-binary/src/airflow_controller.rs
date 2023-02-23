@@ -56,7 +56,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(BuildSnafu)?;
 
-    apply_cluster_resources(&ctx.client, &airflow, built_cluster_resources)
+    apply_cluster_resources(&ctx.client, airflow, built_cluster_resources)
         .await
         .context(ApplySnafu)
 }
