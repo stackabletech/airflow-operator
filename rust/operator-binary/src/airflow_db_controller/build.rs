@@ -39,7 +39,7 @@ pub fn build_cluster_resources(
     let resolved_product_image: ResolvedProductImage =
         airflow_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
+    let (rbac_sa, _) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
 
     built_cluster_resources.push(BuiltClusterResource::PatchRBAC);
 
@@ -73,17 +73,12 @@ pub fn build_cluster_resources(
                     )
                     .context(BuildingFailureSnafu)?;
 
-                    built_cluster_resources
-                        .push(BuiltClusterResource::PatchJob(job.clone(), s.clone()));
+                    built_cluster_resources.push(BuiltClusterResource::PatchJob(job, s.clone()));
                 }
             }
             AirflowDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                let ns = airflow_db
-                    .namespace()
-                    .unwrap_or_else(|| "default".to_string());
-                let job_name = airflow_db.job_name();
                 let job = additional_data.job;
 
                 let new_status = match get_job_state(&job) {
@@ -93,7 +88,7 @@ pub fn build_cluster_resources(
                 };
 
                 if let Some(ns) = new_status {
-                    built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(ns.clone()));
+                    built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(ns));
                 }
             }
             AirflowDBStatusCondition::Ready => (),
@@ -103,7 +98,7 @@ pub fn build_cluster_resources(
         // Status is none => initialize the status object as "Provisioned"
         let new_status = AirflowDBStatus::new();
 
-        built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(new_status.clone()));
+        built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(new_status));
     }
 
     Ok(built_cluster_resources)
