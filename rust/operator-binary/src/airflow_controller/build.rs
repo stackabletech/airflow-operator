@@ -7,83 +7,32 @@ use super::AIRFLOW_CONTROLLER_NAME;
 use crate::airflow_controller::build::misc::{
     build_role_service, build_rolegroup_config_map, build_rolegroup_service,
     build_server_rolegroup_statefulset, role_port,
-use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
-use crate::common::config::{self, PYTHON_IMPORTS};
-use crate::common::controller_commons::{
-    CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
 };
 use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
 
-use crate::common::product_logging::{
-    extend_config_map_with_log_config, resolve_vector_aggregator_address,
-};
-use crate::common::util::env_var_from_secret;
-use crate::common::{controller_commons, rbac};
+use crate::common::rbac;
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
-    build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
-    AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
-    LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+    AirflowCluster, AirflowConfigFragment, AirflowRole, AIRFLOW_CONFIG_FILENAME,
 };
+use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{
-        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder,
-    },
-    cluster_resources::ClusterResources,
-    commons::{
-        authentication::{AuthenticationClass, AuthenticationClassProvider},
-        product_image_selection::ResolvedProductImage,
-    },
-    k8s_openapi::{
-        api::{
-            apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                ConfigMap, EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction,
-            },
-        },
-        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
-    },
-    kube::{
-        runtime::{controller::Action, reflector::ObjectRef},
-        Resource, ResourceExt,
-    },
-    labels::{role_group_selector_labels, role_selector_labels},
-    logging::controller::ReconcilerError,
-    product_config::{
-        flask_app_config_writer, flask_app_config_writer::FlaskAppConfigWriterError,
-        types::PropertyNameKind, ProductConfigManager,
-    },
+    kube::{runtime::reflector::ObjectRef, ResourceExt},
+    product_config::{types::PropertyNameKind, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
-
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-    #[snafu(display("object defines no airflow config role"))]
-    NoAirflowRole,
-
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("Failed to transform configs"))]
@@ -93,34 +42,6 @@ pub enum Error {
     #[snafu(display("failed to apply Airflow DB"))]
     CreateAirflowDBObject {
         source: stackable_airflow_crd::airflowdb::Error,
-    },
-    #[snafu(display("failed to retrieve Airflow DB"))]
-    AirflowDBRetrieval {
-        source: stackable_operator::error::Error,
-    },
-
-    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
-    AuthenticationClassRetrieval {
-        source: stackable_operator::error::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
-    },
-    #[snafu(display(
-        "Airflow doesn't support the AuthenticationClass provider
-    {authentication_class_provider} from AuthenticationClass {authentication_class}"
-    ))]
-    AuthenticationClassProviderNotSupported {
-        authentication_class_provider: String,
-        authentication_class: ObjectRef<AuthenticationClass>,
-    },
-    #[snafu(display("failed to build config file for {rolegroup}"))]
-    BuildRoleGroupConfigFile {
-        source: FlaskAppConfigWriterError,
-        rolegroup: RoleGroupRef<AirflowCluster>,
-    },
-    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
-    BuildRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
     },
     #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
     AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
@@ -135,19 +56,6 @@ pub enum Error {
     },
     #[snafu(display("failed to build"))]
     BuildingFailure { source: misc::Error },
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to resolve the Vector aggregator address"))]
-    ResolveVectorAggregatorAddress {
-        source: crate::common::product_logging::Error,
-    },
-    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
-    InvalidLoggingConfig {
-        source: crate::common::product_logging::Error,
-        cm_name: String,
-    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
