@@ -22,5 +22,23 @@ pub async fn apply_cluster_resources(
     airflow_db: &Arc<AirflowCluster>,
     built_cluster_resources: Vec<BuiltClusterResource>,
 ) -> Result<Action> {
+    /*
+       let mut cluster_resources = ClusterResources::new(
+           APP_NAME,
+           OPERATOR_NAME,
+           AIRFLOW_CONTROLLER_NAME,
+           &airflow.object_ref(&()),
+       )
+       .context(CreateClusterResourcesSnafu)?;
+    */
+
+    // TODO
+    /*
+    cluster_resources
+        .delete_orphaned_resources(client)
+        .await
+        .context(DeleteOrphanedResourcesSnafu)?;
+     */
+
     Ok(Action::await_change())
 }
