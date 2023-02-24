@@ -37,7 +37,7 @@ spec:
   credentialsSecret: test-airflow-credentials
   gitSync:
     name: git-sync
-    image: k8s.gcr.io/git-sync/git-sync:v3.2.2
+    image: k8s.gcr.io/git-sync/git-sync:v3.6.4
     repo: https://github.com/stackabletech/airflow-operator
     branch: "feat/git-sync"
     dagsDirectory: "tests/templates/kuttl/mount-dags-gitsync/dags"

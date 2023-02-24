@@ -33,7 +33,7 @@ pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
 pub const GIT_CONTENT: &str = "content-from-git";
-pub const GIT_ROOT: &str = "/git";
+pub const GIT_ROOT: &str = "/tmp/git";
 pub const GIT_LINK: &str = "current";
 
 pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
