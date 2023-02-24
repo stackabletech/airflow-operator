@@ -3,3 +3,4 @@
 ** xref:airflow:getting_started/first_steps.adoc[]
 * xref:airflow:configuration.adoc[]
 * xref:airflow:usage.adoc[]
+* xref:airflow:pod_placement.adoc[]
