@@ -14,7 +14,7 @@ use stackable_airflow_crd::{
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
-use stackable_airflow_crd::{GIT_CONTENT, GIT_ROOT};
+use stackable_airflow_crd::{GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR};
 use stackable_operator::builder::VolumeBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
@@ -827,6 +827,16 @@ fn build_mapped_envs(
         value: executor,
         ..Default::default()
     });
+
+    if let Some(git_sync) = &airflow.spec.git_sync {
+        if let Some(dags_folder) = &git_sync.dags_directory {
+            env.push(EnvVar {
+                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            })
+        }
+    }
 
     env
 }

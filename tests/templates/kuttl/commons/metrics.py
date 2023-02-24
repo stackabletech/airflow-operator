@@ -2,7 +2,10 @@
 
 import requests
 import time
+import sys
 
+
+sys.tracebacklimit=0
 
 def assert_metric(role, metric):
     response = requests.get(f'http://airflow-{role}-default:9102/metrics')
@@ -18,6 +21,9 @@ dag_conf = {'message': "Hello World"}
 
 rest_url = 'http://airflow-webserver-default:8080/api/v1'
 auth = ('airflow', 'airflow')
+
+# allow a few moments for the DAGs to be registered to all roles
+time.sleep(2)
 
 response = requests.patch(f'{rest_url}/dags/{dag_id}', auth=auth, json={'is_paused': False})
 response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth=auth, json={'conf': dag_conf})

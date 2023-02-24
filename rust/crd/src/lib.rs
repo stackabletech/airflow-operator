@@ -154,6 +154,7 @@ pub struct GitSync {
     pub image: String,
     pub repo: String,
     pub branch: Option<String>,
+    pub dags_directory: Option<String>,
     pub depth: Option<u8>,
     pub wait: Option<u8>,
     pub git_sync_conf: Option<BTreeMap<String, String>>,
@@ -163,15 +164,15 @@ impl GitSync {
     pub fn get_args(&self) -> Vec<String> {
         let mut args: Vec<String> = vec![];
         args.extend(vec![
-            format!("-repo={}", self.repo.clone()),
+            format!("--repo={}", self.repo.clone()),
             format!(
-                "-branch={}",
+                "--branch={}",
                 self.branch.clone().unwrap_or_else(|| "master".to_string())
             ),
-            format!("-depth={}", self.depth.unwrap_or(1u8)),
-            format!("-wait={}", self.wait.unwrap_or(20u8)),
-            format!("-dest={GIT_LINK}"),
-            format!("-root={GIT_ROOT}"),
+            format!("--depth={}", self.depth.unwrap_or(1u8)),
+            format!("--wait={}", self.wait.unwrap_or(20u8)),
+            format!("--dest={GIT_LINK}"),
+            format!("--root={GIT_ROOT}"),
         ]);
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {

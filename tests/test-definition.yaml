@@ -34,6 +34,10 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
+  - name: mount-dags-gitsync
+    dimensions:
+      - airflow-latest
+      - openshift
   - name: ldap
     dimensions:
       - airflow-latest
