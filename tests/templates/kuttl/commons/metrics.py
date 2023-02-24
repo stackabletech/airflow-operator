@@ -5,7 +5,10 @@ import time
 import sys
 
 
-sys.tracebacklimit=0
+def exception_handler(exception_type, exception, traceback):
+    print(f"{exception_type.__name__}: {exception.args}")
+
+sys.excepthook = exception_handler
 
 def assert_metric(role, metric):
     response = requests.get(f'http://airflow-{role}-default:9102/metrics')

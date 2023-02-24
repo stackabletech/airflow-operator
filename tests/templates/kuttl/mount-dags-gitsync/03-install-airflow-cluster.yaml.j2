@@ -38,9 +38,9 @@ spec:
   gitSync:
     name: git-sync
     image: k8s.gcr.io/git-sync/git-sync:v3.2.2
-    repo: https://github.com/adwk67/test_dags
-    branch: main
-    dagsDirectory: dags
+    repo: https://github.com/stackabletech/airflow-operator
+    branch: "feat/git-sync"
+    dagsDirectory: "tests/templates/kuttl/mount-dags-gitsync/dags"
     wait: 20
     gitSyncConf: {}
   webservers:
