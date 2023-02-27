@@ -36,6 +36,9 @@ pub const GIT_CONTENT: &str = "content-from-git";
 pub const GIT_ROOT: &str = "/tmp/git";
 pub const GIT_LINK: &str = "current";
 
+const GIT_SYNC_DEPTH: u8 = 1u8;
+const GIT_SYNC_WAIT: u16 = 20u16;
+
 pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
 #[derive(Snafu, Debug)]
@@ -156,7 +159,7 @@ pub struct GitSync {
     pub branch: Option<String>,
     pub dags_directory: Option<String>,
     pub depth: Option<u8>,
-    pub wait: Option<u8>,
+    pub wait: Option<u16>,
     pub credentials_secret: Option<String>,
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }
@@ -170,8 +173,8 @@ impl GitSync {
                 "--branch={}",
                 self.branch.clone().unwrap_or_else(|| "master".to_string())
             ),
-            format!("--depth={}", self.depth.unwrap_or(1u8)),
-            format!("--wait={}", self.wait.unwrap_or(20u8)),
+            format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
+            format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
             format!("--dest={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
         ]);
