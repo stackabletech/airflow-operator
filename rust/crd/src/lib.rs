@@ -177,6 +177,7 @@ impl GitSync {
             format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
             format!("--dest={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
+            format!("--git-config=safe.directory:{GIT_ROOT}"),
         ]);
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {

@@ -19,6 +19,15 @@ stringData:
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+#---
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  name: git-credentials
+#type: Opaque
+#stringData:
+#  user: ---
+#  password: ---
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -41,7 +50,11 @@ spec:
     repo: https://github.com/stackabletech/airflow-operator
     branch: "feat/git-sync"
     dagsDirectory: "tests/templates/kuttl/mount-dags-gitsync/dags"
-    wait: 360
+    #repo: https://github.com/adwk67/test_dags
+    #branch: main
+    #dagsDirectory: dags
+    wait: 20
+    #credentialsSecret: git-credentials
     gitSyncConf: {}
   webservers:
     config:
