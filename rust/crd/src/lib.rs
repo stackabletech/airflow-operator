@@ -157,6 +157,7 @@ pub struct GitSync {
     pub dags_directory: Option<String>,
     pub depth: Option<u8>,
     pub wait: Option<u8>,
+    pub credentials_secret: Option<String>,
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }
 
@@ -397,6 +398,7 @@ pub struct AirflowConfig {
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
+    pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config() -> AirflowConfigFragment {
         AirflowConfigFragment {
@@ -424,11 +426,20 @@ impl Configuration for AirflowConfigFragment {
         cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        Ok([(
+        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
+        env.insert(
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.credentials_secret.clone()),
-        )]
-        .into())
+        );
+        if let Some(git_sync) = &cluster.spec.git_sync {
+            if let Some(credentials_secret) = &git_sync.credentials_secret {
+                env.insert(
+                    AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY.to_string(),
+                    Some(credentials_secret.to_string()),
+                );
+            }
+        }
+        Ok(env)
     }
 
     fn compute_cli(

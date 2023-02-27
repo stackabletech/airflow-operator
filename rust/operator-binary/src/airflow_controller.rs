@@ -677,6 +677,7 @@ fn build_server_rolegroup_statefulset(
     if let Some(gitsync) = airflow.spec.git_sync.clone() {
         let gitsync_container = ContainerBuilder::new(gitsync.name.as_ref())
             .context(InvalidContainerNameSnafu)?
+            .add_env_vars(build_gitsync_envs(rolegroup_config))
             .image(gitsync.image.clone())
             .args(gitsync.get_args())
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
@@ -798,6 +799,16 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
+    if let Some(git_sync) = &airflow.spec.git_sync {
+        if let Some(dags_folder) = &git_sync.dags_directory {
+            env.push(EnvVar {
+                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            })
+        }
+    }
+
     if let Some(true) = airflow.spec.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
@@ -828,14 +839,23 @@ fn build_mapped_envs(
         ..Default::default()
     });
 
-    if let Some(git_sync) = &airflow.spec.git_sync {
-        if let Some(dags_folder) = &git_sync.dags_directory {
-            env.push(EnvVar {
-                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
-                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-                ..Default::default()
-            })
-        }
+    env
+}
+
+fn build_gitsync_envs(
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+) -> Vec<EnvVar> {
+    let mut env = vec![];
+    if let Some(git_secret) = rolegroup_config
+        .get(&PropertyNameKind::Env)
+        .and_then(|vars| vars.get(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY))
+    {
+        env.push(env_var_from_secret("GIT_SYNC_USERNAME", git_secret, "user"));
+        env.push(env_var_from_secret(
+            "GIT_SYNC_PASSWORD",
+            git_secret,
+            "password",
+        ));
     }
 
     env
