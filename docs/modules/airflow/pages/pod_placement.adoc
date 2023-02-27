@@ -1,0 +1,8 @@
+= Pod Placement
+
+You can configure the Pod placement of the Airflow pods as described in xref:concepts:pod_placement.adoc[].
+
+The default affinities created by the operator are:
+
+1. Co-locate all the Airflow Pods (weight 20)
+2. Distribute all Pods within the same role (worker, webserver, scheduler) (weight 70)

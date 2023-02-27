@@ -5,6 +5,7 @@
 ### Added
 
 - Log aggregation added ([#219]).
+- Deploy default and support custom affinities ([#241]).
 
 ### Changed
 
@@ -15,6 +16,7 @@
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#233]: https://github.com/stackabletech/spark-k8s-operator/pull/233
 [#234]: https://github.com/stackabletech/spark-k8s-operator/pull/234
+[#241]: https://github.com/stackabletech/spark-k8s-operator/pull/241
 
 ## [23.1.0] - 2023-01-23
 
