@@ -9,7 +9,9 @@ use stackable_operator::{
 use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::common::product_logging::resolve_vector_aggregator_address;
+use crate::common::{
+    error_handling::is_a_not_found_error, product_logging::resolve_vector_aggregator_address,
+};
 
 use super::types::FetchedAdditionalData;
 
@@ -40,7 +42,7 @@ pub async fn fetch_additional_data(
     airflow: &Arc<AirflowCluster>,
     client: &Client,
 ) -> Result<FetchedAdditionalData> {
-    let airflow_db = client
+    let airflow_db_result = client
         .get::<AirflowDB>(
             &airflow.name_unchecked(),
             airflow
@@ -49,7 +51,18 @@ pub async fn fetch_additional_data(
                 .context(ObjectHasNoNamespaceSnafu)?,
         )
         .await
-        .context(AirflowDBRetrievalSnafu)?;
+        .context(AirflowDBRetrievalSnafu);
+
+    let airflow_db = match airflow_db_result {
+        Err(airflow_db_error) => {
+            if !is_a_not_found_error(&airflow_db_error) {
+                return Err(airflow_db_error);
+            }
+            // we will create the airflowDB resource in this case
+            None
+        }
+        Ok(airflow_db) => Some(airflow_db),
+    };
 
     let aggregator_address = resolve_vector_aggregator_address(
         client,

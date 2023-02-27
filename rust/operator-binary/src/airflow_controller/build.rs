@@ -77,7 +77,19 @@ pub fn build_cluster_resources(
 
     let airflow_db = additional_data.airflow_db;
 
-    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
+    if airflow_db.is_none() {
+        tracing::debug!(
+            "{}",
+            format!("AirflowDB does not exist yet. Skipping over all remaining build steps.")
+        );
+        return Ok(built_cluster_resources);
+    }
+    let airflow_db = airflow_db.expect("AirflowDB can't be None at this point.");
+
+    tracing::debug!(
+        "{}",
+        format!("Checking AirflowDB status: {:#?}", airflow_db.status)
+    );
 
     if let Some(ref status) = airflow_db.status {
         match status.condition {
@@ -230,8 +242,8 @@ mod tests {
 
         let db_cr = std::fs::File::open("test/smoke/db.yaml").unwrap();
         let db_deserializer = serde_yaml::Deserializer::from_reader(&db_cr);
-        let airflow_db: AirflowDB =
-            serde_yaml::with::singleton_map_recursive::deserialize(db_deserializer).unwrap();
+        let airflow_db: Option<AirflowDB> =
+            Some(serde_yaml::with::singleton_map_recursive::deserialize(db_deserializer).unwrap());
 
         let result = build_cluster_resources(
             Arc::new(druid_cluster),

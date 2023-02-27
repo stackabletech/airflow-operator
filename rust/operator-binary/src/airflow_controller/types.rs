@@ -10,7 +10,7 @@ use stackable_operator::{
 
 #[derive(Debug)]
 pub struct FetchedAdditionalData {
-    pub airflow_db: AirflowDB,
+    pub airflow_db: Option<AirflowDB>,
     pub aggregator_address: Option<String>,
     pub authentication_class: Option<AuthenticationClass>,
 }

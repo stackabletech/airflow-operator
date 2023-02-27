@@ -8,7 +8,7 @@ use stackable_operator::k8s_openapi::api::{
 pub struct FetchedAdditionalData {
     pub initial_secret: Option<Secret>,
     pub vector_aggregator_address: Option<String>,
-    pub job: Job,
+    pub job: Option<Job>,
 }
 
 #[derive(Debug)]

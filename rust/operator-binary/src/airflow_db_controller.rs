@@ -38,7 +38,7 @@ impl ReconcilerError for Error {
 }
 
 pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> Result<Action> {
-    tracing::info!("Starting reconcile");
+    tracing::info!("Starting AirflowDB reconcile");
 
     let fetched_additional_data = fetch_additional_data(&airflow_db, &ctx.client)
         .await

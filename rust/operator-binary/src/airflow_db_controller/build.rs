@@ -77,18 +77,20 @@ pub fn build_cluster_resources(
                 }
             }
             AirflowDBStatusCondition::Initializing => {
-                // In here, check the associated job that is running.
-                // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                let job = additional_data.job;
+                // only proceed if the job already exists
+                if let Some(job) = additional_data.job {
+                    // In here, check the associated job that is running.
+                    // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
 
-                let new_status = match get_job_state(&job) {
-                    JobState::Complete => Some(s.ready()),
-                    JobState::Failed => Some(s.failed()),
-                    JobState::InProgress => None,
-                };
+                    let new_status = match get_job_state(&job) {
+                        JobState::Complete => Some(s.ready()),
+                        JobState::Failed => Some(s.failed()),
+                        JobState::InProgress => None,
+                    };
 
-                if let Some(ns) = new_status {
-                    built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(ns));
+                    if let Some(ns) = new_status {
+                        built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(ns));
+                    }
                 }
             }
             AirflowDBStatusCondition::Ready => (),

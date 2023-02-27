@@ -44,7 +44,7 @@ pub enum Error {
 }
 
 pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> Result<Action> {
-    tracing::info!("Starting reconcile");
+    tracing::info!("Starting AirflowCluster reconcile");
 
     let fetched_additional_data = fetch_additional_data(&airflow, &ctx.client)
         .await

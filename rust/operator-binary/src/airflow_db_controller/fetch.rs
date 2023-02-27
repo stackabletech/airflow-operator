@@ -9,6 +9,7 @@ use stackable_operator::{
 use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
+use crate::common::error_handling::is_a_not_found_error;
 use crate::common::product_logging::resolve_vector_aggregator_address;
 
 use super::types::FetchedAdditionalData;
@@ -70,12 +71,23 @@ pub async fn fetch_additional_data(
         .namespace()
         .unwrap_or_else(|| "default".to_string());
     let job_name = airflow_db.job_name();
-    let job = client
+    let job_result = client
         .get::<Job>(&job_name, &ns)
         .await
         .context(GetInitializationJobSnafu {
             init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-        })?;
+        });
+
+    let job = match job_result {
+        Err(job_error) => {
+            if !is_a_not_found_error(&job_error) {
+                return Err(job_error);
+            }
+            // we will create the job resource in this case
+            None
+        }
+        Ok(job) => Some(job),
+    };
 
     Ok(FetchedAdditionalData {
         job,
