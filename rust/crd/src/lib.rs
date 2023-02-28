@@ -176,7 +176,7 @@ impl GitSync {
             format!("--repo={}", self.repo.clone()),
             format!(
                 "--branch={}",
-                self.branch.clone().unwrap_or_else(|| "master".to_string())
+                self.branch.clone().unwrap_or_else(|| "main".to_string())
             ),
             format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
             format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
