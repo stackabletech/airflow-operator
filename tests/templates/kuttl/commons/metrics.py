@@ -8,6 +8,7 @@ import sys
 def exception_handler(exception_type, exception, traceback):
     print(f"{exception_type.__name__}: {exception.args}")
 
+
 sys.excepthook = exception_handler
 
 def assert_metric(role, metric):
