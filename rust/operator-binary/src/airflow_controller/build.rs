@@ -222,6 +222,8 @@ pub fn build_cluster_resources(
 mod tests {
     use std::sync::Arc;
 
+    use crate::airflow_controller::types::BuiltClusterResource;
+
     use super::super::types::FetchedAdditionalData;
 
     use super::build_cluster_resources;
@@ -256,5 +258,40 @@ mod tests {
         );
 
         assert!(result.is_ok(), "we want an ok, instead we got {:?}", result);
+    }
+
+    #[test]
+    fn test_create_airflow_db() {
+        let cluster_cr = std::fs::File::open("test/smoke/cluster.yaml").unwrap();
+        let cluster_deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
+        let druid_cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(cluster_deserializer).unwrap();
+
+        let product_config_manager =
+            ProductConfigManager::from_yaml_file("test/smoke/properties.yaml").unwrap();
+
+        let result = build_cluster_resources(
+            Arc::new(druid_cluster),
+            FetchedAdditionalData {
+                airflow_db: None,
+                aggregator_address: None,
+                authentication_class: None,
+            },
+            &product_config_manager,
+        )
+        .expect("should produce result");
+
+        assert_eq!(
+            result.len(),
+            1,
+            "we want to have a single resource entry, instead we got {:?}",
+            result
+        );
+
+        if let BuiltClusterResource::PatchAirflowDB(_) = result[0] {
+            // if let ... else is not a thing yet :( https://github.com/rust-lang/rust/pull/93628/
+        } else {
+            panic!("expected PatchAirflowDB entry, found {:?}", result[0]);
+        }
     }
 }

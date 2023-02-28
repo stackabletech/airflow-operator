@@ -108,13 +108,16 @@ pub fn build_cluster_resources(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{collections::BTreeMap, sync::Arc};
+
+    use crate::airflow_db_controller::types::BuiltClusterResource;
 
     use super::super::types::FetchedAdditionalData;
 
     use super::build_cluster_resources;
     //use assert_json_diff::{assert_json_matches_no_panic, CompareMode, Config};
-    use stackable_airflow_crd::airflowdb::AirflowDB;
+    use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
+    use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::core::ObjectMeta};
 
     #[test]
     fn test_build_step_just_runs() {
@@ -127,5 +130,50 @@ mod tests {
             build_cluster_resources(Arc::new(airflow_db), FetchedAdditionalData::default());
 
         assert!(result.is_ok(), "we want an ok, instead we got {:?}", result);
+    }
+
+    #[test]
+    fn test_create_job() {
+        let cluster_cr = std::fs::File::open("test/smoke/db.yaml").unwrap();
+        let deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
+        let mut airflow_db: AirflowDB =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        airflow_db.status = Some(AirflowDBStatus {
+            started_at: None,
+            condition: AirflowDBStatusCondition::Pending,
+        });
+        airflow_db.metadata.uid = Some("hello".to_string());
+
+        let result = build_cluster_resources(
+            Arc::new(airflow_db),
+            FetchedAdditionalData {
+                initial_secret: Some(Secret {
+                    data: None,
+                    immutable: None,
+                    string_data: Some(BTreeMap::from([(
+                        "some_key".to_string(),
+                        "some_value".to_string(),
+                    )])),
+                    metadata: ObjectMeta::default(),
+                    type_: None,
+                }),
+                vector_aggregator_address: None,
+                job: None,
+            },
+        )
+        .expect("should produce result");
+
+        assert_eq!(
+            result.len(),
+            3,
+            "we want to have a single resource entry, instead we got {:?}",
+            result
+        );
+
+        if let BuiltClusterResource::PatchJob(_, _) = result[2] {
+            // if let ... else is not a thing yet :( https://github.com/rust-lang/rust/pull/93628/
+        } else {
+            panic!("expected PatchJob entry, found {:?}", result[0]);
+        }
     }
 }
