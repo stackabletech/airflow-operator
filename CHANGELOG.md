@@ -6,7 +6,7 @@
 
 - Log aggregation added ([#219]).
 - Deploy default and support custom affinities ([#241]).
-- DAG loading via git-sync ([#xxx]).
+- Add the ability to loads DAG via git-sync ([#245]).
 
 ### Changed
 
@@ -18,6 +18,7 @@
 [#233]: https://github.com/stackabletech/spark-k8s-operator/pull/233
 [#234]: https://github.com/stackabletech/spark-k8s-operator/pull/234
 [#241]: https://github.com/stackabletech/spark-k8s-operator/pull/241
+[#245]: https://github.com/stackabletech/spark-k8s-operator/pull/245
 
 ## [23.1.0] - 2023-01-23
 
