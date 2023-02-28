@@ -745,7 +745,7 @@ fn build_server_rolegroup_statefulset(
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_volumes(volumes)
-                .node_selector_opt(rolegroup.and_then(|rg| rg.selector.clone()))
+                .affinity(&config.affinity)
                 .service_account_name(sa_name)
                 .security_context(
                     PodSecurityContextBuilder::new()
