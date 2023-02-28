@@ -187,7 +187,7 @@ impl GitSync {
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
                 // config options that are internal details have
-                // constant values and are not allowed
+                // constant values and will be ignored here
                 if key.eq_ignore_ascii_case("--dest") || key.eq_ignore_ascii_case("--root") {
                     tracing::warn!("Config option {:?} will be ignored...", key);
                 } else {
