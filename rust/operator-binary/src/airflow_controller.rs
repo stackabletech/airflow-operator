@@ -678,8 +678,9 @@ fn build_server_rolegroup_statefulset(
         let gitsync_container = ContainerBuilder::new(gitsync.name.as_ref())
             .context(InvalidContainerNameSnafu)?
             .add_env_vars(build_gitsync_envs(rolegroup_config))
-            .image(gitsync.image.clone())
-            .args(gitsync.get_args())
+            .image_from_product_image(resolved_product_image)
+            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+            .args(vec![gitsync.get_args().join(" ")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .build();
 

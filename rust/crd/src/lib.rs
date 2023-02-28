@@ -154,7 +154,6 @@ pub struct AirflowClusterSpec {
 #[serde(rename_all = "camelCase")]
 pub struct GitSync {
     pub name: String,
-    pub image: String,
     pub repo: String,
     pub branch: Option<String>,
     pub dags_directory: Option<String>,
@@ -168,6 +167,7 @@ impl GitSync {
     pub fn get_args(&self) -> Vec<String> {
         let mut args: Vec<String> = vec![];
         args.extend(vec![
+            "/stackable/git-sync".to_string(),
             format!("--repo={}", self.repo.clone()),
             format!(
                 "--branch={}",
@@ -181,7 +181,13 @@ impl GitSync {
         ]);
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
-                args.push(format!("{key}={value}"));
+                // config options that are internal details have
+                // constant values and are not allowed
+                if key.eq_ignore_ascii_case("--dest") || key.eq_ignore_ascii_case("--root") {
+                    tracing::warn!("Config option {:?} will be ignored...", key);
+                } else {
+                    args.push(format!("{key}={value}"));
+                }
             }
         }
         args
