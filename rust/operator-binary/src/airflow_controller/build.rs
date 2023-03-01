@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_airflow_db() {
+    fn test_initial_create_airflow_db() {
         let cluster_cr = std::fs::File::open("test/smoke/cluster.yaml").unwrap();
         let cluster_deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
         let druid_cluster: AirflowCluster =

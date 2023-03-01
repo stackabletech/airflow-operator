@@ -133,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_job() {
+    fn test_initial_create_job() {
         let cluster_cr = std::fs::File::open("test/smoke/db.yaml").unwrap();
         let deserializer = serde_yaml::Deserializer::from_reader(&cluster_cr);
         let mut airflow_db: AirflowDB =
