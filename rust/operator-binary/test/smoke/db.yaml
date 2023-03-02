@@ -1,0 +1,14 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowDB
+metadata:
+  name: airflow
+spec:
+  config:
+    logging:
+      containers: {}
+      enableVectorAgent: null
+  credentialsSecret: test-airflow-credentials
+  image:
+    productVersion: 2.4.1
+    stackableVersion: 23.4.0-rc2
