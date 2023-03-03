@@ -6,6 +6,8 @@ Once you have followed the steps in the xref:getting_started/installation.adoc[]
 
 As we have installed the external dependencies required by Airflow (Postgresql and Redis) we can now install the Airflow cluster itself.
 
+Supported versions for PostgreSQL and Redis can be found in the https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites[Airflow documentation].
+
 == Secret with Airflow credentials
 
 A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Airflow itself. Create a file called `airflow-credentials.yaml`:
