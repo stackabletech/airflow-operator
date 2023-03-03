@@ -674,7 +674,7 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(container);
     pb.add_container(metrics_container);
 
-    if let Some(gitsync) = airflow.spec.git_sync.clone() {
+    if let Some(gitsync) = airflow.git_sync() {
         let gitsync_container = ContainerBuilder::new(gitsync.name.as_ref())
             .context(InvalidContainerNameSnafu)?
             .add_env_vars(build_gitsync_envs(rolegroup_config))
@@ -800,8 +800,8 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
-    if let Some(git_sync) = &airflow.spec.git_sync {
-        if let Some(dags_folder) = &git_sync.dags_directory {
+    if let Some(git_sync) = &airflow.git_sync() {
+        if let Some(dags_folder) = &git_sync.git_folder {
             env.push(EnvVar {
                 name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
                 value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),

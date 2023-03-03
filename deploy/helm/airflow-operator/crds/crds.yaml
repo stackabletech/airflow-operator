@@ -47,6 +47,48 @@ spec:
                       description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
                       type: string
                   type: object
+                clusterConfig:
+                  description: Global cluster configuration that applies to all roles and role groups
+                  nullable: true
+                  properties:
+                    dagsGitSync:
+                      items:
+                        properties:
+                          branch:
+                            nullable: true
+                            type: string
+                          credentialsSecret:
+                            nullable: true
+                            type: string
+                          depth:
+                            format: uint8
+                            minimum: 0.0
+                            nullable: true
+                            type: integer
+                          gitFolder:
+                            nullable: true
+                            type: string
+                          gitSyncConf:
+                            additionalProperties:
+                              type: string
+                            nullable: true
+                            type: object
+                          name:
+                            type: string
+                          repo:
+                            type: string
+                          wait:
+                            format: uint16
+                            minimum: 0.0
+                            nullable: true
+                            type: integer
+                        required:
+                          - name
+                          - repo
+                        type: object
+                      nullable: true
+                      type: array
+                  type: object
                 credentialsSecret:
                   type: string
                 databaseInitialization:
@@ -135,41 +177,6 @@ spec:
                 exposeConfig:
                   nullable: true
                   type: boolean
-                gitSync:
-                  nullable: true
-                  properties:
-                    branch:
-                      nullable: true
-                      type: string
-                    credentialsSecret:
-                      nullable: true
-                      type: string
-                    dagsDirectory:
-                      nullable: true
-                      type: string
-                    depth:
-                      format: uint8
-                      minimum: 0.0
-                      nullable: true
-                      type: integer
-                    gitSyncConf:
-                      additionalProperties:
-                        type: string
-                      nullable: true
-                      type: object
-                    name:
-                      type: string
-                    repo:
-                      type: string
-                    wait:
-                      format: uint16
-                      minimum: 0.0
-                      nullable: true
-                      type: integer
-                  required:
-                    - name
-                    - repo
-                  type: object
                 image:
                   anyOf:
                     - required:

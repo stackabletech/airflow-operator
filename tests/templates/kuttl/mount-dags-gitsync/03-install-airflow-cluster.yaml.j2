@@ -35,13 +35,14 @@ spec:
   loadExamples: false
   exposeConfig: false
   credentialsSecret: test-airflow-credentials
-  gitSync:
-    name: git-sync
-    repo: https://github.com/stackabletech/airflow-operator
-    branch: "feat/git-sync" # TODO update to main before merging
-    dagsDirectory: "tests/templates/kuttl/mount-dags-gitsync/dags"
-    wait: 20
-    gitSyncConf: {}
+  clusterConfig:
+    dagsGitSync:
+      - name: git-sync
+        repo: https://github.com/stackabletech/airflow-operator
+        branch: "feat/git-sync" # TODO update to main before merging
+        wait: 20
+        gitSyncConf: {}
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
   webservers:
     config:
       logging:

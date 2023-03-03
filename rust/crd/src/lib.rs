@@ -151,8 +151,16 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
+    /// Global cluster configuration that applies to all roles and role groups
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub git_sync: Option<GitSync>,
+    pub cluster_config: Option<AirflowClusterConfig>,
+}
+
+#[derive(Clone, Deserialize, Debug, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowClusterConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dags_git_sync: Option<Vec<GitSync>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
@@ -161,7 +169,7 @@ pub struct GitSync {
     pub name: String,
     pub repo: String,
     pub branch: Option<String>,
-    pub dags_directory: Option<String>,
+    pub git_folder: Option<String>,
     pub depth: Option<u8>,
     pub wait: Option<u16>,
     pub credentials_secret: Option<String>,
@@ -341,7 +349,7 @@ impl AirflowCluster {
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
         let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.iter()).cloned().collect();
-        if self.spec.git_sync.is_some() {
+        if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
                 mount_path: GIT_SYNC_DIR.into(),
@@ -349,6 +357,17 @@ impl AirflowCluster {
             });
         }
         mounts
+    }
+
+    pub fn git_sync(&self) -> Option<GitSync> {
+        if let Some(cluster_config) = &self.spec.cluster_config {
+            if let Some(dags_git_sync) = &cluster_config.dags_git_sync {
+                // dags_git_sync is a list but only the first element is considered
+                // (this avoids a later breaking change when all list elements are processed)
+                return dags_git_sync.first().cloned();
+            }
+        }
+        None
     }
 }
 
@@ -449,7 +468,7 @@ impl Configuration for AirflowConfigFragment {
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.credentials_secret.clone()),
         );
-        if let Some(git_sync) = &cluster.spec.git_sync {
+        if let Some(git_sync) = &cluster.git_sync() {
             if let Some(credentials_secret) = &git_sync.credentials_secret {
                 env.insert(
                     AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY.to_string(),
@@ -641,5 +660,53 @@ mod tests {
         );
         assert!(cluster.spec.load_examples.unwrap_or(false));
         assert!(cluster.spec.expose_config.unwrap_or(false));
+    }
+
+    #[test]
+    fn test_git_sync() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.4.1
+            stackableVersion: 23.4.0-rc3
+          executor: CeleryExecutor
+          loadExamples: false
+          exposeConfig: false
+          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            dagsGitSync:
+              - name: git-sync
+                repo: https://github.com/stackabletech/airflow-operator
+                branch: feat/git-sync
+                wait: 20
+                gitSyncConf: {}
+                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+          webservers:
+            roleGroups:
+              default:
+                config: {}
+          workers:
+            roleGroups:
+              default:
+                config: {}
+          schedulers:
+            roleGroups:
+              default:
+                config: {}
+          ",
+        )
+        .unwrap();
+
+        println!("{:?}", cluster.git_sync().unwrap().git_folder);
+        assert!(cluster.git_sync().is_some());
+        assert_eq!(
+            Some("tests/templates/kuttl/mount-dags-gitsync/dags".to_string()),
+            cluster.git_sync().unwrap().git_folder
+        );
     }
 }
