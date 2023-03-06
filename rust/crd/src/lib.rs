@@ -364,6 +364,12 @@ impl AirflowCluster {
             if let Some(dags_git_sync) = &cluster_config.dags_git_sync {
                 // dags_git_sync is a list but only the first element is considered
                 // (this avoids a later breaking change when all list elements are processed)
+                if dags_git_sync.len() != 1 {
+                    tracing::warn!(
+                        "{:?} git-sync elements: only first will be considered...",
+                        dags_git_sync.len()
+                    );
+                }
                 return dags_git_sync.first().cloned();
             }
         }
