@@ -702,7 +702,6 @@ mod tests {
         )
         .unwrap();
 
-        println!("{:?}", cluster.git_sync().unwrap().git_folder);
         assert!(cluster.git_sync().is_some());
         assert_eq!(
             Some("tests/templates/kuttl/mount-dags-gitsync/dags".to_string()),
