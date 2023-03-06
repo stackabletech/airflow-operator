@@ -1,0 +1,24 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: "2.4.1"
+    stackableVersion: "23.4.0-rc3"
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials # <1>
+  clusterConfig:
+    dagsGitSync: # <2>
+      - name: git-sync # <3>
+        repo: https://github.com/stackabletech/airflow-operator # <4>
+        branch: "main" # <5>
+        wait: 20 # <6>
+        credentialsSecret: git-credentials # <7>
+        gitSyncConf: {} # <8>
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <9>
+  webservers:
+    ...
