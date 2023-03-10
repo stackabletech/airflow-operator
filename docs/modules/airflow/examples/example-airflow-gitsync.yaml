@@ -16,9 +16,12 @@ spec:
       - repo: https://github.com/stackabletech/airflow-operator # <3>
         branch: "main" # <4>
         gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <5>
-        depth: 1 # <6>
+        depth: 10 # <6>
         wait: 20 # <7>
         credentialsSecret: git-credentials # <8>
-        gitSyncConf: {} # <9>
+        gitSyncConf: # <9>
+          --rev: HEAD # <10>
+          #--rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
+          #--rev: 39ee3598bd9946a1d958a448c9f7d3774d7a8043 # N.B. commit must be covered by "depth"
   webservers:
     ...
