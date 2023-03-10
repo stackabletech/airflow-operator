@@ -37,6 +37,8 @@ echo "Adding 'stackable-dev' Helm Chart repository"
 # tag::helm-add-repo[]
 helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
 # end::helm-add-repo[]
+echo "Updating Helm repo"
+helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
 helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
@@ -90,9 +92,9 @@ sleep 5
 
 echo "Awaiting Airflow rollout finish ..."
 # tag::watch-airflow-rollout[]
-kubectl rollout status --watch statefulset/airflow-webserver-default
-kubectl rollout status --watch statefulset/airflow-worker-default
-kubectl rollout status --watch statefulset/airflow-scheduler-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-webserver-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-worker-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-scheduler-default
 # end::watch-airflow-rollout[]
 
 echo "Starting port-forwarding of port 8080"
