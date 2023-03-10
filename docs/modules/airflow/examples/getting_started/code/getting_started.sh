@@ -158,12 +158,13 @@ request_dag_status() {
   # end::check-dag[]
 }
 
+dag_state=$(request_dag_status)
+
 while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
   echo "Awaiting DAG completion ..."
   sleep 5
+  dag_state=$(request_dag_status)
 done
-
-dag_state=$(request_dag_status)
 
 echo "Checking DAG result ..."
 if [ "$dag_state" == "success" ]; then
