@@ -255,15 +255,17 @@ https://github.com/kubernetes/git-sync/tree/release-3.x[git-sync] is a command t
 include::example$example-airflow-gitsync.yaml[]
 ----
 
-<1> The name of the `Secret` used for accessing database and admin user details (included here to illustrate where different credential secrets are defined)
-<2> a list of git-sync elements
-<3> The name used to identify the git-sync definition (required)
+<1> A `Secret` used for accessing database and admin user details (included here to illustrate where different credential secrets are defined)
+<2> The git-gync configuration block that contains list of git-sync elements
+<3> The start of a git-sync element name used to identify the git-sync definition (required)
 <4> The repository that will be cloned (required)
 <5> The branch name (defaults to `main`)
-<6> The synchronisation interval in seconds (defaults to 10 seconds)
-<7> The name of the `Secret` used to access the repository if it is not public. This should include two fields: `user` and `password` (which can be either a password - which is not recommended - or a github token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
-<8> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags[this] configuration section (and the ones that follow on that link)
-<9> The location of the DAG folder, relative to the repository path (required)
+<6> The location of the DAG folder, relative to the synced repository root (required)
+<7> The depth of syncing (defaults to 1)
+<8> The synchronisation interval in seconds (defaults to 10 seconds)
+<9> The name of the `Secret` used to access the repository if it is not public. This should include two fields: `user` and `password` (which can be either a password - which is not recommended - or a github token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
+<10> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags[this] configuration section (and the ones that follow on that link)
+
 
 IMPORTANT: The example above shows a _*list*_ of git-sync definitions, with a single element. This is to avoid breaking-changes in future releases. Currently, only one such git-sync definition is considered and processed.
 

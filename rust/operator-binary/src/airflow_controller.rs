@@ -14,7 +14,7 @@ use stackable_airflow_crd::{
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
-use stackable_airflow_crd::{GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR};
+use stackable_airflow_crd::{GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME};
 use stackable_operator::builder::VolumeBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
@@ -675,7 +675,7 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if let Some(gitsync) = airflow.git_sync() {
-        let gitsync_container = ContainerBuilder::new(gitsync.name.as_ref())
+        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
             .context(InvalidContainerNameSnafu)?
             .add_env_vars(build_gitsync_envs(rolegroup_config))
             .image_from_product_image(resolved_product_image)

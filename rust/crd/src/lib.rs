@@ -27,6 +27,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
 };
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "airflow";
@@ -40,6 +41,7 @@ pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
 pub const GIT_CONTENT: &str = "content-from-git";
 pub const GIT_ROOT: &str = "/tmp/git";
 pub const GIT_LINK: &str = "current";
+pub const GIT_SYNC_NAME: &str = "gitsync";
 
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
@@ -159,14 +161,12 @@ pub struct AirflowClusterSpec {
 #[derive(Clone, Deserialize, Debug, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dags_git_sync: Option<Vec<GitSync>>,
+    pub dags_git_sync: Vec<GitSync>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitSync {
-    pub name: String,
     pub repo: String,
     pub branch: Option<String>,
     pub git_folder: Option<String>,
@@ -196,7 +196,10 @@ impl GitSync {
             for (key, value) in git_sync_conf {
                 // config options that are internal details have
                 // constant values and will be ignored here
-                if key.eq_ignore_ascii_case("--dest") || key.eq_ignore_ascii_case("--root") {
+                if key.eq_ignore_ascii_case("--dest")
+                    || key.eq_ignore_ascii_case("--root")
+                    || key.eq_ignore_ascii_case("--git-config")
+                {
                     tracing::warn!("Config option {:?} will be ignored...", key);
                 } else {
                     args.push(format!("{key}={value}"));
@@ -341,14 +344,15 @@ impl AirflowCluster {
         }
     }
 
+    /// this will extract a Vec<Volume> from Option<Vec<Volume>>
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.volumes.as_ref();
-        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
+        tmp.iter().flat_map(|v| v.deref().clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
-        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.iter()).cloned().collect();
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
@@ -361,17 +365,16 @@ impl AirflowCluster {
 
     pub fn git_sync(&self) -> Option<GitSync> {
         if let Some(cluster_config) = &self.spec.cluster_config {
-            if let Some(dags_git_sync) = &cluster_config.dags_git_sync {
-                // dags_git_sync is a list but only the first element is considered
-                // (this avoids a later breaking change when all list elements are processed)
-                if dags_git_sync.len() != 1 {
-                    tracing::warn!(
-                        "{:?} git-sync elements: only first will be considered...",
-                        dags_git_sync.len()
-                    );
-                }
-                return dags_git_sync.first().cloned();
+            let dags_git_sync = &cluster_config.dags_git_sync;
+            // dags_git_sync is a list but only the first element is considered
+            // (this avoids a later breaking change when all list elements are processed)
+            if dags_git_sync.len() != 1 {
+                tracing::warn!(
+                    "{:?} git-sync elements: only first will be considered...",
+                    dags_git_sync.len()
+                );
             }
+            return dags_git_sync.first().cloned();
         }
         None
     }
@@ -708,7 +711,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(cluster.git_sync().is_some());
+        assert!(cluster.git_sync().is_some(), "git_sync was not Some!");
         assert_eq!(
             Some("tests/templates/kuttl/mount-dags-gitsync/dags".to_string()),
             cluster.git_sync().unwrap().git_folder

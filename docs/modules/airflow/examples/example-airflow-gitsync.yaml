@@ -16,9 +16,10 @@ spec:
       - name: git-sync # <3>
         repo: https://github.com/stackabletech/airflow-operator # <4>
         branch: "main" # <5>
-        wait: 20 # <6>
-        credentialsSecret: git-credentials # <7>
-        gitSyncConf: {} # <8>
-        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <9>
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <6>
+        depth: 1 # <7>
+        wait: 20 # <8>
+        credentialsSecret: git-credentials # <9>
+        gitSyncConf: {} # <10>
   webservers:
     ...
