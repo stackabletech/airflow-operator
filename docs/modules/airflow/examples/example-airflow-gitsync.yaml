@@ -21,7 +21,7 @@ spec:
         credentialsSecret: git-credentials # <8>
         gitSyncConf: # <9>
           --rev: HEAD # <10>
-          #--rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
-          #--rev: 39ee3598bd9946a1d958a448c9f7d3774d7a8043 # N.B. commit must be covered by "depth"
+          # --rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
+          # --rev: 39ee3598bd9946a1d958a448c9f7d3774d7a8043 # N.B. commit must be covered by "depth"
   webservers:
     ...
