@@ -717,4 +717,53 @@ mod tests {
             cluster.git_sync().unwrap().git_folder
         );
     }
+
+    #[test]
+    fn test_git_sync_config() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.4.1
+            stackableVersion: 23.4.0-rc3
+          executor: CeleryExecutor
+          loadExamples: false
+          exposeConfig: false
+          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            dagsGitSync:
+              - name: git-sync
+                repo: https://github.com/stackabletech/airflow-operator
+                branch: feat/git-sync
+                wait: 20
+                gitSyncConf:
+                  --rev: c63921857618a8c392ad757dda13090fff3d879a
+                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+          webservers:
+            roleGroups:
+              default:
+                config: {}
+          workers:
+            roleGroups:
+              default:
+                config: {}
+          schedulers:
+            roleGroups:
+              default:
+                config: {}
+          ",
+        )
+        .unwrap();
+
+        assert!(cluster
+            .git_sync()
+            .unwrap()
+            .get_args()
+            .iter()
+            .any(|c| c == "--rev=c63921857618a8c392ad757dda13090fff3d879a"));
+    }
 }

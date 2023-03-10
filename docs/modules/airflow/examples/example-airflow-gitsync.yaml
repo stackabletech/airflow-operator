@@ -13,13 +13,12 @@ spec:
   credentialsSecret: test-airflow-credentials # <1>
   clusterConfig:
     dagsGitSync: # <2>
-      - name: git-sync # <3>
-        repo: https://github.com/stackabletech/airflow-operator # <4>
-        branch: "main" # <5>
-        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <6>
-        depth: 1 # <7>
-        wait: 20 # <8>
-        credentialsSecret: git-credentials # <9>
-        gitSyncConf: {} # <10>
+      - repo: https://github.com/stackabletech/airflow-operator # <3>
+        branch: "main" # <4>
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <5>
+        depth: 1 # <6>
+        wait: 20 # <7>
+        credentialsSecret: git-credentials # <8>
+        gitSyncConf: {} # <9>
   webservers:
     ...
