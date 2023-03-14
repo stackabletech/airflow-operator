@@ -37,20 +37,22 @@ echo "Adding 'stackable-dev' Helm Chart repository"
 # tag::helm-add-repo[]
 helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
 # end::helm-add-repo[]
+echo "Updating Helm repo"
+helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.5.0-nightly
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.7.0-nightly
-helm install --wait airflow-operator stackable-dev/airflow-operator --version 0.7.0-nightly
+helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
+helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev
+helm install --wait airflow-operator stackable-dev/airflow-operator --version 0.0.0-dev
 # end::helm-install-operators[]
 ;;
 "stackablectl")
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.5.0-nightly \
-  secret=0.7.0-nightly \
-  airflow=0.7.0-nightly
+  commons=0.0.0-dev \
+  secret=0.0.0-dev \
+  airflow=0.0.0-dev
 # end::stackablectl-install-operators[]
 ;;
 *)
@@ -90,9 +92,9 @@ sleep 5
 
 echo "Awaiting Airflow rollout finish ..."
 # tag::watch-airflow-rollout[]
-kubectl rollout status --watch statefulset/airflow-webserver-default
-kubectl rollout status --watch statefulset/airflow-worker-default
-kubectl rollout status --watch statefulset/airflow-scheduler-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-webserver-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-worker-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-scheduler-default
 # end::watch-airflow-rollout[]
 
 echo "Starting port-forwarding of port 8080"
@@ -156,12 +158,13 @@ request_dag_status() {
   # end::check-dag[]
 }
 
+dag_state=$(request_dag_status)
+
 while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
   echo "Awaiting DAG completion ..."
   sleep 5
+  dag_state=$(request_dag_status)
 done
-
-dag_state=$(request_dag_status)
 
 echo "Checking DAG result ..."
 if [ "$dag_state" == "success" ]; then
