@@ -37,6 +37,8 @@ echo "Adding '{{ helm.repo_name }}' Helm Chart repository"
 # tag::helm-add-repo[]
 helm repo add {{ helm.repo_name }} {{ helm.repo_url }}
 # end::helm-add-repo[]
+echo "Updating Helm repo"
+helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
 helm install --wait commons-operator {{ helm.repo_name }}/commons-operator --version {{ versions.commons }}
@@ -90,9 +92,9 @@ sleep 5
 
 echo "Awaiting Airflow rollout finish ..."
 # tag::watch-airflow-rollout[]
-kubectl rollout status --watch statefulset/airflow-webserver-default
-kubectl rollout status --watch statefulset/airflow-worker-default
-kubectl rollout status --watch statefulset/airflow-scheduler-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-webserver-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-worker-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-scheduler-default
 # end::watch-airflow-rollout[]
 
 echo "Starting port-forwarding of port 8080"
@@ -156,12 +158,13 @@ request_dag_status() {
   # end::check-dag[]
 }
 
+dag_state=$(request_dag_status)
+
 while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
   echo "Awaiting DAG completion ..."
   sleep 5
+  dag_state=$(request_dag_status)
 done
-
-dag_state=$(request_dag_status)
 
 echo "Checking DAG result ..."
 if [ "$dag_state" == "success" ]; then
