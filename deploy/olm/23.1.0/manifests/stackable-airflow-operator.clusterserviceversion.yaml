@@ -166,6 +166,29 @@ spec:
               verbs:
                 - get
             - apiGroups:
+                - airflow.stackable.tech
+              resources:
+                - airflowclusters
+                - airflowdbs
+                - airflowdbs/status
+              verbs:
+                - get
+                - list
+                - patch
+                - watch
+            - apiGroups:
+                - airflow.stackable.tech
+              resources:
+                - airflowclusters/status
+              verbs:
+                - patch
+            - apiGroups:
+                - airflow.stackable.tech
+              resources:
+                - airflowdbs
+              verbs:
+                - create
+            - apiGroups:
                 - authentication.stackable.tech
               resources:
                 - authenticationclasses
@@ -179,22 +202,6 @@ spec:
                 - events
               verbs:
                 - create
-            - apiGroups:
-                - airflow.stackable.tech
-              resources:
-                - airflowclusters
-                - airflowdbs
-              verbs:
-                - get
-                - list
-                - patch
-                - watch
-            - apiGroups:
-                - airflow.stackable.tech
-              resources:
-                - airflowclusters/status
-              verbs:
-                - patch
             - apiGroups:
                 - security.openshift.io
               resources:
