@@ -52,6 +52,7 @@ pub async fn apply_cluster_resources(
     client: &Client,
     airflow_db: Arc<AirflowDB>,
     built_cluster_resources: Vec<BuiltClusterResource>,
+    requested_action: Action,
 ) -> Result<Action> {
     for cluster_resource in built_cluster_resources {
         match cluster_resource {
@@ -110,5 +111,5 @@ pub async fn apply_cluster_resources(
         }
     }
 
-    Ok(Action::await_change())
+    Ok(requested_action)
 }

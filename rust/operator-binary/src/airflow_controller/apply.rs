@@ -67,6 +67,7 @@ pub async fn apply_cluster_resources(
     client: &Client,
     airflow: Arc<AirflowCluster>,
     built_cluster_resources: Vec<BuiltClusterResource>,
+    requested_action: Action,
 ) -> Result<Action> {
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -148,5 +149,5 @@ pub async fn apply_cluster_resources(
             .context(DeleteOrphanedResourcesSnafu)?;
     }
 
-    Ok(Action::await_change())
+    Ok(requested_action)
 }

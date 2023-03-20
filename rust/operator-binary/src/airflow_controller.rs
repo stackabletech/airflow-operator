@@ -49,16 +49,21 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let fetched_additional_data = fetch_additional_data(&airflow, &ctx.client)
         .await
         .context(FetchSnafu)?;
-    let built_cluster_resources = build_cluster_resources(
+    let (built_cluster_resources, requested_action) = build_cluster_resources(
         airflow.clone(),
         fetched_additional_data,
         &ctx.product_config,
     )
     .context(BuildSnafu)?;
 
-    apply_cluster_resources(&ctx.client, airflow, built_cluster_resources)
-        .await
-        .context(ApplySnafu)
+    apply_cluster_resources(
+        &ctx.client,
+        airflow,
+        built_cluster_resources,
+        requested_action,
+    )
+    .await
+    .context(ApplySnafu)
 }
 
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

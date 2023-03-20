@@ -6,6 +6,7 @@ use crate::common::util::{get_job_state, JobState};
 
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::{AirflowDB, AirflowDBStatus, AirflowDBStatusCondition};
+use stackable_operator::kube::runtime::controller::Action;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage, kube::ResourceExt,
 };
@@ -33,7 +34,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_cluster_resources(
     airflow_db: Arc<AirflowDB>,
     additional_data: FetchedAdditionalData,
-) -> Result<Vec<BuiltClusterResource>> {
+) -> Result<(Vec<BuiltClusterResource>, Action)> {
     let mut built_cluster_resources: Vec<BuiltClusterResource> = Vec::new();
 
     let resolved_product_image: ResolvedProductImage =
@@ -103,7 +104,7 @@ pub fn build_cluster_resources(
         built_cluster_resources.push(BuiltClusterResource::PatchJobStatus(new_status));
     }
 
-    Ok(built_cluster_resources)
+    Ok((built_cluster_resources, Action::await_change()))
 }
 
 #[cfg(test)]
@@ -144,7 +145,7 @@ mod tests {
         });
         airflow_db.metadata.uid = Some("hello".to_string());
 
-        let result = build_cluster_resources(
+        let (result, _) = build_cluster_resources(
             Arc::new(airflow_db),
             FetchedAdditionalData {
                 initial_secret: Some(Secret {

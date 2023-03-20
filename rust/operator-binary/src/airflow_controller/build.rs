@@ -18,6 +18,7 @@ use stackable_airflow_crd::{
     AirflowCluster, AirflowConfigFragment, AirflowRole, AIRFLOW_CONFIG_FILENAME,
 };
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
+use stackable_operator::kube::runtime::controller::Action;
 use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, ResourceExt},
     product_config::{types::PropertyNameKind, ProductConfigManager},
@@ -64,7 +65,7 @@ pub fn build_cluster_resources(
     airflow: Arc<AirflowCluster>,
     additional_data: FetchedAdditionalData,
     product_config: &ProductConfigManager,
-) -> Result<Vec<BuiltClusterResource>> {
+) -> Result<(Vec<BuiltClusterResource>, Action)> {
     let mut built_cluster_resources: Vec<BuiltClusterResource> = Vec::new();
 
     let resolved_product_image: ResolvedProductImage =
@@ -82,7 +83,7 @@ pub fn build_cluster_resources(
             "{}",
             format!("AirflowDB does not exist yet. Skipping over all remaining build steps.")
         );
-        return Ok(built_cluster_resources);
+        return Ok((built_cluster_resources, Action::await_change()));
     }
     let airflow_db = airflow_db.expect("AirflowDB can't be None at this point.");
 
@@ -97,7 +98,7 @@ pub fn build_cluster_resources(
                 tracing::debug!(
                     "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
                 );
-                return Ok(built_cluster_resources);
+                return Ok((built_cluster_resources, Action::await_change()));
             }
             AirflowDBStatusCondition::Failed => {
                 return AirflowDBFailedSnafu {
@@ -109,7 +110,7 @@ pub fn build_cluster_resources(
         }
     } else {
         tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
-        return Ok(built_cluster_resources);
+        return Ok((built_cluster_resources, Action::await_change()));
     }
 
     let mut roles = HashMap::new();
@@ -215,7 +216,7 @@ pub fn build_cluster_resources(
 
     built_cluster_resources.push(BuiltClusterResource::DeleteOrphaned);
 
-    Ok(built_cluster_resources)
+    Ok((built_cluster_resources, Action::await_change()))
 }
 
 #[cfg(test)]
@@ -270,7 +271,7 @@ mod tests {
         let product_config_manager =
             ProductConfigManager::from_yaml_file("test/smoke/properties.yaml").unwrap();
 
-        let result = build_cluster_resources(
+        let (result, _) = build_cluster_resources(
             Arc::new(druid_cluster),
             FetchedAdditionalData {
                 airflow_db: None,
