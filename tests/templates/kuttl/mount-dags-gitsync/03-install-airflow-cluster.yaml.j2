@@ -35,46 +35,32 @@ spec:
   loadExamples: false
   exposeConfig: false
   credentialsSecret: test-airflow-credentials
-  volumes:
-    - name: external-dags
-      persistentVolumeClaim:
-        claimName: test-pvc-airflow
-  volumeMounts:
-    - name: external-dags
-      mountPath: /stackable/external-dags
+  clusterConfig:
+    dagsGitSync:
+      - name: git-sync
+        repo: https://github.com/stackabletech/airflow-operator
+        branch: "main"
+        wait: 20
+        gitSyncConf: {}
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
   webservers:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        selector:
-          matchLabels:
-            node: "2"
   workers:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        selector:
-          matchLabels:
-            node: "2"
   schedulers:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
         replicas: 1
-        selector:
-          matchLabels:
-            node: "2"

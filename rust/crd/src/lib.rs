@@ -27,6 +27,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
 };
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "airflow";
@@ -36,6 +37,14 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
+pub const GIT_CONTENT: &str = "content-from-git";
+pub const GIT_ROOT: &str = "/tmp/git";
+pub const GIT_LINK: &str = "current";
+pub const GIT_SYNC_NAME: &str = "gitsync";
+
+const GIT_SYNC_DEPTH: u8 = 1u8;
+const GIT_SYNC_WAIT: u16 = 20u16;
 
 pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
@@ -144,6 +153,61 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
+    /// Global cluster configuration that applies to all roles and role groups
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster_config: Option<AirflowClusterConfig>,
+}
+
+#[derive(Clone, Deserialize, Debug, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowClusterConfig {
+    pub dags_git_sync: Vec<GitSync>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSync {
+    pub repo: String,
+    pub branch: Option<String>,
+    pub git_folder: Option<String>,
+    pub depth: Option<u8>,
+    pub wait: Option<u16>,
+    pub credentials_secret: Option<String>,
+    pub git_sync_conf: Option<BTreeMap<String, String>>,
+}
+
+impl GitSync {
+    pub fn get_args(&self) -> Vec<String> {
+        let mut args: Vec<String> = vec![];
+        args.extend(vec![
+            "/stackable/git-sync".to_string(),
+            format!("--repo={}", self.repo.clone()),
+            format!(
+                "--branch={}",
+                self.branch.clone().unwrap_or_else(|| "main".to_string())
+            ),
+            format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
+            format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
+            format!("--dest={GIT_LINK}"),
+            format!("--root={GIT_ROOT}"),
+            format!("--git-config=safe.directory:{GIT_ROOT}"),
+        ]);
+        if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
+            for (key, value) in git_sync_conf {
+                // config options that are internal details have
+                // constant values and will be ignored here
+                if key.eq_ignore_ascii_case("--dest")
+                    || key.eq_ignore_ascii_case("--root")
+                    || key.eq_ignore_ascii_case("--git-config")
+                {
+                    tracing::warn!("Config option {:?} will be ignored...", key);
+                } else {
+                    args.push(format!("{key}={value}"));
+                }
+            }
+        }
+        args
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -280,14 +344,39 @@ impl AirflowCluster {
         }
     }
 
+    /// this will extract a Vec<Volume> from Option<Vec<Volume>>
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.volumes.as_ref();
-        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
+        tmp.iter().flat_map(|v| v.deref().clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.volume_mounts.as_ref();
-        tmp.iter().flat_map(|v| v.iter()).cloned().collect()
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
+        if self.git_sync().is_some() {
+            mounts.push(VolumeMount {
+                name: GIT_CONTENT.into(),
+                mount_path: GIT_SYNC_DIR.into(),
+                ..VolumeMount::default()
+            });
+        }
+        mounts
+    }
+
+    pub fn git_sync(&self) -> Option<GitSync> {
+        if let Some(cluster_config) = &self.spec.cluster_config {
+            let dags_git_sync = &cluster_config.dags_git_sync;
+            // dags_git_sync is a list but only the first element is considered
+            // (this avoids a later breaking change when all list elements are processed)
+            if dags_git_sync.len() != 1 {
+                tracing::warn!(
+                    "{:?} git-sync elements: only first will be considered...",
+                    dags_git_sync.len()
+                );
+            }
+            return dags_git_sync.first().cloned();
+        }
+        None
     }
 }
 
@@ -354,6 +443,7 @@ pub struct AirflowConfig {
 
 impl AirflowConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
+    pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
         AirflowConfigFragment {
@@ -382,11 +472,20 @@ impl Configuration for AirflowConfigFragment {
         cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        Ok([(
+        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
+        env.insert(
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.credentials_secret.clone()),
-        )]
-        .into())
+        );
+        if let Some(git_sync) = &cluster.git_sync() {
+            if let Some(credentials_secret) = &git_sync.credentials_secret {
+                env.insert(
+                    AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY.to_string(),
+                    Some(credentials_secret.to_string()),
+                );
+            }
+        }
+        Ok(env)
     }
 
     fn compute_cli(
@@ -570,5 +669,101 @@ mod tests {
         );
         assert!(cluster.spec.load_examples.unwrap_or(false));
         assert!(cluster.spec.expose_config.unwrap_or(false));
+    }
+
+    #[test]
+    fn test_git_sync() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.4.1
+            stackableVersion: 23.4.0-rc3
+          executor: CeleryExecutor
+          loadExamples: false
+          exposeConfig: false
+          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            dagsGitSync:
+              - name: git-sync
+                repo: https://github.com/stackabletech/airflow-operator
+                branch: feat/git-sync
+                wait: 20
+                gitSyncConf: {}
+                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+          webservers:
+            roleGroups:
+              default:
+                config: {}
+          workers:
+            roleGroups:
+              default:
+                config: {}
+          schedulers:
+            roleGroups:
+              default:
+                config: {}
+          ",
+        )
+        .unwrap();
+
+        assert!(cluster.git_sync().is_some(), "git_sync was not Some!");
+        assert_eq!(
+            Some("tests/templates/kuttl/mount-dags-gitsync/dags".to_string()),
+            cluster.git_sync().unwrap().git_folder
+        );
+    }
+
+    #[test]
+    fn test_git_sync_config() {
+        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.4.1
+            stackableVersion: 23.4.0-rc3
+          executor: CeleryExecutor
+          loadExamples: false
+          exposeConfig: false
+          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            dagsGitSync:
+              - name: git-sync
+                repo: https://github.com/stackabletech/airflow-operator
+                branch: feat/git-sync
+                wait: 20
+                gitSyncConf:
+                  --rev: c63921857618a8c392ad757dda13090fff3d879a
+                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+          webservers:
+            roleGroups:
+              default:
+                config: {}
+          workers:
+            roleGroups:
+              default:
+                config: {}
+          schedulers:
+            roleGroups:
+              default:
+                config: {}
+          ",
+        )
+        .unwrap();
+
+        assert!(cluster
+            .git_sync()
+            .unwrap()
+            .get_args()
+            .iter()
+            .any(|c| c == "--rev=c63921857618a8c392ad757dda13090fff3d879a"));
     }
 }

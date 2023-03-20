@@ -14,6 +14,9 @@ use stackable_airflow_crd::{
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
+use stackable_airflow_crd::{GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME};
+use stackable_operator::builder::VolumeBuilder;
+use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
@@ -671,6 +674,24 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(container);
     pb.add_container(metrics_container);
 
+    if let Some(gitsync) = airflow.git_sync() {
+        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
+            .context(InvalidContainerNameSnafu)?
+            .add_env_vars(build_gitsync_envs(rolegroup_config))
+            .image_from_product_image(resolved_product_image)
+            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+            .args(vec![gitsync.get_args().join(" ")])
+            .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+            .build();
+
+        volumes.push(
+            VolumeBuilder::new(GIT_CONTENT)
+                .empty_dir(EmptyDirVolumeSource::default())
+                .build(),
+        );
+        pb.add_container(gitsync_container);
+    }
+
     if config.logging.enable_vector_agent {
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
@@ -779,6 +800,16 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
+    if let Some(git_sync) = &airflow.git_sync() {
+        if let Some(dags_folder) = &git_sync.git_folder {
+            env.push(EnvVar {
+                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            })
+        }
+    }
+
     if let Some(true) = airflow.spec.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
@@ -808,6 +839,25 @@ fn build_mapped_envs(
         value: executor,
         ..Default::default()
     });
+
+    env
+}
+
+fn build_gitsync_envs(
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+) -> Vec<EnvVar> {
+    let mut env = vec![];
+    if let Some(git_secret) = rolegroup_config
+        .get(&PropertyNameKind::Env)
+        .and_then(|vars| vars.get(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY))
+    {
+        env.push(env_var_from_secret("GIT_SYNC_USERNAME", git_secret, "user"));
+        env.push(env_var_from_secret(
+            "GIT_SYNC_PASSWORD",
+            git_secret,
+            "password",
+        ));
+    }
 
     env
 }

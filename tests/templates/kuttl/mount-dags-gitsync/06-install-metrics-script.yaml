@@ -4,5 +4,5 @@ kind: TestStep
 metadata:
   name: metrics
 commands:
-  - script: kubectl cp -n $NAMESPACE ./metrics.py test-airflow-python-0:/tmp
+  - script: kubectl cp -n $NAMESPACE date_dag_metrics.py test-airflow-python-0:/tmp
     timeout: 240
