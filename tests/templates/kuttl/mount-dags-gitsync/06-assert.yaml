@@ -5,4 +5,4 @@ metadata:
   name: metrics
 timeout: 480
 commands:
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/metrics.py
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/date_dag_metrics.py

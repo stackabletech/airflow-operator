@@ -11,12 +11,12 @@
 dimensions:
   - name: airflow
     values:
-      - 2.2.4-stackable23.4.0-rc2
-      - 2.2.5-stackable23.4.0-rc2
-      - 2.4.1-stackable23.4.0-rc2
+      - 2.2.4-stackable23.4.0-rc3
+      - 2.2.5-stackable23.4.0-rc3
+      - 2.4.1-stackable23.4.0-rc3
   - name: airflow-latest
     values:
-      - 2.4.1-stackable23.4.0-rc2
+      - 2.4.1-stackable23.4.0-rc3
   - name: ldap-authentication
     values:
       - no-tls
@@ -26,15 +26,15 @@ dimensions:
     values:
       - "false"
 tests:
-  - name: mount-dags-pvc
-    dimensions:
-      - airflow-latest
-      - openshift
   - name: smoke
     dimensions:
       - airflow
       - openshift
   - name: mount-dags-configmap
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: mount-dags-gitsync
     dimensions:
       - airflow-latest
       - openshift
