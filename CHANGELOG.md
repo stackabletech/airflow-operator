@@ -7,6 +7,7 @@
 - Log aggregation added ([#219]).
 - Deploy default and support custom affinities ([#241]).
 - Add the ability to loads DAG via git-sync ([#245]).
+- Removed PVC-usage documemtation ([#245]).
 
 ### Changed
 
