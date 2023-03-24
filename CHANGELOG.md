@@ -7,7 +7,6 @@
 - Log aggregation added ([#219]).
 - Deploy default and support custom affinities ([#241]).
 - Add the ability to loads DAG via git-sync ([#245]).
-- Removed PVC-usage documemtation ([#245]).
 
 ### Changed
 
@@ -16,6 +15,10 @@
 - Fixed template parsing for OpenShift tests ([#222]).
 - Revert openshift settings ([#233])
 - Support crate2nix in dev environments ([#234])
+
+### Removed
+
+- Removed PVC-usage documemtation ([#245]).
 
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
