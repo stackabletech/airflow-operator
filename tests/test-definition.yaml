@@ -2,11 +2,7 @@
 # These tests can run against an OpenShift cluster, provided you perform the following
 # steps manually before starting them with scripts/run_tests.sh
 #
-# 1. Label a node in the cluster with "node=2"
-#
-#   kubectl label nodes <node name> node=2
-#
-# 2. Set the "openshift" dimension below to "true" (with quotes)
+# 1. Set the "openshift" dimension below to "true" (with quotes)
 ---
 dimensions:
   - name: airflow
