@@ -16,6 +16,10 @@
 - Revert openshift settings ([#233])
 - Support crate2nix in dev environments ([#234])
 
+### Removed
+
+- Removed PVC-usage documemtation ([#245]).
+
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
 [#233]: https://github.com/stackabletech/airflow-operator/pull/233
