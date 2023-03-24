@@ -7,6 +7,7 @@
 - Log aggregation added ([#219]).
 - Deploy default and support custom affinities ([#241]).
 - Add the ability to loads DAG via git-sync ([#245]).
+- Cluster status conditions ([#xxx])
 
 ### Changed
 
@@ -26,6 +27,7 @@
 [#234]: https://github.com/stackabletech/airflow-operator/pull/234
 [#241]: https://github.com/stackabletech/airflow-operator/pull/241
 [#245]: https://github.com/stackabletech/airflow-operator/pull/245
+[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
 
 ## [23.1.0] - 2023-01-23
 

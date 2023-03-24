@@ -14,7 +14,9 @@ use stackable_airflow_crd::{
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
-use stackable_airflow_crd::{GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME};
+use stackable_airflow_crd::{
+    AirflowClusterStatus, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+};
 use stackable_operator::builder::VolumeBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
@@ -49,6 +51,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
+    status::condition::{compute_conditions, statefulset::StatefulSetConditionBuilder},
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -184,6 +187,10 @@ pub enum Error {
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
+    },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
     },
 }
 
@@ -321,6 +328,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(CreateClusterResourcesSnafu)?;
 
+    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
@@ -381,12 +390,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &rbac_sa.name_unchecked(),
                 &config,
             )?;
-            cluster_resources
-                .add(client, &rg_statefulset)
-                .await
-                .context(ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
+            ss_cond_builder.add(
+                cluster_resources
+                    .add(client, &rg_statefulset)
+                    .await
+                    .context(ApplyRoleGroupStatefulSetSnafu {
+                        rolegroup: rolegroup.clone(),
+                    })?,
+            );
         }
     }
 
@@ -394,6 +405,15 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
+
+    let status = AirflowClusterStatus {
+        conditions: compute_conditions(airflow.as_ref(), &[&ss_cond_builder]),
+    };
+
+    client
+        .apply_patch_status(OPERATOR_NAME, &*airflow, &status)
+        .await
+        .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
 }
