@@ -15,6 +15,7 @@
 - Fixed template parsing for OpenShift tests ([#222]).
 - Revert openshift settings ([#233])
 - Support crate2nix in dev environments ([#234])
+- Fixed LDAP tests on Openshift ([#254])
 
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
@@ -22,6 +23,7 @@
 [#234]: https://github.com/stackabletech/airflow-operator/pull/234
 [#241]: https://github.com/stackabletech/airflow-operator/pull/241
 [#245]: https://github.com/stackabletech/airflow-operator/pull/245
+[#254]: https://github.com/stackabletech/airflow-operator/pull/254
 
 ## [23.1.0] - 2023-01-23
 
