@@ -21,7 +21,7 @@ commands:
       apiVersion: authentication.stackable.tech/v1alpha1
       kind: AuthenticationClass
       metadata:
-        name: airflow-with-ldap-no-tls-ldap-$NAMESPACE
+        name: no-tls-$NAMESPACE
       spec:
         provider:
           ldap:
@@ -35,7 +35,7 @@ commands:
       apiVersion: authentication.stackable.tech/v1alpha1
       kind: AuthenticationClass
       metadata:
-        name: airflow-with-ldap-insecure-tls-ldap-$NAMESPACE
+        name: insecure-tls-$NAMESPACE
       spec:
         provider:
           ldap:
@@ -58,7 +58,7 @@ commands:
       apiVersion: authentication.stackable.tech/v1alpha1
       kind: AuthenticationClass
       metadata:
-        name: airflow-with-ldap-server-veri-tls-ldap-$NAMESPACE
+        name: server-tls-$NAMESPACE
       spec:
         provider:
           ldap:

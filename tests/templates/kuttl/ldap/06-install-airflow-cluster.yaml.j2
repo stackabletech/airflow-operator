@@ -50,11 +50,11 @@ commands:
         credentialsSecret: test-airflow-credentials
         authenticationConfig:
           authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
-              airflow-with-ldap-no-tls-ldap-$NAMESPACE
+              no-tls-$NAMESPACE
             {%- elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' -%}
-              airflow-with-ldap-insecure-tls-ldap-$NAMESPACE
+              insecure-tls-$NAMESPACE
             {%- elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' -%}
-              airflow-with-ldap-server-veri-tls-ldap-$NAMESPACE
+              server-tls-$NAMESPACE
             {%- endif %}
 
           userRegistrationRole: Admin
