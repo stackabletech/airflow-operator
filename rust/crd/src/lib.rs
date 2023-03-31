@@ -9,6 +9,7 @@ use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::role_utils::RoleGroup;
 use stackable_operator::{
+    commons::cluster_operation::ClusterOperation,
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
         Resources, ResourcesFragment,
@@ -156,6 +157,8 @@ pub struct AirflowClusterSpec {
     /// Global cluster configuration that applies to all roles and role groups
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_config: Option<AirflowClusterConfig>,
+    #[serde(default)]
+    pub cluster_operation: ClusterOperation,
 }
 
 #[derive(Clone, Deserialize, Debug, Eq, JsonSchema, PartialEq, Serialize)]
