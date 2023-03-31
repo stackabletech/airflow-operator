@@ -51,3 +51,7 @@ tests:
     dimensions:
       - airflow
       - openshift
+  - name: cluster-operation
+    dimensions:
+      - airflow-latest
+      - openshift
