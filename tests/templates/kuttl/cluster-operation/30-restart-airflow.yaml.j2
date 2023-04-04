@@ -1,0 +1,45 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: restart-airflow
+timeout: 180
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  clusterOperation:
+    reconciliationPaused: false
+    stopped: false
+  image:
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  executor: CeleryExecutor
+  loadExamples: true
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials
+  webservers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  workers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 3
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

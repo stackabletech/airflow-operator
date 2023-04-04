@@ -22,7 +22,7 @@ use stackable_operator::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
-    cluster_resources::ClusterResources,
+    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         product_image_selection::ResolvedProductImage,
@@ -318,6 +318,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         OPERATOR_NAME,
         AIRFLOW_CONTROLLER_NAME,
         &airflow.object_ref(&()),
+        ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 
@@ -327,7 +328,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             let role_service =
                 build_role_service(&airflow, &resolved_product_image, role_name, resolved_port)?;
             cluster_resources
-                .add(client, &role_service)
+                .add(client, role_service)
                 .await
                 .context(ApplyRoleServiceSnafu)?;
         }
@@ -350,7 +351,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
             let rg_service =
                 build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
-            cluster_resources.add(client, &rg_service).await.context(
+            cluster_resources.add(client, rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 },
@@ -366,7 +367,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 vector_aggregator_address.as_deref(),
             )?;
             cluster_resources
-                .add(client, &rg_configmap)
+                .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
@@ -382,7 +383,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &config,
             )?;
             cluster_resources
-                .add(client, &rg_statefulset)
+                .add(client, rg_statefulset)
                 .await
                 .context(ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
