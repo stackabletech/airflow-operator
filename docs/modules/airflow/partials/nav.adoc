@@ -4,3 +4,4 @@
 * xref:airflow:configuration.adoc[]
 * xref:airflow:usage.adoc[]
 * xref:airflow:pod_placement.adoc[]
+* xref:airflow:cluster_operations.adoc[]

@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >-
+      helm install airflow-redis
+      --namespace $NAMESPACE
+      --version 17.3.7
+      -f helm-bitnami-redis-values.yaml
+      --repo https://charts.bitnami.com/bitnami redis
+    timeout: 600

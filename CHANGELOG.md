@@ -8,14 +8,16 @@
 - Deploy default and support custom affinities ([#241]).
 - Add the ability to loads DAG via git-sync ([#245]).
 - Cluster status conditions ([#255])
+- Extend cluster resources for status and cluster operation (paused, stopped) ([#257])
 
 ### Changed
 
-- `operator-rs` `0.31.0` -> `0.34.0` ([#219]).
+- `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` ([#219]) ([#257]).
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
 - Revert openshift settings ([#233])
 - Support crate2nix in dev environments ([#234])
+- Fixed LDAP tests on Openshift ([#254])
 
 ### Removed
 
@@ -27,7 +29,9 @@
 [#234]: https://github.com/stackabletech/airflow-operator/pull/234
 [#241]: https://github.com/stackabletech/airflow-operator/pull/241
 [#245]: https://github.com/stackabletech/airflow-operator/pull/245
+[#254]: https://github.com/stackabletech/airflow-operator/pull/254
 [#255]: https://github.com/stackabletech/airflow-operator/pull/255
+[#257]: https://github.com/stackabletech/airflow-operator/pull/257
 
 ## [23.1.0] - 2023-01-23
 

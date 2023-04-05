@@ -1,69 +1,77 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: openldap
+commands:
+  - script: |
+      kubectl apply -n $NAMESPACE -f - <<EOF
+      ---
+      apiVersion: secrets.stackable.tech/v1alpha1
+      kind: SecretClass
+      metadata:
+        name: airflow-with-ldap-bind
+      spec:
+        backend:
+          k8sSearch:
+            searchNamespace:
+              pod: {}
 {% if test_scenario['values']['ldap-authentication'] == 'no-tls' %}
----
-apiVersion: authentication.stackable.tech/v1alpha1
-kind: AuthenticationClass
-metadata:
-  name: airflow-with-ldap-no-tls-ldap
-spec:
-  provider:
-    ldap:
-      hostname: openldap.default.svc.cluster.local
-      port: 1389
-      searchBase: ou=users,dc=example,dc=org
-      bindCredentials:
-        secretClass: airflow-with-ldap-bind
+      ---
+      apiVersion: authentication.stackable.tech/v1alpha1
+      kind: AuthenticationClass
+      metadata:
+        name: no-tls-$NAMESPACE
+      spec:
+        provider:
+          ldap:
+            hostname: openldap.$NAMESPACE.svc.cluster.local
+            port: 1389
+            searchBase: ou=users,dc=example,dc=org
+            bindCredentials:
+              secretClass: airflow-with-ldap-bind
 {% elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' %}
----
-apiVersion: authentication.stackable.tech/v1alpha1
-kind: AuthenticationClass
-metadata:
-  name: airflow-with-ldap-insecure-tls-ldap
-spec:
-  provider:
-    ldap:
-      hostname: openldap.default.svc.cluster.local
-      port: 1636
-      searchBase: ou=users,dc=example,dc=org
-      ldapFieldNames:
-        uid: uid
-        group: memberof
-        givenName: givenName
-        surname: sn
-        email: mail
-      bindCredentials:
-        secretClass: airflow-with-ldap-bind
-      tls:
-        verification:
-          none: {}
+      ---
+      apiVersion: authentication.stackable.tech/v1alpha1
+      kind: AuthenticationClass
+      metadata:
+        name: insecure-tls-$NAMESPACE
+      spec:
+        provider:
+          ldap:
+            hostname: openldap.$NAMESPACE.svc.cluster.local
+            port: 1636
+            searchBase: ou=users,dc=example,dc=org
+            ldapFieldNames:
+              uid: uid
+              group: memberof
+              givenName: givenName
+              surname: sn
+              email: mail
+            bindCredentials:
+              secretClass: airflow-with-ldap-bind
+            tls:
+              verification:
+                none: {}
 {% elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' %}
----
-apiVersion: authentication.stackable.tech/v1alpha1
-kind: AuthenticationClass
-metadata:
-  name: airflow-with-ldap-server-veri-tls-ldap
-spec:
-  provider:
-    ldap:
-      hostname: openldap.default.svc.cluster.local
-      port: 1636
-      searchBase: ou=users,dc=example,dc=org
-      ldapFieldNames:
-        uid: uid
-      bindCredentials:
-        secretClass: airflow-with-ldap-bind
-      tls:
-        verification:
-          server:
-            caCert:
-              secretClass: openldap-tls
+      ---
+      apiVersion: authentication.stackable.tech/v1alpha1
+      kind: AuthenticationClass
+      metadata:
+        name: server-tls-$NAMESPACE
+      spec:
+        provider:
+          ldap:
+            hostname: openldap.$NAMESPACE.svc.cluster.local
+            port: 1636
+            searchBase: ou=users,dc=example,dc=org
+            ldapFieldNames:
+              uid: uid
+            bindCredentials:
+              secretClass: airflow-with-ldap-bind
+            tls:
+              verification:
+                server:
+                  caCert:
+                    secretClass: openldap-tls-$NAMESPACE
 {% endif %}
----
-apiVersion: secrets.stackable.tech/v1alpha1
-kind: SecretClass
-metadata:
-  name: airflow-with-ldap-bind
-spec:
-  backend:
-    k8sSearch:
-      searchNamespace:
-        pod: {}
