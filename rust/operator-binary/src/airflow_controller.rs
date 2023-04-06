@@ -1007,7 +1007,7 @@ async fn wait_for_db_and_update_status(
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, &*airflow, &status)
+        .apply_patch_status(OPERATOR_NAME, airflow, &status)
         .await
         .context(ApplyStatusSnafu)?;
 
