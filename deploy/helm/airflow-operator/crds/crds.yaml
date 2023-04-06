@@ -48,6 +48,9 @@ spec:
                       type: string
                   type: object
                 clusterConfig:
+                  default:
+                    dagsGitSync: []
+                    listenerClass: cluster-internal
                   description: Global cluster configuration that applies to all roles and role groups
                   properties:
                     dagsGitSync:
@@ -5175,7 +5178,6 @@ spec:
                     - roleGroups
                   type: object
               required:
-                - clusterConfig
                 - credentialsSecret
                 - image
               type: object
