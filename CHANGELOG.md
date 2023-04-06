@@ -11,6 +11,11 @@
 
 ### Changed
 
+- [BREAKING] Support specifying Service type.
+  This enables us to later switch non-breaking to using `ListenerClasses` for the exposure of Services.
+  This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
+  If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
+  to `external-unstable` or `external-stable` ([#XXX]).
 - `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` ([#219]) ([#257]).
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
