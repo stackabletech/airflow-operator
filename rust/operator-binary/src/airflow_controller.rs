@@ -947,7 +947,7 @@ fn add_authentication_volumes_and_volume_mounts(
 /// for the DB to come up.
 ///
 /// Having the DB set up by a Job managed by a different controller has it's own
-/// set of problems as described here: https://github.com/stackabletech/superset-operator/issues/351.
+/// set of problems as described here: <https://github.com/stackabletech/superset-operator/issues/351>.
 /// The Superset operator uses the same pattern as implemented here for setting up the DB.
 ///
 /// When the ticket above is implemented, this function will most likely be removed completely.
