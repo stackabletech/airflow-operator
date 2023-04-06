@@ -8,6 +8,7 @@ use crate::util::env_var_from_secret;
 use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::airflowdb::AirflowDBStatus;
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
@@ -957,8 +958,6 @@ async fn wait_for_db_and_update_status(
     resolved_product_image: &ResolvedProductImage,
     cluster_operation_condition_builder: &ClusterOperationsConditionBuilder<'_>,
 ) -> Result<bool> {
-    let mut result = true;
-
     // ensure admin user has been set up on the airflow database
     let airflow_db = AirflowDB::for_airflow(airflow, resolved_product_image)
         .context(CreateAirflowDBObjectSnafu)?;
@@ -980,30 +979,13 @@ async fn wait_for_db_and_update_status(
 
     tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
 
-    if let Some(ref status) = airflow_db.status {
-        match status.condition {
-            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
-                tracing::debug!(
-                    "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
-                );
-            }
-            AirflowDBStatusCondition::Failed => {
-                return AirflowDBFailedSnafu {
-                    airflow_db: ObjectRef::from_obj(&airflow_db),
-                }
-                .fail();
-            }
-            AirflowDBStatusCondition::Ready => {
-                result = false; // Continue setting up the  Airflow cluster
-            }
-        }
-    } else {
-        tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
-    }
-
     // Update the Airflow cluster status.
+    let db_cond_builder = DbConditionBuilder(airflow_db.status);
     let status = AirflowClusterStatus {
-        conditions: compute_conditions(airflow, &[cluster_operation_condition_builder]),
+        conditions: compute_conditions(
+            airflow,
+            &[&db_cond_builder, cluster_operation_condition_builder],
+        ),
     };
 
     client
@@ -1011,25 +993,32 @@ async fn wait_for_db_and_update_status(
         .await
         .context(ApplyStatusSnafu)?;
 
-    Ok(result)
+    Ok(db_cond_builder.into())
 }
 
-struct DbConditionBuilder(AirflowDBStatusCondition);
+struct DbConditionBuilder(Option<AirflowDBStatus>);
 impl ConditionBuilder for DbConditionBuilder {
     fn build_conditions(&self) -> ClusterConditionSet {
-        let (status, message) = match self.0 {
-            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => (
-                ClusterConditionStatus::False,
-                "Waiting for AirflowDB initialization to complete",
-            ),
-            AirflowDBStatusCondition::Failed => (
-                ClusterConditionStatus::False,
-                "Airflow database initialization failed.",
-            ),
-            AirflowDBStatusCondition::Ready => (
-                ClusterConditionStatus::True,
-                "Airflow database initialization ready.",
-            ),
+        let (status, message) = if let Some(ref status) = self.0 {
+            match status.condition {
+                AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => (
+                    ClusterConditionStatus::False,
+                    "Waiting for AirflowDB initialization to complete",
+                ),
+                AirflowDBStatusCondition::Failed => (
+                    ClusterConditionStatus::False,
+                    "Airflow database initialization failed.",
+                ),
+                AirflowDBStatusCondition::Ready => (
+                    ClusterConditionStatus::True,
+                    "Airflow database initialization ready.",
+                ),
+            }
+        } else {
+            (
+                ClusterConditionStatus::Unknown,
+                "Waiting for Airflow database initialization to start.",
+            )
         };
 
         let cond = ClusterCondition {
@@ -1042,5 +1031,21 @@ impl ConditionBuilder for DbConditionBuilder {
         };
 
         vec![cond].into()
+    }
+}
+
+/// Evaluates to true if the DB is not ready yet (the controller needs to wait).
+/// Otherwise false.
+impl From<DbConditionBuilder> for bool {
+    fn from(cond_builder: DbConditionBuilder) -> Self {
+        if let Some(ref status) = cond_builder.0 {
+            match status.condition {
+                AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => true,
+                AirflowDBStatusCondition::Failed => true,
+                AirflowDBStatusCondition::Ready => false,
+            }
+        } else {
+            true
+        }
     }
 }
