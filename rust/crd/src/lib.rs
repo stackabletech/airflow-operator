@@ -126,11 +126,14 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterSpec {
+    /// The Airflow image to use
+    pub image: ProductImage,
+    /// Global cluster configuration that applies to all roles and role groups
+    #[serde(default)]
+    pub cluster_config: AirflowClusterConfig,
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// The Airflow image to use
-    pub image: ProductImage,
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -156,17 +159,50 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    /// Global cluster configuration that applies to all roles and role groups
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cluster_config: Option<AirflowClusterConfig>,
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 }
 
-#[derive(Clone, Deserialize, Debug, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
     pub dags_git_sync: Vec<GitSync>,
+    /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// will be used to expose the service.
+    /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
+    /// by looking at the ListenerClass name specified,
+    /// In a future release support for custom ListenerClasses will be introduced without a breaking change:
+    ///
+    /// * cluster-internal: Use a ClusterIP service
+    ///
+    /// * external-unstable: Use a NodePort service
+    ///
+    /// * external-stable: Use a LoadBalancer service
+    #[serde(default)]
+    pub listener_class: CurrentlySupportedListenerClasses,
+}
+
+// TODO: Temporary solution until listener-operator is finished
+#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum CurrentlySupportedListenerClasses {
+    #[default]
+    #[serde(rename = "cluster-internal")]
+    ClusterInternal,
+    #[serde(rename = "external-unstable")]
+    ExternalUnstable,
+    #[serde(rename = "external-stable")]
+    ExternalStable,
+}
+
+impl CurrentlySupportedListenerClasses {
+    pub fn k8s_service_type(&self) -> String {
+        match self {
+            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
@@ -368,20 +404,17 @@ impl AirflowCluster {
         mounts
     }
 
-    pub fn git_sync(&self) -> Option<GitSync> {
-        if let Some(cluster_config) = &self.spec.cluster_config {
-            let dags_git_sync = &cluster_config.dags_git_sync;
-            // dags_git_sync is a list but only the first element is considered
-            // (this avoids a later breaking change when all list elements are processed)
-            if dags_git_sync.len() != 1 {
-                tracing::warn!(
-                    "{:?} git-sync elements: only first will be considered...",
-                    dags_git_sync.len()
-                );
-            }
-            return dags_git_sync.first().cloned();
+    pub fn git_sync(&self) -> Option<&GitSync> {
+        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
+        // dags_git_sync is a list but only the first element is considered
+        // (this avoids a later breaking change when all list elements are processed)
+        if dags_git_sync.len() > 1 {
+            tracing::warn!(
+                "{:?} git-sync elements: only first will be considered...",
+                dags_git_sync.len()
+            );
         }
-        None
+        dags_git_sync.first()
     }
 }
 
