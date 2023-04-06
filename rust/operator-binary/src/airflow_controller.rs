@@ -51,7 +51,11 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
-    status::condition::{compute_conditions, statefulset::StatefulSetConditionBuilder},
+    status::condition::{
+        compute_conditions, operations::ClusterOperationsConditionBuilder,
+        statefulset::StatefulSetConditionBuilder, ClusterCondition, ClusterConditionSet,
+        ClusterConditionStatus, ClusterConditionType, ConditionBuilder,
+    },
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -209,45 +213,17 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let resolved_product_image: ResolvedProductImage =
         airflow.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
-    // ensure admin user has been set up on the airflow database
-    let airflow_db = AirflowDB::for_airflow(&airflow, &resolved_product_image)
-        .context(CreateAirflowDBObjectSnafu)?;
-    client
-        .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
-        .await
-        .context(ApplyAirflowDBSnafu)?;
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
 
-    let airflow_db = client
-        .get::<AirflowDB>(
-            &airflow.name_unchecked(),
-            airflow
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(AirflowDBRetrievalSnafu)?;
-
-    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
-
-    if let Some(ref status) = airflow_db.status {
-        match status.condition {
-            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
-                tracing::debug!(
-                    "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
-                );
-                return Ok(Action::await_change());
-            }
-            AirflowDBStatusCondition::Failed => {
-                return AirflowDBFailedSnafu {
-                    airflow_db: ObjectRef::from_obj(&airflow_db),
-                }
-                .fail();
-            }
-            AirflowDBStatusCondition::Ready => (), // Continue starting Airflow
-        }
-    } else {
-        tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
+    if wait_for_db_and_update_status(
+        client,
+        &airflow,
+        &resolved_product_image,
+        &cluster_operation_cond_builder,
+    )
+    .await?
+    {
         return Ok(Action::await_change());
     }
 
@@ -416,7 +392,10 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(DeleteOrphanedResourcesSnafu)?;
 
     let status = AirflowClusterStatus {
-        conditions: compute_conditions(airflow.as_ref(), &[&ss_cond_builder]),
+        conditions: compute_conditions(
+            airflow.as_ref(),
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
     };
 
     client
@@ -951,5 +930,109 @@ fn add_authentication_volumes_and_volume_mounts(
             ),
         }
         .fail(),
+    }
+}
+
+/// Return true if the controller should wait for the DB to be set up.
+///
+/// As a side-effect, the Airflow cluster status is updated as long as the controller waits
+/// for the DB to come up.
+///
+/// Having the DB set up by a Job managed by a different controller has it's own
+/// set of problems as described here: https://github.com/stackabletech/superset-operator/issues/351.
+/// The Superset operator uses the same pattern as implemented here for setting up the DB.
+///
+/// When the ticket above is implemented, this function will most likely be removed completely.
+async fn wait_for_db_and_update_status(
+    client: &stackable_operator::client::Client,
+    airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    cluster_operation_condition_builder: &ClusterOperationsConditionBuilder<'_>,
+) -> Result<bool> {
+    let mut result = true;
+
+    // ensure admin user has been set up on the airflow database
+    let airflow_db = AirflowDB::for_airflow(airflow, resolved_product_image)
+        .context(CreateAirflowDBObjectSnafu)?;
+    client
+        .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
+        .await
+        .context(ApplyAirflowDBSnafu)?;
+
+    let airflow_db = client
+        .get::<AirflowDB>(
+            &airflow.name_unchecked(),
+            airflow
+                .namespace()
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?,
+        )
+        .await
+        .context(AirflowDBRetrievalSnafu)?;
+
+    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
+
+    if let Some(ref status) = airflow_db.status {
+        match status.condition {
+            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => {
+                tracing::debug!(
+                    "Waiting for AirflowDB initialization to complete, not starting Airflow yet"
+                );
+            }
+            AirflowDBStatusCondition::Failed => {
+                return AirflowDBFailedSnafu {
+                    airflow_db: ObjectRef::from_obj(&airflow_db),
+                }
+                .fail();
+            }
+            AirflowDBStatusCondition::Ready => {
+                result = false; // Continue setting up the  Airflow cluster
+            }
+        }
+    } else {
+        tracing::debug!("Waiting for AirflowDBStatus to be reported, not starting Airflow yet");
+    }
+
+    // Update the Airflow cluster status.
+    let status = AirflowClusterStatus {
+        conditions: compute_conditions(airflow, &[cluster_operation_condition_builder]),
+    };
+
+    client
+        .apply_patch_status(OPERATOR_NAME, &*airflow, &status)
+        .await
+        .context(ApplyStatusSnafu)?;
+
+    Ok(result)
+}
+
+struct DbConditionBuilder(AirflowDBStatusCondition);
+impl ConditionBuilder for DbConditionBuilder {
+    fn build_conditions(&self) -> ClusterConditionSet {
+        let (status, message) = match self.0 {
+            AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => (
+                ClusterConditionStatus::False,
+                "Waiting for AirflowDB initialization to complete",
+            ),
+            AirflowDBStatusCondition::Failed => (
+                ClusterConditionStatus::False,
+                "Airflow database initialization failed.",
+            ),
+            AirflowDBStatusCondition::Ready => (
+                ClusterConditionStatus::True,
+                "Airflow database initialization ready.",
+            ),
+        };
+
+        let cond = ClusterCondition {
+            reason: None,
+            message: Some(String::from(message)),
+            status,
+            type_: ClusterConditionType::Available,
+            last_transition_time: None,
+            last_update_time: None,
+        };
+
+        vec![cond].into()
     }
 }
