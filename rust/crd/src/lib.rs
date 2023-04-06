@@ -124,11 +124,14 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterSpec {
+    /// The Airflow image to use
+    pub image: ProductImage,
+    /// Global cluster configuration that applies to all roles and role groups
+    #[serde(default)]
+    pub cluster_config: AirflowClusterConfig,
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// The Airflow image to use
-    pub image: ProductImage,
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,8 +157,6 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    /// Global cluster configuration that applies to all roles and role groups
-    pub cluster_config: AirflowClusterConfig,
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 }
