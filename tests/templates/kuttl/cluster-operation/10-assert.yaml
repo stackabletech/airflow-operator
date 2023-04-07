@@ -4,6 +4,8 @@ kind: TestAssert
 metadata:
   name: test-pause-airflow
 timeout: 180
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=reconciliationPaused airflowclusters.airflow.stackable.tech/airflow --timeout 301s
 ---
 apiVersion: apps/v1
 kind: StatefulSet

@@ -26,7 +26,9 @@ use stackable_operator::{
     product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
+    status::condition::{ClusterCondition, HasStatusCondition},
 };
+
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -544,7 +546,18 @@ impl Configuration for AirflowConfigFragment {
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowClusterStatus {}
+pub struct AirflowClusterStatus {
+    pub conditions: Vec<ClusterCondition>,
+}
+
+impl HasStatusCondition for AirflowCluster {
+    fn conditions(&self) -> Vec<ClusterCondition> {
+        match &self.status {
+            Some(status) => status.conditions.clone(),
+            None => vec![],
+        }
+    }
+}
 
 impl AirflowCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`
