@@ -371,19 +371,12 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
             ss_cond_builder.add(
                 cluster_resources
-                    .add(client, rg_statefulset.clone())
+                    .add(client, rg_statefulset)
                     .await
                     .context(ApplyRoleGroupStatefulSetSnafu {
                         rolegroup: rolegroup.clone(),
                     })?,
             );
-
-            cluster_resources
-                .add(client, rg_statefulset)
-                .await
-                .context(ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
         }
     }
 
