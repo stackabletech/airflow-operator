@@ -3,9 +3,6 @@ use stackable_operator::k8s_openapi::api::core::v1::ServiceAccount;
 use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subject};
 use stackable_operator::kube::{Resource, ResourceExt};
 
-/// Used as runAsUser in the pod security context. This is specified in the Airflow image file
-///pub const AIRFLOW_UID: i64 = 1000;
-
 /// Obsolete: only used in the DB controller for historical reasons. Scheduled for deletion
 /// once the entire DB controller is deleted as discused here: https://github.com/stackabletech/airflow-operator/issues/259
 ///
