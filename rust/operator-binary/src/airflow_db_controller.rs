@@ -1,11 +1,10 @@
 use crate::airflow_controller::DOCKER_IMAGE_BASE_NAME;
-use crate::controller_commons;
 use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
 use crate::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
 };
 use crate::util::{env_var_from_secret, get_job_state, JobState};
-use crate::{APP_NAME, OPERATOR_NAME};
+use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -13,19 +12,18 @@ use stackable_airflow_crd::{
         AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
         AIRFLOW_DB_CONTROLLER_NAME,
     },
-    AIRFLOW_UID, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+    LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
-    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, EnvVar, PodSpec, PodTemplateSpec, Secret},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
-        Resource, ResourceExt,
+        ResourceExt,
     },
     logging::controller::ReconcilerError,
     product_logging::{self, spec::Logging},
@@ -104,18 +102,6 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to build RBAC objects: {source}"))]
-    BuildRBACObjects {
-        source: stackable_operator::error::Error,
-    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -132,29 +118,19 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     let resolved_product_image: ResolvedProductImage =
         airflow_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        OPERATOR_NAME,
-        AIRFLOW_DB_CONTROLLER_NAME,
-        &airflow_db.object_ref(&()),
-        ClusterResourceApplyStrategy::Default,
-    )
-    .context(CreateClusterResourcesSnafu)?;
-
-    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
-        airflow_db.as_ref(),
-        "airflow_db",
-        cluster_resources.get_required_labels(),
-    )
-    .context(BuildRBACObjectsSnafu)?;
-    cluster_resources
-        .add(client, rbac_sa.clone())
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
+    client
+        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
             name: rbac_sa.name_unchecked(),
         })?;
-    cluster_resources
-        .add(client, rbac_rolebinding.clone())
+    client
+        .apply_patch(
+            AIRFLOW_DB_CONTROLLER_NAME,
+            &rbac_rolebinding,
+            &rbac_rolebinding,
+        )
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
             name: rbac_rolebinding.name_unchecked(),
@@ -211,8 +187,8 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         &config,
                         &config_map.name_unchecked(),
                     )?;
-                    cluster_resources
-                        .add(client, job)
+                    client
+                        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
                         .await
                         .context(ApplyJobSnafu {
                             airflow_db: ObjectRef::from_obj(&*airflow_db),
@@ -267,11 +243,6 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
             .await
             .context(ApplyStatusSnafu)?;
     }
-
-    cluster_resources
-        .delete_orphaned_resources(client)
-        .await
-        .context(DeleteOrphanedResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -374,7 +345,7 @@ fn build_init_job(
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             security_context: Some(
                 PodSecurityContextBuilder::new()
-                    .run_as_user(AIRFLOW_UID)
+                    .run_as_user(rbac::AIRFLOW_UID)
                     .run_as_group(0)
                     .build(),
             ),

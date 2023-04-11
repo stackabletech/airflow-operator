@@ -4,6 +4,7 @@ mod config;
 mod controller_commons;
 mod product_logging;
 mod util;
+mod rbac;
 
 use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 
