@@ -1,0 +1,27 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: "2.4.1"
+    stackableVersion: "23.4.0-rc3"
+  executor: CeleryExecutor
+  loadExamples: false
+  exposeConfig: false
+  credentialsSecret: test-airflow-credentials # <1>
+  clusterConfig:
+    dagsGitSync: # <2>
+      - repo: https://github.com/stackabletech/airflow-operator # <3>
+        branch: "main" # <4>
+        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <5>
+        depth: 10 # <6>
+        wait: 20 # <7>
+        credentialsSecret: git-credentials # <8>
+        gitSyncConf: # <9>
+          --rev: HEAD # <10>
+          # --rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
+          # --rev: 39ee3598bd9946a1d958a448c9f7d3774d7a8043 # N.B. commit must be covered by "depth"
+  webservers:
+    ...

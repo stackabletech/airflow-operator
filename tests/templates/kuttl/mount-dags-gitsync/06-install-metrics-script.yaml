@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: metrics
+commands:
+  - script: kubectl cp -n $NAMESPACE date_dag_metrics.py test-airflow-python-0:/tmp
+    timeout: 240

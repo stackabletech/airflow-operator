@@ -1,0 +1,32 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-install-airflow
+timeout: 1200
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow --timeout 301s
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-default
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-default
+status:
+  readyReplicas: 1
+  replicas: 1
