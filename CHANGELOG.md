@@ -23,7 +23,7 @@
 - Revert openshift settings ([#233])
 - Support crate2nix in dev environments ([#234])
 - Fixed LDAP tests on Openshift ([#254])
-- Label RBAC objects consistently ([#xxx])
+- Set RBAC objects labels and owner ([#261])
 
 ### Removed
 
@@ -39,7 +39,7 @@
 [#255]: https://github.com/stackabletech/airflow-operator/pull/255
 [#257]: https://github.com/stackabletech/airflow-operator/pull/257
 [#258]: https://github.com/stackabletech/airflow-operator/pull/258
-[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+[#261]: https://github.com/stackabletech/airflow-operator/pull/261
 
 ## [23.1.0] - 2023-01-23
 
