@@ -1,8 +1,8 @@
 = Mounting DAGs
 
-DAGs can be mounted by using a https://kubernetes.io/docs/concepts/configuration/configmap/[ConfigMap] or a https://kubernetes.io/docs/concepts/storage/persistent-volumes/[PersistentVolumeClaim]. This is best illustrated with an example of each, shown in the next section.
+DAGs can be mounted by using a `ConfigMap` or a `PersistentVolumeClaim`. This is best illustrated with an example of each, shown in the next section.
 
-== via ConfigMap
+== via `ConfigMap`
 
 [source,python]
 ----
@@ -23,42 +23,29 @@ include::example$example-airflow-dags-configmap.yaml[]
 
 The advantage of this approach is that a DAG can be provided "in-line", as it were. This becomes cumbersome when multiple DAGs are to be made available in this way, as each one has to be mapped individually. For multiple DAGs it is probably easier to expose them all via a mounted volume, which is shown below.
 
-== via PersistentVolumeclaim
+=== via `git-sync`
+
+==== Overview
+
+https://github.com/kubernetes/git-sync/tree/release-3.x[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronisation details are required. An example of this usage is given in the next section.
+
+==== Example
 
 [source,yaml]
 ----
-include::example$example-pvc.yaml[]
+include::example$example-airflow-gitsync.yaml[]
 ----
-[source,yaml]
-----
-include::example$example-airflow-dags-pvc.yaml[]
-----
-<1> The name of the `PersistentVolumeClaim` that references the PV
-<2> Job used to populate the `PersistentVolumeClaim` with DAG files
-<3> The volume name that will be mounted as a target for the DAG files
-<4> Defines the `Volume` backed by the PVC, local to the Custom Resource
-<5> The `VolumeMount` used by the Custom Resource
-<6> The path for the `VolumeMount`
-<7> The command used to access/download the DAG files to a specified location
-<8> The `Volume` used by this Custom Resource
-<9> The `PersistentVolumeClaim` that backs this `Volume`
-<10> The `VolumeMount` referencing the `Volume` in the previous step
-<11> The path where this `Volume` is located for each role (webserver, worker, scheduler)
-<12> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.
 
-=== Node selection
+<1> A `Secret` used for accessing database and admin user details (included here to illustrate where different credential secrets are defined)
+<2> The git-gync configuration block that contains list of git-sync elements
+<3> The repository that will be cloned (required)
+<4> The branch name (defaults to `main`)
+<5> The location of the DAG folder, relative to the synced repository root (required)
+<6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
+<7> The synchronisation interval in seconds (defaults to 20 seconds)
+<8> The name of the `Secret` used to access the repository if it is not public. This should include two fields: `user` and `password` (which can be either a password - which is not recommended - or a github token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
+<9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags[this] configuration section (and the ones that follow on that link)
+<10> An example showing how to specify a target revision (the default is HEAD). The revision can also a be tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`. If a tag or commit hash is specified, then git-sync will recognise that and not perform further cloning.
 
-Airflow expects that all its components (webserver, scheduler, workers etc.) have access to the DAG folder. If this is mounted via a PersistentVolumeClaim, then the permissible https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes[access modes] on that claim may require that a specific node is selected. This can be done by providing a label-match as shown below:
 
-[source,yaml]
-----
-  workers:
-    roleGroups:
-      default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/stackable/external-dags"
-        replicas: 1
-        selector:
-          matchLabels:
-            node: "2"
-----
+IMPORTANT: The example above shows a _*list*_ of git-sync definitions, with a single element. This is to avoid breaking-changes in future releases. Currently, only one such git-sync definition is considered and processed.

@@ -10,10 +10,5 @@
 ** xref:airflow:usage-guide/logging.adoc[]
 ** xref:airflow:usage-guide/monitoring.adoc[]
 ** xref:airflow:usage-guide/overrides.adoc[]
+** xref:airflow:usage-guide/cluster-operations.adoc[]
 * xref:airflow:configuration.adoc[]
-<<<<<<< HEAD
-=======
-* xref:airflow:usage.adoc[]
-* xref:airflow:pod_placement.adoc[]
-* xref:airflow:cluster_operations.adoc[]
->>>>>>> origin/main
