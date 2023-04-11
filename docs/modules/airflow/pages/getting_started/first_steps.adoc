@@ -159,4 +159,4 @@ include::example$getting_started/code/getting_started.sh[tag=check-dag]
 
 == What's next
 
-Look at the xref:usage.adoc[Usage page] to find out more about configuring your Airflow cluster and loading your own DAG files.
+Look at the xref:usage-guide/index.adoc[] to find out more about configuring your Airflow cluster and loading your own DAG files.
