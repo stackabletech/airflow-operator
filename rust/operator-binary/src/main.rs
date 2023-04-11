@@ -3,8 +3,8 @@ mod airflow_db_controller;
 mod config;
 mod controller_commons;
 mod product_logging;
-mod util;
 mod rbac;
+mod util;
 
 use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 
