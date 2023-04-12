@@ -1,7 +1,8 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
-use crate::controller_commons;
-use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
+use crate::controller_commons::{
+    self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+};
 use crate::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
 };
