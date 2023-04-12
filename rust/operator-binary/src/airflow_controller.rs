@@ -296,7 +296,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         airflow.as_ref(),
-        "airflow",
+        APP_NAME,
         cluster_resources.get_required_labels(),
     )
     .context(BuildRBACObjectsSnafu)?;
