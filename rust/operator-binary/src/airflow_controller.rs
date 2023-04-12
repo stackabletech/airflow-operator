@@ -139,7 +139,7 @@ pub enum Error {
         name: String,
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to build RBAC objects: {source}"))]
+    #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
