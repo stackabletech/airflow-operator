@@ -45,7 +45,7 @@ Now for the DAG itself. The job to be started is a simple Spark job that calcula
 include::example$example-pyspark-pi.yaml[]
 ----
 
-This will called from within a DAG by using the connection that was defined earlier. It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available. There are two classes that are used to:
+This will called from within a DAG by using the connection that was defined earlier. It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available [here.](https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py) There are two classes that are used to:
 
 - start the job
 - monitor the status of the job
