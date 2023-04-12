@@ -300,18 +300,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(BuildRBACObjectsSnafu)?;
 
-    cluster_resources
-        .add(client, rbac_sa.clone())
+    let rbac_sa = cluster_resources
+        .add(client, rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name_unchecked(),
-        })?;
+        .context(ApplyServiceAccountSnafu)?;
     cluster_resources
-        .add(client, rbac_rolebinding.clone())
+        .add(client, rbac_rolebinding)
         .await
-        .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name_unchecked(),
-        })?;
+        .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
