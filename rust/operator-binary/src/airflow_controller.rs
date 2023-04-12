@@ -130,14 +130,12 @@ pub enum Error {
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch service account: {source}"))]
+    #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
-        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to build RBAC objects"))]

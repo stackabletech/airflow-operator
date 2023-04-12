@@ -18,7 +18,7 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` or `external-stable` ([#258]).
-- `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` ([#219]) ([#257]).
+- `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` -> `0.40.2` ([#219]) ([#257]) ([#261]).
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
 - Revert openshift settings ([#233]).
