@@ -9,6 +9,7 @@
 - Add the ability to loads DAG via git-sync ([#245]).
 - Cluster status conditions ([#255])
 - Extend cluster resources for status and cluster operation (paused, stopped) ([#257])
+- Added more detailed landing page for the docs ([#260]).
 
 ### Changed
 
@@ -20,9 +21,10 @@
 - `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` ([#219]) ([#257]).
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
-- Revert openshift settings ([#233])
-- Support crate2nix in dev environments ([#234])
-- Fixed LDAP tests on Openshift ([#254])
+- Revert openshift settings ([#233]).
+- Support crate2nix in dev environments ([#234]).
+- Fixed LDAP tests on Openshift ([#254]).
+- Reorganized usage guide docs([#260]).
 
 ### Removed
 
@@ -38,6 +40,7 @@
 [#255]: https://github.com/stackabletech/airflow-operator/pull/255
 [#257]: https://github.com/stackabletech/airflow-operator/pull/257
 [#258]: https://github.com/stackabletech/airflow-operator/pull/258
+[#260]: https://github.com/stackabletech/airflow-operator/pull/260
 
 ## [23.1.0] - 2023-01-23
 

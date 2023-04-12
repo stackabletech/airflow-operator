@@ -1,0 +1,19 @@
+= Resource Requests
+
+include::home:concepts:stackable_resource_requests.adoc[]
+
+If no resource requests are configured explicitely, the operator uses the following defaults:
+
+[source,yaml]
+----
+workers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            min: '200m'
+            max: "4"
+          memory:
+            limit: '2Gi'
+----
