@@ -1,11 +1,12 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use crate::config::{self, PYTHON_IMPORTS};
-use crate::controller_commons::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME};
+use crate::controller_commons::{
+    self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+};
 use crate::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
 };
 use crate::util::env_var_from_secret;
-use crate::{controller_commons, rbac};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::AirflowDBStatus;
@@ -16,7 +17,7 @@ use stackable_airflow_crd::{
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{
-    AirflowClusterStatus, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+    AirflowClusterStatus, AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
 };
 use stackable_operator::builder::VolumeBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
@@ -29,6 +30,7 @@ use stackable_operator::{
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         product_image_selection::ResolvedProductImage,
+        rbac::build_rbac_resources,
     },
     k8s_openapi::{
         api::{
@@ -128,14 +130,16 @@ pub enum Error {
     AirflowDBRetrieval {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch service account: {source}"))]
+    #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
-        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build RBAC objects"))]
+    BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
@@ -255,24 +259,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow.as_ref(), "airflow");
-    client
-        .apply_patch(AIRFLOW_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
-        .await
-        .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name_unchecked(),
-        })?;
-    client
-        .apply_patch(
-            AIRFLOW_CONTROLLER_NAME,
-            &rbac_rolebinding,
-            &rbac_rolebinding,
-        )
-        .await
-        .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name_unchecked(),
-        })?;
-
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
         airflow.as_ref(),
@@ -305,6 +291,22 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
+
+    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
+        airflow.as_ref(),
+        APP_NAME,
+        cluster_resources.get_required_labels(),
+    )
+    .context(BuildRBACObjectsSnafu)?;
+
+    let rbac_sa = cluster_resources
+        .add(client, rbac_sa)
+        .await
+        .context(ApplyServiceAccountSnafu)?;
+    cluster_resources
+        .add(client, rbac_rolebinding)
+        .await
+        .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
@@ -759,7 +761,7 @@ fn build_server_rolegroup_statefulset(
                 .service_account_name(sa_name)
                 .security_context(
                     PodSecurityContextBuilder::new()
-                        .run_as_user(rbac::AIRFLOW_UID)
+                        .run_as_user(AIRFLOW_UID)
                         .run_as_group(0)
                         .fs_group(1000) // Needed for secret-operator
                         .build(),

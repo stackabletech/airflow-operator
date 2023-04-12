@@ -33,6 +33,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
+pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";

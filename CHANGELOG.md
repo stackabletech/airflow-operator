@@ -18,13 +18,14 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` or `external-stable` ([#258]).
-- `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` ([#219]) ([#257]).
+- `operator-rs` `0.31.0` -> `0.34.0` -> `0.39.0` -> `0.40.2` ([#219]) ([#257]) ([#261]).
 - Specified security context settings needed for OpenShift ([#222]).
 - Fixed template parsing for OpenShift tests ([#222]).
 - Revert openshift settings ([#233]).
 - Support crate2nix in dev environments ([#234]).
 - Fixed LDAP tests on Openshift ([#254]).
 - Reorganized usage guide docs([#260]).
+- Set RBAC objects labels and owner ([#261])
 
 ### Removed
 
@@ -41,6 +42,7 @@
 [#257]: https://github.com/stackabletech/airflow-operator/pull/257
 [#258]: https://github.com/stackabletech/airflow-operator/pull/258
 [#260]: https://github.com/stackabletech/airflow-operator/pull/260
+[#261]: https://github.com/stackabletech/airflow-operator/pull/261
 
 ## [23.1.0] - 2023-01-23
 

@@ -12,7 +12,7 @@ use stackable_airflow_crd::{
         AirflowDB, AirflowDBStatus, AirflowDBStatusCondition, AirflowDbConfig, Container,
         AIRFLOW_DB_CONTROLLER_NAME,
     },
-    LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+    AIRFLOW_UID, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
@@ -345,7 +345,7 @@ fn build_init_job(
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             security_context: Some(
                 PodSecurityContextBuilder::new()
-                    .run_as_user(rbac::AIRFLOW_UID)
+                    .run_as_user(AIRFLOW_UID)
                     .run_as_group(0)
                     .build(),
             ),
