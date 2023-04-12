@@ -4,7 +4,7 @@ use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subje
 use stackable_operator::kube::{Resource, ResourceExt};
 
 /// Obsolete: only used in the DB controller for historical reasons. Scheduled for deletion
-/// once the entire DB controller is deleted as discused here: https://github.com/stackabletech/airflow-operator/issues/259
+/// once the entire DB controller is deleted as discused here: <https://github.com/stackabletech/airflow-operator/issues/259>
 ///
 /// Build RBAC objects for the product workloads.
 /// The `rbac_prefix` is meant to be the product name, for example: zookeeper, airflow, etc.
