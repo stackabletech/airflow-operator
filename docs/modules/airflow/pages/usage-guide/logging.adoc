@@ -1,0 +1,43 @@
+= Log aggregation
+
+The logs can be forwarded to a Vector log aggregator by providing a discovery
+ConfigMap for the aggregator and by enabling the log agent:
+
+[source,yaml]
+----
+spec:
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+  webservers:
+    config:
+      logging:
+        enableVectorAgent: true
+        containers:
+          airflow:
+            loggers:
+              "flask_appbuilder":
+                level: WARN
+  workers:
+    config:
+      logging:
+        enableVectorAgent: true
+        containers:
+          airflow:
+            loggers:
+              "airflow.processor":
+                level: INFO
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: true
+        containers:
+          airflow:
+            loggers:
+              "airflow.processor_manager":
+                level: INFO
+  databaseInitialization:
+    logging:
+      enableVectorAgent: true
+----
+
+Further information on how to configure logging, can be found in
+xref:home:concepts:logging.adoc[].
