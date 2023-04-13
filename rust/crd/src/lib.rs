@@ -167,6 +167,7 @@ pub struct AirflowClusterSpec {
 #[derive(Clone, Deserialize, Debug, Default, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
+    #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
