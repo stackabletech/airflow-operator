@@ -54,6 +54,7 @@ spec:
                   description: Global cluster configuration that applies to all roles and role groups
                   properties:
                     dagsGitSync:
+                      default: []
                       items:
                         properties:
                           branch:
@@ -101,8 +102,6 @@ spec:
                         - external-unstable
                         - external-stable
                       type: string
-                  required:
-                    - dagsGitSync
                   type: object
                 clusterOperation:
                   default:
