@@ -7,10 +7,11 @@ spec:
   image:
     productVersion: 2.4.1
     stackableVersion: 23.4.0-rc2
-  executor: CeleryExecutor
-  loadExamples: false
-  exposeConfig: false
-  credentialsSecret: simple-airflow-credentials
+  clusterConfig:
+    executor: CeleryExecutor
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
       default:
