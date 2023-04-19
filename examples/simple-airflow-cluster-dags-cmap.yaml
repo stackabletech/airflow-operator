@@ -83,18 +83,19 @@ spec:
   image:
     productVersion: 2.4.1
     stackableVersion: 23.4.0-rc2
-  executor: CeleryExecutor
-  loadExamples: false
-  exposeConfig: false
-  credentialsSecret: simple-airflow-credentials
-  volumes:
-    - name: cm-dag
-      configMap:
-        name: cm-dag
-  volumeMounts:
-    - name: cm-dag
-      mountPath: /dags/test_airflow_dag.py
-      subPath: test_airflow_dag.py
+  clusterConfig:
+    executor: CeleryExecutor
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: simple-airflow-credentials
+    volumes:
+      - name: cm-dag
+        configMap:
+          name: cm-dag
+    volumeMounts:
+      - name: cm-dag
+        mountPath: /dags/test_airflow_dag.py
+        subPath: test_airflow_dag.py
   webservers:
     roleGroups:
       default:
