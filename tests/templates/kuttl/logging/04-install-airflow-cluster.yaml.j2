@@ -59,11 +59,12 @@ spec:
   image:
     productVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['airflow'].split('-stackable')[1] }}"
-  vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
-  executor: CeleryExecutor
-  loadExamples: false
-  exposeConfig: false
-  credentialsSecret: test-airflow-credentials
+  clusterConfig:
+    vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
+    executor: CeleryExecutor
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: test-airflow-credentials
   webservers:
     roleGroups:
       automatic-log-config:
