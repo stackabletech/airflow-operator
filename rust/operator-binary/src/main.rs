@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |airflow: &Arc<AirflowCluster>| {
                                 references_authentication_class(
-                                    &airflow.spec.authentication_config,
+                                    &airflow.spec.cluster_config.authentication_config,
                                     &authentication_class,
                                 )
                             })

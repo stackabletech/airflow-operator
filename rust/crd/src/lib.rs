@@ -132,40 +132,33 @@ pub struct AirflowClusterSpec {
     /// Global cluster configuration that applies to all roles and role groups
     #[serde(default)]
     pub cluster_config: AirflowClusterConfig,
-    /// Name of the Vector aggregator discovery ConfigMap.
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-    pub credentials_secret: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub executor: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub load_examples: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expose_config: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volumes: Option<Vec<Volume>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volume_mounts: Option<Vec<VolumeMount>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authentication_config: Option<AirflowClusterAuthenticationConfig>,
+    /// Cluster operations like pause reconciliation or cluster stop.
+    #[serde(default)]
+    pub cluster_operation: ClusterOperation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workers: Option<Role<AirflowConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    #[serde(default)]
-    pub cluster_operation: ClusterOperation,
 }
 
-#[derive(Clone, Deserialize, Debug, Default, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, Default, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_config: Option<AirflowClusterAuthenticationConfig>,
+    pub credentials_secret: String,
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expose_config: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_examples: Option<bool>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
     /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
@@ -179,6 +172,14 @@ pub struct AirflowClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volumes: Option<Vec<Volume>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_mounts: Option<Vec<VolumeMount>>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -386,12 +387,12 @@ impl AirflowCluster {
 
     /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
     pub fn volumes(&self) -> Vec<Volume> {
-        let tmp = self.spec.volumes.as_ref();
+        let tmp = self.spec.cluster_config.volumes.as_ref();
         tmp.iter().flat_map(|v| v.deref().clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        let tmp = self.spec.volume_mounts.as_ref();
+        let tmp = self.spec.cluster_config.volume_mounts.as_ref();
         let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
@@ -512,7 +513,7 @@ impl Configuration for AirflowConfigFragment {
         let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
         env.insert(
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.credentials_secret.clone()),
+            Some(cluster.spec.cluster_config.credentials_secret.clone()),
         );
         if let Some(git_sync) = &cluster.git_sync() {
             if let Some(credentials_secret) = &git_sync.credentials_secret {
