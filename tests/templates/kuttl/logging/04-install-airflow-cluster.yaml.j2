@@ -65,6 +65,26 @@ spec:
     loadExamples: false
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
+    databaseInitialization:
+      logging:
+        enableVectorAgent: true
+        containers:
+          airflow-init-db:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
+          vector:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
   webservers:
     roleGroups:
       automatic-log-config:
@@ -164,23 +184,3 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
-  databaseInitialization:
-    logging:
-      enableVectorAgent: true
-      containers:
-        airflow-init-db:
-          console:
-            level: INFO
-          file:
-            level: INFO
-          loggers:
-            ROOT:
-              level: INFO
-        vector:
-          console:
-            level: INFO
-          file:
-            level: INFO
-          loggers:
-            ROOT:
-              level: INFO
