@@ -684,10 +684,11 @@ mod tests {
           image:
             productVersion: 2.2.4
             stackableVersion: 23.4.0-rc2
-          executor: KubernetesExecutor
-          loadExamples: true
-          exposeConfig: true
-          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            executor: KubernetesExecutor
+            loadExamples: true
+            exposeConfig: true
+            credentialsSecret: simple-airflow-credentials
           webservers:
             roleGroups:
               default:
@@ -714,10 +715,10 @@ mod tests {
         assert_eq!("2.2.4", &resolved_airflow_image.product_version);
         assert_eq!(
             "KubernetesExecutor",
-            cluster.spec.executor.unwrap_or_default()
+            cluster.spec.cluster_config.executor.unwrap_or_default()
         );
-        assert!(cluster.spec.load_examples.unwrap_or(false));
-        assert!(cluster.spec.expose_config.unwrap_or(false));
+        assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
+        assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
     }
 
     #[test]
@@ -732,11 +733,11 @@ mod tests {
           image:
             productVersion: 2.4.1
             stackableVersion: 23.4.0-rc3
-          executor: CeleryExecutor
-          loadExamples: false
-          exposeConfig: false
-          credentialsSecret: simple-airflow-credentials
           clusterConfig:
+            executor: CeleryExecutor
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecret: simple-airflow-credentials
             dagsGitSync:
               - name: git-sync
                 repo: https://github.com/stackabletech/airflow-operator
@@ -779,11 +780,11 @@ mod tests {
           image:
             productVersion: 2.4.1
             stackableVersion: 23.4.0-rc3
-          executor: CeleryExecutor
-          loadExamples: false
-          exposeConfig: false
-          credentialsSecret: simple-airflow-credentials
           clusterConfig:
+            executor: CeleryExecutor
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecret: simple-airflow-credentials
             dagsGitSync:
               - name: git-sync
                 repo: https://github.com/stackabletech/airflow-operator
