@@ -384,7 +384,7 @@ impl AirflowCluster {
         }
     }
 
-    /// this will extract a Vec<Volume> from Option<Vec<Volume>>
+    /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.volumes.as_ref();
         tmp.iter().flat_map(|v| v.deref().clone()).collect()
