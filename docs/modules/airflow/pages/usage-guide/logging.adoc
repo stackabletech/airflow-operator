@@ -6,7 +6,11 @@ ConfigMap for the aggregator and by enabling the log agent:
 [source,yaml]
 ----
 spec:
-  vectorAggregatorConfigMapName: vector-aggregator-discovery
+  clusterConfig:
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+    databaseInitialization:
+      logging:
+        enableVectorAgent: true
   webservers:
     config:
       logging:
@@ -34,9 +38,6 @@ spec:
             loggers:
               "airflow.processor_manager":
                 level: INFO
-  databaseInitialization:
-    logging:
-      enableVectorAgent: true
 ----
 
 Further information on how to configure logging, can be found in

@@ -262,12 +262,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
         airflow.as_ref(),
-        airflow.spec.vector_aggregator_config_map_name.as_deref(),
+        airflow
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+            .as_deref(),
     )
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
 
-    let authentication_class = match &airflow.spec.authentication_config {
+    let authentication_class = match &airflow.spec.cluster_config.authentication_config {
         Some(authentication_config) => match &authentication_config.authentication_class {
             Some(authentication_class) => Some(
                 AuthenticationClass::resolve(client, authentication_class)
@@ -481,7 +485,7 @@ fn build_rolegroup_config_map(
 
     config::add_airflow_config(
         &mut config,
-        airflow.spec.authentication_config.as_ref(),
+        airflow.spec.cluster_config.authentication_config.as_ref(),
         authentication_class,
     );
 
@@ -818,7 +822,7 @@ fn build_mapped_envs(
         }
     }
 
-    if let Some(true) = airflow.spec.load_examples {
+    if let Some(true) = airflow.spec.cluster_config.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
             value: Some("True".into()),
@@ -832,7 +836,7 @@ fn build_mapped_envs(
         })
     }
 
-    if let Some(true) = airflow.spec.expose_config {
+    if let Some(true) = airflow.spec.cluster_config.expose_config {
         env.push(EnvVar {
             name: "AIRFLOW__WEBSERVER__EXPOSE_CONFIG".into(),
             value: Some("True".into()),
@@ -840,7 +844,7 @@ fn build_mapped_envs(
         })
     }
 
-    let executor = airflow.spec.executor.clone();
+    let executor = airflow.spec.cluster_config.executor.clone();
 
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),

@@ -7,11 +7,11 @@ spec:
   image:
     productVersion: "2.4.1"
     stackableVersion: "23.4.0-rc3"
-  executor: CeleryExecutor
-  loadExamples: false
-  exposeConfig: false
-  credentialsSecret: test-airflow-credentials # <1>
   clusterConfig:
+    executor: CeleryExecutor
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: test-airflow-credentials # <1>
     dagsGitSync: # <2>
       - repo: https://github.com/stackabletech/airflow-operator # <3>
         branch: "main" # <4>

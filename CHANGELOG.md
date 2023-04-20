@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
+
+[#271]: https://github.com/stackabletech/airflow-operator/pull/271
+
 ## [23.4.0] - 2023-04-17
 
 ### Added
@@ -31,7 +37,7 @@
 
 ### Removed
 
-- Removed PVC-usage documemtation ([#245]).
+- Removed PVC-usage documentation ([#245]).
 
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222

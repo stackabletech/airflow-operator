@@ -23,10 +23,10 @@ spec:
   image:
     productVersion: 2.4.1
     stackableVersion: 23.4.0-rc2
-  [...]
-  authenticationConfig:
-    authenticationClass: ldap    # <1>
-    userRegistrationRole: Admin  # <2>
+  clusterConfig:
+    authenticationConfig:
+      authenticationClass: ldap    # <1>
+      userRegistrationRole: Admin  # <2>
 ----
 
 <1> The reference to an AuthenticationClass called `ldap`
@@ -58,10 +58,10 @@ kind: AirflowCluster
 metadata:
   name: airflow-with-ldap
 spec:
-  [...]
-  authenticationConfig:
-    authenticationClass: ldap
-    userRegistrationRole: Admin  # <1>
+  clusterConfig:
+    authenticationConfig:
+      authenticationClass: ldap
+      userRegistrationRole: Admin  # <1>
 ----
 
 <1> All users are assigned to the `Admin` role

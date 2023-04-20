@@ -168,10 +168,11 @@ mod tests {
           image:
             productVersion: 2.2.4
             stackableVersion: 23.4.0-rc2
-          executor: KubernetesExecutor
-          loadExamples: true
-          exposeConfig: true
-          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            executor: KubernetesExecutor
+            loadExamples: true
+            exposeConfig: true
+            credentialsSecret: simple-airflow-credentials
           ",
         )
         .unwrap();
@@ -179,10 +180,13 @@ mod tests {
         let mut result = BTreeMap::new();
         add_airflow_config(
             &mut result,
-            cluster.spec.authentication_config.as_ref(),
+            cluster.spec.cluster_config.authentication_config.as_ref(),
             None,
         );
-        assert_eq!(None, cluster.spec.authentication_config.as_ref());
+        assert_eq!(
+            None,
+            cluster.spec.cluster_config.authentication_config.as_ref()
+        );
         assert_eq!(
             BTreeMap::from([("AUTH_TYPE".into(), "AUTH_DB".into())]),
             result
@@ -201,13 +205,14 @@ mod tests {
           image:
             productVersion: 2.2.4
             stackableVersion: 23.4.0-rc2
-          executor: KubernetesExecutor
-          loadExamples: true
-          exposeConfig: true
-          credentialsSecret: simple-airflow-credentials
-          authenticationConfig:
-            authenticationClass: airflow-with-ldap-server-veri-tls-ldap
-            userRegistrationRole: Admin
+          clusterConfig:
+            executor: KubernetesExecutor
+            loadExamples: true
+            exposeConfig: true
+            credentialsSecret: simple-airflow-credentials
+            authenticationConfig:
+              authenticationClass: airflow-with-ldap-server-veri-tls-ldap
+              userRegistrationRole: Admin
           ",
         )
         .unwrap();
@@ -241,7 +246,7 @@ mod tests {
         let mut result = BTreeMap::new();
         add_airflow_config(
             &mut result,
-            cluster.spec.authentication_config.as_ref(),
+            cluster.spec.cluster_config.authentication_config.as_ref(),
             Some(&authentication_class),
         );
         assert_eq!(
@@ -251,7 +256,7 @@ mod tests {
                 user_registration_role: "Admin".to_string(),
                 sync_roles_at: Registration
             }),
-            cluster.spec.authentication_config
+            cluster.spec.cluster_config.authentication_config
         );
         assert_eq!(
             "AUTH_LDAP",
