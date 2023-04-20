@@ -120,14 +120,16 @@ impl AirflowDB {
                 .build(),
             spec: AirflowDBSpec {
                 image: airflow.spec.image.clone(),
-                credentials_secret: airflow.spec.credentials_secret.clone(),
+                credentials_secret: airflow.spec.cluster_config.credentials_secret.clone(),
                 vector_aggregator_config_map_name: airflow
                     .spec
+                    .cluster_config
                     .vector_aggregator_config_map_name
                     .clone(),
                 config: AirflowDbConfigFragment {
                     logging: airflow
                         .spec
+                        .cluster_config
                         .database_initialization
                         .clone()
                         .unwrap_or_default()

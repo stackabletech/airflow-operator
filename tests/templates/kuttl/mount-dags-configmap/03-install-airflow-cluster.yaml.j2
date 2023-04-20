@@ -64,21 +64,22 @@ spec:
   image:
     productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
+  clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
-  vectorAggregatorConfigMapName: vector-aggregator-discovery
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-  executor: CeleryExecutor
-  loadExamples: false
-  exposeConfig: false
-  credentialsSecret: test-airflow-credentials
-  volumes:
-    - name: test-cm-dag
-      configMap:
-        name: test-cm-dag
-  volumeMounts:
-    - name: test-cm-dag
-      mountPath: /dags/example_trigger_target_dag.py
-      subPath: example_trigger_target_dag.py
+    executor: CeleryExecutor
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: test-airflow-credentials
+    volumes:
+      - name: test-cm-dag
+        configMap:
+          name: test-cm-dag
+    volumeMounts:
+      - name: test-cm-dag
+        mountPath: /dags/example_trigger_target_dag.py
+        subPath: example_trigger_target_dag.py
   webservers:
     config:
       logging:
