@@ -23,8 +23,7 @@ use stackable_operator::{
         core::v1::{Secret, Service},
     },
     kube::{
-        api::ListParams,
-        runtime::{reflector::ObjectRef, Controller},
+        runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
@@ -81,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
 
             let airflow_controller_builder = Controller::new(
                 watch_namespace.get_api::<AirflowCluster>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             );
 
             let airflow_store_1 = airflow_controller_builder.store();
@@ -89,16 +88,16 @@ async fn main() -> anyhow::Result<()> {
             let airflow_controller = airflow_controller_builder
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                 )
                 .owns(
                     watch_namespace.get_api::<StatefulSet>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                 )
                 .shutdown_on_signal()
                 .watches(
                     client.get_api::<AuthenticationClass>(&()),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |authentication_class| {
                         airflow_store_1
                             .state()
@@ -114,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .watches(
                     watch_namespace.get_api::<AirflowDB>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |airflow_db| {
                         airflow_store_2
                             .state()
@@ -144,7 +143,7 @@ async fn main() -> anyhow::Result<()> {
 
             let airflow_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<AirflowDB>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             );
 
             let airflow_db_store1 = airflow_db_controller_builder.store();
@@ -153,7 +152,7 @@ async fn main() -> anyhow::Result<()> {
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<Secret>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |secret| {
                         airflow_db_store1
                             .state()
@@ -172,7 +171,7 @@ async fn main() -> anyhow::Result<()> {
                 // and update our status accordingly
                 .watches(
                     watch_namespace.get_api::<Job>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |job| {
                         airflow_db_store2
                             .state()
