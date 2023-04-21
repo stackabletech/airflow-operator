@@ -10,9 +10,11 @@
 ### Changed
 
 - [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
+- `operator-rs` `0.40.2` -> `0.41.0` ([#272]).
 
 [#270]: https://github.com/stackabletech/airflow-operator/pull/270
 [#271]: https://github.com/stackabletech/airflow-operator/pull/271
+[#272]: https://github.com/stackabletech/airflow-operator/pull/272
 
 ## [23.4.0] - 2023-04-17
 
