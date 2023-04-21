@@ -142,6 +142,7 @@ spec:
               resources:
                 - statefulsets
               verbs:
+                - get
                 - create
                 - delete
                 - list
