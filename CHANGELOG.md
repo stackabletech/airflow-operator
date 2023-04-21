@@ -2,10 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Generate OLM bundle for Release 23.4.0 ([#270]).
+- Fix LDAP tests for Openshift ([#270]).
+
 ### Changed
 
 - [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
 
+[#270]: https://github.com/stackabletech/airflow-operator/pull/270
 [#271]: https://github.com/stackabletech/airflow-operator/pull/271
 
 ## [23.4.0] - 2023-04-17
