@@ -146,7 +146,7 @@ metadata:
 spec:
   image:
     productVersion: 2.4.1
-    stackableVersion: 23.4.0-rc2
+    stackableVersion: 0.0.0-dev
   clusterConfig:
     executor: CeleryExecutor
     loadExamples: true
