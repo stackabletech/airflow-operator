@@ -11,10 +11,13 @@
 
 - [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
 - `operator-rs` `0.40.2` -> `0.41.0` ([#272]).
+- Use 0.0.0-dev product images for testing ([#274])
+- Use testing-tools 0.2.0 ([#274])
 
 [#270]: https://github.com/stackabletech/airflow-operator/pull/270
 [#271]: https://github.com/stackabletech/airflow-operator/pull/271
 [#272]: https://github.com/stackabletech/airflow-operator/pull/272
+[#274]: https://github.com/stackabletech/airflow-operator/pull/274
 
 ## [23.4.0] - 2023-04-17
 
