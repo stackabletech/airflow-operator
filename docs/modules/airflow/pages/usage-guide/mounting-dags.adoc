@@ -23,13 +23,13 @@ include::example$example-airflow-dags-configmap.yaml[]
 
 The advantage of this approach is that a DAG can be provided "in-line", as it were. This becomes cumbersome when multiple DAGs are to be made available in this way, as each one has to be mapped individually. For multiple DAGs it is probably easier to expose them all via a mounted volume, which is shown below.
 
-=== via `git-sync`
+== via `git-sync`
 
-==== Overview
+=== Overview
 
 https://github.com/kubernetes/git-sync/tree/release-3.x[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronisation details are required. An example of this usage is given in the next section.
 
-==== Example
+=== Example
 
 [source,yaml]
 ----
