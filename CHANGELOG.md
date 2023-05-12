@@ -6,6 +6,7 @@
 
 - Generate OLM bundle for Release 23.4.0 ([#270]).
 - Fix LDAP tests for Openshift ([#270]).
+- Missing CRD defaults for `status.conditions` field ([#277]).
 
 ### Changed
 
@@ -18,6 +19,7 @@
 [#271]: https://github.com/stackabletech/airflow-operator/pull/271
 [#272]: https://github.com/stackabletech/airflow-operator/pull/272
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
+[#277]: https://github.com/stackabletech/airflow-operator/pull/277
 
 ## [23.4.0] - 2023-04-17
 
