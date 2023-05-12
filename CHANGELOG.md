@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [23.4.1] - 2023-05-17
+
+### Added
+
+- Missing CRD defaults for `status.conditions` field ([#277]).
+
+[#277]: https://github.com/stackabletech/airflow-operator/pull/277
+
 ## [23.4.0] - 2023-04-17
 
 ### Added
@@ -31,7 +39,7 @@
 
 ### Removed
 
-- Removed PVC-usage documemtation ([#245]).
+- Removed PVC-usage documentation ([#245]).
 
 [#219]: https://github.com/stackabletech/airflow-operator/pull/219
 [#222]: https://github.com/stackabletech/airflow-operator/pull/222
