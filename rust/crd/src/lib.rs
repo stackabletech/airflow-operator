@@ -546,6 +546,7 @@ impl Configuration for AirflowConfigFragment {
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterStatus {
+    #[serde(default)]
     pub conditions: Vec<ClusterCondition>,
 }
 
