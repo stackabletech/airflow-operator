@@ -160,7 +160,7 @@ request_dag_status() {
 
 dag_state=$(request_dag_status)
 
-while [[ "$dag_state" == "running" || "$dag_state" == "queued" ]]; do
+while [[ "$(request_dag_status)" == "running" || "$(request_dag_status)" == "queued" ]]; do
   echo "Awaiting DAG completion ..."
   sleep 5
   dag_state=$(request_dag_status)
