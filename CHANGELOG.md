@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Partially cherry-pick fixes for the ldap tests from main ([#283])
+
+[#283]: https://github.com/stackabletech/airflow-operator/pull/283
+
 ## [23.4.1] - 2023-05-17
 
 ### Added
