@@ -4,9 +4,9 @@
 
 ### Changed
 
-- Partially cherry-pick fixes for the ldap tests from main ([#282])
+- Partially cherry-pick fixes for the ldap tests from main ([#283])
 
-[#282]: https://github.com/stackabletech/airflow-operator/pull/282
+[#283]: https://github.com/stackabletech/airflow-operator/pull/283
 
 ## [23.4.1] - 2023-05-17
 
