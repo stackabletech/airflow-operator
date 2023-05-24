@@ -683,8 +683,8 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.2.4
-            stackableVersion: 23.4.0-rc2
+            productVersion: 2.6.1
+            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: KubernetesExecutor
             loadExamples: true
@@ -712,8 +712,8 @@ mod tests {
         let resolved_airflow_db_image: ResolvedProductImage =
             airflow_db.spec.image.resolve("airflow");
 
-        assert_eq!("2.2.4", &resolved_airflow_db_image.product_version);
-        assert_eq!("2.2.4", &resolved_airflow_image.product_version);
+        assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
+        assert_eq!("2.6.1", &resolved_airflow_image.product_version);
         assert_eq!(
             "KubernetesExecutor",
             cluster.spec.cluster_config.executor.unwrap_or_default()
@@ -732,8 +732,8 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.4.1
-            stackableVersion: 23.4.0-rc3
+            productVersion: 2.6.1
+            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false
@@ -779,8 +779,8 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.4.1
-            stackableVersion: 23.4.0-rc3
+            productVersion: 2.6.1
+            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false
