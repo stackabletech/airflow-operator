@@ -21,7 +21,7 @@ metadata:
   name: airflow-with-ldap
 spec:
   image:
-    productVersion: 2.4.1
+    productVersion: 2.6.1
     stackableVersion: 0.0.0-dev
   clusterConfig:
     authenticationConfig:
