@@ -62,8 +62,8 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.4.1
-            stackableVersion: 23.4.0-rc2
+            productVersion: 2.6.1
+            stackableVersion: 0.0.0-dev
           executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
@@ -158,8 +158,8 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.4.1
-            stackableVersion: 23.4.0-rc2
+            productVersion: 2.6.1
+            stackableVersion: 0.0.0-dev
           executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
