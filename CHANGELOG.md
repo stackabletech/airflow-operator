@@ -8,6 +8,7 @@
 - Fix LDAP tests for Openshift ([#270]).
 - Missing CRD defaults for `status.conditions` field ([#277]).
 - Support Airflow `2.6.1` ([#284]).
+- Add support for resource quota ([#289])
 
 ### Changed
 
@@ -22,6 +23,7 @@
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
+[#289]: https://github.com/stackabletech/airflow-operator/pull/289
 
 ## [23.4.0] - 2023-04-17
 
