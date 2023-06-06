@@ -13,6 +13,13 @@ master:
 {% endif %}
   containerSecurityContext:
     enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "512m"
+    limits:
+      memory: "128Mi"
+      cpu: "1"
 
 replica:
   replicaCount: 1
@@ -24,6 +31,13 @@ replica:
 {% endif %}
   containerSecurityContext:
     enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "512m"
+    limits:
+      memory: "128Mi"
+      cpu: "1"
 
 auth:
   password: redis
