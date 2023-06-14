@@ -712,6 +712,14 @@ fn build_server_rolegroup_statefulset(
             .command(vec!["/bin/bash".to_string(), "-c".to_string()])
             .args(vec![gitsync.get_args().join(" ")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+            .with_resources(
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_limit("500m")
+                    .with_cpu_request("100m")
+                    .with_memory_limit("128Mi")
+                    .with_memory_request("128Mi")
+                    .build(),
+            )
             .build();
 
         volumes.push(
