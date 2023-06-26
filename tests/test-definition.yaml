@@ -71,4 +71,3 @@ suites:
       - dimensions:
           - name: openshift
             expr: "true"
-
