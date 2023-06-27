@@ -14,6 +14,7 @@ use stackable_airflow_crd::{
     },
     AIRFLOW_UID, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
+
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
@@ -139,6 +140,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     if let Some(ref s) = airflow_db.status {
         match s.condition {
             AirflowDBStatusCondition::Pending => {
+                // This is easier to use than `get_opt` and having an Error variant for "Secret does not exist"
                 let _secret = client
                     .get::<Secret>(&airflow_db.spec.credentials_secret, &namespace)
                     .await
@@ -214,7 +216,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME, &*airflow_db, &namespace)
+                        .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME, &*airflow_db, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
