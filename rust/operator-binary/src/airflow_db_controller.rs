@@ -148,7 +148,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         secret: ObjectRef::<Secret>::new(&airflow_db.spec.credentials_secret)
                             .within(&namespace),
                     })?;
-                    
+
                 let vector_aggregator_address = resolve_vector_aggregator_address(
                     client,
                     airflow_db.as_ref(),
