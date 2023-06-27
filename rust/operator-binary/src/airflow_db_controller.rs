@@ -102,8 +102,10 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
-    #[snafu(display("unable to find SecretClass with airflow credentials"))]
-    SecretNotFound,
+    #[snafu(display("unable to find SecretClass [{secret}]. Missing spec.credentialsSecret."))]
+    SecretNotFound{
+        secret: String,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -205,7 +207,9 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         .await
                         .context(ApplyStatusSnafu)?;
                 } else {
-                    return SecretNotFoundSnafu.fail();
+                    return SecretNotFoundSnafu{
+                        secret: &airflow_db.spec.credentials_secret 
+                    }.fail();
                 }
             }
             AirflowDBStatusCondition::Initializing => {
