@@ -15,6 +15,7 @@
 - `operator-rs` `0.40.2` -> `0.41.0` ([#272]).
 - Use 0.0.0-dev product images for testing ([#274])
 - Use testing-tools 0.2.0 ([#274])
+- Added kuttl test suites ([#291])
 
 [#270]: https://github.com/stackabletech/airflow-operator/pull/270
 [#271]: https://github.com/stackabletech/airflow-operator/pull/271
@@ -22,6 +23,7 @@
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
+[#291]: https://github.com/stackabletech/airflow-operator/pull/291
 
 ## [23.4.0] - 2023-04-17
 
