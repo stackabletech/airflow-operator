@@ -205,7 +205,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                         .await
                         .context(ApplyStatusSnafu)?;
                 } else {
-                    return SecretNotFoundSnafu.fail()
+                    return SecretNotFoundSnafu.fail();
                 }
             }
             AirflowDBStatusCondition::Initializing => {
