@@ -304,8 +304,8 @@ fn build_init_job(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
                 .with_cpu_limit("400m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
+                .with_memory_request("512Mi")
+                .with_memory_limit("512Mi")
                 .build(),
         );
 
