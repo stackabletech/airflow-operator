@@ -27,47 +27,47 @@ tests:
     dimensions:
       - airflow
       - openshift
-#   - name: mount-dags-configmap
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: mount-dags-gitsync
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: ldap
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#       - ldap-authentication
-#   - name: resources
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: orphaned-resources
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: logging
-#     dimensions:
-#       - airflow
-#       - openshift
-#   - name: cluster-operation
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-# suites:
-#   - name: latest
-#     patch:
-#       - dimensions:
-#           - expr: last
-#   - name: smoke
-#     select:
-#       - smoke
-#   - name: openshift
-#     patch:
-#       - dimensions:
-#           - expr: last
-#       - dimensions:
-#           - name: openshift
-#             expr: "true"
+  - name: mount-dags-configmap
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: mount-dags-gitsync
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: ldap
+    dimensions:
+      - airflow-latest
+      - openshift
+      - ldap-authentication
+  - name: resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: orphaned-resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: logging
+    dimensions:
+      - airflow
+      - openshift
+  - name: cluster-operation
+    dimensions:
+      - airflow-latest
+      - openshift
+suites:
+  - name: latest
+    patch:
+      - dimensions:
+          - expr: last
+  - name: smoke
+    select:
+      - smoke
+  - name: openshift
+    patch:
+      - dimensions:
+          - expr: last
+      - dimensions:
+          - name: openshift
+            expr: "true"
