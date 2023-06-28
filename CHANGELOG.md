@@ -25,8 +25,8 @@
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
-[#284]: https://github.com/stackabletech/airflow-operator/pull/289
-[#284]: https://github.com/stackabletech/airflow-operator/pull/293
+[#289]: https://github.com/stackabletech/airflow-operator/pull/289
+[#293]: https://github.com/stackabletech/airflow-operator/pull/293
 
 ## [23.4.0] - 2023-04-17
 
