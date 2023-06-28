@@ -6,14 +6,29 @@ If no resource requests are configured explicitly, the operator uses the followi
 
 [source,yaml]
 ----
-workers:
-  roleGroups:
-    default:
-      config:
-        resources:
-          cpu:
-            min: '200m'
-            max: "4"
-          memory:
-            limit: '2Gi'
+spec:
+  schedulers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 400m
+        memory:
+          limit: 512Mi
+  workers:
+    config:
+      resources:
+        cpu:
+          min: 200m
+          max: 800m
+        memory:
+          limit: 1750Mi
+  webservers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 400m
+        memory:
+          limit: 700Mi
 ----
