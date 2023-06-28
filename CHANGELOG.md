@@ -8,7 +8,7 @@
 - Fix LDAP tests for Openshift ([#270]).
 - Missing CRD defaults for `status.conditions` field ([#277]).
 - Support Airflow `2.6.1` ([#284]).
-- Add support for resource quota ([#289])
+- Set explicit resources on all containers ([#289])
 - Operator errors out when credentialsSecret is missing ([#293]).
 
 ### Changed
