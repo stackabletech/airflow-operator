@@ -188,11 +188,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                     })?;
                 // The job is started, update status to reflect new state
                 client
-                    .apply_patch_status(
-                        AIRFLOW_DB_CONTROLLER_NAME,
-                        &*airflow_db,
-                        &s.initializing(),
-                    )
+                    .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME,&*airflow_db,&s.initializing())
                     .await
                     .context(ApplyStatusSnafu)?;
             }
@@ -200,13 +196,11 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
                 let job_name = airflow_db.job_name();
-                let job =
-                    client
-                        .get::<Job>(&job_name, &namespace)
-                        .await
-                        .context(GetInitializationJobSnafu {
+                let job = client.get::<Job>(&job_name, &namespace).await.context(
+                    GetInitializationJobSnafu {
                             init_job: ObjectRef::<Job>::new(&job_name).within(&namespace),
-                        })?;
+                    },
+                )?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Complete => Some(s.ready()),
