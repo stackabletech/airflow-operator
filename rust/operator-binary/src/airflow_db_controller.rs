@@ -14,6 +14,7 @@ use stackable_airflow_crd::{
     },
     AIRFLOW_UID, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
 };
+
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
@@ -115,6 +116,7 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let namespace = airflow_db.namespace().context(ObjectHasNoNamespaceSnafu)?;
     let resolved_product_image: ResolvedProductImage =
         airflow_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
@@ -138,86 +140,67 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
     if let Some(ref s) = airflow_db.status {
         match s.condition {
             AirflowDBStatusCondition::Pending => {
-                let secret = client
-                    .get_opt::<Secret>(
-                        &airflow_db.spec.credentials_secret,
-                        airflow_db
-                            .namespace()
-                            .as_deref()
-                            .context(ObjectHasNoNamespaceSnafu)?,
-                    )
+                // This is easier to use than `get_opt` and having an Error variant for "Secret does not exist"
+                let _secret = client
+                    .get::<Secret>(&airflow_db.spec.credentials_secret, &namespace)
                     .await
-                    .with_context(|_| {
-                        let mut secret_ref =
-                            ObjectRef::<Secret>::new(&airflow_db.spec.credentials_secret);
-                        if let Some(ns) = airflow_db.namespace() {
-                            secret_ref = secret_ref.within(&ns);
-                        }
-                        SecretCheckSnafu { secret: secret_ref }
+                    .context(SecretCheckSnafu {
+                        secret: ObjectRef::<Secret>::new(&airflow_db.spec.credentials_secret)
+                            .within(&namespace),
                     })?;
-                if secret.is_some() {
-                    let vector_aggregator_address = resolve_vector_aggregator_address(
-                        client,
-                        airflow_db.as_ref(),
-                        airflow_db.spec.vector_aggregator_config_map_name.as_deref(),
-                    )
+
+                let vector_aggregator_address = resolve_vector_aggregator_address(
+                    client,
+                    airflow_db.as_ref(),
+                    airflow_db.spec.vector_aggregator_config_map_name.as_deref(),
+                )
+                .await
+                .context(ResolveVectorAggregatorAddressSnafu)?;
+
+                let config = airflow_db
+                    .merged_config()
+                    .context(FailedToResolveConfigSnafu)?;
+
+                let config_map = build_config_map(
+                    &airflow_db,
+                    &config.logging,
+                    vector_aggregator_address.as_deref(),
+                )?;
+                client
+                    .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &config_map, &config_map)
                     .await
-                    .context(ResolveVectorAggregatorAddressSnafu)?;
+                    .context(ApplyConfigMapSnafu {
+                        name: config_map.name_any(),
+                    })?;
 
-                    let config = airflow_db
-                        .merged_config()
-                        .context(FailedToResolveConfigSnafu)?;
-
-                    let config_map = build_config_map(
-                        &airflow_db,
-                        &config.logging,
-                        vector_aggregator_address.as_deref(),
-                    )?;
-                    client
-                        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &config_map, &config_map)
-                        .await
-                        .context(ApplyConfigMapSnafu {
-                            name: config_map.name_any(),
-                        })?;
-
-                    let job = build_init_job(
-                        &airflow_db,
-                        &resolved_product_image,
-                        &rbac_sa.name_unchecked(),
-                        &config,
-                        &config_map.name_unchecked(),
-                    )?;
-                    client
-                        .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
-                        .await
-                        .context(ApplyJobSnafu {
-                            airflow_db: ObjectRef::from_obj(&*airflow_db),
-                        })?;
-                    // The job is started, update status to reflect new state
-                    client
-                        .apply_patch_status(
-                            AIRFLOW_DB_CONTROLLER_NAME,
-                            &*airflow_db,
-                            &s.initializing(),
-                        )
-                        .await
-                        .context(ApplyStatusSnafu)?;
-                }
+                let job = build_init_job(
+                    &airflow_db,
+                    &resolved_product_image,
+                    &rbac_sa.name_unchecked(),
+                    &config,
+                    &config_map.name_unchecked(),
+                )?;
+                client
+                    .apply_patch(AIRFLOW_DB_CONTROLLER_NAME, &job, &job)
+                    .await
+                    .context(ApplyJobSnafu {
+                        airflow_db: ObjectRef::from_obj(&*airflow_db),
+                    })?;
+                // The job is started, update status to reflect new state
+                client
+                    .apply_patch_status(AIRFLOW_DB_CONTROLLER_NAME, &*airflow_db, &s.initializing())
+                    .await
+                    .context(ApplyStatusSnafu)?;
             }
             AirflowDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                let ns = airflow_db
-                    .namespace()
-                    .unwrap_or_else(|| "default".to_string());
                 let job_name = airflow_db.job_name();
-                let job =
-                    client
-                        .get::<Job>(&job_name, &ns)
-                        .await
-                        .context(GetInitializationJobSnafu {
-                            init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                        })?;
+                let job = client.get::<Job>(&job_name, &namespace).await.context(
+                    GetInitializationJobSnafu {
+                        init_job: ObjectRef::<Job>::new(&job_name).within(&namespace),
+                    },
+                )?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Complete => Some(s.ready()),

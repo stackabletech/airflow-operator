@@ -8,6 +8,7 @@
 - Fix LDAP tests for Openshift ([#270]).
 - Missing CRD defaults for `status.conditions` field ([#277]).
 - Support Airflow `2.6.1` ([#284]).
+- Operator errors out when credentialsSecret is missing ([#293]).
 
 ### Changed
 
@@ -24,6 +25,7 @@
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
+[#293]: https://github.com/stackabletech/airflow-operator/pull/293
 
 ## [23.4.0] - 2023-04-17
 
