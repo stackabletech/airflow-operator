@@ -203,10 +203,6 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to build pod template"))]
-    BuildTemplate {
-        source: stackable_operator::error::Error,
-    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -633,7 +629,7 @@ fn build_server_rolegroup_statefulset(
 
     let cb = cb
         .image_from_product_image(resolved_product_image)
-        .with_resources(config.resources.clone().into())
+        .resources(config.resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")]);
 
@@ -685,12 +681,12 @@ fn build_server_rolegroup_statefulset(
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
-        .with_resources(
+        .resources(
             ResourceRequirementsBuilder::new()
-                .with_cpu_limit("500m")
                 .with_cpu_request("100m")
-                .with_memory_limit("128Mi")
-                .with_memory_request("128Mi")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
                 .build(),
         )
         .build();
@@ -712,12 +708,12 @@ fn build_server_rolegroup_statefulset(
             .command(vec!["/bin/bash".to_string(), "-c".to_string()])
             .args(vec![gitsync.get_args().join(" ")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
-            .with_resources(
+            .resources(
                 ResourceRequirementsBuilder::new()
-                    .with_cpu_limit("500m")
                     .with_cpu_request("100m")
-                    .with_memory_limit("128Mi")
-                    .with_memory_request("128Mi")
+                    .with_cpu_limit("200m")
+                    .with_memory_request("64Mi")
+                    .with_memory_limit("64Mi")
                     .build(),
             )
             .build();
@@ -731,18 +727,17 @@ fn build_server_rolegroup_statefulset(
     }
 
     if config.logging.enable_vector_agent {
-        let resources = ResourceRequirementsBuilder::new()
-            .with_cpu_limit("500m")
-            .with_cpu_request("100m")
-            .with_memory_limit("40Mi")
-            .with_memory_request("8Mi")
-            .build();
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
-            resources,
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
         ));
     }
 
@@ -795,8 +790,7 @@ fn build_server_rolegroup_statefulset(
                         .fs_group(1000) // Needed for secret-operator
                         .build(),
                 )
-                .build_template()
-                .context(BuildTemplateSnafu)?,
+                .build_template(),
             ..StatefulSetSpec::default()
         }),
         status: None,

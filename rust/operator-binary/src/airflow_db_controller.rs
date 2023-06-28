@@ -300,12 +300,12 @@ fn build_init_job(
         .add_env_vars(env)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .with_resources(
+        .resources(
             ResourceRequirementsBuilder::new()
-                .with_cpu_limit("500m")
                 .with_cpu_request("100m")
-                .with_memory_limit("512Mi")
+                .with_cpu_limit("400m")
                 .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
                 .build(),
         );
 
@@ -317,18 +317,17 @@ fn build_init_job(
     containers.push(cb.build());
 
     if config.logging.enable_vector_agent {
-        let resources = ResourceRequirementsBuilder::new()
-            .with_cpu_limit("500m")
-            .with_cpu_request("100m")
-            .with_memory_limit("40Mi")
-            .with_memory_request("8Mi")
-            .build();
         containers.push(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
-            resources,
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
         ));
     }
 
