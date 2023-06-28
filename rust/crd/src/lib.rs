@@ -484,16 +484,33 @@ impl AirflowConfig {
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
-        AirflowConfigFragment {
-            resources: ResourcesFragment {
-                cpu: CpuLimitsFragment {
+        let (cpu, memory) = match role {
+            AirflowRole::Worker => (
+                CpuLimitsFragment {
+                    min: Some(Quantity("200m".into())),
+                    max: Some(Quantity("800m".into())),
+                },
+                MemoryLimitsFragment {
+                    limit: Some(Quantity("1024Mi".into())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+            ),
+            _ => (
+                CpuLimitsFragment {
                     min: Some(Quantity("100m".to_owned())),
                     max: Some(Quantity("400m".to_owned())),
                 },
-                memory: MemoryLimitsFragment {
+                MemoryLimitsFragment {
                     limit: Some(Quantity("512Mi".to_owned())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
+            ),
+        };
+
+        AirflowConfigFragment {
+            resources: ResourcesFragment {
+                cpu,
+                memory,
                 storage: AirflowStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
