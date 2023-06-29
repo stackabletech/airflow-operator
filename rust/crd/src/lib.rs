@@ -501,7 +501,7 @@ impl AirflowConfig {
                     max: Some(Quantity("400m".into())),
                 },
                 MemoryLimitsFragment {
-                    limit: Some(Quantity("700Mi".into())),
+                    limit: Some(Quantity("1024Mi".into())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
             ),

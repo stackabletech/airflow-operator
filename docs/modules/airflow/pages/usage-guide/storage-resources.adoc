@@ -6,7 +6,7 @@ A minimal HA setup consisting of 2 Airflow instances has the following https://k
 
 * `3500m` CPU request
 * `8600m` CPU limit
-* `7460Mi` memory request and limit
+* `8108Mi` memory request and limit
 
 Corresponding to the values above, the operator uses the following resource defaults:
 
@@ -36,5 +36,5 @@ spec:
           min: 100m
           max: 400m
         memory:
-          limit: 700Mi
+          limit: 1024Mi
 ----
