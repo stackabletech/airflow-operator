@@ -1,4 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
+use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
     self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
@@ -679,6 +681,14 @@ fn build_server_rolegroup_statefulset(
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("100m")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
+                .build(),
+        )
         .build();
 
     let mut volumes = airflow.volumes();
@@ -698,6 +708,14 @@ fn build_server_rolegroup_statefulset(
             .command(vec!["/bin/bash".to_string(), "-c".to_string()])
             .args(vec![gitsync.get_args().join(" ")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+            .resources(
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_request("100m")
+                    .with_cpu_limit("200m")
+                    .with_memory_request("64Mi")
+                    .with_memory_limit("64Mi")
+                    .build(),
+            )
             .build();
 
         volumes.push(
@@ -714,6 +732,12 @@ fn build_server_rolegroup_statefulset(
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
         ));
     }
 

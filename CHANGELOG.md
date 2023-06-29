@@ -8,6 +8,7 @@
 - Fix LDAP tests for Openshift ([#270]).
 - Missing CRD defaults for `status.conditions` field ([#277]).
 - Support Airflow `2.6.1` ([#284]).
+- Set explicit resources on all containers ([#289])
 - Operator errors out when credentialsSecret is missing ([#293]).
 
 ### Changed
@@ -24,6 +25,7 @@
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
+[#289]: https://github.com/stackabletech/airflow-operator/pull/289
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
 [#293]: https://github.com/stackabletech/airflow-operator/pull/293
 

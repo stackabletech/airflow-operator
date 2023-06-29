@@ -1,10 +1,9 @@
 use stackable_airflow_crd::{
     AirflowClusterAuthenticationConfig, AirflowConfigOptions, LdapRolesSyncMoment,
 };
-use stackable_operator::commons::{
-    authentication::{AuthenticationClass, AuthenticationClassProvider},
-    ldap::LdapAuthenticationProvider,
-    tls::TlsVerification,
+use stackable_operator::commons::authentication::{
+    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClass,
+    AuthenticationClassProvider,
 };
 use std::collections::BTreeMap;
 

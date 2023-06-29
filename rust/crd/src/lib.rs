@@ -484,16 +484,43 @@ impl AirflowConfig {
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
-        AirflowConfigFragment {
-            resources: ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("200m".to_owned())),
-                    max: Some(Quantity("4".to_owned())),
+        let (cpu, memory) = match role {
+            AirflowRole::Worker => (
+                CpuLimitsFragment {
+                    min: Some(Quantity("200m".into())),
+                    max: Some(Quantity("800m".into())),
                 },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".to_owned())),
+                MemoryLimitsFragment {
+                    limit: Some(Quantity("1750Mi".into())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
+            ),
+            AirflowRole::Webserver => (
+                CpuLimitsFragment {
+                    min: Some(Quantity("100m".into())),
+                    max: Some(Quantity("400m".into())),
+                },
+                MemoryLimitsFragment {
+                    limit: Some(Quantity("1024Mi".into())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+            ),
+            AirflowRole::Scheduler => (
+                CpuLimitsFragment {
+                    min: Some(Quantity("100m".to_owned())),
+                    max: Some(Quantity("400m".to_owned())),
+                },
+                MemoryLimitsFragment {
+                    limit: Some(Quantity("512Mi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+            ),
+        };
+
+        AirflowConfigFragment {
+            resources: ResourcesFragment {
+                cpu,
+                memory,
                 storage: AirflowStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
