@@ -10,6 +10,7 @@
 - Support Airflow `2.6.1` ([#284]).
 - Set explicit resources on all containers ([#289])
 - Operator errors out when credentialsSecret is missing ([#293]).
+- Support podOverrides ([#295]).
 
 ### Changed
 
@@ -28,6 +29,7 @@
 [#289]: https://github.com/stackabletech/airflow-operator/pull/289
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
 [#293]: https://github.com/stackabletech/airflow-operator/pull/293
+[#295]: https://github.com/stackabletech/airflow-operator/pull/295
 
 ## [23.4.0] - 2023-04-17
 
