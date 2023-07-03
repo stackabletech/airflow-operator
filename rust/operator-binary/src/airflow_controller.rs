@@ -238,7 +238,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let mut roles = HashMap::new();
 
     for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(role.clone()).clone() {
+        if let Some(resolved_role) = airflow.get_role(&role).clone() {
             roles.insert(
                 role.to_string(),
                 (
@@ -612,7 +612,7 @@ fn build_server_rolegroup_statefulset(
     config: &AirflowConfig,
 ) -> Result<StatefulSet> {
     let role = airflow
-        .get_role(airflow_role.clone())
+        .get_role(airflow_role)
         .as_ref()
         .context(NoAirflowRoleSnafu)?;
 
