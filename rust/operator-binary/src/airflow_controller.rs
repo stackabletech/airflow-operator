@@ -371,6 +371,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             let rg_statefulset = build_server_rolegroup_statefulset(
                 &airflow,
                 &resolved_product_image,
+                &airflow_role,
                 &rolegroup,
                 rolegroup_config,
                 authentication_class.as_ref(),
@@ -599,16 +600,17 @@ fn build_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
+#[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
+    airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     sa_name: &str,
     config: &AirflowConfig,
 ) -> Result<StatefulSet> {
-    let airflow_role = AirflowRole::from_str(&rolegroup_ref.role).unwrap();
     let role = airflow
         .get_role(airflow_role.clone())
         .as_ref()
