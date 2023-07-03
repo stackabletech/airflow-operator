@@ -57,17 +57,26 @@ tests:
       - airflow-latest
       - openshift
 suites:
-  - name: latest
+  - name: nightly
+    # Run nightly with the latest airflow
     patch:
       - dimensions:
-          - expr: last
-  - name: smoke
+          - name: airflow
+            expr: last
+  - name: smoke-latest
+    # Useful for development
     select:
       - smoke
+    patch:
+      - dimensions:
+          - expr: last
   - name: openshift
+    # Run on OpenShift with latest airflow
     patch:
       - dimensions:
           - expr: last
       - dimensions:
+          - name: airflow
+            expr: last
           - name: openshift
             expr: "true"
