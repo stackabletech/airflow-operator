@@ -25,10 +25,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 1Gi
+              memory: 2Gi
             limits:
               cpu: "1"
-              memory: 1Gi
+              memory: 2Gi
         - name: metrics
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
         - name: vector
@@ -49,9 +49,33 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 2Gi
+              memory: 3Gi
             limits:
               cpu: "2"
+              memory: 3Gi
+        - name: metrics
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-resources-from-pod-overrides
+spec:
+  template:
+    spec:
+      containers:
+        - name: airflow
+          resources:
+            requests:
+              cpu: 300m
+              memory: 2Gi
+            limits:
+              cpu: 900m
               memory: 2Gi
         - name: metrics
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
