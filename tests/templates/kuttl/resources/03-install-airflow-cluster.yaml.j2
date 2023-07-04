@@ -52,7 +52,7 @@ spec:
           min: 100m
           max: "1"
         memory:
-          limit: 1Gi
+          limit: 2Gi
     roleGroups:
       resources-from-role:
         replicas: 1
@@ -63,7 +63,7 @@ spec:
               min: 200m
               max: "2"
             memory:
-              limit: 2Gi
+              limit: 3Gi
         replicas: 1
       resources-from-pod-overrides:
         podOverrides:
