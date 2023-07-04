@@ -64,6 +64,30 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  name: airflow-worker-resources-from-pod-overrides
+spec:
+  template:
+    spec:
+      containers:
+        - name: airflow
+          resources:
+            requests:
+              cpu: 300m
+              memory: 1Gi
+            limits:
+              cpu: 900m
+              memory: 1Gi
+        - name: metrics
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
   name: airflow-scheduler-default
 status:
   readyReplicas: 1

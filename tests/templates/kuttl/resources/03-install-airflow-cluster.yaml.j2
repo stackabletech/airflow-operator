@@ -65,6 +65,16 @@ spec:
             memory:
               limit: 2Gi
         replicas: 1
+      resources-from-pod-overrides:
+        podOverrides:
+          spec:
+            containers:
+              - name: airflow
+                resources:
+                  requests:
+                    cpu: 300m
+                  limits:
+                    cpu: 900m
   schedulers:
     config:
       logging:
