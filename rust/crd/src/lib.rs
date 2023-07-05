@@ -377,7 +377,7 @@ impl AirflowRole {
 }
 
 impl AirflowCluster {
-    pub fn get_role(&self, role: AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
+    pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
