@@ -7,6 +7,7 @@ on:
       - main
       - staging
       - trying
+      - test-image-signing
       - "renovate/**"
     tags:
       - '[0-9][0-9].[0-9]+.[0-9]+'
@@ -78,7 +79,7 @@ jobs:
           if [[ $TRIGGER == "pull_request" ]]; then
             echo "exporting test as target helm repo: ${{ env.TEST_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.TEST_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ $TRIGGER == "push" && $GITHUB_REF == "refs/heads/main" ]]; then
+          elif [[ $TRIGGER == "push" && ($GITHUB_REF == "refs/heads/main" || $GITHUB_REF == "refs/heads/test-image-signing") ]]; then
             echo "exporting dev as target helm repo: ${{ env.DEV_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.DEV_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
           elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && $GITHUB_REF == refs/tags/* ]]; then
@@ -282,6 +283,8 @@ jobs:
       - tests_passed
       - select_helm_repo
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     env:
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
       HELM_REPO: ${{ needs.select_helm_repo.outputs.helm_repository }}
@@ -312,6 +315,8 @@ jobs:
         # Recreate charts and publish charts and docker image. The "-e" is needed as we want to override the
         # default value in the makefile if called from this action, but not otherwise (i.e. when called locally).
         # This is needed for the HELM_REPO variable.
+      - name: Set up Cosign
+        uses: sigstore/cosign-installer@v3.0.5
       - name: Publish Docker image and Helm chart
         run: make -e publish
         # Output the name of the published image to the Job output for later use

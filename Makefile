@@ -31,6 +31,12 @@ docker-build:
 docker-publish:
 	echo "${NEXUS_PASSWORD}" | docker login --username github --password-stdin "${DOCKER_REPO}"
 	docker push --all-tags "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}"
+	REPO_ARTIFACT_BY_DIGEST=$$(docker inspect --format='{{range .RepoDigests}}{{ . }}{{end}}' '${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}' | grep -E '^${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@sha256:[0-9a-f]{64}$$' | head -n1);\
+	if [ -z "$$REPO_ARTIFACT_BY_DIGEST" ]; then\
+		echo 'Could not find repo digest for container image: ${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}';\
+		exit 1;\
+	fi;\
+	cosign sign -y $$REPO_ARTIFACT_BY_DIGEST
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
