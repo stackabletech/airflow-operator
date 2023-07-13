@@ -14,7 +14,7 @@
 
 ### Fixed
 
-- Increase the size limit of the log volume ([#xxx]).
+- Increase the size limit of the log volume ([#299]).
 
 ### Changed
 
@@ -34,7 +34,7 @@
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
 [#293]: https://github.com/stackabletech/airflow-operator/pull/293
 [#295]: https://github.com/stackabletech/airflow-operator/pull/295
-[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+[#299]: https://github.com/stackabletech/airflow-operator/pull/299
 
 ## [23.4.0] - 2023-04-17
 
