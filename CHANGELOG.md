@@ -12,10 +12,14 @@
 - Operator errors out when credentialsSecret is missing ([#293]).
 - Support podOverrides ([#295]).
 
+### Fixed
+
+- Increase the size limit of the log volume ([#299]).
+
 ### Changed
 
 - [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
-- `operator-rs` `0.40.2` -> `0.41.0` ([#272]).
+- `operator-rs` `0.40.2` -> `0.44.0` ([#272], [#299]).
 - Use 0.0.0-dev product images for testing ([#274])
 - Use testing-tools 0.2.0 ([#274])
 - Added kuttl test suites ([#291])
@@ -30,6 +34,7 @@
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
 [#293]: https://github.com/stackabletech/airflow-operator/pull/293
 [#295]: https://github.com/stackabletech/airflow-operator/pull/295
+[#299]: https://github.com/stackabletech/airflow-operator/pull/299
 
 ## [23.4.0] - 2023-04-17
 
