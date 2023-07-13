@@ -7,6 +7,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::commons::affinity::StackableAffinity;
 use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::kube::ResourceExt;
+use stackable_operator::memory::{BinaryMultiple, MemoryQuantity};
 use stackable_operator::role_utils::RoleGroup;
 use stackable_operator::{
     commons::cluster_operation::ClusterOperation,
@@ -50,7 +51,10 @@ pub const GIT_SYNC_NAME: &str = "gitsync";
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
 
-pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
+pub const MAX_LOG_FILES_SIZE_IN_MIB: MemoryQuantity = MemoryQuantity {
+    value: 10.0,
+    unit: BinaryMultiple::Mebi,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
