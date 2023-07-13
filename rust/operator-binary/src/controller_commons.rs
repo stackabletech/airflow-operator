@@ -1,4 +1,4 @@
-use stackable_airflow_crd::MAX_LOG_FILES_SIZE_IN_MIB;
+use stackable_airflow_crd::MAX_LOG_FILES_SIZE;
 use stackable_operator::{
     builder::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
@@ -31,7 +31,7 @@ pub fn create_volumes(
         empty_dir: Some(EmptyDirVolumeSource {
             medium: None,
             size_limit: Some(product_logging::framework::calculate_log_volume_size_limit(
-                &[MAX_LOG_FILES_SIZE_IN_MIB],
+                &[MAX_LOG_FILES_SIZE],
             )),
         }),
         ..Volume::default()

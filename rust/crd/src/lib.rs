@@ -51,7 +51,7 @@ pub const GIT_SYNC_NAME: &str = "gitsync";
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
 
-pub const MAX_LOG_FILES_SIZE_IN_MIB: MemoryQuantity = MemoryQuantity {
+pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
