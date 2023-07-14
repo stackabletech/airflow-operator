@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-airflow-crd"
-version = "0.0.0-dev"
+version = "23.7.0"
 dependencies = [
  "rstest",
  "serde",
@@ -1920,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-airflow-operator"
-version = "0.0.0-dev"
+version = "23.7.0"
 dependencies = [
  "anyhow",
  "built",
