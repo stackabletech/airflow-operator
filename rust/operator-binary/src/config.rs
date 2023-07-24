@@ -151,43 +151,17 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 #[cfg(test)]
 mod tests {
     use crate::config::add_airflow_config;
-    use crate::AirflowCluster;
-    use stackable_airflow_crd::FlaskRolesSyncMoment::Registration;
-    use stackable_airflow_crd::{AirflowAuthenticationConfig, AirflowConfigOptions};
+    use stackable_airflow_crd::authentication::{
+        default_sync_roles_at, default_user_registration, AirflowAuthenticationConfigResolved,
+    };
+    use stackable_airflow_crd::AirflowConfigOptions;
     use stackable_operator::commons::authentication::AuthenticationClass;
     use std::collections::BTreeMap;
 
     #[test]
     fn test_no_ldap() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
-        apiVersion: airflow.stackable.tech/v1alpha1
-        kind: AirflowCluster
-        metadata:
-          name: airflow
-        spec:
-          image:
-            productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
-          clusterConfig:
-            executor: KubernetesExecutor
-            loadExamples: true
-            exposeConfig: true
-            credentialsSecret: simple-airflow-credentials
-          ",
-        )
-        .unwrap();
-
         let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
-            cluster.spec.cluster_config.authentication_config.as_ref(),
-            None,
-        );
-        assert_eq!(
-            None,
-            cluster.spec.cluster_config.authentication_config.as_ref()
-        );
+        add_airflow_config(&mut result, &vec![]);
         assert_eq!(
             BTreeMap::from([("AUTH_TYPE".into(), "AUTH_DB".into())]),
             result
@@ -196,28 +170,6 @@ mod tests {
 
     #[test]
     fn test_ldap() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
-        apiVersion: airflow.stackable.tech/v1alpha1
-        kind: AirflowCluster
-        metadata:
-          name: airflow
-        spec:
-          image:
-            productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
-          clusterConfig:
-            executor: KubernetesExecutor
-            loadExamples: true
-            exposeConfig: true
-            credentialsSecret: simple-airflow-credentials
-            authenticationConfig:
-              authenticationClass: airflow-with-ldap-server-veri-tls-ldap
-              userRegistrationRole: Admin
-          ",
-        )
-        .unwrap();
-
         let authentication_class: AuthenticationClass =
             serde_yaml::from_str::<AuthenticationClass>(
                 "
@@ -244,27 +196,21 @@ mod tests {
             )
             .unwrap();
 
+        let resolved_config = AirflowAuthenticationConfigResolved {
+            authentication_class: Some(authentication_class),
+            user_registration: default_user_registration(),
+            user_registration_role: "Admin".to_string(),
+            sync_roles_at: default_sync_roles_at(),
+        };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
-            cluster.spec.cluster_config.authentication_config.as_ref(),
-            Some(&authentication_class),
-        );
-        assert_eq!(
-            Some(AirflowAuthenticationConfig {
-                authentication_class: Some("airflow-with-ldap-server-veri-tls-ldap".to_string()),
-                user_registration: true,
-                user_registration_role: "Admin".to_string(),
-                sync_roles_at: Registration
-            }),
-            cluster.spec.cluster_config.authentication_config
-        );
+        add_airflow_config(&mut result, &vec![resolved_config]);
+
         assert_eq!(
             "AUTH_LDAP",
             result
                 .get(&AirflowConfigOptions::AuthType.to_string())
                 .unwrap()
         );
-        println!("{result:#?}");
     }
 }
