@@ -1,9 +1,11 @@
 = Security
 
 == Authentication
+
 Every user has to authenticate themselves before using Airflow and there are several ways of doing this.
 
 === Webinterface
+
 The default setting is to view and manually set up users via the Webserver UI. Note the blue "+" button where users can be added directly:
 
 image::airflow_security.png[Airflow Security menu]
@@ -60,8 +62,9 @@ metadata:
 spec:
   clusterConfig:
     authentication:
-      - authenticationClass: ldap
-        userRegistrationRole: Admin  # <1>
+      - authenticationClass: ldap # <1>
+        userRegistrationRole: Admin  # <2>
 ----
 
-<1> All users are assigned to the `Admin` role
+<1> The reference to an AuthenticationClass called `ldap`
+<2> All users are assigned to the `Admin` role
