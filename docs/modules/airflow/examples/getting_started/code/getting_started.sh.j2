@@ -4,7 +4,7 @@ set -euo pipefail
 # This script contains all the code snippets from the guide, as well as some assert tests
 # to test if the instructions in the guide work. The user *could* use it, but it is intended
 # for testing only.
-# The script will install the operators, create a airflow instance and briefly open a port
+# The script will install the operators, create an airflow instance and briefly open a port
 # forward and connect to the airflow instance to make sure it is up and running.
 # No running processes are left behind (i.e. the port-forwarding is closed at the end)
 
