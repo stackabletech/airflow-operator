@@ -1,9 +1,9 @@
 use stackable_airflow_crd::{
-    AirflowClusterAuthenticationConfig, AirflowConfigOptions, LdapRolesSyncMoment,
+    authentication::AirflowAuthenticationConfigResolved, authentication::FlaskRolesSyncMoment,
+    AirflowConfigOptions,
 };
 use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClass,
-    AuthenticationClassProvider,
+    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
 };
 use std::collections::BTreeMap;
 
@@ -16,14 +16,8 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: Option<&AirflowClusterAuthenticationConfig>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
 ) {
-    if let Some(authentication_config) = authentication_config {
-        if let Some(authentication_class) = authentication_class {
-            append_authentication_config(config, authentication_config, authentication_class);
-        }
-    }
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
             // should default to AUTH_TYPE = AUTH_DB
@@ -31,29 +25,37 @@ pub fn add_airflow_config(
             "AUTH_DB".into(),
         );
     }
+
+    append_authentication_config(config, authentication_config);
 }
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &AirflowClusterAuthenticationConfig,
-    authentication_class: &AuthenticationClass,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
 ) {
-    if let AuthenticationClassProvider::Ldap(ldap) = &authentication_class.spec.provider {
-        append_ldap_config(config, ldap);
-    }
+    // TODO: we make sure in crd/src/authentication.rs that currently there is only one
+    //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
+    //    to adapt the config here accordingly
+    for auth_config in authentication_config {
+        if let Some(auth_class) = &auth_config.authentication_class {
+            if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
+                append_ldap_config(config, ldap);
+            }
+        }
 
-    config.insert(
-        AirflowConfigOptions::AuthUserRegistration.to_string(),
-        authentication_config.user_registration.to_string(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthUserRegistrationRole.to_string(),
-        authentication_config.user_registration_role.to_string(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        (authentication_config.sync_roles_at == LdapRolesSyncMoment::Login).to_string(),
-    );
+        config.insert(
+            AirflowConfigOptions::AuthUserRegistration.to_string(),
+            auth_config.user_registration.to_string(),
+        );
+        config.insert(
+            AirflowConfigOptions::AuthUserRegistrationRole.to_string(),
+            auth_config.user_registration_role.to_string(),
+        );
+        config.insert(
+            AirflowConfigOptions::AuthRolesSyncAtLogin.to_string(),
+            (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+        );
+    }
 }
 
 fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
@@ -150,8 +152,8 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 mod tests {
     use crate::config::add_airflow_config;
     use crate::AirflowCluster;
-    use stackable_airflow_crd::LdapRolesSyncMoment::Registration;
-    use stackable_airflow_crd::{AirflowClusterAuthenticationConfig, AirflowConfigOptions};
+    use stackable_airflow_crd::FlaskRolesSyncMoment::Registration;
+    use stackable_airflow_crd::{AirflowAuthenticationConfig, AirflowConfigOptions};
     use stackable_operator::commons::authentication::AuthenticationClass;
     use std::collections::BTreeMap;
 
@@ -249,7 +251,7 @@ mod tests {
             Some(&authentication_class),
         );
         assert_eq!(
-            Some(AirflowClusterAuthenticationConfig {
+            Some(AirflowAuthenticationConfig {
                 authentication_class: Some("airflow-with-ldap-server-veri-tls-ldap".to_string()),
                 user_registration: true,
                 user_registration_role: "Admin".to_string(),
