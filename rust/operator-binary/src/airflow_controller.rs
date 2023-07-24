@@ -945,7 +945,7 @@ fn add_authentication_volumes_and_volume_mounts(
     pb: &mut PodBuilder,
 ) {
     // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
-    //    Needs adaptation once FAB and superset support multiple auth methods.
+    //    Needs adaptation once FAB and airflow support multiple auth methods.
     // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
     for config in authentication_config {
         if let Some(auth_class) = &config.authentication_class {
@@ -996,7 +996,7 @@ async fn wait_for_db_and_update_status(
 
     tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
 
-    // Update the Superset cluster status, only if the controller needs to wait.
+    // Update the Airflow cluster status, only if the controller needs to wait.
     // This avoids updating the status twice per reconcile call. when the DB
     // has a ready condition.
     let db_cond_builder = DbConditionBuilder(airflow_db.status);

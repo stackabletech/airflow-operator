@@ -104,7 +104,7 @@ impl AirflowAuthentication {
     ) -> Result<Vec<AirflowAuthenticationConfigResolved>> {
         let mut resolved = vec![];
 
-        // TODO: adapt if multiple authentication classes are supported by superset.
+        // TODO: adapt if multiple authentication classes are supported by airflow.
         //    This is currently not possible due to the Flask App Builder not supporting it.
         if self.authentication.len() > 1 {
             return Err(Error::MultipleAuthenticationClassesProvided);
