@@ -56,7 +56,6 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
-- `spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
 - `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
 is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
 (whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
