@@ -96,7 +96,9 @@
 - `operator-rs` `0.27.1` -> `0.30.1` ([#208])
 - `operator-rs` `0.30.1` -> `0.31.0` ([#216]).
 - Updated stackable image versions ([#193]).
-- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
+- [BREAKING] Use Product image selection instead of version ([#206]).
+  - `spec.version` has been replaced by `spec.image`.
+  - `spec.statsdExporterVersion` has been removed, the statsd-exporter is now part of the images itself
 - Fixed the RoleGroup `selector`. It was not used before. ([#208])
 - Refactored LDAP related code to use new `LdapAuthenticationProvider` functionality ([#216])
 
