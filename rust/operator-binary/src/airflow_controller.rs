@@ -13,6 +13,7 @@ use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::airflowdb::AirflowDBStatus;
+use stackable_airflow_crd::authentication::AirflowAuthenticationConfigResolved;
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AirflowDBStatusCondition},
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
@@ -22,12 +23,10 @@ use stackable_airflow_crd::{
 use stackable_airflow_crd::{
     AirflowClusterStatus, AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
 };
-use stackable_operator::builder::VolumeBuilder;
-use stackable_operator::k8s_openapi::api::core::v1::EmptyDirVolumeSource;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder,
+        PodSecurityContextBuilder, VolumeBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -39,7 +38,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EnvVar, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction,
+                ConfigMap, EmptyDirVolumeSource, EnvVar, Probe, Service, ServicePort, ServiceSpec,
+                TCPSocketAction,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -204,6 +204,10 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to apply authentication configuration"))]
+    InvalidAuthenticationConfig {
+        source: stackable_airflow_crd::authentication::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -234,6 +238,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     {
         return Ok(Action::await_change());
     }
+
+    let authentication_config = airflow
+        .spec
+        .cluster_config
+        .authentication
+        .resolve(client)
+        .await
+        .context(InvalidAuthenticationConfigSnafu)?;
 
     let mut roles = HashMap::new();
 
@@ -273,22 +285,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
-
-    let authentication_class = match &airflow.spec.cluster_config.authentication_config {
-        Some(authentication_config) => match &authentication_config.authentication_class {
-            Some(authentication_class) => Some(
-                AuthenticationClass::resolve(client, authentication_class)
-                    .await
-                    .context(AuthenticationClassRetrievalSnafu {
-                        authentication_class: ObjectRef::<AuthenticationClass>::new(
-                            authentication_class,
-                        ),
-                    })?,
-            ),
-            None => None,
-        },
-        None => None,
-    };
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -357,7 +353,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
-                authentication_class.as_ref(),
+                authentication_config.as_ref(),
                 &config.logging,
                 vector_aggregator_address.as_deref(),
             )?;
@@ -374,7 +370,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &airflow_role,
                 &rolegroup,
                 rolegroup_config,
-                authentication_class.as_ref(),
+                authentication_config.as_ref(),
                 &rbac_sa.name_unchecked(),
                 &config,
             )?;
@@ -478,7 +474,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
@@ -487,11 +483,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_airflow_config(
-        &mut config,
-        airflow.spec.cluster_config.authentication_config.as_ref(),
-        authentication_class,
-    );
+    config::add_airflow_config(&mut config, authentication_config);
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
@@ -607,7 +599,7 @@ fn build_server_rolegroup_statefulset(
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
 ) -> Result<StatefulSet> {
@@ -644,13 +636,11 @@ fn build_server_rolegroup_statefulset(
     let mut airflow_container = ContainerBuilder::new(&Container::Airflow.to_string())
         .context(InvalidContainerNameSnafu)?;
 
-    if let Some(authentication_class) = authentication_class {
-        add_authentication_volumes_and_volume_mounts(
-            authentication_class,
-            &mut airflow_container,
-            &mut pb,
-        )?;
-    }
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    );
 
     airflow_container
         .image_from_product_image(resolved_product_image)
@@ -950,22 +940,22 @@ pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -
 }
 
 fn add_authentication_volumes_and_volume_mounts(
-    authentication_class: &AuthenticationClass,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) -> Result<()> {
-    match &authentication_class.spec.provider {
-        AuthenticationClassProvider::Ldap(ldap) => {
-            ldap.add_volumes_and_mounts(pb, vec![cb]);
-            Ok(())
+) {
+    // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
+    //    Needs adaptation once FAB and airflow support multiple auth methods.
+    // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
+    for config in authentication_config {
+        if let Some(auth_class) = &config.authentication_class {
+            match &auth_class.spec.provider {
+                AuthenticationClassProvider::Ldap(ldap) => {
+                    ldap.add_volumes_and_mounts(pb, vec![cb]);
+                }
+                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+            }
         }
-        _ => AuthenticationClassProviderNotSupportedSnafu {
-            authentication_class_provider: authentication_class.spec.provider.to_string(),
-            authentication_class: ObjectRef::<AuthenticationClass>::new(
-                &authentication_class.name_unchecked(),
-            ),
-        }
-        .fail(),
     }
 }
 
@@ -1006,7 +996,7 @@ async fn wait_for_db_and_update_status(
 
     tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
 
-    // Update the Superset cluster status, only if the controller needs to wait.
+    // Update the Airflow cluster status, only if the controller needs to wait.
     // This avoids updating the status twice per reconcile call. when the DB
     // has a ready condition.
     let db_cond_builder = DbConditionBuilder(airflow_db.status);

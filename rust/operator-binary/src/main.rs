@@ -12,7 +12,8 @@ use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
 use stackable_airflow_crd::{
     airflowdb::{AirflowDB, AIRFLOW_DB_CONTROLLER_NAME},
-    AirflowCluster, AirflowClusterAuthenticationConfig, APP_NAME, OPERATOR_NAME,
+    authentication::AirflowAuthentication,
+    AirflowCluster, APP_NAME, OPERATOR_NAME,
 };
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
@@ -104,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |airflow: &Arc<AirflowCluster>| {
                                 references_authentication_class(
-                                    &airflow.spec.cluster_config.authentication_config,
+                                    &airflow.spec.cluster_config.authentication,
                                     &authentication_class,
                                 )
                             })
@@ -208,13 +209,15 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    authentication_config: &Option<AirflowClusterAuthenticationConfig>,
+    authentication_config: &AirflowAuthentication,
     authentication_class: &AuthenticationClass,
 ) -> bool {
     assert!(authentication_class.metadata.name.is_some());
 
     authentication_config
-        .as_ref()
-        .and_then(|c| c.authentication_class.as_ref())
-        == authentication_class.metadata.name.as_ref()
+        .authentication_class_names()
+        .into_iter()
+        .filter(|c| *c == authentication_class.name_any())
+        .count()
+        > 0
 }
