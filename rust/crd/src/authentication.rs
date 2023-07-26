@@ -42,6 +42,10 @@ pub struct AirflowAuthenticationConfigResolved {
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowAuthentication {
+    /// The Airflow authentication settings.
+    /// Currently the underlying Flask App Builder only supports one authentication mechanism
+    /// at a time. This means the operator will error out if multiple references to an
+    /// `AuthenticationClass` are provided.
     #[serde(default)]
     authentication: Vec<AirflowAuthenticationConfig>,
 }
