@@ -34,7 +34,7 @@ spec:
                   properties:
                     authentication:
                       default: []
-                      description: The Airflow authentication settings. Currently the underlying Flask App Builder only supports one authentication mechanism at a time. This means the operator will error out if multiple references to a `AuthenticationClass` are provided.
+                      description: The Airflow authentication settings. Currently the underlying Flask App Builder only supports one authentication mechanism at a time. This means the operator will error out if multiple references to an `AuthenticationClass` are provided.
                       items:
                         properties:
                           authenticationClass:
