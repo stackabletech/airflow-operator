@@ -21,7 +21,8 @@ use stackable_airflow_crd::{
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{
-    AirflowClusterStatus, AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+    AirflowClusterStatus, AirflowExecutor, AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT,
+    GIT_SYNC_DIR, GIT_SYNC_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -179,6 +180,11 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+    #[snafu(display("could not parse Airflow executor [{executor}]"))]
+    UnidentifiedAirflowExecutor {
+        source: strum::ParseError,
+        executor: String,
+    },
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::error::Error,
@@ -314,6 +320,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (role_name, role_config) in validated_role_config.iter() {
+        let executor = &airflow.spec.cluster_config.executor;
+        let airflow_executor = AirflowExecutor::from_str(executor.clone().as_str()).context(
+            UnidentifiedAirflowExecutorSnafu {
+                executor: executor.clone().as_str(),
+            },
+        )?;
+
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service =
@@ -336,53 +349,60 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                     role: role_name.to_string(),
                 })?;
 
-            let config = airflow
-                .merged_config(&airflow_role, &rolegroup)
-                .context(FailedToResolveConfigSnafu)?;
+            // worker role is dependent on the executor type
+            if airflow_role == AirflowRole::Worker
+                && airflow_executor == AirflowExecutor::Kubernetes
+            {
+                tracing::info!("Ignoring worker role as using the kubernetes executor");
+            } else {
+                let config = airflow
+                    .merged_config(&airflow_role, &rolegroup)
+                    .context(FailedToResolveConfigSnafu)?;
 
-            let rg_service =
-                build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
-            cluster_resources.add(client, rg_service).await.context(
-                ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
-                },
-            )?;
-
-            let rg_configmap = build_rolegroup_config_map(
-                &airflow,
-                &resolved_product_image,
-                &rolegroup,
-                rolegroup_config,
-                authentication_config.as_ref(),
-                &config.logging,
-                vector_aggregator_address.as_deref(),
-            )?;
-            cluster_resources
-                .add(client, rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-
-            let rg_statefulset = build_server_rolegroup_statefulset(
-                &airflow,
-                &resolved_product_image,
-                &airflow_role,
-                &rolegroup,
-                rolegroup_config,
-                authentication_config.as_ref(),
-                &rbac_sa.name_unchecked(),
-                &config,
-            )?;
-
-            ss_cond_builder.add(
-                cluster_resources
-                    .add(client, rg_statefulset)
-                    .await
-                    .context(ApplyRoleGroupStatefulSetSnafu {
+                let rg_service =
+                    build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
+                cluster_resources.add(client, rg_service).await.context(
+                    ApplyRoleGroupServiceSnafu {
                         rolegroup: rolegroup.clone(),
-                    })?,
-            );
+                    },
+                )?;
+
+                let rg_configmap = build_rolegroup_config_map(
+                    &airflow,
+                    &resolved_product_image,
+                    &rolegroup,
+                    rolegroup_config,
+                    authentication_config.as_ref(),
+                    &config.logging,
+                    vector_aggregator_address.as_deref(),
+                )?;
+                cluster_resources
+                    .add(client, rg_configmap)
+                    .await
+                    .with_context(|_| ApplyRoleGroupConfigSnafu {
+                        rolegroup: rolegroup.clone(),
+                    })?;
+
+                let rg_statefulset = build_server_rolegroup_statefulset(
+                    &airflow,
+                    &resolved_product_image,
+                    &airflow_role,
+                    &rolegroup,
+                    rolegroup_config,
+                    authentication_config.as_ref(),
+                    &rbac_sa.name_unchecked(),
+                    &config,
+                )?;
+
+                ss_cond_builder.add(
+                    cluster_resources
+                        .add(client, rg_statefulset)
+                        .await
+                        .context(ApplyRoleGroupStatefulSetSnafu {
+                            rolegroup: rolegroup.clone(),
+                        })?,
+                );
+            }
         }
     }
 
@@ -610,7 +630,8 @@ fn build_server_rolegroup_statefulset(
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
-    let commands = airflow_role.get_commands();
+    let executor = airflow.spec.cluster_config.executor.clone();
+    let commands = airflow_role.get_commands(executor);
 
     let mut pb = PodBuilder::new();
     pb.metadata_builder(|m| {
@@ -870,7 +891,7 @@ fn build_mapped_envs(
 
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: executor,
+        value: Some(executor),
         ..Default::default()
     });
 
