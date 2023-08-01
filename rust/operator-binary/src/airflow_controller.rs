@@ -851,6 +851,7 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_executor_template_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
