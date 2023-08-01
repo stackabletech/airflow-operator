@@ -33,7 +33,6 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
 };
 use std::collections::BTreeMap;
-use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -351,12 +350,12 @@ impl AirflowCluster {
     /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.cluster_config.volumes.as_ref();
-        tmp.iter().flat_map(|v| v.deref().clone()).collect()
+        tmp.iter().flat_map(|v| (*v).clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.cluster_config.volume_mounts.as_ref();
-        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| (*v).clone()).collect();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
