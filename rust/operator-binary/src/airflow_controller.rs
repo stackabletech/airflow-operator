@@ -364,7 +364,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             if airflow_role == AirflowRole::Worker
                 && airflow_executor == AirflowExecutor::KubernetesExecutor
             {
-                tracing::info!("Creating executor template");
+                tracing::info!("Creating worker/executor template");
                 let worker_pod_template_config_map = build_executor_template_config_map(
                     &airflow,
                     &resolved_product_image,
@@ -374,9 +374,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                     authentication_config.as_ref(),
                     &rbac_sa.name_unchecked(),
                     &config,
-                    &airflow_executor,
                 )?;
-                tracing::info!("CM template [{:#?}]", worker_pod_template_config_map);
                 cluster_resources
                     .add(client, worker_pod_template_config_map)
                     .await
@@ -853,7 +851,6 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_executor_template_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
@@ -863,7 +860,6 @@ fn build_executor_template_config_map(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
-    _executor: &AirflowExecutor,
 ) -> Result<ConfigMap> {
     let role = airflow
         .get_role(airflow_role)
@@ -917,12 +913,10 @@ fn build_executor_template_config_map(
         })
         .collect::<Vec<_>>();
 
-    // mapped environment variables
     let env_mapped = build_template_envs(rolegroup_config);
 
     airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_mapped);
-    airflow_container.add_env_vars(build_static_envs());
 
     let volume_mounts = airflow.volume_mounts();
     airflow_container.add_volume_mounts(volume_mounts);
@@ -931,23 +925,6 @@ fn build_executor_template_config_map(
     airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     pb.add_container(airflow_container.build());
-
-    // let metrics_container = ContainerBuilder::new("metrics")
-    //     .context(InvalidContainerNameSnafu)?
-    //     .image_from_product_image(resolved_product_image)
-    //     .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-    //     .args(vec!["/stackable/statsd_exporter".to_string()])
-    //     .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
-    //     .resources(
-    //         ResourceRequirementsBuilder::new()
-    //             .with_cpu_request("100m")
-    //             .with_cpu_limit("200m")
-    //             .with_memory_request("64Mi")
-    //             .with_memory_limit("64Mi")
-    //             .build(),
-    //     )
-    //     .build();
-    // pb.add_container(metrics_container);
 
     pb.add_volumes(airflow.volumes());
     pb.add_volumes(controller_commons::create_volumes(
@@ -1116,6 +1093,16 @@ fn build_template_envs(
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
         value: Some("LocalExecutor".to_string()),
+        ..Default::default()
+    });
+    env.push(EnvVar {
+        name: "PYTHONPATH".into(),
+        value: Some(LOG_CONFIG_DIR.into()),
+        ..Default::default()
+    });
+    env.push(EnvVar {
+        name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
+        value: Some("log_config.LOGGING_CONFIG".into()),
         ..Default::default()
     });
 
