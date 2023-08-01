@@ -6,7 +6,7 @@
 
 - [BREAKING] Consolidated `spec.clusterConfig.authenticationConfig` to `spec.clusterConfig.authentication` which now takes a vector of AuthenticationClass references  ([#303]).
 - `vector` `0.26.0` -> `0.31.0` ([#308]).
-- `operator-rs` `0.44.0` -> `0.45.0` ([#308]).
+- `operator-rs` `0.44.0` -> `0.45.1` ([#308]).
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
