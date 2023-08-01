@@ -30,10 +30,17 @@ def check_sent_events():
 
     transforms = result['data']['transforms']['nodes']
     for transform in transforms:
-        sentEvents = transform['metrics']['sentEventsTotal']['sentEventsTotal']
+        sentEvents = transform['metrics']['sentEventsTotal']
         componentId = transform['componentId']
-        assert sentEvents > 0, \
-            f'No events were sent in "{componentId}".'
+
+        if componentId == 'filteredInvalidEvents':
+            assert sentEvents is None or \
+                sentEvents['sentEventsTotal'] == 0, \
+                'Invalid log events were sent.'
+        else:
+            assert sentEvents is not None and \
+                sentEvents['sentEventsTotal'] > 0, \
+                f'No events were sent in "{componentId}".'
 
 
 if __name__ == '__main__':
