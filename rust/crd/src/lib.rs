@@ -695,11 +695,12 @@ mod tests {
         )
         .unwrap();
 
-        let resolved_airflow_image: ResolvedProductImage = cluster.spec.image.resolve("airflow");
+        let resolved_airflow_image: ResolvedProductImage =
+            cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
         let airflow_db = AirflowDB::for_airflow(&cluster, &resolved_airflow_image).unwrap();
         let resolved_airflow_db_image: ResolvedProductImage =
-            airflow_db.spec.image.resolve("airflow");
+            airflow_db.spec.image.resolve("airflow", "0.0.0-dev");
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
