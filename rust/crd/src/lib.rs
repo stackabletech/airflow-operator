@@ -159,7 +159,7 @@ pub struct AirflowClusterConfig {
     pub dags_git_sync: Vec<GitSync>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    pub executor: String,
+    pub executor: AirflowExecutor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -305,6 +305,7 @@ pub enum AirflowRole {
 #[derive(
     Clone,
     Debug,
+    Default,
     Deserialize,
     Display,
     EnumIter,
@@ -317,11 +318,12 @@ pub enum AirflowRole {
 )]
 pub enum AirflowExecutor {
     #[strum(serialize = "CeleryExecutor")]
-    Celery,
+    #[default]
+    CeleryExecutor,
     #[strum(serialize = "KubernetesExecutor")]
-    Kubernetes,
+    KubernetesExecutor,
     #[strum(serialize = "CeleryKubernetesExecutor")]
-    CeleryKubernetes,
+    CeleryKubernetesExecutor,
 }
 
 impl AirflowRole {
@@ -339,11 +341,12 @@ impl AirflowRole {
             AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
             AirflowRole::Worker => {
                 match executor {
-                    // TODO which command for CeleryKubernetes?
-                    &AirflowExecutor::Celery | &AirflowExecutor::CeleryKubernetes => {
+                    // TODO-ke which command for CeleryKubernetes?
+                    &AirflowExecutor::CeleryExecutor
+                    | &AirflowExecutor::CeleryKubernetesExecutor => {
                         vec![copy_config, "airflow celery worker".to_string()]
                     }
-                    &AirflowExecutor::Kubernetes => vec![],
+                    &AirflowExecutor::KubernetesExecutor => vec![],
                 }
             }
         }
@@ -733,7 +736,10 @@ mod tests {
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
-        assert_eq!("KubernetesExecutor", cluster.spec.cluster_config.executor);
+        assert_eq!(
+            "KubernetesExecutor",
+            cluster.spec.cluster_config.executor.to_string()
+        );
         assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
         assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
     }

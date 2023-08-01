@@ -14,6 +14,10 @@ use stackable_operator::{
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
+pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
+pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
+pub const TEMPLATE_LOCATION: &str = "/templates";
+pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
 pub fn create_volumes(
     config_map_name: &str,
