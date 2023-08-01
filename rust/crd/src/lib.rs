@@ -320,6 +320,8 @@ pub enum AirflowExecutor {
     Celery,
     #[strum(serialize = "KubernetesExecutor")]
     Kubernetes,
+    #[strum(serialize = "CeleryKubernetesExecutor")]
+    CeleryKubernetes,
 }
 
 impl AirflowRole {
@@ -327,7 +329,7 @@ impl AirflowRole {
     /// components to have the same image/configuration (e.g. DAG folder location), even if not all
     /// configuration settings are used everywhere. For this reason we ensure that the webserver
     /// config file is in the Airflow home directory on all pods.
-    pub fn get_commands(&self, executor: String) -> Vec<String> {
+    pub fn get_commands(&self, executor: &AirflowExecutor) -> Vec<String> {
         let copy_config = format!(
             "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
@@ -336,11 +338,12 @@ impl AirflowRole {
             AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
             AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
             AirflowRole::Worker => {
-                // TODO introduce an enum for valid options to this function
-                if executor == *"CeleryExecutor".to_string() {
-                    vec![copy_config, "airflow celery worker".to_string()]
-                } else {
-                    vec![]
+                match executor {
+                    // TODO which command for CeleryKubernetes?
+                    &AirflowExecutor::Celery | &AirflowExecutor::CeleryKubernetes => {
+                        vec![copy_config, "airflow celery worker".to_string()]
+                    }
+                    &AirflowExecutor::Kubernetes => vec![],
                 }
             }
         }
