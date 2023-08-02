@@ -367,8 +367,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 && airflow_executor == AirflowExecutor::KubernetesExecutor
             {
                 tracing::info!(
-                    "Creating worker/executor template from the worker role: 
-                non-relevant custom resource pod settings (e.g. replicas) will be ignored!"
+                    "Creating worker/executor template from the worker role: non-relevant custom resource pod settings (e.g. replicas) will be ignored!"
                 );
                 let worker_pod_template_config_map = build_executor_template_config_map(
                     &airflow,

@@ -31,7 +31,7 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    executor: CeleryExecutor
+    executor: KubernetesExecutor
     loadExamples: true
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
