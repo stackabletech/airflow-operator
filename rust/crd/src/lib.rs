@@ -33,7 +33,6 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
 };
 use std::collections::BTreeMap;
-use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -383,12 +382,12 @@ impl AirflowCluster {
     /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.cluster_config.volumes.as_ref();
-        tmp.iter().flat_map(|v| v.deref().clone()).collect()
+        tmp.iter().flat_map(|v| (*v).clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.cluster_config.volume_mounts.as_ref();
-        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| (*v).clone()).collect();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
@@ -706,7 +705,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: KubernetesExecutor
             loadExamples: true
@@ -728,11 +726,12 @@ mod tests {
         )
         .unwrap();
 
-        let resolved_airflow_image: ResolvedProductImage = cluster.spec.image.resolve("airflow");
+        let resolved_airflow_image: ResolvedProductImage =
+            cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
         let airflow_db = AirflowDB::for_airflow(&cluster, &resolved_airflow_image).unwrap();
         let resolved_airflow_db_image: ResolvedProductImage =
-            airflow_db.spec.image.resolve("airflow");
+            airflow_db.spec.image.resolve("airflow", "0.0.0-dev");
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
@@ -755,7 +754,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false
@@ -802,7 +800,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false
