@@ -29,6 +29,7 @@ spec:
                     authentication: []
                     credentialsSecret: ''
                     dagsGitSync: []
+                    executor: CeleryExecutor
                     listenerClass: cluster-internal
                   description: Global cluster configuration that applies to all roles and role groups
                   properties:
@@ -175,7 +176,10 @@ spec:
                           type: object
                       type: object
                     executor:
-                      nullable: true
+                      enum:
+                        - CeleryExecutor
+                        - KubernetesExecutor
+                        - CeleryKubernetesExecutor
                       type: string
                     exposeConfig:
                       nullable: true
@@ -1308,6 +1312,7 @@ spec:
                       type: array
                   required:
                     - credentialsSecret
+                    - executor
                   type: object
                 clusterOperation:
                   default:
