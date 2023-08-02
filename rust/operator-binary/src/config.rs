@@ -170,9 +170,7 @@ mod tests {
 
     #[test]
     fn test_ldap() {
-        let authentication_class: AuthenticationClass =
-            serde_yaml::from_str::<AuthenticationClass>(
-                "
+        let authentication_class = "
             apiVersion: authentication.stackable.tech/v1alpha1
             kind: AuthenticationClass
             metadata:
@@ -192,9 +190,10 @@ mod tests {
                       server:
                         caCert:
                           secretClass: openldap-tls
-          ",
-            )
-            .unwrap();
+          ";
+        let deserializer = serde_yaml::Deserializer::from_str(authentication_class);
+        let authentication_class: AuthenticationClass =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_config = AirflowAuthenticationConfigResolved {
             authentication_class: Some(authentication_class),
