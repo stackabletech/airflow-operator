@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#312]).
+
 ### Changed
 
 - [BREAKING] Consolidated `spec.clusterConfig.authenticationConfig` to `spec.clusterConfig.authentication` which now takes a vector of AuthenticationClass references  ([#303]).
@@ -10,6 +14,7 @@
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
+[#312]: https://github.com/stackabletech/airflow-operator/pull/312
 
 ## [23.7.0] - 2023-07-14
 
