@@ -191,7 +191,6 @@ mod tests {
                         caCert:
                           secretClass: openldap-tls
           ";
-
         let deserializer = serde_yaml::Deserializer::from_str(authentication_class);
         let authentication_class: AuthenticationClass =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
