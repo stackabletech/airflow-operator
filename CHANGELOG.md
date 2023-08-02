@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#XXX]).
+
 ### Changed
 
 - [BREAKING] Consolidated `spec.clusterConfig.authenticationConfig` to `spec.clusterConfig.authentication` which now takes a vector of AuthenticationClass references  ([#303]).
