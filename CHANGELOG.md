@@ -4,7 +4,7 @@
 
 ### Added
 
-- Default stackableVersion to operator version ([#XXX]).
+- Default stackableVersion to operator version ([#312]).
 
 ### Changed
 
@@ -14,6 +14,7 @@
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
+[#312]: https://github.com/stackabletech/airflow-operator/pull/312
 
 ## [23.7.0] - 2023-07-14
 
