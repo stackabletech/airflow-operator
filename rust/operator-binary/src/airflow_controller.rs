@@ -918,7 +918,7 @@ fn build_executor_template_config_map(
         })
         .collect::<Vec<_>>();
 
-    let env_mapped = build_template_envs(rolegroup_config);
+    let env_mapped = build_template_envs(airflow, rolegroup_config);
 
     airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_mapped);
@@ -1066,12 +1066,18 @@ fn build_mapped_envs(
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
             ..Default::default()
         });
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        });
     }
 
     env
 }
 
 fn build_template_envs(
+    airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
     let secret_prop = rolegroup_config
@@ -1108,6 +1114,11 @@ fn build_template_envs(
     env.push(EnvVar {
         name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
         value: Some("log_config.LOGGING_CONFIG".into()),
+        ..Default::default()
+    });
+    env.push(EnvVar {
+        name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
+        value: airflow.namespace(),
         ..Default::default()
     });
 
