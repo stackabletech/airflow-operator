@@ -1071,6 +1071,11 @@ fn build_mapped_envs(
             value: airflow.namespace(),
             ..Default::default()
         });
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        });
     }
 
     env
@@ -1118,6 +1123,11 @@ fn build_template_envs(
     });
     env.push(EnvVar {
         name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
+        value: airflow.namespace(),
+        ..Default::default()
+    });
+    env.push(EnvVar {
+        name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
         value: airflow.namespace(),
         ..Default::default()
     });
