@@ -366,15 +366,12 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             if airflow_role == AirflowRole::Worker
                 && airflow_executor == AirflowExecutor::KubernetesExecutor
             {
-                tracing::info!(
+                tracing::info!( // replace with error when using an enum
                     "Creating worker/executor template from the worker role: non-relevant custom resource pod settings (e.g. replicas) will be ignored!"
                 );
                 let worker_pod_template_config_map = build_executor_template_config_map(
                     &airflow,
                     &resolved_product_image,
-                    &airflow_role,
-                    &rolegroup,
-                    rolegroup_config,
                     authentication_config.as_ref(),
                     &rbac_sa.name_unchecked(),
                     &config,
@@ -859,28 +856,18 @@ fn build_server_rolegroup_statefulset(
 fn build_executor_template_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
-    airflow_role: &AirflowRole,
-    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
 ) -> Result<ConfigMap> {
-    let role = airflow
-        .get_role(airflow_role)
-        .as_ref()
-        .context(NoAirflowRoleSnafu)?;
-
-    let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
-
     let mut pb = PodBuilder::new();
     pb.metadata_builder(|m| {
         m.with_recommended_labels(build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
             &resolved_product_image.app_version_label,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
+            "executor",
+            "executor-template",
         ))
     })
     .image_pull_secrets_from_product_image(resolved_product_image)
@@ -906,57 +893,17 @@ fn build_executor_template_config_map(
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into());
 
-    // environment variables
-    let env_config = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .iter()
-        .flat_map(|env_vars| env_vars.iter())
-        .map(|(k, v)| EnvVar {
-            name: k.clone(),
-            value: Some(v.clone()),
-            ..EnvVar::default()
-        })
-        .collect::<Vec<_>>();
+    let env_mapped = build_template_envs(airflow);
 
-    let env_mapped = build_template_envs(airflow, rolegroup_config);
-
-    airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_mapped);
 
     let volume_mounts = airflow.volume_mounts();
     airflow_container.add_volume_mounts(volume_mounts);
-    airflow_container.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
-    airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
-    airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     pb.add_container(airflow_container.build());
-
     pb.add_volumes(airflow.volumes());
-    pb.add_volumes(controller_commons::create_volumes(
-        &rolegroup_ref.object_name(),
-        config.logging.containers.get(&Container::Airflow),
-    ));
 
-    if config.logging.enable_vector_agent {
-        pb.add_container(product_logging::framework::vector_container(
-            resolved_product_image,
-            CONFIG_VOLUME_NAME,
-            LOG_VOLUME_NAME,
-            config.logging.containers.get(&Container::Vector),
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("250m")
-                .with_cpu_limit("500m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
-                .build(),
-        ));
-    }
-
-    let mut pod_template = pb.build_template();
-    pod_template.merge_from(role.config.pod_overrides.clone());
-    if let Some(rolegroup) = rolegroup {
-        pod_template.merge_from(rolegroup.config.pod_overrides.clone());
-    }
+    let pod_template = pb.build_template();
     let mut cm_builder = ConfigMapBuilder::new();
 
     cm_builder
@@ -970,8 +917,8 @@ fn build_executor_template_config_map(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
                     &resolved_product_image.app_version_label,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
+                    "executor",
+                    "executor-template",
                 ))
                 .with_label("restarter.stackable.tech/enabled", "true")
                 .build(),
@@ -1081,13 +1028,15 @@ fn build_mapped_envs(
     env
 }
 
-fn build_template_envs(
-    airflow: &AirflowCluster,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-) -> Vec<EnvVar> {
-    let secret_prop = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
+fn build_template_envs(airflow: &AirflowCluster) -> Vec<EnvVar> {
+    let secret_prop = Some(
+        airflow
+            .spec
+            .cluster_config
+            .credentials_secret
+            .as_str()
+            .clone(),
+    );
 
     let mut env = secret_prop
         .map(|secret| {
@@ -1112,20 +1061,11 @@ fn build_template_envs(
         ..Default::default()
     });
     env.push(EnvVar {
-        name: "PYTHONPATH".into(),
-        value: Some(LOG_CONFIG_DIR.into()),
-        ..Default::default()
-    });
-    env.push(EnvVar {
-        name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
-        value: Some("log_config.LOGGING_CONFIG".into()),
-        ..Default::default()
-    });
-    env.push(EnvVar {
         name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
         value: airflow.namespace(),
         ..Default::default()
     });
+    // name of the variable prior to airflow 2.5.0
     env.push(EnvVar {
         name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
         value: airflow.namespace(),
