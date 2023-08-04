@@ -7,13 +7,13 @@
 dimensions:
   - name: airflow
     values:
-      - 2.2.4-stackable0.0.0-dev
-      - 2.2.5-stackable0.0.0-dev
-      - 2.4.1-stackable0.0.0-dev
-      - 2.6.1-stackable0.0.0-dev
+      - 2.2.4
+      - 2.2.5
+      - 2.4.1
+      - 2.6.1
   - name: airflow-latest
     values:
-      - 2.6.1-stackable0.0.0-dev
+      - 2.6.1
   - name: ldap-authentication
     values:
       - no-tls

@@ -39,8 +39,7 @@ commands:
         name: airflow
       spec:
         image:
-          productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
-          stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
+          productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
         clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
           vectorAggregatorConfigMapName: vector-aggregator-discovery
@@ -49,16 +48,16 @@ commands:
           loadExamples: true
           exposeConfig: false
           credentialsSecret: test-airflow-credentials
-          authenticationConfig:
-            authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
-                no-tls-$NAMESPACE
+          authentication:
+            - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
+              no-tls-$NAMESPACE
             {%- elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' -%}
-                insecure-tls-$NAMESPACE
+              insecure-tls-$NAMESPACE
             {%- elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' -%}
-                server-tls-$NAMESPACE
+              server-tls-$NAMESPACE
             {%- endif %}
 
-            userRegistrationRole: Admin
+              userRegistrationRole: Admin
         webservers:
           config:
             logging:

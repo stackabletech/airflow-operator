@@ -20,7 +20,6 @@ OCI_REGISTRY_PROJECT_IMAGES := ${ORGANIZATION}/images
 OCI_REGISTRY_PROJECT_CHARTS := ${ORGANIZATION}/charts
 # this will be overwritten by an environmental variable if called from the github action
 HELM_REPO := https://repo.stackable.tech/repository/helm-dev
-HELM_CHART_NAME := ${OPERATOR_NAME}
 HELM_CHART_ARTIFACT := target/helm/${OPERATOR_NAME}-${VERSION}.tgz
 
 SHELL=/usr/bin/env bash -euo pipefail
@@ -49,8 +48,8 @@ docker-publish:
 
 	# push to Harbor
 	# we need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
-	docker login --username "${value OCI_REGISTRY_USERNAME}" --password "${OCI_REGISTRY_PASSWORD}" "${OCI_REGISTRY_HOSTNAME}"
-	DOCKER_OUTPUT=$$(docker push --all-tags "${OCI_REGISTRY_HOSTNAME}/${ORGANIZATION}/${OPERATOR_NAME}");\
+	docker login --username '${value OCI_REGISTRY_USERNAME}' --password '${OCI_REGISTRY_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
+	DOCKER_OUTPUT=$$(docker push --all-tags '${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}');\
 	# Obtain the digest of the pushed image from the output of `docker push`, because signing by tag is deprecated and will be removed from cosign in the future\
 	REPO_DIGEST_OF_IMAGE=$$(echo "$$DOCKER_OUTPUT" | awk '/^${VERSION}: digest: sha256:[0-9a-f]{64} size: [0-9]+$$/ { print $$3 }');\
 	if [ -z "$$REPO_DIGEST_OF_IMAGE" ]; then\
@@ -59,7 +58,7 @@ docker-publish:
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
+	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
@@ -73,17 +72,17 @@ helm-publish:
 
 	# push to Harbor
 	# we need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
-	helm registry login --username "${value OCI_REGISTRY_USERNAME}" --password "${OCI_REGISTRY_PASSWORD}" "${OCI_REGISTRY_HOSTNAME}"
+	helm registry login --username '${value OCI_REGISTRY_USERNAME}' --password '${OCI_REGISTRY_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
 	# Obtain the digest of the pushed artifact from the output of `helm push`, because signing by tag is deprecated and will be removed from cosign in the future\
-	HELM_OUTPUT=$$(helm push "${HELM_CHART_ARTIFACT}" "oci://${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}" 2>&1);\
+	HELM_OUTPUT=$$(helm push '${HELM_CHART_ARTIFACT}' 'oci://${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}' 2>&1);\
 	REPO_DIGEST_OF_ARTIFACT=$$(echo "$$HELM_OUTPUT" | awk '/^Digest: sha256:[0-9a-f]{64}$$/ { print $$2 }');\
 	if [ -z "$$REPO_DIGEST_OF_ARTIFACT" ]; then\
-		echo 'Could not find repo digest for helm chart: ${HELM_CHART_NAME}';\
+		echo 'Could not find repo digest for helm chart: ${OPERATOR_NAME}';\
 		exit 1;\
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the chart artifact\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}:@$$REPO_DIGEST_OF_ARTIFACT
+	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_ARTIFACT
 
 helm-package:
 	mkdir -p target/helm && helm package --destination target/helm deploy/helm/${OPERATOR_NAME}

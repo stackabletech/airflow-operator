@@ -119,8 +119,10 @@ pub async fn reconcile_airflow_db(airflow_db: Arc<AirflowDB>, ctx: Arc<Ctx>) -> 
 
     let client = &ctx.client;
     let namespace = airflow_db.namespace().context(ObjectHasNoNamespaceSnafu)?;
-    let resolved_product_image: ResolvedProductImage =
-        airflow_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+    let resolved_product_image: ResolvedProductImage = airflow_db
+        .spec
+        .image
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(airflow_db.as_ref(), "airflow");
     client

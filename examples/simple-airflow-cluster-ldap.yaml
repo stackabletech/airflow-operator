@@ -152,9 +152,9 @@ spec:
     loadExamples: true
     exposeConfig: true
     credentialsSecret: airflow-with-ldap-server-veri-tls-credentials
-    authenticationConfig:
-      authenticationClass: airflow-with-ldap-server-veri-tls-ldap
-      userRegistrationRole: Admin
+    authentication:
+      - authenticationClass: airflow-with-ldap-server-veri-tls-ldap
+        userRegistrationRole: Admin
   webservers:
     roleGroups:
       default:

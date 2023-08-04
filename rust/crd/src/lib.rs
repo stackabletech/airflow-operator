@@ -1,36 +1,38 @@
 pub mod affinity;
 pub mod airflowdb;
+pub mod authentication;
 
 use crate::affinity::get_affinity;
+use crate::authentication::AirflowAuthentication;
+
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::commons::affinity::StackableAffinity;
-use stackable_operator::commons::product_image_selection::ProductImage;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::role_utils::RoleGroup;
 use stackable_operator::{
-    commons::cluster_operation::ClusterOperation,
-    commons::resources::{
-        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
-        Resources, ResourcesFragment,
+    commons::{
+        affinity::StackableAffinity,
+        cluster_operation::ClusterOperation,
+        product_image_selection::ProductImage,
+        resources::{
+            CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+            Resources, ResourcesFragment,
+        },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
     },
-    kube::CustomResource,
+    kube::{CustomResource, ResourceExt},
     labels::ObjectLabels,
+    memory::{BinaryMultiple, MemoryQuantity},
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{Role, RoleGroupRef},
+    role_utils::{Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-
 use std::collections::BTreeMap;
-use std::ops::Deref;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -50,7 +52,10 @@ pub const GIT_SYNC_NAME: &str = "gitsync";
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
 
-pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
+pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
+    value: 10.0,
+    unit: BinaryMultiple::Mebi,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -143,11 +148,11 @@ pub struct AirflowClusterSpec {
     pub workers: Option<Role<AirflowConfigFragment>>,
 }
 
-#[derive(Clone, Deserialize, Debug, Default, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Default, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authentication_config: Option<AirflowClusterAuthenticationConfig>,
+    #[serde(flatten)]
+    pub authentication: AirflowAuthentication,
     pub credentials_secret: String,
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
@@ -251,49 +256,6 @@ impl GitSync {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterAuthenticationConfig {
-    /// Name of the AuthenticationClass used to authenticate the users.
-    /// At the moment only LDAP is supported.
-    /// If not specified the default authentication (AUTH_DB) will be used.
-    pub authentication_class: Option<String>,
-
-    /// Allow users who are not already in the FAB DB.
-    /// Gets mapped to `AUTH_USER_REGISTRATION`
-    #[serde(default = "default_user_registration")]
-    pub user_registration: bool,
-
-    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
-    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
-    #[serde(default = "default_user_registration_role")]
-    pub user_registration_role: String,
-
-    /// If we should replace ALL the user's roles each login, or only on registration.
-    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-    #[serde(default = "default_sync_roles_at")]
-    pub sync_roles_at: LdapRolesSyncMoment,
-}
-
-pub fn default_user_registration() -> bool {
-    true
-}
-
-pub fn default_user_registration_role() -> String {
-    "Public".to_string()
-}
-
-/// Matches Flask's default mode of syncing at registration
-pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
-    LdapRolesSyncMoment::Registration
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum LdapRolesSyncMoment {
-    Registration,
-    Login,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowCredentials {
@@ -388,12 +350,12 @@ impl AirflowCluster {
     /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
     pub fn volumes(&self) -> Vec<Volume> {
         let tmp = self.spec.cluster_config.volumes.as_ref();
-        tmp.iter().flat_map(|v| v.deref().clone()).collect()
+        tmp.iter().flat_map(|v| (*v).clone()).collect()
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         let tmp = self.spec.cluster_config.volume_mounts.as_ref();
-        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| v.deref().clone()).collect();
+        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| (*v).clone()).collect();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
@@ -501,7 +463,7 @@ impl AirflowConfig {
                     max: Some(Quantity("400m".into())),
                 },
                 MemoryLimitsFragment {
-                    limit: Some(Quantity("1024Mi".into())),
+                    limit: Some(Quantity("2Gi".into())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
             ),
@@ -711,7 +673,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: KubernetesExecutor
             loadExamples: true
@@ -733,11 +694,12 @@ mod tests {
         )
         .unwrap();
 
-        let resolved_airflow_image: ResolvedProductImage = cluster.spec.image.resolve("airflow");
+        let resolved_airflow_image: ResolvedProductImage =
+            cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
         let airflow_db = AirflowDB::for_airflow(&cluster, &resolved_airflow_image).unwrap();
         let resolved_airflow_db_image: ResolvedProductImage =
-            airflow_db.spec.image.resolve("airflow");
+            airflow_db.spec.image.resolve("airflow", "0.0.0-dev");
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
@@ -760,7 +722,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false
@@ -807,7 +768,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           clusterConfig:
             executor: CeleryExecutor
             loadExamples: false

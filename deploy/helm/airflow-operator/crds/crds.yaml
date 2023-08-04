@@ -26,34 +26,38 @@ spec:
               properties:
                 clusterConfig:
                   default:
+                    authentication: []
                     credentialsSecret: ''
                     dagsGitSync: []
                     listenerClass: cluster-internal
                   description: Global cluster configuration that applies to all roles and role groups
                   properties:
-                    authenticationConfig:
-                      nullable: true
-                      properties:
-                        authenticationClass:
-                          description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
-                          nullable: true
-                          type: string
-                        syncRolesAt:
-                          default: Registration
-                          description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-                          enum:
-                            - Registration
-                            - Login
-                          type: string
-                        userRegistration:
-                          default: true
-                          description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
-                          type: boolean
-                        userRegistrationRole:
-                          default: Public
-                          description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
-                          type: string
-                      type: object
+                    authentication:
+                      default: []
+                      description: The Airflow authentication settings. Currently the underlying Flask App Builder only supports one authentication mechanism at a time. This means the operator will error out if multiple references to an `AuthenticationClass` are provided.
+                      items:
+                        properties:
+                          authenticationClass:
+                            description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
+                            nullable: true
+                            type: string
+                          syncRolesAt:
+                            default: Registration
+                            description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+                            enum:
+                              - Registration
+                              - Login
+                            type: string
+                          userRegistration:
+                            default: true
+                            description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
+                            type: boolean
+                          userRegistrationRole:
+                            default: Public
+                            description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+                            type: string
+                        type: object
+                      type: array
                     credentialsSecret:
                       type: string
                     dagsGitSync:
@@ -1327,7 +1331,6 @@ spec:
                         - productVersion
                     - required:
                         - productVersion
-                        - stackableVersion
                   description: The Airflow image to use
                   properties:
                     custom:
@@ -1337,7 +1340,7 @@ spec:
                       description: Version of the product, e.g. `1.4.1`.
                       type: string
                     pullPolicy:
-                      default: IfNotPresent
+                      default: Always
                       description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the Images'
                       enum:
                         - IfNotPresent
@@ -1360,7 +1363,8 @@ spec:
                       nullable: true
                       type: string
                     stackableVersion:
-                      description: Stackable version of the product, e.g. 2.1.0
+                      description: Stackable version of the product, e.g. `23.4`, `23.4.1` or `0.0.0-dev`. If not specified, the operator will use its own version, e.g. `23.4.1`. When using a nightly operator or a pr version, it will use the nightly `0.0.0-dev` image.
+                      nullable: true
                       type: string
                   type: object
                 schedulers:
@@ -21937,7 +21941,6 @@ spec:
                         - productVersion
                     - required:
                         - productVersion
-                        - stackableVersion
                   description: The Airflow image to use
                   properties:
                     custom:
@@ -21947,7 +21950,7 @@ spec:
                       description: Version of the product, e.g. `1.4.1`.
                       type: string
                     pullPolicy:
-                      default: IfNotPresent
+                      default: Always
                       description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the Images'
                       enum:
                         - IfNotPresent
@@ -21970,7 +21973,8 @@ spec:
                       nullable: true
                       type: string
                     stackableVersion:
-                      description: Stackable version of the product, e.g. 2.1.0
+                      description: Stackable version of the product, e.g. `23.4`, `23.4.1` or `0.0.0-dev`. If not specified, the operator will use its own version, e.g. `23.4.1`. When using a nightly operator or a pr version, it will use the nightly `0.0.0-dev` image.
+                      nullable: true
                       type: string
                   type: object
                 vectorAggregatorConfigMapName:

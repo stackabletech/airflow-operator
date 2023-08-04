@@ -63,7 +63,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
@@ -159,7 +158,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-            stackableVersion: 0.0.0-dev
           executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
