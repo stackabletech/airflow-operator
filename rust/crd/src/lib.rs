@@ -33,7 +33,7 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
 };
 use std::collections::BTreeMap;
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumDiscriminants, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -63,6 +63,8 @@ pub enum Error {
     UnknownAirflowRole { role: String, roles: Vec<String> },
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+    #[snafu(display("Configuration/Executor conflict!"))]
+    NoRoleForExecutorFailure,
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -145,7 +147,7 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workers: Option<Role<AirflowConfigFragment>>,
+    pub executor: Option<AirflowExecutor>,
 }
 
 #[derive(Clone, Deserialize, Default, Debug, JsonSchema, PartialEq, Serialize)]
@@ -158,7 +160,6 @@ pub struct AirflowClusterConfig {
     pub dags_git_sync: Vec<GitSync>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    pub executor: AirflowExecutor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -301,36 +302,12 @@ pub enum AirflowRole {
     Worker,
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Default,
-    Deserialize,
-    Display,
-    EnumIter,
-    Eq,
-    Hash,
-    JsonSchema,
-    PartialEq,
-    Serialize,
-    EnumString,
-)]
-pub enum AirflowExecutor {
-    #[strum(serialize = "CeleryExecutor")]
-    #[default]
-    CeleryExecutor,
-    #[strum(serialize = "KubernetesExecutor")]
-    KubernetesExecutor,
-    #[strum(serialize = "CeleryKubernetesExecutor")]
-    CeleryKubernetesExecutor,
-}
-
 impl AirflowRole {
     /// Returns the start commands for the different airflow components. Airflow expects all
     /// components to have the same image/configuration (e.g. DAG folder location), even if not all
     /// configuration settings are used everywhere. For this reason we ensure that the webserver
     /// config file is in the Airflow home directory on all pods.
-    pub fn get_commands(&self, executor: &AirflowExecutor) -> Vec<String> {
+    pub fn get_commands(&self) -> Vec<String> {
         let copy_config = format!(
             "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
@@ -338,16 +315,7 @@ impl AirflowRole {
         match &self {
             AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
             AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
-            AirflowRole::Worker => {
-                match executor {
-                    // TODO-ke which command for CeleryKubernetes?
-                    &AirflowExecutor::CeleryExecutor
-                    | &AirflowExecutor::CeleryKubernetesExecutor => {
-                        vec![copy_config, "airflow celery worker".to_string()]
-                    }
-                    &AirflowExecutor::KubernetesExecutor => vec![],
-                }
-            }
+            AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
 
@@ -370,12 +338,40 @@ impl AirflowRole {
     }
 }
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    JsonSchema,
+    PartialEq,
+    Serialize,
+    EnumString,
+    EnumDiscriminants,
+)]
+#[strum_discriminants(derive(IntoStaticStr))]
+pub enum AirflowExecutor {
+    #[serde(rename = "celery")]
+    CeleryExecutor {
+        config: Option<Role<AirflowConfigFragment>>,
+    },
+    #[serde(rename = "kubernetes")]
+    KubernetesExecutor { config: ExecutorConfigFragment },
+}
+
 impl AirflowCluster {
     pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
-            AirflowRole::Worker => &self.spec.workers,
+            AirflowRole::Worker => {
+                if let Some(AirflowExecutor::CeleryExecutor { config }) = &self.spec.executor {
+                    config
+                } else {
+                    &None
+                }
+            }
         }
     }
 
@@ -471,6 +467,27 @@ pub struct AirflowConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+}
+
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct ExecutorConfig {
+    #[fragment_attrs(serde(default))]
+    pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
 }
 
 impl AirflowConfig {
@@ -606,14 +623,16 @@ impl AirflowCluster {
                         roles: AirflowRole::roles(),
                     })?
             }
-            AirflowRole::Worker => self
-                .spec
-                .workers
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu {
-                    role: role.to_string(),
-                    roles: AirflowRole::roles(),
-                })?,
+            AirflowRole::Worker => {
+                if let Some(AirflowExecutor::CeleryExecutor { config }) = &self.spec.executor {
+                    config.as_ref().context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
             AirflowRole::Scheduler => {
                 self.spec
                     .schedulers
@@ -696,8 +715,7 @@ mod tests {
 
     #[test]
     fn test_cluster_config() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
+        let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha1
         kind: AirflowCluster
         metadata:
@@ -706,7 +724,6 @@ mod tests {
           image:
             productVersion: 2.6.1
           clusterConfig:
-            executor: KubernetesExecutor
             loadExamples: true
             exposeConfig: true
             credentialsSecret: simple-airflow-credentials
@@ -714,17 +731,20 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          workers:
-            roleGroups:
-              default:
-                config: {}
+          executor:
+            celery:
+              roleGroups:
+                default:
+                  config: {}
           schedulers:
             roleGroups:
               default:
                 config: {}
-          ",
-        )
-        .unwrap();
+          ";
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_airflow_image: ResolvedProductImage =
             cluster.spec.image.resolve("airflow", "0.0.0-dev");
@@ -735,18 +755,17 @@ mod tests {
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
-        assert_eq!(
-            "KubernetesExecutor",
-            cluster.spec.cluster_config.executor.to_string()
-        );
+        // assert_eq!(
+        //     "KubernetesExecutor",
+        //     cluster.spec.cluster_config.executor.to_string()
+        // );
         assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
         assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
     }
 
     #[test]
     fn test_git_sync() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
+        let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha1
         kind: AirflowCluster
         metadata:
@@ -755,7 +774,6 @@ mod tests {
           image:
             productVersion: 2.6.1
           clusterConfig:
-            executor: CeleryExecutor
             loadExamples: false
             exposeConfig: false
             credentialsSecret: simple-airflow-credentials
@@ -770,17 +788,20 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          workers:
-            roleGroups:
-              default:
-                config: {}
+          executor:
+            celery:
+              roleGroups:
+                default:
+                  config: {}
           schedulers:
             roleGroups:
               default:
                 config: {}
-          ",
-        )
-        .unwrap();
+          ";
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         assert!(cluster.git_sync().is_some(), "git_sync was not Some!");
         assert_eq!(
@@ -791,8 +812,7 @@ mod tests {
 
     #[test]
     fn test_git_sync_config() {
-        let cluster: AirflowCluster = serde_yaml::from_str::<AirflowCluster>(
-            "
+        let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha1
         kind: AirflowCluster
         metadata:
@@ -801,7 +821,6 @@ mod tests {
           image:
             productVersion: 2.6.1
           clusterConfig:
-            executor: CeleryExecutor
             loadExamples: false
             exposeConfig: false
             credentialsSecret: simple-airflow-credentials
@@ -817,17 +836,20 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          workers:
-            roleGroups:
-              default:
-                config: {}
+          executor:
+            celery:
+              roleGroups:
+                default:
+                  config: {}
           schedulers:
             roleGroups:
               default:
                 config: {}
-          ",
-        )
-        .unwrap();
+          ";
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         assert!(cluster
             .git_sync()

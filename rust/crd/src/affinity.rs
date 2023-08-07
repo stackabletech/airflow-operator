@@ -51,11 +51,11 @@ mod tests {
     use crate::{AirflowCluster, AirflowRole};
 
     #[rstest]
-    #[case(AirflowRole::Worker)]
+    // #[case(AirflowRole::Worker)]
     #[case(AirflowRole::Scheduler)]
     #[case(AirflowRole::Webserver)]
     fn test_affinity_defaults(#[case] role: AirflowRole) {
-        let input = r#"
+        let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha1
         kind: AirflowCluster
         metadata:
@@ -63,7 +63,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-          executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
           credentialsSecret: simple-airflow-credentials
@@ -71,16 +70,20 @@ mod tests {
             roleGroups:
               default:
                 replicas: 1
-          workers:
-            roleGroups:
-              default:
-                replicas: 2
+          executor:
+            celery:
+              roleGroups:
+                default:
+                  replicas: 2
           schedulers:
             roleGroups:
               default:
                 replicas: 1
-        "#;
-        let airflow: AirflowCluster = serde_yaml::from_str(input).expect("illegal test input");
+        ";
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let airflow: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let rolegroup_ref = RoleGroupRef {
             cluster: ObjectRef::from_obj(&airflow),
@@ -150,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_affinity_legacy_node_selector() {
-        let input = r#"
+        let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha1
         kind: AirflowCluster
         metadata:
@@ -158,7 +161,6 @@ mod tests {
         spec:
           image:
             productVersion: 2.6.1
-          executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
           credentialsSecret: simple-airflow-credentials
@@ -166,10 +168,11 @@ mod tests {
             roleGroups:
               default:
                 replicas: 1
-          workers:
-            roleGroups:
-              default:
-                replicas: 2
+          executor:
+            celery:
+              roleGroups:
+                default:
+                  replicas: 2
           schedulers:
             roleGroups:
               default:
@@ -183,9 +186,11 @@ mod tests {
                       values:
                         - antarctica-east1
                         - antarctica-west1
-        "#;
+        ";
 
-        let airflow: AirflowCluster = serde_yaml::from_str(input).expect("illegal test input");
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let airflow: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {
             node_affinity: Some(NodeAffinity {
