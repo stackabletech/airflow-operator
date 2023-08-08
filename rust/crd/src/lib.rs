@@ -354,6 +354,7 @@ impl AirflowRole {
 pub enum AirflowExecutor {
     #[serde(rename = "celery")]
     CeleryExecutor {
+        #[serde(flatten)]
         config: Option<Role<AirflowConfigFragment>>,
     },
     #[serde(rename = "kubernetes")]
@@ -710,7 +711,7 @@ pub struct AirflowClusterRef {
 #[cfg(test)]
 mod tests {
     use crate::airflowdb::AirflowDB;
-    use crate::AirflowCluster;
+    use crate::{AirflowCluster, AirflowExecutorDiscriminants};
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
     #[test]
@@ -732,10 +733,8 @@ mod tests {
               default:
                 config: {}
           executor:
-            celery:
-              roleGroups:
-                default:
-                  config: {}
+            kubernetes:
+              config: {}
           schedulers:
             roleGroups:
               default:
@@ -755,10 +754,10 @@ mod tests {
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
-        // assert_eq!(
-        //     "KubernetesExecutor",
-        //     cluster.spec.cluster_config.executor.to_string()
-        // );
+        assert_eq!(
+            AirflowExecutorDiscriminants::KubernetesExecutor,
+            AirflowExecutorDiscriminants::from(cluster.spec.executor.unwrap())
+        );
         assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
         assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
     }
