@@ -20,6 +20,7 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
+{% if test_scenario['values']['executor'] == 'celery' -%}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -28,6 +29,7 @@ metadata:
 status:
   readyReplicas: 2
   replicas: 2
+{%- endif %}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
