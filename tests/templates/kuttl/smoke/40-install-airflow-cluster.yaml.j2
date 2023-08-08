@@ -42,7 +42,7 @@ spec:
       default:
         replicas: 1
   executor:
-    {% if test_scenario['values']['executor'] == 'celery' -%}
+{% if test_scenario['values']['executor'] == 'celery' %}
     celery:
       config:
         logging:
@@ -50,11 +50,11 @@ spec:
       roleGroups:
         default:
           replicas: 2
-    {%- elif test_scenario['values']['executor'] == 'kubernetes' -%}
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
     kubernetes:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    {%- endif %}
+{% endif %}
   schedulers:
     config:
       logging:
