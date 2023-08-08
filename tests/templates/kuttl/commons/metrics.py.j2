@@ -39,5 +39,7 @@ time.sleep(4)
 
 assert_metric('scheduler', 'airflow_scheduler_heartbeat')
 assert_metric('webserver', 'airflow_task_instance_created_BashOperator')
-assert_metric('worker', 'airflow_ti_successes')
 
+{% if test_scenario['values']['executor'] == 'celery' %}
+assert_metric('worker', 'airflow_ti_successes')
+{% endif %}
