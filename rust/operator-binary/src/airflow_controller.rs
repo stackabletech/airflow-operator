@@ -1,6 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
-use stackable_operator::config::fragment::{self, ValidationError};
+use stackable_operator::config::fragment::ValidationError;
 use stackable_operator::k8s_openapi::DeepMerge;
 
 use crate::config::{self, PYTHON_IMPORTS};
@@ -339,7 +339,9 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let airflow_executor = airflow.spec.executor.clone().unwrap(); // TODO replace unwrap
 
     if let AirflowExecutor::KubernetesExecutor { config } = airflow_executor.clone() {
-        let config = fragment::validate(config).context(FragmentValidationFailureSnafu)?;
+        let config = airflow
+            .merged_executor_config(config)
+            .context(FailedToResolveConfigSnafu)?;
 
         let worker_pod_template_config_map = build_executor_template_config_map(
             &airflow,

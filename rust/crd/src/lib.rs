@@ -496,48 +496,52 @@ impl AirflowConfig {
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
-        let (cpu, memory) = match role {
-            AirflowRole::Worker => (
-                CpuLimitsFragment {
-                    min: Some(Quantity("200m".into())),
-                    max: Some(Quantity("800m".into())),
-                },
-                MemoryLimitsFragment {
-                    limit: Some(Quantity("1750Mi".into())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-            ),
-            AirflowRole::Webserver => (
-                CpuLimitsFragment {
-                    min: Some(Quantity("100m".into())),
-                    max: Some(Quantity("400m".into())),
-                },
-                MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".into())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-            ),
-            AirflowRole::Scheduler => (
-                CpuLimitsFragment {
-                    min: Some(Quantity("100m".to_owned())),
-                    max: Some(Quantity("400m".to_owned())),
-                },
-                MemoryLimitsFragment {
-                    limit: Some(Quantity("512Mi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-            ),
-        };
-
         AirflowConfigFragment {
-            resources: ResourcesFragment {
-                cpu,
-                memory,
-                storage: AirflowStorageConfigFragment {},
-            },
+            resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
         }
+    }
+}
+
+fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConfig> {
+    let (cpu, memory) = match role {
+        AirflowRole::Worker => (
+            CpuLimitsFragment {
+                min: Some(Quantity("200m".into())),
+                max: Some(Quantity("800m".into())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("1750Mi".into())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::Webserver => (
+            CpuLimitsFragment {
+                min: Some(Quantity("100m".into())),
+                max: Some(Quantity("400m".into())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("2Gi".into())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::Scheduler => (
+            CpuLimitsFragment {
+                min: Some(Quantity("100m".to_owned())),
+                max: Some(Quantity("400m".to_owned())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("512Mi".to_owned())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+    };
+
+    ResourcesFragment {
+        cpu,
+        memory,
+        storage: AirflowStorageConfigFragment {},
     }
 }
 
@@ -676,6 +680,24 @@ impl AirflowCluster {
 
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    /// Retrieve and merge resource configs for the executor template
+    pub fn merged_executor_config(
+        &self,
+        config: ExecutorConfigFragment,
+    ) -> Result<ExecutorConfig, Error> {
+        // use the worker defaults for executor pods
+        let resources = default_resources(&AirflowRole::Worker);
+        let logging = product_logging::spec::default_logging();
+
+        let executor_defaults = ExecutorConfigFragment { resources, logging };
+
+        let mut conf_executor = config.to_owned();
+        conf_executor.merge(&executor_defaults);
+
+        tracing::debug!("Merged executor config: {:?}", conf_executor);
+        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
 }
 
