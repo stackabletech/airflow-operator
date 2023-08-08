@@ -36,18 +36,18 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
-      #- executor
+      - executor
   - name: mount-dags-gitsync
     dimensions:
       - airflow-latest
       - openshift
-      #- executor
+      - executor
   - name: ldap
     dimensions:
       - airflow-latest
       - openshift
       - ldap-authentication
-      #- executor
+      - executor
   - name: resources
     dimensions:
       - airflow-latest
