@@ -31,9 +31,9 @@ For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you 
 
 ConfigMaps are created, one per RoleGroup and also one for the AirflowDB. Both ConfigMaps contains two files: `log_config.py` and `webserver_config.py` which contain logging and general Airflow configuration respectively.
 
-== Prerequisites
+== Required external components
 
-Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:prerequisites.adoc[] page lists all supported databases and redis versions to use in production. You need to provide these prerequisites for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
+Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production. You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
 
 == Using custom workflows/DAGs
 

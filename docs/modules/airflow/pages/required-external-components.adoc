@@ -1,4 +1,4 @@
-= Prerequisites
+= Required external components
 
 Airflow requires an SQL database to operate. The https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html[Airflow documentation] specifies:
 
