@@ -338,7 +338,11 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let airflow_executor = airflow.spec.executor.clone().unwrap(); // TODO replace unwrap
 
-    if let AirflowExecutor::KubernetesExecutor { config } = airflow_executor.clone() {
+    if let AirflowExecutor::KubernetesExecutor {
+        config,
+        env_overrides,
+    } = airflow_executor.clone()
+    {
         let config = airflow
             .merged_executor_config(config)
             .context(FailedToResolveConfigSnafu)?;
@@ -349,6 +353,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             authentication_config.as_ref(),
             &rbac_sa.name_unchecked(),
             &config,
+            env_overrides,
         )?;
         cluster_resources
             .add(client, worker_pod_template_config_map)
@@ -862,6 +867,7 @@ fn build_executor_template_config_map(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &ExecutorConfig,
+    env_overrides: HashMap<String, String>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     pb.metadata_builder(|m| {
@@ -896,7 +902,7 @@ fn build_executor_template_config_map(
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into());
 
-    airflow_container.add_env_vars(build_template_envs(airflow));
+    airflow_container.add_env_vars(build_template_envs(airflow, env_overrides));
     airflow_container.add_volume_mounts(airflow.volume_mounts());
 
     pb.add_container(airflow_container.build());
@@ -1036,7 +1042,10 @@ fn build_mapped_envs(
     env
 }
 
-fn build_template_envs(airflow: &AirflowCluster) -> Vec<EnvVar> {
+fn build_template_envs(
+    airflow: &AirflowCluster,
+    env_overrides: HashMap<String, String>,
+) -> Vec<EnvVar> {
     let secret_prop = Some(
         airflow
             .spec
@@ -1072,6 +1081,14 @@ fn build_template_envs(airflow: &AirflowCluster) -> Vec<EnvVar> {
         value: airflow.namespace(),
         ..Default::default()
     });
+
+    for (k, v) in env_overrides {
+        env.push(EnvVar {
+            name: k,
+            value: Some(v),
+            ..Default::default()
+        });
+    }
 
     env
 }

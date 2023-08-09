@@ -32,7 +32,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use strum::{Display, EnumDiscriminants, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -358,7 +358,11 @@ pub enum AirflowExecutor {
         config: Option<Role<AirflowConfigFragment>>,
     },
     #[serde(rename = "kubernetes")]
-    KubernetesExecutor { config: ExecutorConfigFragment },
+    KubernetesExecutor {
+        config: ExecutorConfigFragment,
+        #[serde(default)]
+        env_overrides: HashMap<String, String>,
+    },
 }
 
 impl AirflowCluster {
