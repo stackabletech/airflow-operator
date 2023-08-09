@@ -1014,11 +1014,18 @@ fn build_mapped_envs(
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
             ..Default::default()
         });
+        // version < 2.5
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES__POD_TEMPLATE_FILE".into(),
+            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
+            ..Default::default()
+        });
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
             value: airflow.namespace(),
             ..Default::default()
         });
+        // version < 2.5
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
             value: airflow.namespace(),
