@@ -11,5 +11,5 @@
 ** xref:airflow:usage-guide/monitoring.adoc[]
 ** xref:airflow:usage-guide/overrides.adoc[]
 ** xref:airflow:usage-guide/cluster-operations.adoc[]
-* xref:prerequisites.adoc[]
+* xref:airflow:prerequisites.adoc[]
 * xref:airflow:configuration.adoc[]
