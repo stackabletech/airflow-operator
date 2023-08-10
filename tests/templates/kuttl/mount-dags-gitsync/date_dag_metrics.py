@@ -37,4 +37,6 @@ assert response.status_code == 200, "DAG run could not be triggered."
 time.sleep(4)
 
 assert_metric('scheduler', 'airflow_scheduler_heartbeat')
-assert_metric('worker', 'airflow_ti_successes')
+
+# Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
+assert_metric('scheduler', 'airflow_dagrun_duration_success_date_demo_count')

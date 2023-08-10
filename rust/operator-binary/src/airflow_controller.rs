@@ -908,6 +908,45 @@ fn build_executor_template_config_map(
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes());
 
+    if let Some(gitsync) = airflow.git_sync() {
+        let mut env = vec![];
+        if let Some(credentials_secret) = &gitsync.credentials_secret {
+            env.push(env_var_from_secret(
+                "GIT_SYNC_USERNAME",
+                credentials_secret,
+                "user",
+            ));
+            env.push(env_var_from_secret(
+                "GIT_SYNC_PASSWORD",
+                credentials_secret,
+                "password",
+            ));
+        }
+        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
+            .context(InvalidContainerNameSnafu)?
+            .add_env_vars(env)
+            .image_from_product_image(resolved_product_image)
+            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+            .args(vec![gitsync.get_args().join(" ")])
+            .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+            .resources(
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_request("100m")
+                    .with_cpu_limit("200m")
+                    .with_memory_request("64Mi")
+                    .with_memory_limit("64Mi")
+                    .build(),
+            )
+            .build();
+
+        pb.add_volume(
+            VolumeBuilder::new(GIT_CONTENT)
+                .empty_dir(EmptyDirVolumeSource::default())
+                .build(),
+        );
+        pb.add_container(gitsync_container);
+    }
+
     let pod_template = pb.build_template();
     let mut cm_builder = ConfigMapBuilder::new();
 
@@ -1020,7 +1059,7 @@ fn build_mapped_envs(
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
             ..Default::default()
         });
-        // version < 2.5
+        // TODO: version < 2.5, delete when these versions are no longer supported
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES__POD_TEMPLATE_FILE".into(),
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
@@ -1031,7 +1070,7 @@ fn build_mapped_envs(
             value: airflow.namespace(),
             ..Default::default()
         });
-        // version < 2.5
+        // TODO: version < 2.5, delete when these versions are no longer supported
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
             value: airflow.namespace(),
@@ -1075,7 +1114,7 @@ fn build_template_envs(
         value: airflow.namespace(),
         ..Default::default()
     });
-    // name of the variable prior to airflow 2.5.0
+    // TODO: version < 2.5, delete when these versions are no longer supported
     env.push(EnvVar {
         name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
         value: airflow.namespace(),
@@ -1088,6 +1127,16 @@ fn build_template_envs(
             value: Some(v),
             ..Default::default()
         });
+    }
+
+    if let Some(git_sync) = &airflow.git_sync() {
+        if let Some(dags_folder) = &git_sync.git_folder {
+            env.push(EnvVar {
+                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            })
+        }
     }
 
     env
