@@ -14,11 +14,12 @@
 
 ### Fixed
 
-- BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#XXX]).
+- BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#316]).
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
 [#312]: https://github.com/stackabletech/airflow-operator/pull/312
+[#316]: https://github.com/stackabletech/airflow-operator/pull/316
 
 ## [23.7.0] - 2023-07-14
 
