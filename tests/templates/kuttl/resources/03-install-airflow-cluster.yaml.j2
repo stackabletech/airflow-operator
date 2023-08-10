@@ -31,7 +31,6 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -42,38 +41,39 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  workers:
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      resources:
-        cpu:
-          min: 100m
-          max: "1"
-        memory:
-          limit: 2Gi
-    roleGroups:
-      resources-from-role:
-        replicas: 1
-      resources-from-role-group:
-        config:
-          resources:
-            cpu:
-              min: 200m
-              max: "2"
-            memory:
-              limit: 3Gi
-        replicas: 1
-      resources-from-pod-overrides:
-        podOverrides:
-          spec:
-            containers:
-              - name: airflow
-                resources:
-                  requests:
-                    cpu: 300m
-                  limits:
-                    cpu: 900m
+  executor:
+    celery:
+      config:
+        logging:
+          enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        resources:
+          cpu:
+            min: 100m
+            max: "1"
+          memory:
+            limit: 2Gi
+      roleGroups:
+        resources-from-role:
+          replicas: 1
+        resources-from-role-group:
+          config:
+            resources:
+              cpu:
+                min: 200m
+                max: "2"
+              memory:
+                limit: 3Gi
+          replicas: 1
+        resources-from-pod-overrides:
+          podOverrides:
+            spec:
+              containers:
+                - name: airflow
+                  resources:
+                    requests:
+                      cpu: 300m
+                    limits:
+                      cpu: 900m
   schedulers:
     config:
       logging:
