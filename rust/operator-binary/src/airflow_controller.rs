@@ -270,8 +270,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut roles = HashMap::new();
 
-    // if the executor enum indicates that we are using celery, then we want the worker role in the collection
-    // and it is easiest to treat the worker structure the same as other roles
     for role in AirflowRole::iter() {
         if let Some(resolved_role) = airflow.get_role(&role).clone() {
             roles.insert(
@@ -347,6 +345,28 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             .merged_executor_config(config)
             .context(FailedToResolveConfigSnafu)?;
 
+        let rolegroup = RoleGroupRef {
+            cluster: ObjectRef::from_obj(&*airflow),
+            role: "executor".into(),
+            role_group: "kubernetes".into(),
+        };
+
+        let rg_configmap = build_rolegroup_config_map(
+            &airflow,
+            &resolved_product_image,
+            &rolegroup,
+            &HashMap::new(),
+            authentication_config.as_ref(),
+            &config.logging,
+            vector_aggregator_address.as_deref(),
+        )?;
+        cluster_resources
+            .add(client, rg_configmap)
+            .await
+            .with_context(|_| ApplyRoleGroupConfigSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
+
         let worker_pod_template_config_map = build_executor_template_config_map(
             &airflow,
             &resolved_product_image,
@@ -354,6 +374,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             &rbac_sa.name_unchecked(),
             &config,
             env_overrides,
+            &rolegroup,
         )?;
         cluster_resources
             .add(client, worker_pod_template_config_map)
@@ -868,6 +889,7 @@ fn build_executor_template_config_map(
     sa_name: &str,
     config: &ExecutorConfig,
     env_overrides: HashMap<String, String>,
+    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     pb.metadata_builder(|m| {
@@ -905,8 +927,17 @@ fn build_executor_template_config_map(
     airflow_container.add_env_vars(build_template_envs(airflow, env_overrides));
     airflow_container.add_volume_mounts(airflow.volume_mounts());
 
+    airflow_container.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
+    airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
+    airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes());
+
+    pb.add_volumes(controller_commons::create_volumes(
+        &rolegroup_ref.object_name(),
+        config.logging.containers.get(&Container::Airflow),
+    ));
 
     if let Some(gitsync) = airflow.git_sync() {
         let mut env = vec![];
@@ -945,6 +976,21 @@ fn build_executor_template_config_map(
                 .build(),
         );
         pb.add_container(gitsync_container);
+    }
+
+    if config.logging.enable_vector_agent {
+        pb.add_container(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            config.logging.containers.get(&Container::Vector),
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
+        ));
     }
 
     let pod_template = pb.build_template();
