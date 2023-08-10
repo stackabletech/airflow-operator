@@ -60,7 +60,6 @@ spec:
     productVersion: "{{ test_scenario['values']['airflow'] }}"
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
-    executor: CeleryExecutor
     loadExamples: false
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -117,39 +116,40 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
-  workers:
-    roleGroups:
-      automatic-log-config:
-        replicas: 1
-        config:
-          logging:
-            enableVectorAgent: true
-            containers:
-              airflow:
-                console:
-                  level: INFO
-                file:
-                  level: DEBUG
-                loggers:
-                  ROOT:
-                    level: DEBUG
-              vector:
-                console:
-                  level: INFO
-                file:
-                  level: INFO
-                loggers:
-                  ROOT:
+  executor:
+    celery:
+      roleGroups:
+        automatic-log-config:
+          replicas: 1
+          config:
+            logging:
+              enableVectorAgent: true
+              containers:
+                airflow:
+                  console:
                     level: INFO
-      custom-log-config:
-        replicas: 1
-        config:
-          logging:
-            enableVectorAgent: true
-            containers:
-              airflow:
-                custom:
-                  configMap: airflow-log-config
+                  file:
+                    level: DEBUG
+                  loggers:
+                    ROOT:
+                      level: DEBUG
+                vector:
+                  console:
+                    level: INFO
+                  file:
+                    level: INFO
+                  loggers:
+                    ROOT:
+                      level: INFO
+        custom-log-config:
+          replicas: 1
+          config:
+            logging:
+              enableVectorAgent: true
+              containers:
+                airflow:
+                  custom:
+                    configMap: airflow-log-config
   schedulers:
     roleGroups:
       automatic-log-config:
