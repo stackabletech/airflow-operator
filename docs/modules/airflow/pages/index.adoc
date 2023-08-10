@@ -29,12 +29,11 @@ The diagram above depicts all the Kubernetes resources created by the operator, 
 
 For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the Operator creates a StatefulSet with the amount of replicas defined in the RoleGroup. Every Pod in the StatefulSet has two containers: the main container running Airflow and a sidecar container gathering metrics for xref:operators:monitoring.adoc[]. The Operator creates a Service per role group as well as a single service for the whole `webserver` role called `<clustername>-webserver`.
 
-// TODO configmaps?
 ConfigMaps are created, one per RoleGroup and also one for the AirflowDB. Both ConfigMaps contains two files: `log_config.py` and `webserver_config.py` which contain logging and general Airflow configuration respectively.
 
-== Dependencies
+== Required external components
 
-Airflow requires an SQL database in which to store its metadata. The Stackable platform does not have its own Operator for an SQL database but the xref:getting_started/index.adoc[] guides you through installing an example database with an Airflow instance that you can use to get started.
+Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production. You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
 
 == Using custom workflows/DAGs
 
