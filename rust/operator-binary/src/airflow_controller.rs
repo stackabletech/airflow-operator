@@ -520,15 +520,7 @@ fn build_role_service(
     role_name: &str,
     port: u16,
 ) -> Result<Service> {
-    let role_svc_name = format!(
-        "{}-{}",
-        airflow
-            .metadata
-            .name
-            .as_ref()
-            .unwrap_or(&APP_NAME.to_string()),
-        role_name
-    );
+    let role_svc_name = format!("{}-{}", airflow.name_any(), role_name);
     let ports = role_ports(port);
 
     Ok(Service {
@@ -563,7 +555,7 @@ fn build_role_service(
 
 fn role_ports(port: u16) -> Vec<ServicePort> {
     vec![ServicePort {
-        name: Some(APP_NAME.to_string()),
+        name: Some("http".to_string()),
         port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
