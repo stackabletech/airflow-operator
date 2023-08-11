@@ -270,6 +270,8 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut roles = HashMap::new();
 
+    // if the kubernetes executor is specified there will be no worker role as the pods
+    // are provisioned by airflow as defined by the task (default: one pod per task)
     for role in AirflowRole::iter() {
         if let Some(resolved_role) = airflow.get_role(&role).clone() {
             roles.insert(
@@ -334,53 +336,36 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    let airflow_executor = airflow.spec.executor.clone().unwrap(); // TODO replace unwrap
+    let airflow_executor = airflow.spec.executor.clone();
 
-    if let AirflowExecutor::KubernetesExecutor {
+    // if the kubernetes executor is specified, in place of a worker role that will be in the role
+    // collection there will be a pod template created to be used for pod provisioning
+    if let Some(AirflowExecutor::KubernetesExecutor {
         config,
         env_overrides,
-    } = airflow_executor.clone()
+    }) = airflow_executor.clone()
     {
-        let config = airflow
-            .merged_executor_config(config)
-            .context(FailedToResolveConfigSnafu)?;
-
-        let rolegroup = RoleGroupRef {
-            cluster: ObjectRef::from_obj(&*airflow),
-            role: "executor".into(),
-            role_group: "kubernetes".into(),
-        };
-
-        let rg_configmap = build_rolegroup_config_map(
+        build_executor_template(
             &airflow,
+            config,
             &resolved_product_image,
-            &rolegroup,
-            &HashMap::new(),
-            authentication_config.as_ref(),
-            &config.logging,
-            vector_aggregator_address.as_deref(),
-        )?;
-        cluster_resources
-            .add(client, rg_configmap)
-            .await
-            .with_context(|_| ApplyRoleGroupConfigSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-
-        let worker_pod_template_config_map = build_executor_template_config_map(
-            &airflow,
-            &resolved_product_image,
-            authentication_config.as_ref(),
-            &rbac_sa.name_unchecked(),
-            &config,
+            &authentication_config,
+            &vector_aggregator_address,
+            &mut cluster_resources,
+            client,
+            &rbac_sa,
             env_overrides,
-            &rolegroup,
-        )?;
-        cluster_resources
-            .add(client, worker_pod_template_config_map)
-            .await
-            .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
+        )
+        .await?;
     }
+
+    // from this point on we only need the discriminant
+    let airflow_executor = if let Some(executor) = airflow_executor.clone() {
+        AirflowExecutorDiscriminants::from(executor)
+    } else {
+        // defaulting to this
+        AirflowExecutorDiscriminants::CeleryExecutor
+    };
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -426,7 +411,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 authentication_config.as_ref(),
                 &rbac_sa.name_unchecked(),
                 &config,
-                &airflow_executor,
+                airflow_executor,
             )?;
 
             ss_cond_builder.add(
@@ -474,6 +459,57 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn build_executor_template(
+    airflow: &Arc<AirflowCluster>,
+    config: stackable_airflow_crd::ExecutorConfigFragment,
+    resolved_product_image: &ResolvedProductImage,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    vector_aggregator_address: &Option<String>,
+    cluster_resources: &mut ClusterResources,
+    client: &stackable_operator::client::Client,
+    rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
+    env_overrides: HashMap<String, String>,
+) -> Result<(), Error> {
+    let config = airflow
+        .merged_executor_config(config)
+        .context(FailedToResolveConfigSnafu)?;
+    let rolegroup = RoleGroupRef {
+        cluster: ObjectRef::from_obj(&**airflow),
+        role: "executor".into(),
+        role_group: "kubernetes".into(),
+    };
+    let rg_configmap = build_rolegroup_config_map(
+        airflow,
+        resolved_product_image,
+        &rolegroup,
+        &HashMap::new(),
+        authentication_config,
+        &config.logging,
+        vector_aggregator_address.as_deref(),
+    )?;
+    cluster_resources
+        .add(client, rg_configmap)
+        .await
+        .with_context(|_| ApplyRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
+    let worker_pod_template_config_map = build_executor_template_config_map(
+        airflow,
+        resolved_product_image,
+        authentication_config,
+        &rbac_sa.name_unchecked(),
+        &config,
+        env_overrides,
+        &rolegroup,
+    )?;
+    cluster_resources
+        .add(client, worker_pod_template_config_map)
+        .await
+        .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
+    Ok(())
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
@@ -672,7 +708,7 @@ fn build_server_rolegroup_statefulset(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
-    executor: &AirflowExecutor,
+    executor: AirflowExecutorDiscriminants,
 ) -> Result<StatefulSet> {
     let role = airflow
         .get_role(airflow_role)
@@ -743,9 +779,7 @@ fn build_server_rolegroup_statefulset(
     airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
-    if AirflowExecutorDiscriminants::from(executor)
-        == AirflowExecutorDiscriminants::KubernetesExecutor
-    {
+    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
         airflow_container.add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION);
     }
 
@@ -789,9 +823,7 @@ fn build_server_rolegroup_statefulset(
         config.logging.containers.get(&Container::Airflow),
     ));
 
-    if AirflowExecutorDiscriminants::from(executor)
-        == AirflowExecutorDiscriminants::KubernetesExecutor
-    {
+    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
                 .with_config_map(TEMPLATE_CONFIGMAP_NAME)
@@ -1026,7 +1058,7 @@ fn build_executor_template_config_map(
 fn build_mapped_envs(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    executor: &AirflowExecutor,
+    executor: AirflowExecutorDiscriminants,
 ) -> Vec<EnvVar> {
     let secret_prop = rolegroup_config
         .get(&PropertyNameKind::Env)
@@ -1091,15 +1123,16 @@ fn build_mapped_envs(
             ..Default::default()
         })
     }
+
+    let executor_name: &'static str = executor.into();
+
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: Some(executor.to_string()),
+        value: Some(executor_name.to_string()),
         ..Default::default()
     });
 
-    if AirflowExecutorDiscriminants::from(executor)
-        == AirflowExecutorDiscriminants::KubernetesExecutor
-    {
+    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE".into(),
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),

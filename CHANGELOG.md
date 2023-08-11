@@ -4,7 +4,7 @@
 
 ### Added
 
-- Implement KubernetesExecutor ([#311]).
+- [BREAKING] Implement KubernetesExecutor ([#311]).
 - Default stackableVersion to operator version ([#312]).
 
 ### Changed

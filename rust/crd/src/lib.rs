@@ -366,6 +366,8 @@ pub enum AirflowExecutor {
 }
 
 impl AirflowCluster {
+    /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
+    /// the kubernetes executor is specified)
     pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
         match role {
             AirflowRole::Webserver => &self.spec.webservers,
