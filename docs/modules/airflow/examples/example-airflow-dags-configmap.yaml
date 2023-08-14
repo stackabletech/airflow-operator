@@ -7,7 +7,6 @@ spec:
   image:
     productVersion: 2.6.1
   clusterConfig:
-    executor: CeleryExecutor
     loadExamples: false
     exposeConfig: false
     credentialsSecret: simple-airflow-credentials
@@ -25,12 +24,13 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
         replicas: 1
-  workers:
-    roleGroups:
-      default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        replicas: 2
+  executor:
+    celery:
+      roleGroups:
+        default:
+          envOverrides:
+            AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
+          replicas: 2
   schedulers:
     roleGroups:
       default:

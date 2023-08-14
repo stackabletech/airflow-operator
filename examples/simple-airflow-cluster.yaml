@@ -24,7 +24,6 @@ spec:
     productVersion: 2.6.1
     stackableVersion: 0.0.0-dev
   clusterConfig:
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: false
     credentialsSecret: simple-airflow-credentials
@@ -32,10 +31,11 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  workers:
-    roleGroups:
-      default:
-        replicas: 2
+  executor:
+    celery:
+      roleGroups:
+        default:
+          replicas: 2
   schedulers:
     roleGroups:
       default:

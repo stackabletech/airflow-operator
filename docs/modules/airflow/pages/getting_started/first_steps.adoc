@@ -56,13 +56,10 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
-- `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
-is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
-(whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
+- `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types). This field takes one of two values, `celery` or `kubernetes`: `celery` will deploy workers as defined by the role and specify `CeleryExecutor` internally. `kubernetes` will set `KubernetesExecutor` internally, and the scheduler will take responsibility for creating (and terminating) pods for the DAG individual tasks.
 - the `spec.loadExamples` key is optional and defaults to `false`. It is set to `true` here as the example DAGs will be used when verifying the installation.
 - the `spec.exposeConfig` key is optional and defaults to `false`. It is set to `true` only as an aid to verify the configuration and should never be used as such in anything other than test or demo clusters.
 - the previously created secret must be referenced in `spec.credentialsSecret`
-
 
 NOTE: Please note that the version you need to specify for `spec.version` is not only the version of Apache Airflow which you want to roll out, but has to be amended with a Stackable version as shown. This Stackable version is the version of the underlying container image which is used to execute the processes. For a list of available versions please check our
 https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%airflow%2Ftags[image registry].
