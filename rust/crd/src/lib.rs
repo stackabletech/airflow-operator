@@ -49,6 +49,11 @@ pub const GIT_ROOT: &str = "/tmp/git";
 pub const GIT_LINK: &str = "current";
 pub const GIT_SYNC_NAME: &str = "gitsync";
 
+pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
+pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
+pub const TEMPLATE_LOCATION: &str = "/templates";
+pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
+
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
 

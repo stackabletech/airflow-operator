@@ -5,8 +5,7 @@ use stackable_operator::k8s_openapi::DeepMerge;
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
-    self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, TEMPLATE_CONFIGMAP_NAME,
-    TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
 };
 use crate::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
@@ -25,6 +24,7 @@ use stackable_airflow_crd::{
 use stackable_airflow_crd::{
     AirflowClusterStatus, AirflowExecutor, AirflowExecutorDiscriminants, ExecutorConfig,
     AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
