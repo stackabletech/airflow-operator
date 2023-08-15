@@ -2,6 +2,7 @@
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
 use stackable_operator::config::fragment::ValidationError;
 use stackable_operator::k8s_openapi::DeepMerge;
+use stackable_operator::product_logging::framework::shutdown_vector_command;
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
@@ -931,6 +932,8 @@ fn build_executor_template_config_map(
             .build(),
     );
 
+    // N.B. this "base" name is an airflow requirement and should not be changed!
+    // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
     let mut airflow_container = ContainerBuilder::new("base").context(InvalidContainerNameSnafu)?;
 
     add_authentication_volumes_and_volume_mounts(
@@ -949,6 +952,18 @@ fn build_executor_template_config_map(
     airflow_container.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
     airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+
+    if config.logging.enable_vector_agent {
+        airflow_container.add_env_var(
+            "_STACKABLE_POST_HOOK",
+            [
+                // Wait for Vector to gather the logs.
+                "sleep 10",
+                &shutdown_vector_command(STACKABLE_LOG_DIR),
+            ]
+            .join("; "),
+        );
+    }
 
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes());
