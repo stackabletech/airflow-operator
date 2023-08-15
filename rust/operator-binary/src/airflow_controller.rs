@@ -22,9 +22,9 @@ use stackable_airflow_crd::{
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{
-    AirflowClusterStatus, AirflowExecutor, AirflowExecutorDiscriminants, ExecutorConfig,
-    AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
-    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    AirflowClusterStatus, AirflowExecutor, ExecutorConfig, AIRFLOW_UID, GIT_CONTENT, GIT_LINK,
+    GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
+    TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -336,14 +336,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    let airflow_executor = airflow.spec.executor.clone();
+    let airflow_executor = &airflow.spec.executor;
 
     // if the kubernetes executor is specified, in place of a worker role that will be in the role
     // collection there will be a pod template created to be used for pod provisioning
-    if let Some(AirflowExecutor::KubernetesExecutor {
+    if let AirflowExecutor::KubernetesExecutor {
         config,
         env_overrides,
-    }) = airflow_executor.clone()
+    } = &airflow_executor
     {
         build_executor_template(
             &airflow,
@@ -360,12 +360,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     }
 
     // from this point on we only need the discriminant
-    let airflow_executor = if let Some(executor) = airflow_executor.clone() {
-        AirflowExecutorDiscriminants::from(executor)
-    } else {
-        // defaulting to this
-        AirflowExecutorDiscriminants::CeleryExecutor
-    };
+    //let airflow_executor = AirflowExecutorDiscriminants::from(airflow_executor);
 
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
@@ -464,14 +459,14 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &Arc<AirflowCluster>,
-    config: stackable_airflow_crd::ExecutorConfigFragment,
+    config: &stackable_airflow_crd::ExecutorConfigFragment,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     vector_aggregator_address: &Option<String>,
     cluster_resources: &mut ClusterResources,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
-    env_overrides: HashMap<String, String>,
+    env_overrides: &HashMap<String, String>,
 ) -> Result<(), Error> {
     let config = airflow
         .merged_executor_config(config)
@@ -700,7 +695,7 @@ fn build_server_rolegroup_statefulset(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
-    executor: AirflowExecutorDiscriminants,
+    executor: &AirflowExecutor,
 ) -> Result<StatefulSet> {
     let role = airflow
         .get_role(airflow_role)
@@ -771,7 +766,7 @@ fn build_server_rolegroup_statefulset(
     airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
-    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         airflow_container.add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION);
     }
 
@@ -815,7 +810,7 @@ fn build_server_rolegroup_statefulset(
         config.logging.containers.get(&Container::Airflow),
     ));
 
-    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
                 .with_config_map(TEMPLATE_CONFIGMAP_NAME)
@@ -912,7 +907,7 @@ fn build_executor_template_config_map(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &ExecutorConfig,
-    env_overrides: HashMap<String, String>,
+    env_overrides: &HashMap<String, String>,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
@@ -1050,7 +1045,7 @@ fn build_executor_template_config_map(
 fn build_mapped_envs(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    executor: AirflowExecutorDiscriminants,
+    executor: &AirflowExecutor,
 ) -> Vec<EnvVar> {
     let secret_prop = rolegroup_config
         .get(&PropertyNameKind::Env)
@@ -1116,15 +1111,13 @@ fn build_mapped_envs(
         })
     }
 
-    let executor_name: &'static str = executor.into();
-
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: Some(executor_name.to_string()),
+        value: Some(executor.to_string()),
         ..Default::default()
     });
 
-    if executor == AirflowExecutorDiscriminants::KubernetesExecutor {
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE".into(),
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
@@ -1154,7 +1147,7 @@ fn build_mapped_envs(
 
 fn build_template_envs(
     airflow: &AirflowCluster,
-    env_overrides: HashMap<String, String>,
+    env_overrides: &HashMap<String, String>,
 ) -> Vec<EnvVar> {
     let secret_prop = Some(
         airflow
@@ -1194,8 +1187,8 @@ fn build_template_envs(
 
     for (k, v) in env_overrides {
         env.push(EnvVar {
-            name: k,
-            value: Some(v),
+            name: k.to_string(),
+            value: Some(v.to_string()),
             ..Default::default()
         });
     }

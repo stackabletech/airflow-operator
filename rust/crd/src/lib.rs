@@ -33,7 +33,7 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
 };
 use std::collections::{BTreeMap, HashMap};
-use strum::{Display, EnumDiscriminants, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -151,8 +151,7 @@ pub struct AirflowClusterSpec {
     pub webservers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub executor: Option<AirflowExecutor>,
+    pub executor: AirflowExecutor,
 }
 
 #[derive(Clone, Deserialize, Default, Debug, JsonSchema, PartialEq, Serialize)]
@@ -344,18 +343,8 @@ impl AirflowRole {
 }
 
 #[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    JsonSchema,
-    PartialEq,
-    Serialize,
-    EnumString,
-    EnumDiscriminants,
+    Clone, Debug, Deserialize, Display, EnumIter, JsonSchema, PartialEq, Serialize, EnumString,
 )]
-#[strum_discriminants(derive(IntoStaticStr))]
 pub enum AirflowExecutor {
     #[serde(rename = "celery")]
     CeleryExecutor {
@@ -378,7 +367,7 @@ impl AirflowCluster {
             AirflowRole::Webserver => &self.spec.webservers,
             AirflowRole::Scheduler => &self.spec.schedulers,
             AirflowRole::Worker => {
-                if let Some(AirflowExecutor::CeleryExecutor { config }) = &self.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
                     config
                 } else {
                     &None
@@ -640,7 +629,7 @@ impl AirflowCluster {
                     })?
             }
             AirflowRole::Worker => {
-                if let Some(AirflowExecutor::CeleryExecutor { config }) = &self.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
                     config.as_ref().context(UnknownAirflowRoleSnafu {
                         role: role.to_string(),
                         roles: AirflowRole::roles(),
@@ -696,7 +685,7 @@ impl AirflowCluster {
     /// Retrieve and merge resource configs for the executor template
     pub fn merged_executor_config(
         &self,
-        config: ExecutorConfigFragment,
+        config: &ExecutorConfigFragment,
     ) -> Result<ExecutorConfig, Error> {
         // use the worker defaults for executor pods
         let resources = default_resources(&AirflowRole::Worker);
@@ -744,7 +733,7 @@ pub struct AirflowClusterRef {
 #[cfg(test)]
 mod tests {
     use crate::airflowdb::AirflowDB;
-    use crate::{AirflowCluster, AirflowExecutorDiscriminants};
+    use crate::AirflowCluster;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
     #[test]
@@ -787,10 +776,8 @@ mod tests {
 
         assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
-        assert_eq!(
-            AirflowExecutorDiscriminants::KubernetesExecutor,
-            AirflowExecutorDiscriminants::from(cluster.spec.executor.unwrap())
-        );
+
+        assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
         assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
     }
