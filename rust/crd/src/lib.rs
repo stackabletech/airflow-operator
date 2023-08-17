@@ -28,11 +28,11 @@ use stackable_operator::{
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{Role, RoleGroup, RoleGroupRef},
+    role_utils::{CommonConfiguration, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -342,35 +342,32 @@ impl AirflowRole {
     }
 }
 
-#[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, JsonSchema, PartialEq, Serialize, EnumString,
-)]
+#[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
 pub enum AirflowExecutor {
-    #[serde(rename = "celery")]
+    #[serde(rename = "celeryExecutors")]
     CeleryExecutor {
         #[serde(flatten)]
-        config: Option<Role<AirflowConfigFragment>>,
+        config: Role<AirflowConfigFragment>,
     },
-    #[serde(rename = "kubernetes")]
+    #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
-        config: ExecutorConfigFragment,
-        #[serde(default)]
-        env_overrides: HashMap<String, String>,
+        #[serde(flatten)]
+        common_configuration: CommonConfiguration<ExecutorConfigFragment>,
     },
 }
 
 impl AirflowCluster {
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
     /// the kubernetes executor is specified)
-    pub fn get_role(&self, role: &AirflowRole) -> &Option<Role<AirflowConfigFragment>> {
+    pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
         match role {
-            AirflowRole::Webserver => &self.spec.webservers,
-            AirflowRole::Scheduler => &self.spec.schedulers,
+            AirflowRole::Webserver => self.spec.webservers.as_ref(),
+            AirflowRole::Scheduler => self.spec.schedulers.as_ref(),
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
+                    Some(config)
                 } else {
-                    &None
+                    None
                 }
             }
         }
@@ -631,10 +628,7 @@ impl AirflowCluster {
             }
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config.as_ref().context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
+                    config
                 } else {
                     return Err(Error::NoRoleForExecutorFailure);
                 }

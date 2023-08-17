@@ -277,7 +277,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     // if the kubernetes executor is specified there will be no worker role as the pods
     // are provisioned by airflow as defined by the task (default: one pod per task)
     for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role).clone() {
+        if let Some(resolved_role) = airflow.get_role(&role) {
             roles.insert(
                 role.to_string(),
                 (
@@ -285,7 +285,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                         PropertyNameKind::Env,
                         PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
                     ],
-                    resolved_role,
+                    resolved_role.clone(),
                 ),
             );
         }
@@ -345,20 +345,19 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     // if the kubernetes executor is specified, in place of a worker role that will be in the role
     // collection there will be a pod template created to be used for pod provisioning
     if let AirflowExecutor::KubernetesExecutor {
-        config,
-        env_overrides,
+        common_configuration,
     } = &airflow_executor
     {
         build_executor_template(
             &airflow,
-            config,
+            &common_configuration.config,
             &resolved_product_image,
             &authentication_config,
             &vector_aggregator_address,
             &mut cluster_resources,
             client,
             &rbac_sa,
-            env_overrides,
+            &common_configuration.env_overrides,
         )
         .await?;
     }
@@ -705,10 +704,8 @@ fn build_server_rolegroup_statefulset(
     config: &AirflowConfig,
     executor: &AirflowExecutor,
 ) -> Result<StatefulSet> {
-    let role = airflow
-        .get_role(airflow_role)
-        .as_ref()
-        .context(NoAirflowRoleSnafu)?;
+    let binding = airflow.get_role(airflow_role);
+    let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
     let commands = airflow_role.get_commands();
