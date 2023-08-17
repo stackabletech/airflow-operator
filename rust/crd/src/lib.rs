@@ -445,6 +445,7 @@ pub struct AirflowStorageConfig {}
 pub enum Container {
     Airflow,
     Vector,
+    Base,
 }
 
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]

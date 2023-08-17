@@ -2,7 +2,10 @@
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
 use stackable_operator::config::fragment::ValidationError;
 use stackable_operator::k8s_openapi::DeepMerge;
-use stackable_operator::product_logging::framework::shutdown_vector_command;
+use stackable_operator::product_logging::framework::{
+    capture_shell_output, shutdown_vector_command,
+};
+use stackable_operator::product_logging::spec::{ContainerLogConfig, ContainerLogConfigChoice};
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
@@ -427,6 +430,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 authentication_config.as_ref(),
                 &config.logging,
                 vector_aggregator_address.as_deref(),
+                &Container::Airflow,
             )?;
             cluster_resources
                 .add(client, rg_configmap)
@@ -485,6 +489,7 @@ async fn build_executor_template(
         authentication_config,
         &config.logging,
         vector_aggregator_address.as_deref(),
+        &Container::Base,
     )?;
     cluster_resources
         .add(client, rg_configmap)
@@ -563,6 +568,7 @@ fn role_port(role_name: &str) -> Option<u16> {
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
@@ -571,6 +577,7 @@ fn build_rolegroup_config_map(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
+    container: &Container,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
@@ -616,7 +623,7 @@ fn build_rolegroup_config_map(
         rolegroup,
         vector_aggregator_address,
         logging,
-        &Container::Airflow,
+        container,
         &Container::Vector,
         &mut cm_builder,
     )
@@ -736,11 +743,24 @@ fn build_server_rolegroup_statefulset(
         &mut pb,
     );
 
+    let mut args = Vec::new();
+    if let Some(ContainerLogConfig {
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = config.logging.containers.get(&Container::Airflow)
+    {
+        args.push(capture_shell_output(
+            STACKABLE_LOG_DIR,
+            &Container::Airflow.to_string(),
+            log_config,
+        ));
+    }
+    args.extend(commands);
+
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")]);
+        .args(vec![String::from("-c"), args.join("; ")]);
 
     // environment variables
     let env_config = rolegroup_config
@@ -934,7 +954,8 @@ fn build_executor_template_config_map(
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
-    let mut airflow_container = ContainerBuilder::new("base").context(InvalidContainerNameSnafu)?;
+    let mut airflow_container =
+        ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
 
     add_authentication_volumes_and_volume_mounts(
         authentication_config,
