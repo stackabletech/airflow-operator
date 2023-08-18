@@ -87,24 +87,23 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         replicas: 1
-  executor:
 {% if test_scenario['values']['executor'] == 'celery' %}
-    celery:
-      config:
-        logging:
-          enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      roleGroups:
-        default:
-          envOverrides:
-            AIRFLOW__CORE__DAGS_FOLDER: "/dags"
-          replicas: 2
+  celeryExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        replicas: 2
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
-    kubernetes:
-      config:
-        logging:
-          enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      envOverrides:
-            AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+  kubernetesExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
 {% endif %}
   schedulers:
     config:

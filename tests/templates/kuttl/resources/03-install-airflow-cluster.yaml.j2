@@ -41,39 +41,38 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  executor:
-    celery:
-      config:
-        logging:
-          enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-        resources:
-          cpu:
-            min: 100m
-            max: "1"
-          memory:
-            limit: 2Gi
-      roleGroups:
-        resources-from-role:
-          replicas: 1
-        resources-from-role-group:
-          config:
-            resources:
-              cpu:
-                min: 200m
-                max: "2"
-              memory:
-                limit: 3Gi
-          replicas: 1
-        resources-from-pod-overrides:
-          podOverrides:
-            spec:
-              containers:
-                - name: airflow
-                  resources:
-                    requests:
-                      cpu: 300m
-                    limits:
-                      cpu: 900m
+  celeryExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      resources:
+        cpu:
+          min: 100m
+          max: "1"
+        memory:
+          limit: 2Gi
+    roleGroups:
+      resources-from-role:
+        replicas: 1
+      resources-from-role-group:
+        config:
+          resources:
+            cpu:
+              min: 200m
+              max: "2"
+            memory:
+              limit: 3Gi
+        replicas: 1
+      resources-from-pod-overrides:
+        podOverrides:
+          spec:
+            containers:
+              - name: airflow
+                resources:
+                  requests:
+                    cpu: 300m
+                  limits:
+                    cpu: 900m
   schedulers:
     config:
       logging:

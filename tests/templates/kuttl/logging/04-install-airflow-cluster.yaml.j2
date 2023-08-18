@@ -116,40 +116,39 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
-  executor:
-    celery:
-      roleGroups:
-        automatic-log-config:
-          replicas: 1
-          config:
-            logging:
-              enableVectorAgent: true
-              containers:
-                airflow:
-                  console:
-                    level: INFO
-                  file:
+  celeryExecutors:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                console:
+                  level: INFO
+                file:
+                  level: DEBUG
+                loggers:
+                  ROOT:
                     level: DEBUG
-                  loggers:
-                    ROOT:
-                      level: DEBUG
-                vector:
-                  console:
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
                     level: INFO
-                  file:
-                    level: INFO
-                  loggers:
-                    ROOT:
-                      level: INFO
-        custom-log-config:
-          replicas: 1
-          config:
-            logging:
-              enableVectorAgent: true
-              containers:
-                airflow:
-                  custom:
-                    configMap: airflow-log-config
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              airflow:
+                custom:
+                  configMap: airflow-log-config
   schedulers:
     roleGroups:
       automatic-log-config:
