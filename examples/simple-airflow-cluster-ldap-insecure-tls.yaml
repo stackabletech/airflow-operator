@@ -160,11 +160,10 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  executor:
-    celery:
-      roleGroups:
-        default:
-          replicas: 1
+  celeryExecutors:
+    roleGroups:
+      default:
+        replicas: 1
   schedulers:
     roleGroups:
       default:

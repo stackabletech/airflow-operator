@@ -29,18 +29,17 @@ The `worker` role is defined implicitly when `spec.executor` is set to `celery` 
 ----
 spec:
 ...
-executor:
-  celery:
-    roleGroups:
-      default:
-        envOverrides:
+celeryExecutors:
+  roleGroups:
+    default:
+      envOverrides:
+        ...
+      configOverrides:
+        ...
+      replicas: 2
+  config:
+    logging:
           ...
-        configOverrides:
-          ...
-        replicas: 2
-    config:
-      logging:
-            ...
 ----
 
 ==== `kubernetes`
@@ -49,15 +48,12 @@ executor:
 ----
 spec:
 ...
-executor:
-  kubernetes:
-    envOverrides:
+kubernetesExecutors:
+  config:
+    logging:
       ...
-    config:
-      logging:
-        ...
-      resources:
-        ...
+    resources:
+      ...
 ----
 
 i.e. for the `kubernetes` executor there exists only a top-level config for the resources and logging settings (since there are no separate roles or role groups), plus a field for setting/overriding environment variables (this is necessary primarily for defining the DAGs folder).
@@ -78,7 +74,7 @@ ConfigMaps are created, one per RoleGroup and also one for the AirflowDB. Both C
 
 Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production. You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
 
-NOTE: Redis is only needed if `spec.executor` has been set to `celery` as the jobs will be queued via Redis before being assigned to a `worker` pod. When using the `kubernetes` executor the scheduler will take direct responsibility for this.
+NOTE: Redis is only needed if `spec.executor` has been set to `celeryExecutors` as the jobs will be queued via Redis before being assigned to a `worker` pod. When using `kubernetesExecutors` the scheduler will take direct responsibility for this.
 
 == Using custom workflows/DAGs
 

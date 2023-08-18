@@ -24,13 +24,12 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
         replicas: 1
-  executor:
-    celery:
-      roleGroups:
-        default:
-          envOverrides:
-            AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-          replicas: 2
+  celeryExecutors:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
+        replicas: 2
   schedulers:
     roleGroups:
       default:
