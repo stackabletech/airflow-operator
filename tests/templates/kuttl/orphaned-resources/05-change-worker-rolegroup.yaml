@@ -4,9 +4,8 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-  executor:
-    celery:
-      roleGroups:
-        default: null
-        newrolegroup:
-          replicas: 1
+  celeryExecutors:
+    roleGroups:
+      default: null
+      newrolegroup:
+        replicas: 1

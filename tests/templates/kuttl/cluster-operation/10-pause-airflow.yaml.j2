@@ -28,14 +28,13 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  executor:
-    celery:
-      config:
-        logging:
-          enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      roleGroups:
-        default:
-          replicas: 3 # ignored because paused
+  celeryExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 3 # ignored because paused
   schedulers:
     config:
       logging:
