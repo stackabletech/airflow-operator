@@ -15,15 +15,15 @@ The Operator manages three https://kubernetes.io/docs/concepts/extend-kubernetes
 
 === Custom resources
 
-The AirflowCluster is the main resource for the configuration of the Airflow instance. The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.executor`: this is described in the next section). The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
+The AirflowCluster is the main resource for the configuration of the Airflow instance. The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section). The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
 
 When an AirflowCluster is first deployed, an AirflowDB resource is created. The AirflowDB resource is a wrapper resource for the metadata SQL database that is used by Airflow to store information on users and permissions as well as workflows, task instances and their execution. The resource contains some configuration but also keeps track of whether the database has been initialized or not. It is not deleted automatically if a AirflowCluster is deleted, and so can be reused.
 
-=== Executor
+=== Executors
 
-The `worker` role is defined implicitly when `spec.executor` is set to `celery` but is not used when set to `kubernetes` as pods are created dynamically as needed. This means that the `worker` role structure - configuration, logging, resources etc. - is slightly different depending on the executor. This is illustrated below:
+The `worker` role is deployed when `spec.celeryExecutors` is specified (the alternative is `spec.kubernetesExecutors`, whereby pods are created dynamically as needed without jobs being routed through a redis queue to the workers). This means that for `celeryExecutors` there exists an implicit single role which does not appear in resource definition. This is illustrated below:
 
-==== `celery`
+==== `celeryExecutors`
 
 [source,yaml]
 ----
@@ -42,7 +42,7 @@ celeryExecutors:
           ...
 ----
 
-==== `kubernetes`
+==== `kubernetesExecutors`
 
 [source,yaml]
 ----
@@ -55,8 +55,6 @@ kubernetesExecutors:
     resources:
       ...
 ----
-
-i.e. for the `kubernetes` executor there exists only a top-level config for the resources and logging settings (since there are no separate roles or role groups), plus a field for setting/overriding environment variables (this is necessary primarily for defining the DAGs folder).
 
 === Kubernetes resources
 
@@ -74,7 +72,7 @@ ConfigMaps are created, one per RoleGroup and also one for the AirflowDB. Both C
 
 Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production. You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
 
-NOTE: Redis is only needed if `spec.executor` has been set to `celeryExecutors` as the jobs will be queued via Redis before being assigned to a `worker` pod. When using `kubernetesExecutors` the scheduler will take direct responsibility for this.
+NOTE: Redis is only needed if the executors have been set to `spec.celeryExecutors` as the jobs will be queued via Redis before being assigned to a `worker` pod. When using `spec.kubernetesExecutors` the scheduler will take direct responsibility for this.
 
 == Using custom workflows/DAGs
 
