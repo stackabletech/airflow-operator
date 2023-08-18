@@ -151,6 +151,7 @@ pub struct AirflowClusterSpec {
     pub webservers: Option<Role<AirflowConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
+    #[serde(flatten)]
     pub executor: AirflowExecutor,
 }
 
@@ -749,9 +750,8 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          executor:
-            kubernetes:
-              config: {}
+          kubernetesExecutors:
+            config: {}
           schedulers:
             roleGroups:
               default:
@@ -802,11 +802,10 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          executor:
-            celery:
-              roleGroups:
-                default:
-                  config: {}
+          celeryExecutors:
+            roleGroups:
+              default:
+                config: {}
           schedulers:
             roleGroups:
               default:
@@ -850,11 +849,10 @@ mod tests {
             roleGroups:
               default:
                 config: {}
-          executor:
-            celery:
-              roleGroups:
-                default:
-                  config: {}
+          celeryExecutors:
+            roleGroups:
+              default:
+                config: {}
           schedulers:
             roleGroups:
               default:

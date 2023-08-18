@@ -70,11 +70,10 @@ mod tests {
             roleGroups:
               default:
                 replicas: 1
-          executor:
-            celery:
-              roleGroups:
-                default:
-                  replicas: 2
+          celeryExecutors:
+            roleGroups:
+              default:
+                replicas: 2
           schedulers:
             roleGroups:
               default:
@@ -168,11 +167,10 @@ mod tests {
             roleGroups:
               default:
                 replicas: 1
-          executor:
-            celery:
-              roleGroups:
-                default:
-                  replicas: 2
+          celeryExecutors:
+            roleGroups:
+              default:
+                replicas: 2
           schedulers:
             roleGroups:
               default:
