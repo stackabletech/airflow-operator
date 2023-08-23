@@ -963,11 +963,11 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
-        .add_env_vars(build_template_envs(airflow, env_overrides));
-        .add_volume_mounts(airflow.volume_mounts());
-        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .add_env_vars(build_template_envs(airflow, env_overrides))
+        .add_volume_mounts(airflow.volume_mounts())
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     if config.logging.enable_vector_agent {
         airflow_container.add_env_var(
