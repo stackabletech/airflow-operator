@@ -21,7 +21,7 @@ When an AirflowCluster is first deployed, an AirflowDB resource is created. The 
 
 === Executors
 
-The `worker` role is deployed when `spec.celeryExecutors` is specified (the alternative is `spec.kubernetesExecutors`, whereby pods are created dynamically as needed without jobs being routed through a redis queue to the workers). This means that for `celeryExecutors` there exists an implicit single role which does not appear in resource definition. This is illustrated below:
+The `worker` role is deployed when `spec.celeryExecutors` is specified (the alternative is `spec.kubernetesExecutors`, whereby pods are created dynamically as needed without jobs being routed through a redis queue to the workers). This means that for `kubernetesExecutors` there exists an implicit single role which does not appear in resource definition. This is illustrated below:
 
 ==== `celeryExecutors`
 
