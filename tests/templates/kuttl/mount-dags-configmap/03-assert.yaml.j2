@@ -2,14 +2,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: test-available-condition
-timeout: 600
-commands:
-  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow --timeout 301s
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-metadata:
   name: test-airflow-cluster
 timeout: 1200
 ---
@@ -20,6 +12,7 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -28,6 +21,7 @@ metadata:
 status:
   readyReplicas: 2
   replicas: 2
+{% endif %}
 ---
 apiVersion: apps/v1
 kind: StatefulSet

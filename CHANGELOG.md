@@ -4,6 +4,7 @@
 
 ### Added
 
+- [BREAKING] Implement KubernetesExecutor ([#311]).
 - Default stackableVersion to operator version ([#312]).
 
 ### Changed
@@ -18,6 +19,7 @@
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
+[#311]: https://github.com/stackabletech/airflow-operator/pull/311
 [#312]: https://github.com/stackabletech/airflow-operator/pull/312
 [#316]: https://github.com/stackabletech/airflow-operator/pull/316
 

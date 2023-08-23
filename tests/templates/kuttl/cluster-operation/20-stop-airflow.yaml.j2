@@ -18,7 +18,6 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -29,7 +28,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  workers:
+  celeryExecutors:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

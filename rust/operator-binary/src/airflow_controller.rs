@@ -1,6 +1,11 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+use stackable_operator::config::fragment::ValidationError;
 use stackable_operator::k8s_openapi::DeepMerge;
+use stackable_operator::product_logging::framework::{
+    capture_shell_output, shutdown_vector_command,
+};
+use stackable_operator::product_logging::spec::{ContainerLogConfig, ContainerLogConfigChoice};
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
@@ -21,7 +26,9 @@ use stackable_airflow_crd::{
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{
-    AirflowClusterStatus, AIRFLOW_UID, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+    AirflowClusterStatus, AirflowExecutor, ExecutorConfig, AIRFLOW_UID, GIT_CONTENT, GIT_LINK,
+    GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
+    TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -179,6 +186,10 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+    #[snafu(display("invalid executor name"))]
+    UnidentifiedAirflowExecutor {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::error::Error,
@@ -208,6 +219,18 @@ pub enum Error {
     InvalidAuthenticationConfig {
         source: stackable_airflow_crd::authentication::Error,
     },
+    #[snafu(display("pod template serialization"))]
+    PodTemplateSerde { source: serde_yaml::Error },
+    #[snafu(display("failed to build the pod template config map"))]
+    PodTemplateConfigMap {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to apply executor template ConfigMap"))]
+    ApplyExecutorTemplateConfig {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("fragment validation failure"))]
+    FragmentValidationFailure { source: ValidationError },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -251,8 +274,10 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut roles = HashMap::new();
 
+    // if the kubernetes executor is specified there will be no worker role as the pods
+    // are provisioned by airflow as defined by the task (default: one pod per task)
     for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role).clone() {
+        if let Some(resolved_role) = airflow.get_role(&role) {
             roles.insert(
                 role.to_string(),
                 (
@@ -260,7 +285,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                         PropertyNameKind::Env,
                         PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
                     ],
-                    resolved_role,
+                    resolved_role.clone(),
                 ),
             );
         }
@@ -315,6 +340,31 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
+    let airflow_executor = &airflow.spec.executor;
+
+    // if the kubernetes executor is specified, in place of a worker role that will be in the role
+    // collection there will be a pod template created to be used for pod provisioning
+    if let AirflowExecutor::KubernetesExecutor {
+        common_configuration,
+    } = &airflow_executor
+    {
+        build_executor_template(
+            &airflow,
+            &common_configuration.config,
+            &resolved_product_image,
+            &authentication_config,
+            &vector_aggregator_address,
+            &mut cluster_resources,
+            client,
+            &rbac_sa,
+            &common_configuration.env_overrides,
+        )
+        .await?;
+    }
+
+    // from this point on we only need the discriminant
+    //let airflow_executor = AirflowExecutorDiscriminants::from(airflow_executor);
+
     for (role_name, role_config) in validated_role_config.iter() {
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
@@ -350,22 +400,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 },
             )?;
 
-            let rg_configmap = build_rolegroup_config_map(
-                &airflow,
-                &resolved_product_image,
-                &rolegroup,
-                rolegroup_config,
-                authentication_config.as_ref(),
-                &config.logging,
-                vector_aggregator_address.as_deref(),
-            )?;
-            cluster_resources
-                .add(client, rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-
             let rg_statefulset = build_server_rolegroup_statefulset(
                 &airflow,
                 &resolved_product_image,
@@ -375,6 +409,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 authentication_config.as_ref(),
                 &rbac_sa.name_unchecked(),
                 &config,
+                airflow_executor,
             )?;
 
             ss_cond_builder.add(
@@ -385,6 +420,23 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                         rolegroup: rolegroup.clone(),
                     })?,
             );
+
+            let rg_configmap = build_rolegroup_config_map(
+                &airflow,
+                &resolved_product_image,
+                &rolegroup,
+                rolegroup_config,
+                authentication_config.as_ref(),
+                &config.logging,
+                vector_aggregator_address.as_deref(),
+                &Container::Airflow,
+            )?;
+            cluster_resources
+                .add(client, rg_configmap)
+                .await
+                .with_context(|_| ApplyRoleGroupConfigSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
         }
     }
 
@@ -406,6 +458,58 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn build_executor_template(
+    airflow: &Arc<AirflowCluster>,
+    config: &stackable_airflow_crd::ExecutorConfigFragment,
+    resolved_product_image: &ResolvedProductImage,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    vector_aggregator_address: &Option<String>,
+    cluster_resources: &mut ClusterResources,
+    client: &stackable_operator::client::Client,
+    rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
+    env_overrides: &HashMap<String, String>,
+) -> Result<(), Error> {
+    let config = airflow
+        .merged_executor_config(config)
+        .context(FailedToResolveConfigSnafu)?;
+    let rolegroup = RoleGroupRef {
+        cluster: ObjectRef::from_obj(&**airflow),
+        role: "executor".into(),
+        role_group: "kubernetes".into(),
+    };
+    let rg_configmap = build_rolegroup_config_map(
+        airflow,
+        resolved_product_image,
+        &rolegroup,
+        &HashMap::new(),
+        authentication_config,
+        &config.logging,
+        vector_aggregator_address.as_deref(),
+        &Container::Base,
+    )?;
+    cluster_resources
+        .add(client, rg_configmap)
+        .await
+        .with_context(|_| ApplyRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
+    let worker_pod_template_config_map = build_executor_template_config_map(
+        airflow,
+        resolved_product_image,
+        authentication_config,
+        &rbac_sa.name_unchecked(),
+        &config,
+        env_overrides,
+        &rolegroup,
+    )?;
+    cluster_resources
+        .add(client, worker_pod_template_config_map)
+        .await
+        .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
+    Ok(())
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
@@ -463,6 +567,7 @@ fn role_port(role_name: &str) -> Option<u16> {
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
@@ -471,6 +576,7 @@ fn build_rolegroup_config_map(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
+    container: &Container,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
@@ -516,7 +622,7 @@ fn build_rolegroup_config_map(
         rolegroup,
         vector_aggregator_address,
         logging,
-        &Container::Airflow,
+        container,
         &Container::Vector,
         &mut cm_builder,
     )
@@ -596,14 +702,12 @@ fn build_server_rolegroup_statefulset(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
     config: &AirflowConfig,
+    executor: &AirflowExecutor,
 ) -> Result<StatefulSet> {
-    let role = airflow
-        .get_role(airflow_role)
-        .as_ref()
-        .context(NoAirflowRoleSnafu)?;
+    let binding = airflow.get_role(airflow_role);
+    let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
-
     let commands = airflow_role.get_commands();
 
     let mut pb = PodBuilder::new();
@@ -623,7 +727,7 @@ fn build_server_rolegroup_statefulset(
         PodSecurityContextBuilder::new()
             .run_as_user(AIRFLOW_UID)
             .run_as_group(0)
-            .fs_group(1000) // Needed for secret-operator
+            .fs_group(1000)
             .build(),
     );
 
@@ -636,11 +740,24 @@ fn build_server_rolegroup_statefulset(
         &mut pb,
     );
 
+    let mut args = Vec::new();
+    if let Some(ContainerLogConfig {
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = config.logging.containers.get(&Container::Airflow)
+    {
+        args.push(capture_shell_output(
+            STACKABLE_LOG_DIR,
+            &Container::Airflow.to_string(),
+            log_config,
+        ));
+    }
+    args.extend(commands);
+
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
         .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")]);
+        .args(vec![String::from("-c"), args.join("; ")]);
 
     // environment variables
     let env_config = rolegroup_config
@@ -655,7 +772,7 @@ fn build_server_rolegroup_statefulset(
         .collect::<Vec<_>>();
 
     // mapped environment variables
-    let env_mapped = build_mapped_envs(airflow, rolegroup_config);
+    let env_mapped = build_mapped_envs(airflow, rolegroup_config, executor);
 
     airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_mapped);
@@ -666,6 +783,10 @@ fn build_server_rolegroup_statefulset(
     airflow_container.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
     airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
     airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+        airflow_container.add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION);
+    }
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
         let probe = Probe {
@@ -706,6 +827,14 @@ fn build_server_rolegroup_statefulset(
         &rolegroup_ref.object_name(),
         config.logging.containers.get(&Container::Airflow),
     ));
+
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+        pb.add_volume(
+            VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
+                .with_config_map(TEMPLATE_CONFIGMAP_NAME)
+                .build(),
+        );
+    }
 
     if let Some(gitsync) = airflow.git_sync() {
         let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
@@ -789,11 +918,165 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+fn build_executor_template_config_map(
+    airflow: &AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    sa_name: &str,
+    config: &ExecutorConfig,
+    env_overrides: &HashMap<String, String>,
+    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+) -> Result<ConfigMap> {
+    let mut pb = PodBuilder::new();
+    pb.metadata_builder(|m| {
+        m.with_recommended_labels(build_recommended_labels(
+            airflow,
+            AIRFLOW_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            "executor",
+            "executor-template",
+        ))
+    })
+    .image_pull_secrets_from_product_image(resolved_product_image)
+    .service_account_name(sa_name)
+    .restart_policy("Never")
+    .security_context(
+        PodSecurityContextBuilder::new()
+            .run_as_user(AIRFLOW_UID)
+            .run_as_group(0)
+            .fs_group(1000)
+            .build(),
+    );
+
+    // N.B. this "base" name is an airflow requirement and should not be changed!
+    // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
+    let mut airflow_container =
+        ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
+
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    );
+
+    airflow_container
+        .image_from_product_image(resolved_product_image)
+        .resources(config.resources.clone().into())
+        .add_env_vars(build_template_envs(airflow, env_overrides))
+        .add_volume_mounts(airflow.volume_mounts())
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+
+    if config.logging.enable_vector_agent {
+        airflow_container.add_env_var(
+            "_STACKABLE_POST_HOOK",
+            [
+                // Wait for Vector to gather the logs.
+                "sleep 10",
+                &shutdown_vector_command(STACKABLE_LOG_DIR),
+            ]
+            .join("; "),
+        );
+    }
+
+    pb.add_container(airflow_container.build());
+    pb.add_volumes(airflow.volumes());
+
+    pb.add_volumes(controller_commons::create_volumes(
+        &rolegroup_ref.object_name(),
+        config.logging.containers.get(&Container::Airflow),
+    ));
+
+    if let Some(gitsync) = airflow.git_sync() {
+        let mut env = vec![];
+        if let Some(credentials_secret) = &gitsync.credentials_secret {
+            env.push(env_var_from_secret(
+                "GIT_SYNC_USERNAME",
+                credentials_secret,
+                "user",
+            ));
+            env.push(env_var_from_secret(
+                "GIT_SYNC_PASSWORD",
+                credentials_secret,
+                "password",
+            ));
+        }
+        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
+            .context(InvalidContainerNameSnafu)?
+            .add_env_vars(env)
+            .image_from_product_image(resolved_product_image)
+            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+            .args(vec![gitsync.get_args().join(" ")])
+            .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+            .resources(
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_request("100m")
+                    .with_cpu_limit("200m")
+                    .with_memory_request("64Mi")
+                    .with_memory_limit("64Mi")
+                    .build(),
+            )
+            .build();
+
+        pb.add_volume(
+            VolumeBuilder::new(GIT_CONTENT)
+                .empty_dir(EmptyDirVolumeSource::default())
+                .build(),
+        );
+        pb.add_container(gitsync_container);
+    }
+
+    if config.logging.enable_vector_agent {
+        pb.add_container(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            config.logging.containers.get(&Container::Vector),
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
+        ));
+    }
+
+    let pod_template = pb.build_template();
+    let mut cm_builder = ConfigMapBuilder::new();
+
+    cm_builder
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(airflow)
+                .name(TEMPLATE_CONFIGMAP_NAME)
+                .ownerreference_from_resource(airflow, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(build_recommended_labels(
+                    airflow,
+                    AIRFLOW_CONTROLLER_NAME,
+                    &resolved_product_image.app_version_label,
+                    "executor",
+                    "executor-template",
+                ))
+                .with_label("restarter.stackable.tech/enabled", "true")
+                .build(),
+        )
+        .add_data(
+            TEMPLATE_NAME,
+            serde_yaml::to_string(&pod_template).context(PodTemplateSerdeSnafu)?,
+        );
+
+    cm_builder.build().context(PodTemplateConfigMapSnafu)
+}
+
 /// This builds a collection of environment variables some require some minimal mapping,
 /// such as executor type, contents of the secret etc.
 fn build_mapped_envs(
     airflow: &AirflowCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    executor: &AirflowExecutor,
 ) -> Vec<EnvVar> {
     let secret_prop = rolegroup_config
         .get(&PropertyNameKind::Env)
@@ -837,7 +1120,6 @@ fn build_mapped_envs(
             })
         }
     }
-
     if let Some(true) = airflow.spec.cluster_config.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
@@ -860,13 +1142,97 @@ fn build_mapped_envs(
         })
     }
 
-    let executor = airflow.spec.cluster_config.executor.clone();
+    env.push(EnvVar {
+        name: "AIRFLOW__CORE__EXECUTOR".into(),
+        value: Some(executor.to_string()),
+        ..Default::default()
+    });
+
+    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE".into(),
+            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
+            ..Default::default()
+        });
+        // TODO: version < 2.5, delete when these versions are no longer supported
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES__POD_TEMPLATE_FILE".into(),
+            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
+            ..Default::default()
+        });
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        });
+        // TODO: version < 2.5, delete when these versions are no longer supported
+        env.push(EnvVar {
+            name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        });
+    }
+
+    env
+}
+
+fn build_template_envs(
+    airflow: &AirflowCluster,
+    env_overrides: &HashMap<String, String>,
+) -> Vec<EnvVar> {
+    let secret_prop = Some(
+        airflow
+            .spec
+            .cluster_config
+            .credentials_secret
+            .as_str()
+            .clone(),
+    );
+
+    let mut env = secret_prop
+        .map(|secret| {
+            vec![env_var_from_secret(
+                "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
+                secret,
+                "connections.sqlalchemyDatabaseUri",
+            )]
+        })
+        .unwrap_or_default();
 
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: executor,
+        value: Some("LocalExecutor".to_string()),
         ..Default::default()
     });
+    env.push(EnvVar {
+        name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
+        value: airflow.namespace(),
+        ..Default::default()
+    });
+    // TODO: version < 2.5, delete when these versions are no longer supported
+    env.push(EnvVar {
+        name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
+        value: airflow.namespace(),
+        ..Default::default()
+    });
+
+    for (k, v) in env_overrides {
+        env.push(EnvVar {
+            name: k.to_string(),
+            value: Some(v.to_string()),
+            ..Default::default()
+        });
+    }
+
+    if let Some(git_sync) = &airflow.git_sync() {
+        if let Some(dags_folder) = &git_sync.git_folder {
+            env.push(EnvVar {
+                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            })
+        }
+    }
 
     env
 }

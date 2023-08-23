@@ -44,7 +44,6 @@ commands:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-          executor: CeleryExecutor
           loadExamples: true
           exposeConfig: false
           credentialsSecret: test-airflow-credentials
@@ -65,13 +64,20 @@ commands:
           roleGroups:
             default:
               replicas: 1
-        workers:
+{% if test_scenario['values']['executor'] == 'celery' %}
+        celeryExecutors:
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
             default:
               replicas: 1
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+        kubernetesExecutors:
+          config:
+            logging:
+              enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+{% endif %}
         schedulers:
           config:
             logging:

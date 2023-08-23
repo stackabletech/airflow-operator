@@ -60,7 +60,6 @@ spec:
     productVersion: "{{ test_scenario['values']['airflow'] }}"
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
-    executor: CeleryExecutor
     loadExamples: false
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -117,7 +116,7 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
-  workers:
+  celeryExecutors:
     roleGroups:
       automatic-log-config:
         replicas: 1

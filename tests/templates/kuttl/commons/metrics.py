@@ -39,4 +39,6 @@ time.sleep(4)
 
 assert_metric('scheduler', 'airflow_scheduler_heartbeat')
 assert_metric('webserver', 'airflow_task_instance_created_BashOperator')
-assert_metric('worker', 'airflow_ti_successes')
+
+# Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
+assert_metric('scheduler', 'airflow_dagrun_duration_success_example_trigger_target_dag_count')

@@ -150,7 +150,6 @@ spec:
     productVersion: 2.6.1
     stackableVersion: 0.0.0-dev
   clusterConfig:
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: true
     credentialsSecret: airflow-with-ldap-server-veri-tls-credentials
@@ -161,7 +160,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  workers:
+  celeryExecutors:
     roleGroups:
       default:
         replicas: 1

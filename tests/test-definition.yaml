@@ -22,24 +22,32 @@ dimensions:
   - name: openshift
     values:
       - "false"
+  - name: executor
+    values:
+      - celery
+      - kubernetes
 tests:
   - name: smoke
     dimensions:
       - airflow
       - openshift
+      - executor
   - name: mount-dags-configmap
     dimensions:
       - airflow-latest
       - openshift
+      - executor
   - name: mount-dags-gitsync
     dimensions:
       - airflow-latest
       - openshift
+      - executor
   - name: ldap
     dimensions:
       - airflow-latest
       - openshift
       - ldap-authentication
+      - executor
   - name: resources
     dimensions:
       - airflow-latest
