@@ -16,6 +16,7 @@ clap.workspace = true
 fnv.workspace = true
 futures.workspace = true
 serde.workspace = true
+serde_yaml.workspace = true
 snafu.workspace = true
 stackable-operator.workspace = true
 strum.workspace = true
@@ -23,6 +24,7 @@ tokio.workspace = true
 tracing.workspace = true
 
 [build-dependencies]
+
 built.workspace = true
 
 [dev-dependencies]

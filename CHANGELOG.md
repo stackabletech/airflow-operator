@@ -4,6 +4,7 @@
 
 ### Added
 
+- [BREAKING] Implement KubernetesExecutor ([#311]).
 - Default stackableVersion to operator version ([#312]).
 
 ### Changed
@@ -12,9 +13,15 @@
 - `vector` `0.26.0` -> `0.31.0` ([#308]).
 - `operator-rs` `0.44.0` -> `0.45.1` ([#308]).
 
+### Fixed
+
+- BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#316]).
+
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
+[#311]: https://github.com/stackabletech/airflow-operator/pull/311
 [#312]: https://github.com/stackabletech/airflow-operator/pull/312
+[#316]: https://github.com/stackabletech/airflow-operator/pull/316
 
 ## [23.7.0] - 2023-07-14
 

@@ -1,3 +1,4 @@
+{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
@@ -8,4 +9,6 @@ commands:
       --version 17.11.3
       -f helm-bitnami-redis-values.yaml
       --repo https://charts.bitnami.com/bitnami redis
+      --wait
     timeout: 600
+{% endif %}
