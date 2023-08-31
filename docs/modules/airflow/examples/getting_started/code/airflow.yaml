@@ -9,6 +9,7 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
+    listenerClass: external-unstable
     credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
