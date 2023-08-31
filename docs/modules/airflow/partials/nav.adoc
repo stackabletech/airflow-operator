@@ -5,6 +5,7 @@
 ** xref:airflow:usage-guide/pod-placement.adoc[]
 ** xref:airflow:usage-guide/mounting-dags.adoc[]
 ** xref:airflow:usage-guide/applying-custom-resources.adoc[]
+** xref:airflow:usage-guide/listenerclass.adoc[]
 ** xref:airflow:usage-guide/storage-resources.adoc[]
 ** xref:airflow:usage-guide/security.adoc[]
 ** xref:airflow:usage-guide/logging.adoc[]
