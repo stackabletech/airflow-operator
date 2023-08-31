@@ -169,7 +169,7 @@ pub struct AirflowClusterConfig {
     pub expose_config: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_examples: Option<bool>,
-    /// This enum controls which type of Service the Operator creates for this AirflowCluster:
+    /// This field controls which type of Service the Operator creates for this AirflowCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
     ///
