@@ -9,16 +9,16 @@ use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
 use stackable_airflow_crd::{
-    AirflowCluster, authentication::AirflowAuthentication, APP_NAME, OPERATOR_NAME,
+    authentication::AirflowAuthentication, AirflowCluster, APP_NAME, OPERATOR_NAME,
 };
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
-    k8s_openapi::api::{
-        apps::v1::StatefulSet,
-        core::v1::Service,
+    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    kube::{
+        runtime::{reflector::ObjectRef, watcher, Controller},
+        ResourceExt,
     },
-    kube::{runtime::{reflector::ObjectRef, Controller, watcher}, ResourceExt},
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
