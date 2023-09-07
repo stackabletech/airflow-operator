@@ -885,10 +885,11 @@ fn build_server_rolegroup_statefulset(
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some(
-                if airflow_role == &AirflowRole::Scheduler {
-                    "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
-                } else {
-                    "Parallel"
+                match airflow_role {
+                    AirflowRole::Scheduler => {
+                        "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
+                    }
+                    AirflowRole::Webserver | AirflowRole::Worker => "Parallel",
                 }
                 .to_string(),
             ),
