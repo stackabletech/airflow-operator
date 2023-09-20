@@ -1,5 +1,4 @@
 pub mod affinity;
-pub mod airflowdb;
 pub mod authentication;
 
 use crate::affinity::get_affinity;
@@ -164,8 +163,6 @@ pub struct AirflowClusterConfig {
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<airflowdb::AirflowDbConfigFragment>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expose_config: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_examples: Option<bool>,
@@ -317,9 +314,24 @@ impl AirflowRole {
             "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
         );
+
         match &self {
             AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
-            AirflowRole::Scheduler => vec![copy_config, "airflow scheduler".to_string()],
+            AirflowRole::Scheduler => vec![
+                copy_config,
+                // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
+                "airflow db init".to_string(),
+                "airflow db upgrade".to_string(),
+                "airflow users create \
+                    --username \"$ADMIN_USERNAME\" \
+                    --firstname \"$ADMIN_FIRSTNAME\" \
+                    --lastname \"$ADMIN_LASTNAME\" \
+                    --email \"$ADMIN_EMAIL\" \
+                    --password \"$ADMIN_PASSWORD\" \
+                    --role \"Admin\""
+                    .to_string(),
+                "airflow scheduler".to_string(),
+            ],
             AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
         }
     }
@@ -728,7 +740,6 @@ pub struct AirflowClusterRef {
 
 #[cfg(test)]
 mod tests {
-    use crate::airflowdb::AirflowDB;
     use crate::AirflowCluster;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
@@ -765,11 +776,6 @@ mod tests {
         let resolved_airflow_image: ResolvedProductImage =
             cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
-        let airflow_db = AirflowDB::for_airflow(&cluster, &resolved_airflow_image).unwrap();
-        let resolved_airflow_db_image: ResolvedProductImage =
-            airflow_db.spec.image.resolve("airflow", "0.0.0-dev");
-
-        assert_eq!("2.6.1", &resolved_airflow_db_image.product_version);
         assert_eq!("2.6.1", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());

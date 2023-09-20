@@ -17,10 +17,8 @@ use crate::product_logging::{
 use crate::util::env_var_from_secret;
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::airflowdb::AirflowDBStatus;
 use stackable_airflow_crd::authentication::AirflowAuthenticationConfigResolved;
 use stackable_airflow_crd::{
-    airflowdb::{AirflowDB, AirflowDBStatusCondition},
     build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
     AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
     LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
@@ -66,8 +64,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder, ClusterCondition, ClusterConditionSet,
-        ClusterConditionStatus, ClusterConditionType, ConditionBuilder,
+        statefulset::StatefulSetConditionBuilder,
     },
 };
 use std::{
@@ -128,18 +125,6 @@ pub enum Error {
     ProductConfigTransform {
         source: stackable_operator::product_config_utils::ConfigError,
     },
-    #[snafu(display("failed to apply Airflow DB"))]
-    CreateAirflowDBObject {
-        source: stackable_airflow_crd::airflowdb::Error,
-    },
-    #[snafu(display("failed to apply Airflow DB"))]
-    ApplyAirflowDB {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to retrieve Airflow DB"))]
-    AirflowDBRetrieval {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::error::Error,
@@ -175,8 +160,6 @@ pub enum Error {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
-    #[snafu(display("Airflow db {airflow_db} initialization failed, not starting airflow"))]
-    AirflowDBFailed { airflow_db: ObjectRef<AirflowDB> },
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig {
         source: stackable_airflow_crd::Error,
@@ -252,17 +235,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
-
-    if wait_for_db_and_update_status(
-        client,
-        &airflow,
-        &resolved_product_image,
-        &cluster_operation_cond_builder,
-    )
-    .await?
-    {
-        return Ok(Action::await_change());
-    }
 
     let authentication_config = airflow
         .spec
@@ -776,6 +748,19 @@ fn build_server_rolegroup_statefulset(
 
     airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_mapped);
+
+    // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
+    if airflow_role == &AirflowRole::Scheduler {
+        let secret = &airflow.spec.cluster_config.credentials_secret;
+        airflow_container.add_env_vars(vec![
+            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
+            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
+            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
+            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
+            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
+        ]);
+    }
+
     airflow_container.add_env_vars(build_static_envs());
 
     let volume_mounts = airflow.volume_mounts();
@@ -899,7 +884,15 @@ fn build_server_rolegroup_statefulset(
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
-            pod_management_policy: Some("Parallel".to_string()),
+            pod_management_policy: Some(
+                match airflow_role {
+                    AirflowRole::Scheduler => {
+                        "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
+                    }
+                    AirflowRole::Webserver | AirflowRole::Worker => "Parallel",
+                }
+                .to_string(),
+            ),
             replicas: rolegroup.and_then(|rg| rg.replicas).map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(role_group_selector_labels(
@@ -1315,117 +1308,6 @@ fn add_authentication_volumes_and_volume_mounts(
                 }
                 AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
             }
-        }
-    }
-}
-
-/// Return true if the controller should wait for the DB to be set up.
-///
-/// As a side-effect, the Airflow cluster status is updated as long as the controller waits
-/// for the DB to come up.
-///
-/// Having the DB set up by a Job managed by a different controller has it's own
-/// set of problems as described here: <https://github.com/stackabletech/superset-operator/issues/351>.
-/// The Superset operator uses the same pattern as implemented here for setting up the DB.
-///
-/// When the ticket above is implemented, this function will most likely be removed completely.
-async fn wait_for_db_and_update_status(
-    client: &stackable_operator::client::Client,
-    airflow: &AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    cluster_operation_condition_builder: &ClusterOperationsConditionBuilder<'_>,
-) -> Result<bool> {
-    // ensure admin user has been set up on the airflow database
-    let airflow_db = AirflowDB::for_airflow(airflow, resolved_product_image)
-        .context(CreateAirflowDBObjectSnafu)?;
-    client
-        .apply_patch(AIRFLOW_CONTROLLER_NAME, &airflow_db, &airflow_db)
-        .await
-        .context(ApplyAirflowDBSnafu)?;
-
-    let airflow_db = client
-        .get::<AirflowDB>(
-            &airflow.name_unchecked(),
-            airflow
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(AirflowDBRetrievalSnafu)?;
-
-    tracing::debug!("{}", format!("Checking status: {:#?}", airflow_db.status));
-
-    // Update the Airflow cluster status, only if the controller needs to wait.
-    // This avoids updating the status twice per reconcile call. when the DB
-    // has a ready condition.
-    let db_cond_builder = DbConditionBuilder(airflow_db.status);
-    if bool::from(&db_cond_builder) {
-        let status = AirflowClusterStatus {
-            conditions: compute_conditions(
-                airflow,
-                &[&db_cond_builder, cluster_operation_condition_builder],
-            ),
-        };
-
-        client
-            .apply_patch_status(OPERATOR_NAME, airflow, &status)
-            .await
-            .context(ApplyStatusSnafu)?;
-    }
-    Ok(bool::from(&db_cond_builder))
-}
-
-struct DbConditionBuilder(Option<AirflowDBStatus>);
-impl ConditionBuilder for DbConditionBuilder {
-    fn build_conditions(&self) -> ClusterConditionSet {
-        let (status, message) = if let Some(ref status) = self.0 {
-            match status.condition {
-                AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => (
-                    ClusterConditionStatus::False,
-                    "Waiting for AirflowDB initialization to complete",
-                ),
-                AirflowDBStatusCondition::Failed => (
-                    ClusterConditionStatus::False,
-                    "Airflow database initialization failed.",
-                ),
-                AirflowDBStatusCondition::Ready => (
-                    ClusterConditionStatus::True,
-                    "Airflow database initialization ready.",
-                ),
-            }
-        } else {
-            (
-                ClusterConditionStatus::Unknown,
-                "Waiting for Airflow database initialization to start.",
-            )
-        };
-
-        let cond = ClusterCondition {
-            reason: None,
-            message: Some(String::from(message)),
-            status,
-            type_: ClusterConditionType::Available,
-            last_transition_time: None,
-            last_update_time: None,
-        };
-
-        vec![cond].into()
-    }
-}
-
-/// Evaluates to true if the DB is not ready yet (the controller needs to wait).
-/// Otherwise false.
-impl From<&DbConditionBuilder> for bool {
-    fn from(cond_builder: &DbConditionBuilder) -> bool {
-        if let Some(ref status) = cond_builder.0 {
-            match status.condition {
-                AirflowDBStatusCondition::Pending | AirflowDBStatusCondition::Initializing => true,
-                AirflowDBStatusCondition::Failed => true,
-                AirflowDBStatusCondition::Ready => false,
-            }
-        } else {
-            true
         }
     }
 }
