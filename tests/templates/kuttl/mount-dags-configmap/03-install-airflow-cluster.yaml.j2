@@ -62,13 +62,11 @@ metadata:
   name: airflow
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
-    stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
   clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    executor: CeleryExecutor
     loadExamples: false
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -89,7 +87,8 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         replicas: 1
-  workers:
+{% if test_scenario['values']['executor'] == 'celery' %}
+  celeryExecutors:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -98,6 +97,14 @@ spec:
         envOverrides:
           AIRFLOW__CORE__DAGS_FOLDER: "/dags"
         replicas: 2
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+  kubernetesExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+{% endif %}
   schedulers:
     config:
       logging:

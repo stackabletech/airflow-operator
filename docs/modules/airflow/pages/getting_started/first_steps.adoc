@@ -56,14 +56,10 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
-- `spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
-- `spec.executor`: this setting determines how the cluster will run (for more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types): the `CeleryExecutor`
-is the recommended setting although `SequentialExecutor` (all jobs run in one process in series) and `LocalExecutor`
-(whereby all jobs are run on one node, using whatever parallelism is possible) are also supported
+- `spec.celeryExecutors`: deploy workers managed by Airflow's Celery engine. Alternatively you can use `kuberenetesExectors` that will use Airflow's Kubernetes engine for worker management. For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
 - the `spec.loadExamples` key is optional and defaults to `false`. It is set to `true` here as the example DAGs will be used when verifying the installation.
 - the `spec.exposeConfig` key is optional and defaults to `false`. It is set to `true` only as an aid to verify the configuration and should never be used as such in anything other than test or demo clusters.
 - the previously created secret must be referenced in `spec.credentialsSecret`
-
 
 NOTE: Please note that the version you need to specify for `spec.version` is not only the version of Apache Airflow which you want to roll out, but has to be amended with a Stackable version as shown. This Stackable version is the version of the underlying container image which is used to execute the processes. For a list of available versions please check our
 https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%airflow%2Ftags[image registry].
@@ -71,30 +67,7 @@ It should generally be safe to simply use the latest image version that is avail
 
 This will create the actual Airflow cluster.
 
-== Initialization of the Airflow database
-
-When creating an Airflow cluster, a database-initialization job is first started to ensure that the database schema is present and correct (i.e. populated with an admin user). A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
-
-You can use kubectl to wait on the resource, although the cluster itself will not be created until this step is complete.:
-
-[source,bash]
-include::example$getting_started/code/getting_started.sh[tag=wait-airflowdb]
-
-The job status can be inspected and verified like this:
-
-[source,bash]
-----
-kubectl get jobs
-----
-
-which will show something like this:
-
-----
-NAME      COMPLETIONS   DURATION   AGE
-airflow   1/1           85s        11m
-----
-
-Then, make sure that all the Pods in the StatefulSets are ready:
+After a while, all the Pods in the StatefulSets should be ready:
 
 [source,bash]
 ----
@@ -112,10 +85,6 @@ airflow-scheduler-default   1/1     11m
 airflow-webserver-default   1/1     11m
 airflow-worker-default      2/2     11m
 ----
-
-The completed set of pods for the Airflow cluster will look something like this:
-
-image::getting_started/airflow_pods.png[Airflow pods]
 
 When the Airflow cluster has been created and the database is initialized, Airflow can be opened in the
 browser: the webserver UI port defaults to `8080` can be forwarded to the local host:

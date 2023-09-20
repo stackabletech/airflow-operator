@@ -4,16 +4,46 @@
 
 ### Added
 
+- [BREAKING] Implement KubernetesExecutor ([#311]).
+- Default stackableVersion to operator version ([#312]).
+
+### Changed
+
+- [BREAKING] Consolidated `spec.clusterConfig.authenticationConfig` to `spec.clusterConfig.authentication` which now takes a vector of AuthenticationClass references  ([#303]).
+- `vector` `0.26.0` -> `0.31.0` ([#308]).
+- `operator-rs` `0.44.0` -> `0.45.1` ([#308]).
+- [BREAKING] Removed AirflowDB object, since it created some problems when reinstalling or upgrading an Airflow cluster. Instead, the initialization of the database was moved to the startup phase of each scheduler pod. To make sure the initialization does not run in parallel, the `PodManagementPolicy` of the scheduler StatefulSet was set to `OrderedReady`. The `.spec.clusterConfig.databaseInitialization` option was removed from the CRD, since it was just there to enable logging for the database initialization Job, which doesn't exist anymore ([#322]).
+
+### Fixed
+
+- BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#316]).
+
+[#303]: https://github.com/stackabletech/airflow-operator/pull/303
+[#308]: https://github.com/stackabletech/airflow-operator/pull/308
+[#311]: https://github.com/stackabletech/airflow-operator/pull/311
+[#312]: https://github.com/stackabletech/airflow-operator/pull/312
+[#316]: https://github.com/stackabletech/airflow-operator/pull/316
+
+## [23.7.0] - 2023-07-14
+
+### Added
+
 - Generate OLM bundle for Release 23.4.0 ([#270]).
 - Fix LDAP tests for Openshift ([#270]).
 - Missing CRD defaults for `status.conditions` field ([#277]).
 - Support Airflow `2.6.1` ([#284]).
+- Set explicit resources on all containers ([#289])
 - Operator errors out when credentialsSecret is missing ([#293]).
+- Support podOverrides ([#295]).
+
+### Fixed
+
+- Increase the size limit of the log volume ([#299]).
 
 ### Changed
 
 - [BREAKING] Consolidated remaining top-level config options to `clusterConfig` ([#271]).
-- `operator-rs` `0.40.2` -> `0.41.0` ([#272]).
+- `operator-rs` `0.40.2` -> `0.44.0` ([#272], [#299]).
 - Use 0.0.0-dev product images for testing ([#274])
 - Use testing-tools 0.2.0 ([#274])
 - Added kuttl test suites ([#291])
@@ -24,8 +54,11 @@
 [#274]: https://github.com/stackabletech/airflow-operator/pull/274
 [#277]: https://github.com/stackabletech/airflow-operator/pull/277
 [#284]: https://github.com/stackabletech/airflow-operator/pull/284
+[#289]: https://github.com/stackabletech/airflow-operator/pull/289
 [#291]: https://github.com/stackabletech/airflow-operator/pull/291
 [#293]: https://github.com/stackabletech/airflow-operator/pull/293
+[#295]: https://github.com/stackabletech/airflow-operator/pull/295
+[#299]: https://github.com/stackabletech/airflow-operator/pull/299
 
 ## [23.4.0] - 2023-04-17
 
@@ -79,7 +112,9 @@
 - `operator-rs` `0.27.1` -> `0.30.1` ([#208])
 - `operator-rs` `0.30.1` -> `0.31.0` ([#216]).
 - Updated stackable image versions ([#193]).
-- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#206]).
+- [BREAKING] Use Product image selection instead of version ([#206]).
+  - `spec.version` has been replaced by `spec.image`.
+  - `spec.statsdExporterVersion` has been removed, the statsd-exporter is now part of the images itself
 - Fixed the RoleGroup `selector`. It was not used before. ([#208])
 - Refactored LDAP related code to use new `LdapAuthenticationProvider` functionality ([#216])
 

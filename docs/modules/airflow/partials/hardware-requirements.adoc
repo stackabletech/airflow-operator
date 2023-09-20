@@ -1,0 +1,2 @@
+* 0.2 cores (e.g. i5 or similar)
+* 256MB RAM

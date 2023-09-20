@@ -2,18 +2,39 @@
 
 include::home:concepts:stackable_resource_requests.adoc[]
 
-If no resource requests are configured explicitly, the operator uses the following defaults:
+A minimal HA setup consisting of 2 schedulers, 2 workers and 2 webservers has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+
+* `3500m` CPU request
+* `8600m` CPU limit
+* `10156Mi` memory request and limit
+
+Corresponding to the values above, the operator uses the following resource defaults:
 
 [source,yaml]
 ----
-workers:
-  roleGroups:
-    default:
-      config:
-        resources:
-          cpu:
-            min: '200m'
-            max: "4"
-          memory:
-            limit: '2Gi'
+spec:
+  schedulers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 400m
+        memory:
+          limit: 512Mi
+  workers:
+    config:
+      resources:
+        cpu:
+          min: 200m
+          max: 800m
+        memory:
+          limit: 1750Mi
+  webservers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 400m
+        memory:
+          limit: 2Gi
 ----

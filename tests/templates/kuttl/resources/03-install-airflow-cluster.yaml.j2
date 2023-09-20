@@ -26,13 +26,11 @@ metadata:
   name: airflow
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[0] }}"
-    stackableVersion: "{{ test_scenario['values']['airflow-latest'].split('-stackable')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
   clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: false
     credentialsSecret: test-airflow-credentials
@@ -43,7 +41,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  workers:
+  celeryExecutors:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -52,7 +50,7 @@ spec:
           min: 100m
           max: "1"
         memory:
-          limit: 1Gi
+          limit: 2Gi
     roleGroups:
       resources-from-role:
         replicas: 1
@@ -63,8 +61,18 @@ spec:
               min: 200m
               max: "2"
             memory:
-              limit: 2Gi
+              limit: 3Gi
         replicas: 1
+      resources-from-pod-overrides:
+        podOverrides:
+          spec:
+            containers:
+              - name: airflow
+                resources:
+                  requests:
+                    cpu: 300m
+                  limits:
+                    cpu: 900m
   schedulers:
     config:
       logging:

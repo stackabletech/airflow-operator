@@ -6,20 +6,26 @@ metadata:
 spec:
   image:
     productVersion: 2.6.1
-    stackableVersion: 0.0.0-dev
   clusterConfig:
-    executor: CeleryExecutor
     loadExamples: true
     exposeConfig: false
+    listenerClass: external-unstable
     credentialsSecret: simple-airflow-credentials
   webservers:
     roleGroups:
       default:
         replicas: 1
-  workers:
+  celeryExecutors:
     roleGroups:
       default:
         replicas: 2
+    config:
+      resources:
+        cpu:
+          min: 400m
+          max: 800m
+        memory:
+          limit: 2Gi
   schedulers:
     roleGroups:
       default:

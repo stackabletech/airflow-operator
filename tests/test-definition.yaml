@@ -7,13 +7,13 @@
 dimensions:
   - name: airflow
     values:
-      - 2.2.4-stackable0.0.0-dev
-      - 2.2.5-stackable0.0.0-dev
-      - 2.4.1-stackable0.0.0-dev
-      - 2.6.1-stackable0.0.0-dev
+      - 2.2.4
+      - 2.2.5
+      - 2.4.1
+      - 2.6.1
   - name: airflow-latest
     values:
-      - 2.6.1-stackable0.0.0-dev
+      - 2.6.1
   - name: ldap-authentication
     values:
       - no-tls
@@ -22,52 +22,69 @@ dimensions:
   - name: openshift
     values:
       - "false"
+  - name: executor
+    values:
+      - celery
+      - kubernetes
 tests:
   - name: smoke
     dimensions:
       - airflow
       - openshift
-#   - name: mount-dags-configmap
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: mount-dags-gitsync
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: ldap
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#       - ldap-authentication
-#   - name: resources
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: orphaned-resources
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-#   - name: logging
-#     dimensions:
-#       - airflow
-#       - openshift
-#   - name: cluster-operation
-#     dimensions:
-#       - airflow-latest
-#       - openshift
-# suites:
-#   - name: latest
-#     patch:
-#       - dimensions:
-#           - expr: last
-#   - name: smoke
-#     select:
-#       - smoke
-#   - name: openshift
-#     patch:
-#       - dimensions:
-#           - expr: last
-#       - dimensions:
-#           - name: openshift
-#             expr: "true"
+      - executor
+  - name: mount-dags-configmap
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
+  - name: mount-dags-gitsync
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
+  - name: ldap
+    dimensions:
+      - airflow-latest
+      - openshift
+      - ldap-authentication
+      - executor
+  - name: resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: orphaned-resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: logging
+    dimensions:
+      - airflow
+      - openshift
+  - name: cluster-operation
+    dimensions:
+      - airflow-latest
+      - openshift
+suites:
+  - name: nightly
+    # Run nightly with the latest airflow
+    patch:
+      - dimensions:
+          - name: airflow
+            expr: last
+  - name: smoke-latest
+    # Useful for development
+    select:
+      - smoke
+    patch:
+      - dimensions:
+          - expr: last
+  - name: openshift
+    # Run on OpenShift with latest airflow
+    patch:
+      - dimensions:
+          - expr: last
+      - dimensions:
+          - name: airflow
+            expr: last
+          - name: openshift
+            expr: "true"
