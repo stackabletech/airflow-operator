@@ -9,15 +9,9 @@ Apache Airflow is an open-source application for creating, scheduling, and monit
 
 Get started using Airflow with the Stackable Operator by following the xref:getting_started/index.adoc[] guide. It guides you through installing the Operator alongside a PostgreSQL database and Redis instance, connecting to your Airflow instance and running your first workflow.
 
-== Resources
-
-The Operator manages three https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/[custom resources]: The _AirflowCluster_ and _AirflowDB_. It creates a number of different Kubernetes resources based on the custom resources.
-
 === Custom resources
 
-The AirflowCluster is the main resource for the configuration of the Airflow instance. The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section). The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
-
-When an AirflowCluster is first deployed, an AirflowDB resource is created. The AirflowDB resource is a wrapper resource for the metadata SQL database that is used by Airflow to store information on users and permissions as well as workflows, task instances and their execution. The resource contains some configuration but also keeps track of whether the database has been initialized or not. It is not deleted automatically if a AirflowCluster is deleted, and so can be reused.
+The AirflowCluster is the resource for the configuration of the Airflow instance. The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section). The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
 
 === Executors
 
@@ -62,11 +56,11 @@ Based on the custom resources you define, the Operator creates ConfigMaps, State
 
 image::airflow_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
-The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other. The Job created for the AirflowDB is not shown.
+The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
 
 For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the Operator creates a StatefulSet with the amount of replicas defined in the RoleGroup. Every Pod in the StatefulSet has two containers: the main container running Airflow and a sidecar container gathering metrics for xref:operators:monitoring.adoc[]. The Operator creates a Service per role group as well as a single service for the whole `webserver` role called `<clustername>-webserver`.
 
-ConfigMaps are created, one per RoleGroup and also one for the AirflowDB. Both ConfigMaps contains two files: `log_config.py` and `webserver_config.py` which contain logging and general Airflow configuration respectively.
+Additionally, a ConfigMap is created for each RoleGroup. These ConfigMaps contain two files, `log_config.py` and `webserver_config.py`, which contain logging and general Airflow configuration respectively.
 
 == Required external components
 
