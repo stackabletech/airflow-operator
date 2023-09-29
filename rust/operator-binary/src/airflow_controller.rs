@@ -6,11 +6,13 @@ use stackable_operator::product_logging::framework::{
     capture_shell_output, shutdown_vector_command,
 };
 use stackable_operator::product_logging::spec::{ContainerLogConfig, ContainerLogConfigChoice};
+use stackable_operator::role_utils::RoleConfig;
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
     self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
 };
+use crate::operations::pdb::add_pdbs;
 use crate::product_logging::{
     extend_config_map_with_log_config, resolve_vector_aggregator_address,
 };
@@ -214,6 +216,10 @@ pub enum Error {
     },
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+    #[snafu(display("failed to create PodDisruptionBudget"))]
+    FailedToCreatePdb {
+        source: crate::operations::pdb::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -338,6 +344,11 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     //let airflow_executor = AirflowExecutorDiscriminants::from(airflow_executor);
 
     for (role_name, role_config) in validated_role_config.iter() {
+        let airflow_role =
+            AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
+                role: role_name.to_string(),
+            })?;
+
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service =
@@ -354,11 +365,6 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
-
-            let airflow_role =
-                AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
-                    role: role_name.to_string(),
-                })?;
 
             let config = airflow
                 .merged_config(&airflow_role, &rolegroup)
@@ -409,6 +415,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+        }
+
+        let role_config = airflow.role_config(&airflow_role);
+        if let Some(RoleConfig {
+            pod_disruption_budget: pdb,
+        }) = role_config
+        {
+            add_pdbs(pdb, &airflow, &airflow_role, client, &mut cluster_resources)
+                .await
+                .context(FailedToCreatePdbSnafu)?;
         }
     }
 

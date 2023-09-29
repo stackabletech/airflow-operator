@@ -1,0 +1,16 @@
+= Allowed Pod disruptions
+
+You can configure the allowed Pod disruptions for Airflow nodes as described in xref:concepts:operations/pod_disruptions.adoc[].
+
+Unless you configure something else or disable our PodDisruptionBudgets (PDBs), we write the following PDBs:
+
+== Schedules
+We only allow a single scheduler to be offline at any given time, regardless of the number of replicas or `roleGroups`.
+
+
+== Webservers
+We only allow a single webserver to be offline at any given time, regardless of the number of replicas or `roleGroups`.
+
+== Executors
+* In case you use Celery executors, we only allow a single executor to be offline at any given time, regardless of the number of replicas or `roleGroups`.
+* In case you use Kubernetes executors, we don't deploy any PDB, as it's Airflows responsibility to take care of the executor Pods.
