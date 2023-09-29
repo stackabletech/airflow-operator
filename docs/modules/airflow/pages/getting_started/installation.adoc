@@ -25,14 +25,14 @@ WARNING: Do not use this setup in production! Supported databases and versions a
 
 There are 2 ways to run Stackable Operators
 
-1. Using xref:stackablectl::index.adoc[]
+1. Using xref:management:stackablectl:index.adoc[]
 
 2. Using Helm
 
 === stackablectl
 
 stackablectl is the command line tool to interact with Stackable operators and our recommended way to install Operators.
-Follow the xref:stackablectl::installation.adoc[installation steps] for your platform.
+Follow the xref:management:stackablectl:installation.adoc[installation steps] for your platform.
 
 After you have installed stackablectl run the following command to install all Operators necessary for Airflow:
 
@@ -49,7 +49,8 @@ The tool will show
 [INFO ] Installing airflow operator
 ----
 
-TIP: Consult the xref:stackablectl::quickstart.adoc[] to learn more about how to use stackablectl. For example, you can use the `-k` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use stackablectl. For
+example, you can use the `--cluster kind` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
 
 === Helm
 
@@ -65,8 +66,11 @@ Then install the Stackable Operators:
 include::example$getting_started/code/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Airflow cluster (as well as the CRDs for the required operators). You are now ready to deploy Apache Airflow in Kubernetes.
+Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Airflow cluster (as well as the
+CRDs for the required operators). You are now ready to deploy Apache Airflow in Kubernetes.
 
 == What's next
 
-xref:getting_started/first_steps.adoc[Set up an Airflow cluster] and its dependencies and xref:getting_started/first_steps.adoc#_verify_that_it_works[verify that it works] by inspecting and running an example DAG.
+xref:getting_started/first_steps.adoc[Set up an Airflow cluster] and its dependencies and
+xref:getting_started/first_steps.adoc#_verify_that_it_works[verify that it works] by inspecting and running an example
+DAG.
