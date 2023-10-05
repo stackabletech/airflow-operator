@@ -47,6 +47,7 @@ status:
   expectedPods: 1
   currentHealthy: 1
   disruptionsAllowed: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -56,6 +57,7 @@ status:
   expectedPods: 2
   currentHealthy: 2
   disruptionsAllowed: 1
+{% endif %}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
