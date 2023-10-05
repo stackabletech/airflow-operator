@@ -38,3 +38,32 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-webserver
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-worker
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+{% endif %}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-scheduler
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
