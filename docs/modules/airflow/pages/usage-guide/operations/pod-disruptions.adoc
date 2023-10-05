@@ -4,9 +4,8 @@ You can configure the allowed Pod disruptions for Airflow nodes as described in 
 
 Unless you configure something else or disable our PodDisruptionBudgets (PDBs), we write the following PDBs:
 
-== Schedules
+== Schedulers
 We only allow a single scheduler to be offline at any given time, regardless of the number of replicas or `roleGroups`.
-
 
 == Webservers
 We only allow a single webserver to be offline at any given time, regardless of the number of replicas or `roleGroups`.
