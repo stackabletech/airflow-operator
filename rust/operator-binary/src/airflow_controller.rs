@@ -6,7 +6,7 @@ use stackable_operator::product_logging::framework::{
     capture_shell_output, shutdown_vector_command,
 };
 use stackable_operator::product_logging::spec::{ContainerLogConfig, ContainerLogConfigChoice};
-use stackable_operator::role_utils::RoleConfig;
+use stackable_operator::role_utils::GenericRoleConfig;
 
 use crate::config::{self, PYTHON_IMPORTS};
 use crate::controller_commons::{
@@ -269,7 +269,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
     }
 
-    let role_config = transform_all_roles_to_config::<AirflowConfigFragment>(&airflow, roles);
+    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(&airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -418,7 +418,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
 
         let role_config = airflow.role_config(&airflow_role);
-        if let Some(RoleConfig {
+        if let Some(GenericRoleConfig {
             pod_disruption_budget: pdb,
         }) = role_config
         {

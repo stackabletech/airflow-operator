@@ -27,7 +27,7 @@ use stackable_operator::{
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{CommonConfiguration, Role, RoleConfig, RoleGroup, RoleGroupRef},
+    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
@@ -386,7 +386,7 @@ impl AirflowCluster {
         }
     }
 
-    pub fn role_config(&self, role: &AirflowRole) -> Option<&RoleConfig> {
+    pub fn role_config(&self, role: &AirflowRole) -> Option<&GenericRoleConfig> {
         self.get_role(role).map(|r| &r.role_config)
     }
 
