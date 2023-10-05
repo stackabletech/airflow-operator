@@ -1,6 +1,6 @@
 = Graceful shutdown
 
-Graceful shutdown of Zookeeper nodes is either not supported by the product itself
+Graceful shutdown of Airflow nodes is either not supported by the product itself
 or we have not implemented it yet.
 
 The efforts of implementing graceful shutdown for all products that have this functionality is tracked in
