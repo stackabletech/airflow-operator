@@ -227,6 +227,9 @@ pub struct GitSync {
 impl GitSync {
     pub fn get_args(&self) -> Vec<String> {
         let mut args: Vec<String> = vec![];
+        let safe_dir = "safe.directory";
+        let mut git_config = format!("{safe_dir}:{GIT_ROOT}");
+
         args.extend(vec![
             "/stackable/git-sync".to_string(),
             format!("--repo={}", self.repo.clone()),
@@ -238,21 +241,27 @@ impl GitSync {
             format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
             format!("--dest={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
-            format!("--git-config=safe.directory:{GIT_ROOT}"),
         ]);
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
                 // config options that are internal details have
                 // constant values and will be ignored here
-                if key.eq_ignore_ascii_case("--dest")
-                    || key.eq_ignore_ascii_case("--root")
-                    || key.eq_ignore_ascii_case("--git-config")
-                {
+                if key.eq_ignore_ascii_case("--dest") || key.eq_ignore_ascii_case("--root") {
                     tracing::warn!("Config option {:?} will be ignored...", key);
                 } else {
-                    args.push(format!("{key}={value}"));
+                    // both "-git-config" and "--gitconfig" are recognised by gitsync
+                    if key.to_lowercase().ends_with("-git-config") {
+                        if value.to_lowercase().contains(safe_dir) {
+                            tracing::warn!("Config option {:?} contains a value for {safe_dir} that duplicates 
+                            the constant value used internally!", value);
+                        }
+                        git_config = format!("{git_config},{value}");
+                    } else {
+                        args.push(format!("{key}={value}"));
+                    }
                 }
             }
+            args.push(format!("--git-config='{git_config}'"));
         }
         args
     }
@@ -745,6 +754,7 @@ pub struct AirflowClusterRef {
 #[cfg(test)]
 mod tests {
     use crate::AirflowCluster;
+    use rstest::rstest;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
     #[test]
@@ -879,5 +889,79 @@ mod tests {
             .get_args()
             .iter()
             .any(|c| c == "--rev=c63921857618a8c392ad757dda13090fff3d879a"));
+    }
+
+    #[rstest]
+    #[case(
+        "\"--git-config\": \"http.sslCAInfo:/tmp/ca-cert/ca.crt\"",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
+    )]
+    #[case(
+        "\"-git-config\": \"http.sslCAInfo:/tmp/ca-cert/ca.crt\"",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
+    )]
+    #[case(
+        "\"--git-config\": http.sslCAInfo:/tmp/ca-cert/ca.crt",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
+    )]
+    #[case(
+        "--git-config: http.sslCAInfo:/tmp/ca-cert/ca.crt",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
+    )]
+    #[case(
+        "'--git-config': 'http.sslCAInfo:/tmp/ca-cert/ca.crt'",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
+    )]
+    #[case(
+        "--git-config: 'http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'"
+    )]
+    fn test_git_sync_git_config(#[case] input: &str, #[case] output: &str) {
+        let cluster = format!(
+            "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.6.1
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecret: simple-airflow-credentials
+            dagsGitSync:
+              - name: git-sync
+                repo: https://github.com/stackabletech/airflow-operator
+                branch: feat/git-sync
+                wait: 20
+                gitSyncConf:
+                  {input}
+                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+          webservers:
+            roleGroups:
+              default:
+                replicas: 1
+          celeryExecutors:
+            roleGroups:
+              default:
+                replicas: 1
+          schedulers:
+            roleGroups:
+              default:
+                replicas: 1
+          "
+        );
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster.as_str());
+        let cluster: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        assert!(cluster
+            .git_sync()
+            .unwrap()
+            .get_args()
+            .iter()
+            .any(|c| c == { output }));
     }
 }
