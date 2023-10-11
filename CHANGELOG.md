@@ -7,6 +7,7 @@
 - [BREAKING] Implement KubernetesExecutor ([#311]).
 - Default stackableVersion to operator version ([#312]).
 - Support PodDisruptionBudgets ([#330]).
+- Added support for versions 2.6.3, 2.7.1 ([#334]).
 
 ### Changed
 
@@ -19,12 +20,17 @@
 
 - BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#316]).
 
+### Removed
+
+- Removed support for 2.2.3, 2.2.4, 2.2.5, 2.4.1 ([#334]).
+
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
 [#311]: https://github.com/stackabletech/airflow-operator/pull/311
 [#312]: https://github.com/stackabletech/airflow-operator/pull/312
 [#316]: https://github.com/stackabletech/airflow-operator/pull/316
 [#330]: https://github.com/stackabletech/airflow-operator/pull/330
+[#334]: https://github.com/stackabletech/airflow-operator/pull/334
 
 ## [23.7.0] - 2023-07-14
 
