@@ -145,7 +145,7 @@ metadata:
   name: airflow-with-ldap-server-veri-tls
 spec:
   image:
-    productVersion: 2.6.1
+    productVersion: 2.7.1
     stackableVersion: 0.0.0-dev
   clusterConfig:
     loadExamples: true
