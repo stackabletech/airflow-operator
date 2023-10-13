@@ -47,6 +47,7 @@ pub const GIT_CONTENT: &str = "content-from-git";
 pub const GIT_ROOT: &str = "/tmp/git";
 pub const GIT_LINK: &str = "current";
 pub const GIT_SYNC_NAME: &str = "gitsync";
+pub const GIT_SAFE_DIR: &str = "safe.directory";
 
 pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
@@ -227,8 +228,7 @@ pub struct GitSync {
 impl GitSync {
     pub fn get_args(&self) -> Vec<String> {
         let mut args: Vec<String> = vec![];
-        let safe_dir = "safe.directory";
-        let mut git_config = format!("{safe_dir}:{GIT_ROOT}");
+        let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
 
         args.extend(vec![
             "/stackable/git-sync".to_string(),
@@ -251,8 +251,8 @@ impl GitSync {
                 } else {
                     // both "-git-config" and "--gitconfig" are recognized by gitsync
                     if key.to_lowercase().ends_with("-git-config") {
-                        if value.to_lowercase().contains(safe_dir) {
-                            tracing::warn!("Config option {:?} contains a value for {safe_dir} that duplicates 
+                        if value.to_lowercase().contains(GIT_SAFE_DIR) {
+                            tracing::warn!("Config option {:?} contains a value for {GIT_SAFE_DIR} that duplicates
                             the constant value used internally!", value);
                         }
                         git_config = format!("{git_config},{value}");
