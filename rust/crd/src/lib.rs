@@ -249,7 +249,7 @@ impl GitSync {
                 if key.eq_ignore_ascii_case("--dest") || key.eq_ignore_ascii_case("--root") {
                     tracing::warn!("Config option {:?} will be ignored...", key);
                 } else {
-                    // both "-git-config" and "--gitconfig" are recognised by gitsync
+                    // both "-git-config" and "--gitconfig" are recognized by gitsync
                     if key.to_lowercase().ends_with("-git-config") {
                         if value.to_lowercase().contains(safe_dir) {
                             tracing::warn!("Config option {:?} contains a value for {safe_dir} that duplicates 
