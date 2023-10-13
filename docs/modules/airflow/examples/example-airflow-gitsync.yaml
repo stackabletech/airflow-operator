@@ -21,5 +21,6 @@ spec:
           --rev: HEAD # <10>
           # --rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
           # --rev: 39ee3598bd9946a1d958a448c9f7d3774d7a8043 # N.B. commit must be covered by "depth"
+          --git-config: http.sslCAInfo:/tmp/ca-cert/ca.crt # <11>
   webservers:
     ...

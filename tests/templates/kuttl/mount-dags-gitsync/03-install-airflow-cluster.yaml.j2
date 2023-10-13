@@ -39,7 +39,9 @@ spec:
         repo: https://github.com/stackabletech/airflow-operator
         branch: "main"
         wait: 20
-        gitSyncConf: {}
+        gitSyncConf:
+          # supply some config to check that safe.directory is correctly set
+          --git-config: http.sslVerify:false
         gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
   webservers:
     config:
