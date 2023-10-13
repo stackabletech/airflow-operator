@@ -252,8 +252,8 @@ impl GitSync {
                     // both "-git-config" and "--gitconfig" are recognized by gitsync
                     if key.to_lowercase().ends_with("-git-config") {
                         if value.to_lowercase().contains(GIT_SAFE_DIR) {
-                            tracing::warn!("Config option {:?} contains a value for {GIT_SAFE_DIR} that duplicates
-                            the constant value used internally!", value);
+                            tracing::warn!("Config option {value:?} contains a value for {GIT_SAFE_DIR} that overrides
+                                the value of this operator. Git-sync functionality will probably not work as expected!");
                         }
                         git_config = format!("{git_config},{value}");
                     } else {
