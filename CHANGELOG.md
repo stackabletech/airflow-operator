@@ -19,6 +19,7 @@
 ### Fixed
 
 - BREAKING: Rename Service port name from `airflow` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#316]).
+- Fix user-supplied gitsync git-config settings ([#335]).
 
 ### Removed
 
@@ -31,6 +32,7 @@
 [#316]: https://github.com/stackabletech/airflow-operator/pull/316
 [#330]: https://github.com/stackabletech/airflow-operator/pull/330
 [#334]: https://github.com/stackabletech/airflow-operator/pull/334
+[#335]: https://github.com/stackabletech/airflow-operator/pull/335
 
 ## [23.7.0] - 2023-07-14
 

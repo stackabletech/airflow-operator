@@ -41,6 +41,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
+    duration::Duration,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -73,7 +74,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
     sync::Arc,
-    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
@@ -1305,7 +1305,7 @@ fn build_static_envs() -> Vec<EnvVar> {
 }
 
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(Duration::from_secs(5))
+    Action::requeue(*Duration::from_secs(5))
 }
 
 fn add_authentication_volumes_and_volume_mounts(
