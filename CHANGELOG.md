@@ -7,7 +7,7 @@
 - [BREAKING] Implement KubernetesExecutor ([#311]).
 - Default stackableVersion to operator version ([#312]).
 - Support PodDisruptionBudgets ([#330]).
-- Added support for versions 2.6.3, 2.7.1 ([#334]).
+- Added support for versions 2.6.3, 2.7.2 ([#334]).
 
 ### Changed
 
