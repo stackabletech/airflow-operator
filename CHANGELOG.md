@@ -12,8 +12,8 @@
 ### Changed
 
 - [BREAKING] Consolidated `spec.clusterConfig.authenticationConfig` to `spec.clusterConfig.authentication` which now takes a vector of AuthenticationClass references  ([#303]).
-- `vector` `0.26.0` -> `0.31.0` ([#308]).
-- `operator-rs` `0.44.0` -> `0.52.1` ([#308], [#330]).
+- `vector` `0.26.0` -> `0.33.0` ([#308], [#334]).
+- `operator-rs` `0.44.0` -> `0.55.0` ([#308], [#330], [#334]).
 - [BREAKING] Removed AirflowDB object, since it created some problems when reinstalling or upgrading an Airflow cluster. Instead, the initialization of the database was moved to the startup phase of each scheduler pod. To make sure the initialization does not run in parallel, the `PodManagementPolicy` of the scheduler StatefulSet was set to `OrderedReady`. The `.spec.clusterConfig.databaseInitialization` option was removed from the CRD, since it was just there to enable logging for the database initialization Job, which doesn't exist anymore ([#322]).
 
 ### Fixed
