@@ -83,6 +83,11 @@ commands:
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+            # There are some OOM kill events when using celery executor with the default (currently 512Mi) resources
+            # due to 2.7.x is more resource hungry?
+            resources:
+              memory:
+                limit: '1Gi'
           roleGroups:
             default:
               replicas: 1
