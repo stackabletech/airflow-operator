@@ -1,0 +1,33 @@
+= Service Restarts
+
+== Manual Restarts
+
+Sometimes it is necessary to restart services deployed in Kubernetes. A service restart should induce as little disruption as possible, ideally none.
+
+Kubernetes offers rollout mechanism for this purpose. You can use `kubectl rollout restart statefulset` to restart the Airflow `scheduler`, `webserver` or `worker` Pods.
+
+For example, given the following stateful sets deployed for an Airflow cluster:
+
+----
+❯ kubectl get sts 
+NAME                        READY   AGE
+airflow-scheduler-default   1/1     61m
+airflow-webserver-default   1/1     61m
+airflow-worker-default      2/2     61m
+postgresql-airflow          1/1     64m
+redis-airflow-master        1/1     64m
+redis-airflow-replicas      1/1     64m
+----
+
+To restart the Airflow scheduler, run:
+
+----
+❯ kubectl rollout restart statefulset airflow-scheduler-default 
+statefulset.apps/airflow-scheduler-default restarted
+----
+
+NOTE: When using Airflow's https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/executor/kubernetes.html[Kubernetes executor], `worker` Pods are created dynamically by DAGs when needed, this in general it's not necessary to restart them.
+
+== Automatic Restarts
+
+The Commons Operator of the Stackable Platform might restart Pods automatically, for example to ensure that security certificates are up to date. For details, see the xref:commons:index.adoc[Commons Operator documentation].

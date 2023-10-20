@@ -17,3 +17,4 @@
 *** xref:airflow:usage-guide/operations/pod-placement.adoc[]
 *** xref:airflow:usage-guide/operations/pod-disruptions.adoc[]
 *** xref:airflow:usage-guide/operations/graceful-shutdown.adoc[]
+*** xref:airflow:usage-guide/operations/restart.adoc[]
