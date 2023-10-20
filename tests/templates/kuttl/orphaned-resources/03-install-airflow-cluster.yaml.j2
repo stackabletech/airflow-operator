@@ -27,7 +27,6 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
-    pullPolicy: IfNotPresent
   clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
