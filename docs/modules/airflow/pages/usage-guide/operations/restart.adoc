@@ -8,6 +8,7 @@ Kubernetes offers rollout mechanism for this purpose. You can use `kubectl rollo
 
 For example, given the following stateful sets deployed for an Airflow cluster:
 
+[source,shell]
 ----
 ❯ kubectl get sts 
 NAME                        READY   AGE
@@ -21,6 +22,7 @@ redis-airflow-replicas      1/1     64m
 
 To restart the Airflow scheduler, run:
 
+[source,shell]
 ----
 ❯ kubectl rollout restart statefulset airflow-scheduler-default 
 statefulset.apps/airflow-scheduler-default restarted
@@ -30,4 +32,4 @@ NOTE: When using Airflow's https://airflow.apache.org/docs/apache-airflow/stable
 
 == Automatic Restarts
 
-The Commons Operator of the Stackable Platform might restart Pods automatically, for example to ensure that security certificates are up to date. For details, see the xref:commons:index.adoc[Commons Operator documentation].
+The Commons Operator of the Stackable Platform might restart Pods automatically, for example to ensure that security certificates are up-to-date. For details, see the xref:commons:index.adoc[Commons Operator documentation].
