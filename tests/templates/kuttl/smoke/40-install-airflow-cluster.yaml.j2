@@ -47,9 +47,14 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      # There are some OOM kill events when using celery executor with the default (currently 1.75Gi) resources
+      # so we provide more memory
+      resources:
+        memory:
+          limit: '2.5Gi'
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
