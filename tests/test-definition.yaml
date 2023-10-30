@@ -7,13 +7,12 @@
 dimensions:
   - name: airflow
     values:
-      - 2.2.4
-      - 2.2.5
-      - 2.4.1
       - 2.6.1
+      - 2.6.3
+      - 2.7.2
   - name: airflow-latest
     values:
-      - 2.6.1
+      - 2.7.2
   - name: ldap-authentication
     values:
       - no-tls

@@ -62,7 +62,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.6.1
+            productVersion: 2.7.2
           loadExamples: true
           exposeConfig: false
           credentialsSecret: simple-airflow-credentials
@@ -159,7 +159,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.6.1
+            productVersion: 2.7.2
           loadExamples: true
           exposeConfig: false
           credentialsSecret: simple-airflow-credentials

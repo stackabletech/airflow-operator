@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
-    "from airflow.www.fab_security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    "from flask_appbuilder.const import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
     "basedir = os.path.abspath(os.path.dirname(__file__))",
     "WTF_CSRF_ENABLED = True",
 ];
