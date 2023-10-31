@@ -1,11 +1,7 @@
-pub mod affinity;
-pub mod authentication;
-mod git_sync;
-
-use crate::affinity::get_affinity;
-use crate::authentication::AirflowAuthentication;
+use std::collections::BTreeMap;
 
 use git_sync::GitSync;
+use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -26,15 +22,19 @@ use stackable_operator::{
     kube::{CustomResource, ResourceExt},
     labels::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+
+use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
+
+pub mod affinity;
+pub mod authentication;
+mod git_sync;
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";

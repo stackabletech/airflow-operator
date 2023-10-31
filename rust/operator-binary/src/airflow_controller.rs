@@ -1,39 +1,28 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
-use stackable_operator::builder::resources::ResourceRequirementsBuilder;
-use stackable_operator::config::fragment::ValidationError;
-use stackable_operator::k8s_openapi::DeepMerge;
-use stackable_operator::product_logging::framework::{
-    capture_shell_output, shutdown_vector_command,
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
 };
-use stackable_operator::product_logging::spec::{ContainerLogConfig, ContainerLogConfigChoice};
-use stackable_operator::role_utils::GenericRoleConfig;
 
-use crate::config::{self, PYTHON_IMPORTS};
-use crate::controller_commons::{
-    self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+use product_config::{
+    flask_app_config_writer::{self, FlaskAppConfigWriterError},
+    types::PropertyNameKind,
+    ProductConfigManager,
 };
-use crate::operations::pdb::add_pdbs;
-use crate::product_logging::{
-    extend_config_map_with_log_config, resolve_vector_aggregator_address,
-};
-use crate::util::env_var_from_secret;
-
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::authentication::AirflowAuthenticationConfigResolved;
 use stackable_airflow_crd::{
-    build_recommended_labels, AirflowCluster, AirflowConfig, AirflowConfigFragment,
-    AirflowConfigOptions, AirflowRole, Container, AIRFLOW_CONFIG_FILENAME, APP_NAME, CONFIG_PATH,
-    LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
-};
-use stackable_airflow_crd::{
-    AirflowClusterStatus, AirflowExecutor, ExecutorConfig, AIRFLOW_UID, GIT_CONTENT, GIT_LINK,
-    GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
+    authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
+    AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
+    AirflowExecutor, AirflowRole, Container, ExecutorConfig, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID,
+    APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
+    LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
     TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
-        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder, VolumeBuilder,
+        resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
+        ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder, VolumeBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -41,6 +30,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
+    config::fragment::ValidationError,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -50,6 +40,7 @@ use stackable_operator::{
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        DeepMerge,
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
@@ -57,25 +48,28 @@ use stackable_operator::{
     },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
-    product_config::{
-        flask_app_config_writer, flask_app_config_writer::FlaskAppConfigWriterError,
-        types::PropertyNameKind, ProductConfigManager,
-    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    product_logging::{self, spec::Logging},
-    role_utils::RoleGroupRef,
+    product_logging::{
+        self,
+        framework::{capture_shell_output, create_vector_shutdown_file_command},
+        spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
+    },
+    role_utils::{GenericRoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
+
+use crate::{
+    config::{self, PYTHON_IMPORTS},
+    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    operations::pdb::add_pdbs,
+    product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
+    util::env_var_from_secret,
+};
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
@@ -984,7 +978,7 @@ fn build_executor_template_config_map(
             [
                 // Wait for Vector to gather the logs.
                 "sleep 10",
-                &shutdown_vector_command(STACKABLE_LOG_DIR),
+                &create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             ]
             .join("; "),
         );
