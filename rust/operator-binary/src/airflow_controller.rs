@@ -1189,14 +1189,7 @@ fn build_template_envs(
     airflow: &AirflowCluster,
     env_overrides: &HashMap<String, String>,
 ) -> Vec<EnvVar> {
-    let secret_prop = Some(
-        airflow
-            .spec
-            .cluster_config
-            .credentials_secret
-            .as_str()
-            .clone(),
-    );
+    let secret_prop = Some(airflow.spec.cluster_config.credentials_secret.as_str());
 
     let mut env = secret_prop
         .map(|secret| {
