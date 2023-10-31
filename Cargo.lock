@@ -2015,8 +2015,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.55.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?branch=refactor/product-config-errors#e76654e90e8d1f51af77fdfa98ac52393c20ff6c"
+version = "0.56.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.56.0#1acaac4dacf302cc068b4294c8a1d4c2928977c0"
 dependencies = [
  "chrono",
  "clap",
@@ -2050,8 +2050,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator-derive"
-version = "0.55.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?branch=refactor/product-config-errors#e76654e90e8d1f51af77fdfa98ac52393c20ff6c"
+version = "0.56.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.56.0#1acaac4dacf302cc068b4294c8a1d4c2928977c0"
 dependencies = [
  "darling 0.20.3",
  "proc-macro2",
