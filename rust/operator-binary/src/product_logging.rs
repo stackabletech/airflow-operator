@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::STACKABLE_LOG_DIR;
@@ -122,16 +122,17 @@ fn create_airflow_config(log_config: &AutomaticContainerLogConfig, log_dir: &str
         .loggers
         .iter()
         .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
-        .map(|(name, config)| {
-            format!(
+        .fold(String::new(), |mut output, (name, config)| {
+            let _ = writeln!(
+                output,
                 "
 LOGGING_CONFIG['loggers'].setdefault('{name}', {{ 'propagate': True }})
 LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
 ",
                 level = config.level.to_python_expression()
-            )
-        })
-        .collect::<String>();
+            );
+            output
+        });
 
     format!(
         "\
