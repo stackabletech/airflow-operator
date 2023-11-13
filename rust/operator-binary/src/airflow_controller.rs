@@ -1,10 +1,4 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
-
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
     types::PropertyNameKind,
@@ -14,10 +8,10 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
     AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
-    AirflowExecutor, AirflowRole, Container, ExecutorConfig, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID,
-    APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_LINK, GIT_ROOT, GIT_SYNC_DIR, GIT_SYNC_NAME,
-    LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
-    TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    AirflowExecutor, AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment,
+    AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_LINK, GIT_ROOT,
+    GIT_SYNC_DIR, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -54,19 +48,30 @@ use stackable_operator::{
         framework::{capture_shell_output, create_vector_shutdown_file_command},
         spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
     },
-    role_utils::{GenericRoleConfig, RoleGroupRef},
+    role_utils::{CommonConfiguration, GenericRoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    operations::pdb::add_pdbs,
+    operations::{
+        graceful_shutdown::{
+            add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
+        },
+        pdb::add_pdbs,
+    },
     product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
     util::env_var_from_secret,
 };
@@ -214,6 +219,10 @@ pub enum Error {
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
     },
+    #[snafu(display("failed to configure graceful shutdown"))]
+    GracefulShutdown {
+        source: crate::operations::graceful_shutdown::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -322,20 +331,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     {
         build_executor_template(
             &airflow,
-            &common_configuration.config,
+            common_configuration,
             &resolved_product_image,
             &authentication_config,
             &vector_aggregator_address,
             &mut cluster_resources,
             client,
             &rbac_sa,
-            &common_configuration.env_overrides,
         )
         .await?;
     }
-
-    // from this point on we only need the discriminant
-    //let airflow_executor = AirflowExecutorDiscriminants::from(airflow_executor);
 
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
@@ -360,7 +365,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 role_group: rolegroup_name.into(),
             };
 
-            let config = airflow
+            let merged_airflow_config = airflow
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
@@ -380,7 +385,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 rolegroup_config,
                 authentication_config.as_ref(),
                 &rbac_sa.name_unchecked(),
-                &config,
+                &merged_airflow_config,
                 airflow_executor,
             )?;
 
@@ -399,7 +404,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &rolegroup,
                 rolegroup_config,
                 authentication_config.as_ref(),
-                &config.logging,
+                &merged_airflow_config.logging,
                 vector_aggregator_address.as_deref(),
                 &Container::Airflow,
             )?;
@@ -445,17 +450,16 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &Arc<AirflowCluster>,
-    config: &stackable_airflow_crd::ExecutorConfigFragment,
+    common_config: &CommonConfiguration<ExecutorConfigFragment>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     vector_aggregator_address: &Option<String>,
     cluster_resources: &mut ClusterResources,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
-    env_overrides: &HashMap<String, String>,
 ) -> Result<(), Error> {
-    let config = airflow
-        .merged_executor_config(config)
+    let merged_executor_config = airflow
+        .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
     let rolegroup = RoleGroupRef {
         cluster: ObjectRef::from_obj(&**airflow),
@@ -468,7 +472,7 @@ async fn build_executor_template(
         &rolegroup,
         &HashMap::new(),
         authentication_config,
-        &config.logging,
+        &merged_executor_config.logging,
         vector_aggregator_address.as_deref(),
         &Container::Base,
     )?;
@@ -483,8 +487,8 @@ async fn build_executor_template(
         resolved_product_image,
         authentication_config,
         &rbac_sa.name_unchecked(),
-        &config,
-        env_overrides,
+        &merged_executor_config,
+        &common_config.env_overrides,
         &rolegroup,
     )?;
     cluster_resources
@@ -683,14 +687,13 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
-    config: &AirflowConfig,
+    merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
 ) -> Result<StatefulSet> {
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
 
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
-    let commands = airflow_role.get_commands();
 
     let mut pb = PodBuilder::new();
     pb.metadata_builder(|m| {
@@ -703,7 +706,7 @@ fn build_server_rolegroup_statefulset(
         ))
     })
     .image_pull_secrets_from_product_image(resolved_product_image)
-    .affinity(&config.affinity)
+    .affinity(&merged_airflow_config.affinity)
     .service_account_name(sa_name)
     .security_context(
         PodSecurityContextBuilder::new()
@@ -722,24 +725,36 @@ fn build_server_rolegroup_statefulset(
         &mut pb,
     );
 
-    let mut args = Vec::new();
+    add_airflow_graceful_shutdown_config(&merged_airflow_config, &mut pb)
+        .context(GracefulShutdownSnafu)?;
+
+    let mut airflow_container_args = Vec::new();
     if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = config.logging.containers.get(&Container::Airflow)
+    }) = merged_airflow_config
+        .logging
+        .containers
+        .get(&Container::Airflow)
     {
-        args.push(capture_shell_output(
+        airflow_container_args.push(capture_shell_output(
             STACKABLE_LOG_DIR,
             &Container::Airflow.to_string(),
             log_config,
         ));
     }
-    args.extend(commands);
+    airflow_container_args.extend(airflow_role.get_commands());
 
     airflow_container
         .image_from_product_image(resolved_product_image)
-        .resources(config.resources.clone().into())
-        .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), args.join("; ")]);
+        .resources(merged_airflow_config.resources.clone().into())
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![airflow_container_args.join("\n")]);
 
     // environment variables
     let env_config = rolegroup_config
@@ -803,8 +818,20 @@ fn build_server_rolegroup_statefulset(
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-        .args(vec!["/stackable/statsd_exporter".to_string()])
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![vec![
+            COMMON_BASH_TRAP_FUNCTIONS.to_string(),
+            "prepare_signal_handlers".to_string(),
+            "/stackable/statsd_exporter &".to_string(),
+            "wait_for_termination $!".to_string(),
+        ]
+        .join("\n")])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .resources(
             ResourceRequirementsBuilder::new()
@@ -820,7 +847,10 @@ fn build_server_rolegroup_statefulset(
     pb.add_volumes(airflow.volumes());
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
-        config.logging.containers.get(&Container::Airflow),
+        merged_airflow_config
+            .logging
+            .containers
+            .get(&Container::Airflow),
     ));
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
@@ -836,8 +866,14 @@ fn build_server_rolegroup_statefulset(
             .context(InvalidContainerNameSnafu)?
             .add_env_vars(build_gitsync_envs(rolegroup_config))
             .image_from_product_image(resolved_product_image)
-            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-            .args(vec![gitsync.get_args().join(" ")])
+            .command(vec![
+                "/bin/bash".to_string(),
+                "-x".to_string(),
+                "-euo".to_string(),
+                "pipefail".to_string(),
+                "-c".to_string(),
+            ])
+            .args(vec![gitsync.get_args().join("\n")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .resources(
                 ResourceRequirementsBuilder::new()
@@ -857,12 +893,15 @@ fn build_server_rolegroup_statefulset(
         pb.add_container(gitsync_container);
     }
 
-    if config.logging.enable_vector_agent {
+    if merged_airflow_config.logging.enable_vector_agent {
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
-            config.logging.containers.get(&Container::Vector),
+            merged_airflow_config
+                .logging
+                .containers
+                .get(&Container::Vector),
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("250m")
                 .with_cpu_limit("500m")
@@ -951,6 +990,8 @@ fn build_executor_template_config_map(
             .fs_group(1000)
             .build(),
     );
+
+    add_executor_graceful_shutdown_config(&config, &mut pb).context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image

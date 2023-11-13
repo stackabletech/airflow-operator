@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -23,18 +21,25 @@ use stackable_operator::{
     labels::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{ConfigError, Configuration},
-    product_logging::{self, spec::Logging},
+    product_logging::{
+        self,
+        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
+        spec::Logging,
+    },
     role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
+    time::Duration,
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
+use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-
-use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
 
 pub mod affinity;
 pub mod authentication;
 mod git_sync;
+
+use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -58,6 +63,9 @@ pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
 const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
+
+const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
+const DEFAULT_EXECUTOR_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
@@ -272,10 +280,16 @@ impl AirflowRole {
             {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
         );
 
+        let mut command = vec![
+            copy_config,
+            COMMON_BASH_TRAP_FUNCTIONS.to_string(),
+            remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            "prepare_signal_handlers".to_string(),
+        ];
+
         match &self {
-            AirflowRole::Webserver => vec![copy_config, "airflow webserver".to_string()],
-            AirflowRole::Scheduler => vec![
-                copy_config,
+            AirflowRole::Webserver => command.push("airflow webserver &".to_string()),
+            AirflowRole::Scheduler => command.extend(vec![
                 // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                 "airflow db init".to_string(),
                 "airflow db upgrade".to_string(),
@@ -287,10 +301,17 @@ impl AirflowRole {
                     --password \"$ADMIN_PASSWORD\" \
                     --role \"Admin\""
                     .to_string(),
-                "airflow scheduler".to_string(),
-            ],
-            AirflowRole::Worker => vec![copy_config, "airflow celery worker".to_string()],
+                "airflow scheduler &".to_string(),
+            ]),
+            AirflowRole::Worker => command.push("airflow celery worker &".to_string()),
         }
+
+        command.extend(vec![
+            "wait_for_termination $!".to_string(),
+            create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+        ]);
+
+        command
     }
 
     /// Will be used to expose service ports and - by extension - which roles should be
@@ -378,6 +399,103 @@ impl AirflowCluster {
         }
         dags_git_sync.first()
     }
+
+    /// The name of the role-level load-balanced Kubernetes `Service`
+    pub fn node_role_service_name(&self) -> Option<String> {
+        self.metadata.name.clone()
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn merged_config(
+        &self,
+        role: &AirflowRole,
+        rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+    ) -> Result<AirflowConfig, Error> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
+
+        let role = match role {
+            AirflowRole::Webserver => {
+                self.spec
+                    .webservers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                    config
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
+            AirflowRole::Scheduler => {
+                self.spec
+                    .schedulers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+        };
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        if let Some(RoleGroup {
+            selector: Some(selector),
+            ..
+        }) = role.role_groups.get(&rolegroup_ref.role_group)
+        {
+            // Migrate old `selector` attribute, see ADR 26 affinities.
+            // TODO Can be removed after support for the old `selector` field is dropped.
+            #[allow(deprecated)]
+            conf_rolegroup.affinity.add_legacy_selector(selector);
+        }
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    /// Retrieve and merge resource configs for the executor template
+    pub fn merged_executor_config(
+        &self,
+        config: &ExecutorConfigFragment,
+    ) -> Result<ExecutorConfig, Error> {
+        // use the worker defaults for executor pods
+        let resources = default_resources(&AirflowRole::Worker);
+        let logging = product_logging::spec::default_logging();
+        let graceful_shutdown_timeout = Some(DEFAULT_EXECUTOR_GRACEFUL_SHUTDOWN_TIMEOUT);
+        let executor_defaults = ExecutorConfigFragment {
+            resources,
+            logging,
+            graceful_shutdown_timeout,
+        };
+
+        let mut conf_executor = config.to_owned();
+        conf_executor.merge(&executor_defaults);
+
+        tracing::debug!("Merged executor config: {:?}", conf_executor);
+        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -440,6 +558,9 @@ pub struct AirflowConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+    #[fragment_attrs(serde(default))]
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
@@ -461,6 +582,9 @@ pub struct ExecutorConfig {
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+    #[fragment_attrs(serde(default))]
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
 impl AirflowConfig {
@@ -472,6 +596,7 @@ impl AirflowConfig {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
+            graceful_shutdown_timeout: Some(DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT),
         }
     }
 }
@@ -572,101 +697,6 @@ impl HasStatusCondition for AirflowCluster {
             Some(status) => status.conditions.clone(),
             None => vec![],
         }
-    }
-}
-
-impl AirflowCluster {
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<AirflowCluster>,
-    ) -> Result<AirflowConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
-
-        let role = match role {
-            AirflowRole::Webserver => {
-                self.spec
-                    .webservers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        if let Some(RoleGroup {
-            selector: Some(selector),
-            ..
-        }) = role.role_groups.get(&rolegroup_ref.role_group)
-        {
-            // Migrate old `selector` attribute, see ADR 26 affinities.
-            // TODO Can be removed after support for the old `selector` field is dropped.
-            #[allow(deprecated)]
-            conf_rolegroup.affinity.add_legacy_selector(selector);
-        }
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
-
-    /// Retrieve and merge resource configs for the executor template
-    pub fn merged_executor_config(
-        &self,
-        config: &ExecutorConfigFragment,
-    ) -> Result<ExecutorConfig, Error> {
-        // use the worker defaults for executor pods
-        let resources = default_resources(&AirflowRole::Worker);
-        let logging = product_logging::spec::default_logging();
-
-        let executor_defaults = ExecutorConfigFragment { resources, logging };
-
-        let mut conf_executor = config.to_owned();
-        conf_executor.merge(&executor_defaults);
-
-        tracing::debug!("Merged executor config: {:?}", conf_executor);
-        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
 }
 

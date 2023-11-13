@@ -1,7 +1,11 @@
-use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
 use serde::{Deserialize, Serialize};
-use stackable_operator::schemars::{self, JsonSchema};
+use stackable_operator::{
+    schemars::{self, JsonSchema},
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
+};
 use std::collections::BTreeMap;
+
+use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,10 +20,13 @@ pub struct GitSync {
 }
 impl GitSync {
     pub fn get_args(&self) -> Vec<String> {
-        let mut args: Vec<String> = vec![];
-        let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
+        let mut args: Vec<String> = vec![
+            COMMON_BASH_TRAP_FUNCTIONS.to_string(),
+            "prepare_signal_handlers".to_string(),
+        ];
 
-        args.extend(vec![
+        let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
+        let mut git_sync_command = vec![
             "/stackable/git-sync".to_string(),
             format!("--repo={}", self.repo.clone()),
             format!(
@@ -30,7 +37,7 @@ impl GitSync {
             format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
             format!("--dest={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
-        ]);
+        ];
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
                 // config options that are internal details have
@@ -46,12 +53,17 @@ impl GitSync {
                         }
                         git_config = format!("{git_config},{value}");
                     } else {
-                        args.push(format!("{key}={value}"));
+                        git_sync_command.push(format!("{key}={value}"));
                     }
                 }
             }
-            args.push(format!("--git-config='{git_config}'"));
+            git_sync_command.push(format!("--git-config='{git_config}'"));
         }
+        // send process to background
+        git_sync_command.push("&".to_string());
+
+        args.push(git_sync_command.join(" "));
+        args.push("wait_for_termination $!".to_string());
         args
     }
 }
