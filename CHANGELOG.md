@@ -8,6 +8,7 @@
 - Default stackableVersion to operator version ([#312]).
 - Support PodDisruptionBudgets ([#330]).
 - Added support for versions 2.6.3, 2.7.2 ([#334]).
+- Support graceful shutdown ([#343]).
 
 ### Changed
 
@@ -33,6 +34,7 @@
 [#330]: https://github.com/stackabletech/airflow-operator/pull/330
 [#334]: https://github.com/stackabletech/airflow-operator/pull/334
 [#335]: https://github.com/stackabletech/airflow-operator/pull/335
+[#343]: https://github.com/stackabletech/airflow-operator/pull/343
 
 ## [23.7.0] - 2023-07-14
 
