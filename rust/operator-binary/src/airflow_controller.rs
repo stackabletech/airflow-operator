@@ -725,7 +725,7 @@ fn build_server_rolegroup_statefulset(
         &mut pb,
     );
 
-    add_airflow_graceful_shutdown_config(&merged_airflow_config, &mut pb)
+    add_airflow_graceful_shutdown_config(merged_airflow_config, &mut pb)
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
@@ -991,7 +991,7 @@ fn build_executor_template_config_map(
             .build(),
     );
 
-    add_executor_graceful_shutdown_config(&config, &mut pb).context(GracefulShutdownSnafu)?;
+    add_executor_graceful_shutdown_config(config, &mut pb).context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
