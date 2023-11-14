@@ -65,7 +65,7 @@ const GIT_SYNC_DEPTH: u8 = 1u8;
 const GIT_SYNC_WAIT: u16 = 20u16;
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
-const DEFAULT_EXECUTOR_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
+const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
@@ -275,13 +275,9 @@ impl AirflowRole {
     /// configuration settings are used everywhere. For this reason we ensure that the webserver
     /// config file is in the Airflow home directory on all pods.
     pub fn get_commands(&self) -> Vec<String> {
-        let copy_config = format!(
-            "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} \
-            {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
-        );
-
         let mut command = vec![
-            copy_config,
+            format!("cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"),
+            // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             "prepare_signal_handlers".to_string(),
@@ -305,7 +301,7 @@ impl AirflowRole {
             ]),
             AirflowRole::Worker => command.push("airflow celery worker &".to_string()),
         }
-
+        // graceful shutdown part
         command.extend(vec![
             "wait_for_termination $!".to_string(),
             create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
@@ -483,7 +479,7 @@ impl AirflowCluster {
         // use the worker defaults for executor pods
         let resources = default_resources(&AirflowRole::Worker);
         let logging = product_logging::spec::default_logging();
-        let graceful_shutdown_timeout = Some(DEFAULT_EXECUTOR_GRACEFUL_SHUTDOWN_TIMEOUT);
+        let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
         let executor_defaults = ExecutorConfigFragment {
             resources,
             logging,
@@ -596,7 +592,12 @@ impl AirflowConfig {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
-            graceful_shutdown_timeout: Some(DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT),
+            graceful_shutdown_timeout: Some(match role {
+                AirflowRole::Webserver | AirflowRole::Scheduler => {
+                    DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT
+                }
+                AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            }),
         }
     }
 }
