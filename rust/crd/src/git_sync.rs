@@ -233,8 +233,6 @@ mod tests {
         let cluster: AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        println!("{:?}", cluster.git_sync().unwrap().get_args());
-
         assert!(cluster
             .git_sync()
             .unwrap()
