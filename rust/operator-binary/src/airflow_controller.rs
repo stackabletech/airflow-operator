@@ -1051,8 +1051,14 @@ fn build_executor_template_config_map(
             .context(InvalidContainerNameSnafu)?
             .add_env_vars(env)
             .image_from_product_image(resolved_product_image)
-            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-            .args(vec![gitsync.get_args().join(" ")])
+            .command(vec![
+                "/bin/bash".to_string(),
+                "-x".to_string(),
+                "-euo".to_string(),
+                "pipefail".to_string(),
+                "-c".to_string(),
+            ])
+            .args(vec![gitsync.get_args().join("\n")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .resources(
                 ResourceRequirementsBuilder::new()
