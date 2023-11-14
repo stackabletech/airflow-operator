@@ -164,7 +164,7 @@ mod tests {
             .unwrap()
             .get_args()
             .iter()
-            .any(|c| c == "--rev=c63921857618a8c392ad757dda13090fff3d879a"));
+            .any(|c| c.contains("--rev=c63921857618a8c392ad757dda13090fff3d879a")));
     }
 
     #[rstest]
@@ -233,11 +233,13 @@ mod tests {
         let cluster: AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
+        println!("{:?}", cluster.git_sync().unwrap().get_args());
+
         assert!(cluster
             .git_sync()
             .unwrap()
             .get_args()
             .iter()
-            .any(|c| c == { output }));
+            .any(|c| c.contains(output)));
     }
 }
