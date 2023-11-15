@@ -51,7 +51,7 @@ airflow [2023-11-14 09:08:58 +0000] [15] [INFO] Shutting down: Master
 
 == Celery Executor
 
-As a default, Airflow celery executors have `5 minutes` to shut down gracefully.
+As a default, Airflow celery executors have `5 minutes` to shut down gracefully (jobs running with the KubernetesExecutor use the same shutdown mechanism but this is managed internally by Airflow).
 
 They use the same mechanism described above.
 
