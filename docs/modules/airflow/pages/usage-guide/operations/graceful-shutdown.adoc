@@ -10,7 +10,7 @@ After the graceful shutdown timeout runs out, and the process still didn't exit,
 
 As a default, Airflow schedulers have `2 minutes` to shut down gracefully.
 
-They use the same mechanism described above.
+They use the same mechanism described above. The example log output below is from a Scheduler running the KubernetesExecutor, but the mechanism is the same for CeleryExecutor-run jobs as well.
 
 [source,text]
 ----
