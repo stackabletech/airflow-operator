@@ -280,11 +280,13 @@ impl AirflowRole {
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-            "prepare_signal_handlers".to_string(),
         ];
 
         match &self {
-            AirflowRole::Webserver => command.push("airflow webserver &".to_string()),
+            AirflowRole::Webserver => command.extend(vec![
+                "prepare_signal_handlers".to_string(),
+                "airflow webserver &".to_string(),
+            ]),
             AirflowRole::Scheduler => command.extend(vec![
                 // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                 "airflow db init".to_string(),
@@ -297,9 +299,13 @@ impl AirflowRole {
                     --password \"$ADMIN_PASSWORD\" \
                     --role \"Admin\""
                     .to_string(),
+                "prepare_signal_handlers".to_string(),
                 "airflow scheduler &".to_string(),
             ]),
-            AirflowRole::Worker => command.push("airflow celery worker &".to_string()),
+            AirflowRole::Worker => command.extend(vec![
+                "prepare_signal_handlers".to_string(),
+                "airflow celery worker &".to_string(),
+            ]),
         }
         // graceful shutdown part
         command.extend(vec![
