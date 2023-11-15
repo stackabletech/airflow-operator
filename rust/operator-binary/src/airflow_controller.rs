@@ -1013,21 +1013,8 @@ fn build_executor_template_config_map(
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
-    if config.logging.enable_vector_agent {
-        airflow_container.add_env_var(
-            "_STACKABLE_POST_HOOK",
-            [
-                // Wait for Vector to gather the logs.
-                "sleep 10",
-                &create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-            ]
-            .join("; "),
-        );
-    }
-
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes());
-
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         config.logging.containers.get(&Container::Airflow),
