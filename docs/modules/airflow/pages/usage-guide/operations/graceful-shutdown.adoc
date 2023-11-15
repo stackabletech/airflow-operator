@@ -1,7 +1,65 @@
 = Graceful shutdown
 
-Graceful shutdown of Airflow nodes is either not supported by the product itself
-or we have not implemented it yet.
+You can configure the graceful shutdown as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
-Outstanding implementation work for the graceful shutdowns of all products where this functionality is relevant is tracked in
-https://github.com/stackabletech/issues/issues/357
+The Airflow processes will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+It will log the received signal as shown in the log below and initiate a graceful shutdown.
+After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
+
+== Scheduler
+
+As a default, Airflow schedulers have `2 minutes` to shut down gracefully.
+
+They use the same mechanism described above. The example log output below is from a Scheduler running the KubernetesExecutor, but the mechanism is the same for CeleryExecutor-run jobs as well.
+
+[source,text]
+----
+airflow [2023-11-14T09:03:40.699+0000] {scheduler_job_runner.py:248} INFO - Exiting gracefully upon receiving signal 15
+airflow [2023-11-14T09:03:41.701+0000] {process_utils.py:131} INFO - Sending Signals.SIGTERM to group 165. PIDs of all processes in the group: [5990, 5994, 165]
+airflow [2023-11-14T09:03:41.702+0000] {process_utils.py:86} INFO - Sending the signal Signals.SIGTERM to group 165
+airflow [2023-11-14T09:03:41.702+0000] {manager.py:469} INFO - Exiting gracefully upon receiving signal 15
+airflow [2023-11-14T09:03:41.702+0000] {manager.py:469} INFO - Exiting gracefully upon receiving signal 15
+airflow [2023-11-14T09:03:42.604+0000] {manager.py:469} INFO - Exiting gracefully upon receiving signal 15
+airflow [2023-11-14T09:03:42.606+0000] {process_utils.py:259} INFO - Waiting up to 5 seconds for processes to exit...
+airflow [2023-11-14T09:03:42.611+0000] {process_utils.py:259} INFO - Waiting up to 5 seconds for processes to exit...
+airflow [2023-11-14T09:03:42.621+0000] {process_utils.py:79} INFO - Process psutil.Process(pid=5994, status='terminated', started='09:03:41') (5994) terminated with exit code None
+airflow [2023-11-14T09:03:42.621+0000] {process_utils.py:79} INFO - Process psutil.Process(pid=5990, status='terminated', started='09:03:41') (5990) terminated with exit code None
+airflow [2023-11-14T09:03:42.621+0000] {process_utils.py:79} INFO - Process psutil.Process(pid=165, status='terminated', exitcode=0, started='08:55:59') (165) terminated with exit code 0
+airflow [2023-11-14T09:03:42.622+0000] {kubernetes_executor.py:698} INFO - Shutting down Kubernetes executor
+airflow [2023-11-14T09:03:42.707+0000] {process_utils.py:131} INFO - Sending Signals.SIGTERM to group 165. PIDs of all processes in the group: []
+airflow [2023-11-14T09:03:42.707+0000] {process_utils.py:86} INFO - Sending the signal Signals.SIGTERM to group 165
+airflow [2023-11-14T09:03:42.707+0000] {process_utils.py:100} INFO - Sending the signal Signals.SIGTERM to process 165 as process group is missing.
+airflow [2023-11-14T09:03:42.707+0000] {scheduler_job_runner.py:874} INFO - Exited execute loop
+----
+
+== Webserver
+
+As a default, Airflow webservers have `2 minutes` to shut down gracefully.
+
+They use the same mechanism described above.
+
+[source,text]
+----
+airflow [2023-11-14T09:08:46.554+0000] {webserver_command.py:441} INFO - Received signal: 15. Closing gunicorn.
+airflow [2023-11-14 09:08:46 +0000] [15] [INFO] Handling signal: term
+airflow [2023-11-14 09:08:46 +0000] [83] [INFO] Worker exiting (pid: 83)
+airflow [2023-11-14 09:08:46 +0000] [82] [INFO] Worker exiting (pid: 82)
+airflow [2023-11-14 09:08:46 +0000] [85] [INFO] Worker exiting (pid: 85)
+airflow [2023-11-14 09:08:46 +0000] [84] [INFO] Worker exiting (pid: 84)
+airflow [2023-11-14 09:08:58 +0000] [15] [INFO] Shutting down: Master
+----
+
+== Celery Executor
+
+As a default, Airflow celery executors have `5 minutes` to shut down gracefully (jobs running with the KubernetesExecutor use the same shutdown mechanism but this is managed internally by Airflow).
+
+They use the same mechanism described above.
+
+[source,text]
+----
+airflow worker: Warm shutdown (MainProcess)
+airflow [2023-11-14 09:18:17 +0000] [15] [INFO] Handling signal: term
+airflow [2023-11-14 09:18:17 +0000] [17] [INFO] Worker exiting (pid: 17)
+airflow [2023-11-14 09:18:17 +0000] [16] [INFO] Worker exiting (pid: 16)
+airflow [2023-11-14 09:18:17 +0000] [15] [INFO] Shutting down: Master
+----
