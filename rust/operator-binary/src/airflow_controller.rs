@@ -45,7 +45,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
-        framework::{capture_shell_output, create_vector_shutdown_file_command},
+        framework::capture_shell_output,
         spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
     },
     role_utils::{CommonConfiguration, GenericRoleConfig, RoleGroupRef},
