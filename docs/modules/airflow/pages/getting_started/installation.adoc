@@ -1,6 +1,6 @@
 = Installation
 
-On this page you will install the Stackable Airflow Operator, the software that Airflow depends on - Postgresql and Redis - as well as the commons and secret operator which are required by all Stackable Operators.
+On this page you will install the Stackable Airflow Operator, the software that Airflow depends on - Postgresql and Redis - as well as the commons, secret and listener operator which are required by all Stackable Operators.
 
 == Required external components: Postgresql and Redis
 
@@ -46,6 +46,7 @@ The tool will show
 ----
 [INFO ] Installing commons operator
 [INFO ] Installing secret operator
+[INFO ] Installing listener operator
 [INFO ] Installing airflow operator
 ----
 
