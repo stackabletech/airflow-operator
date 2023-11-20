@@ -5,6 +5,7 @@ helm:
 versions:
   commons: 0.0.0-dev
   secret: 0.0.0-dev
+  listener: 0.0.0-dev
   airflow: 0.0.0-dev
   postgresql: 12.1.5
   redis: 17.3.7
