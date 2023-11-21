@@ -85,6 +85,11 @@ commands:
 {% endif %}
         schedulers:
           config:
+            # Sometimes the scheduler restarts randomly, which leads to timeouts in the LDAP celery integration test
+            # metrics check. The metrics check cannot connect because the scheduler is restarting / terminating.
+            # The metrics check python script runs a dag with every execution and therefore the scheduler can not
+            # shut down gracefully and must be killed by Kubernetes.
+            gracefulShutdownTimeout: 30s
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
