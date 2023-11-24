@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [23.11.0] - 2023-11-24
+
 ### Added
 
 - [BREAKING] Implement KubernetesExecutor ([#311]).
