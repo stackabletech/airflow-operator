@@ -26,7 +26,7 @@ The `connections.secretKey` will be used for securely signing the session cookie
 
 `connections.celeryResultBackend` must contain the connection string to the SQL database storing the job metadata (in the example above we are using the same postgresql database for both).
 
-`connections.celeryBrokerUrl` must contain the connection string to the Redis instance used for queuing the jobs submitted to the airflow worker(s).
+`connections.celeryBrokerUrl` must contain the connection string to the Redis instance used for queuing the jobs submitted to the airflow executor(s).
 
 The `adminUser` fields are used to create an admin user.
 Please note that the admin user will be disabled if you use a non-default authentication mechanism like LDAP.
@@ -36,7 +36,7 @@ Please note that the admin user will be disabled if you use a non-default authen
 An Airflow cluster is made of up three components:
 
 - `webserver`: this provides the main UI for user-interaction
-- `workers`: the nodes over which the job workload will be distributed by the scheduler
+- `executors`: the `CeleryExecutor` or `KubernetesExecutor` nodes over which the job workload will be distributed by the scheduler
 - `scheduler`: responsible for triggering jobs and persisting their metadata to the backend database
 
 Create a file named `airflow.yaml` with the following contents:
@@ -56,7 +56,7 @@ Where:
 
 - `metadata.name` contains the name of the Airflow cluster
 - the label of the Docker image provided by Stackable must be set in `spec.version`
-- `spec.celeryExecutors`: deploy workers managed by Airflow's Celery engine. Alternatively you can use `kuberenetesExectors` that will use Airflow's Kubernetes engine for worker management. For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
+- `spec.celeryExecutors`: deploy executors managed by Airflow's Celery engine. Alternatively you can use `kuberenetesExectors` that will use Airflow's Kubernetes engine for executor management. For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
 - the `spec.loadExamples` key is optional and defaults to `false`. It is set to `true` here as the example DAGs will be used when verifying the installation.
 - the `spec.exposeConfig` key is optional and defaults to `false`. It is set to `true` only as an aid to verify the configuration and should never be used as such in anything other than test or demo clusters.
 - the previously created secret must be referenced in `spec.credentialsSecret`
@@ -77,13 +77,13 @@ kubectl get statefulset
 The output should show all pods ready, including the external dependencies:
 
 ----
-NAME                        READY   AGE
-airflow-postgresql          1/1     16m
-airflow-redis-master        1/1     16m
-airflow-redis-replicas      1/1     16m
-airflow-scheduler-default   1/1     11m
-airflow-webserver-default   1/1     11m
-airflow-worker-default      2/2     11m
+NAME                            READY   AGE
+airflow-postgresql              1/1     16m
+airflow-redis-master            1/1     16m
+airflow-redis-replicas          1/1     16m
+airflow-scheduler-default       1/1     11m
+airflow-webserver-default       1/1     11m
+airflow-celery-executor-default 2/2     11m
 ----
 
 When the Airflow cluster has been created and the database is initialized, Airflow can be opened in the
