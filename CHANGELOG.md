@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+
+### Changed
+
+- Increase resource defaults ([#352]).
+
+[#352]: https://github.com/stackabletech/airflow-operator/pull/352
+
 ## [23.11.0] - 2023-11-24
 
 ### Added
