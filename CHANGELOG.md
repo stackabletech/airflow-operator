@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-
 ### Changed
 
 - Increase resource defaults ([#352]).

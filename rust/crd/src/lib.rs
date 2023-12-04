@@ -612,8 +612,8 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     let (cpu, memory) = match role {
         AirflowRole::Worker => (
             CpuLimitsFragment {
-                min: Some(Quantity("800m".into())),
-                max: Some(Quantity("1".into())),
+                min: Some(Quantity("500m".into())),
+                max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".into())),
@@ -622,8 +622,8 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         ),
         AirflowRole::Webserver => (
             CpuLimitsFragment {
-                min: Some(Quantity("800m".into())),
-                max: Some(Quantity("1".into())),
+                min: Some(Quantity("500m".into())),
+                max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".into())),
@@ -632,8 +632,8 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         ),
         AirflowRole::Scheduler => (
             CpuLimitsFragment {
-                min: Some(Quantity("800m".to_owned())),
-                max: Some(Quantity("1".to_owned())),
+                min: Some(Quantity("500m".to_owned())),
+                max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
                 limit: Some(Quantity("512Mi".to_owned())),
