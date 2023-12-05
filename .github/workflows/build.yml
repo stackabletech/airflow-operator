@@ -83,7 +83,7 @@ jobs:
           if [[ $TRIGGER == "pull_request" ]]; then
             echo "exporting test as target helm repo: ${{ env.TEST_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.TEST_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ $TRIGGER == "push" && $GITHUB_REF == "refs/heads/main" ]]; then
+          elif [[ $TRIGGER == "push" && ($GITHUB_REF == "refs/heads/main" || $GITHUB_REF == "refs/heads/trying")]]; then
             echo "exporting dev as target helm repo: ${{ env.DEV_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.DEV_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
           elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && $GITHUB_REF == refs/tags/* ]]; then
@@ -296,8 +296,10 @@ jobs:
     env:
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
       HELM_REPO: ${{ needs.select_helm_repo.outputs.helm_repository }}
-      OCI_REGISTRY_PASSWORD: ${{ secrets.HARBOR_ROBOT_STACKABLE_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_USERNAME: "robot$stackable+github-action-build"
+      OCI_REGISTRY_STACKABLE_PASSWORD: ${{ secrets.HARBOR_ROBOT_STACKABLE_GITHUB_ACTION_BUILD_SECRET }}
+      OCI_REGISTRY_STACKABLE_USERNAME: "robot$stackable+github-action-build"
+      OCI_REGISTRY_STACKABLE_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_STACKABLE_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
+      OCI_REGISTRY_STACKABLE_CHARTS_USERNAME: "robot$stackable+github-action-build"
     if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
