@@ -4,7 +4,9 @@
 
 ### Fixed
 
-- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#XXX]).
+- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#353]).
+
+[#353]: https://github.com/stackabletech/airflow-operator/pull/353
 
 ## [23.11.0] - 2023-11-24
 
