@@ -1157,7 +1157,7 @@ fn build_mapped_envs(
             })
         }
     }
-    if let Some(true) = airflow.spec.cluster_config.load_examples {
+    if airflow.spec.cluster_config.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
             value: Some("True".into()),
@@ -1171,7 +1171,7 @@ fn build_mapped_envs(
         })
     }
 
-    if let Some(true) = airflow.spec.cluster_config.expose_config {
+    if airflow.spec.cluster_config.expose_config {
         env.push(EnvVar {
             name: "AIRFLOW__WEBSERVER__EXPOSE_CONFIG".into(),
             value: Some("True".into()),
