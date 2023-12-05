@@ -81,6 +81,8 @@ helm-publish:
 		echo 'Could not find repo digest for helm chart: ${HELM_CHART_NAME}';\
 		exit 1;\
 	fi;\
+	# Login to Harbor, needed for cosign to be able to push the signature for the Helm chart\
+	docker login --username '${value OCI_REGISTRY_STACKABLE_CHARTS_USERNAME}' --password '${OCI_REGISTRY_STACKABLE_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}';\
 	# This generates a signature and publishes it to the registry, next to the chart artifact\
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}:@$$REPO_DIGEST_OF_ARTIFACT
