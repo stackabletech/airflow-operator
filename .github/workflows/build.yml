@@ -299,7 +299,7 @@ jobs:
       OCI_REGISTRY_STACKABLE_PASSWORD: ${{ secrets.HARBOR_ROBOT_STACKABLE_GITHUB_ACTION_BUILD_SECRET }}
       OCI_REGISTRY_STACKABLE_USERNAME: "robot$stackable+github-action-build"
       OCI_REGISTRY_STACKABLE_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_STACKABLE_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_STACKABLE_CHARTS_USERNAME: "robot$stackable+github-action-build"
+      OCI_REGISTRY_STACKABLE_CHARTS_USERNAME: "robot$stackable-charts+github-action-build"
     if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
