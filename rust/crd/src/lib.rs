@@ -151,32 +151,41 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 pub struct AirflowClusterSpec {
     /// The Airflow image to use
     pub image: ProductImage,
+
     /// Global cluster configuration that applies to all roles and role groups
-    #[serde(default)]
     pub cluster_config: AirflowClusterConfig,
+
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfigFragment>>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
+
     #[serde(flatten)]
     pub executor: AirflowExecutor,
 }
 
-#[derive(Clone, Deserialize, Default, Debug, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
     #[serde(flatten)]
     pub authentication: AirflowAuthentication,
+
     pub credentials_secret: String,
+
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expose_config: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub load_examples: Option<bool>,
+
+    #[serde(default)]
+    pub expose_config: bool,
+
+    #[serde(default)]
+    pub load_examples: bool,
+
     /// This field controls which type of Service the Operator creates for this AirflowCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
@@ -190,12 +199,15 @@ pub struct AirflowClusterConfig {
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volume_mounts: Option<Vec<VolumeMount>>,
 }
@@ -207,8 +219,10 @@ pub enum CurrentlySupportedListenerClasses {
     #[default]
     #[serde(rename = "cluster-internal")]
     ClusterInternal,
+
     #[serde(rename = "external-unstable")]
     ExternalUnstable,
+
     #[serde(rename = "external-stable")]
     ExternalStable,
 }
@@ -263,6 +277,7 @@ pub struct Connections {
 pub enum AirflowRole {
     #[strum(serialize = "webserver")]
     Webserver,
+
     #[strum(serialize = "scheduler")]
     Scheduler,
     #[strum(serialize = "worker")]
@@ -342,6 +357,7 @@ pub enum AirflowExecutor {
         #[serde(flatten)]
         config: Role<AirflowConfigFragment>,
     },
+
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
@@ -726,16 +742,6 @@ pub fn build_recommended_labels<'a, T>(
     }
 }
 
-/// A reference to a [`AirflowCluster`]
-#[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterRef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use crate::AirflowCluster;
@@ -777,7 +783,7 @@ mod tests {
         assert_eq!("2.7.2", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
-        assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
-        assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
+        assert!(cluster.spec.cluster_config.load_examples);
+        assert!(cluster.spec.cluster_config.expose_config);
     }
 }

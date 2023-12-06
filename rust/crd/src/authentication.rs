@@ -39,7 +39,7 @@ pub struct AirflowAuthenticationConfigResolved {
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowAuthentication {
     /// The Airflow authentication settings.
