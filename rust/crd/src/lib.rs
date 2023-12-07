@@ -137,7 +137,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
 ///
 /// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
-/// Alternatively to the celeryExecutor you can use the kubernetesExecutor.
+/// You can use either the celeryExecutor or the kubernetesExecutor.
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
