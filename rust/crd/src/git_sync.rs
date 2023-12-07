@@ -18,7 +18,7 @@ pub struct GitSync {
     pub git_folder: Option<String>,
     /// The depth of syncing i.e. the number of commits to clone; defaults to 1.
     pub depth: Option<u8>,
-    /// The synchronisation interval in seconds; defaults to 20 seconds.
+    /// The synchronization interval in seconds; defaults to 20 seconds.
     pub wait: Option<u16>,
     /// The name of the Secret used to access the repository if it is not public.
     /// This should include two fields: `user` and `password`.
