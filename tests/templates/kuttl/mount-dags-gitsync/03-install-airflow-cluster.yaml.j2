@@ -31,8 +31,6 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    loadExamples: false
-    exposeConfig: false
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
       - name: git-sync
@@ -66,6 +64,7 @@ spec:
 {% endif %}
   schedulers:
     config:
+      gracefulShutdownTimeout: 10s
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
