@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- More CRD documentation ([#354]).
+
 ### Changed
 
+- `operator-rs` `0.56.1` -> `0.57.0` ([#354]).
 - Increase resource defaults ([#352]).
 
 ### Fixed
@@ -12,6 +17,7 @@
 
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
+[#354]: https://github.com/stackabletech/airflow-operator/pull/354
 
 ## [23.11.0] - 2023-11-24
 

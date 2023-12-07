@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     match opts.cmd {
         Command::Crd => {
-            AirflowCluster::print_yaml_schema()?;
+            AirflowCluster::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
         }
         Command::Run(ProductOperatorRun {
             product_config,
