@@ -10,12 +10,23 @@ use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitSync {
+    /// The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.
     pub repo: String,
+    /// The branch to clone. Defaults to `main`.
     pub branch: Option<String>,
+    /// The location of the DAG folder, relative to the synced repository root.
     pub git_folder: Option<String>,
+    /// The depth of syncing i.e. the number of commits to clone; defaults to 1.
     pub depth: Option<u8>,
+    /// The synchronisation interval in seconds; defaults to 20 seconds.
     pub wait: Option<u16>,
+    /// The name of the Secret used to access the repository if it is not public.
+    /// This should include two fields: `user` and `password`.
+    /// The `password` field can either be an actual password (not recommended) or a GitHub token,
+    /// as described [here](https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication).
     pub credentials_secret: Option<String>,
+    /// A map of optional configuration settings that are listed in the [git-sync documentation](https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags).
+    /// Read the [git sync example](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_example).
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }
 impl GitSync {
