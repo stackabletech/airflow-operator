@@ -45,7 +45,6 @@ commands:
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
           loadExamples: true
-          exposeConfig: false
           credentialsSecret: test-airflow-credentials
           authentication:
             - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}

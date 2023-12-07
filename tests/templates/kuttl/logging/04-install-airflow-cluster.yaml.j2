@@ -60,8 +60,6 @@ spec:
     productVersion: "{{ test_scenario['values']['airflow'] }}"
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
-    loadExamples: false
-    exposeConfig: false
     credentialsSecret: test-airflow-credentials
   webservers:
     roleGroups:
