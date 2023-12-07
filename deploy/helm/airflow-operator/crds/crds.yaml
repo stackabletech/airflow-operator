@@ -26,7 +26,7 @@ spec:
               description: |-
                 An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/airflow/).
 
-                The CRD contains three roles: webserver, scheduler and worker/celeryExecutor. Alternatively to the celeryExecutor you can use the kubernetesExecutor.
+                The CRD contains three roles: webserver, scheduler and worker/celeryExecutor. You can use either the celeryExecutor or the kubernetesExecutor.
               oneOf:
                 - required:
                     - celeryExecutors
@@ -7045,7 +7045,7 @@ spec:
                       type: string
                     loadExamples:
                       default: false
-                      description: Wether to load example DAGs or not; defaults to false. The examples are used in the [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
+                      description: Whether to load example DAGs or not; defaults to false. The examples are used in the [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                       type: boolean
                     vectorAggregatorConfigMapName:
                       description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
