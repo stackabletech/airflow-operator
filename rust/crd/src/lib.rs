@@ -197,7 +197,7 @@ pub struct AirflowClusterConfig {
     /// for internal use only - not for production use.
     #[serde(default)]
     pub expose_config: bool,
-    /// Wether to load example DAGs or not; defaults to false. The examples are used in the
+    /// Whether to load example DAGs or not; defaults to false. The examples are used in the
     /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
     #[serde(default)]
     pub load_examples: bool,
