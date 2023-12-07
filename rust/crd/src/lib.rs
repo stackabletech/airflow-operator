@@ -170,8 +170,8 @@ pub struct AirflowClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfigFragment>>,
 
-    // The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
-    // Jobs are scheduled on the workers/executors.
+    /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+    /// Jobs are scheduled on the workers/executors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
 

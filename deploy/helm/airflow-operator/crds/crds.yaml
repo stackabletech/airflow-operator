@@ -11173,7 +11173,7 @@ spec:
                       type: object
                   type: object
                 schedulers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database. Jobs are scheduled on the workers/executors.
                   nullable: true
                   properties:
                     cliOverrides:

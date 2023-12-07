@@ -2,10 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- More CRD documentation ([#354]).
+
+### Changed
+
+- `operator-rs` `0.56.1` -> `0.57.0` ([#354]).
+
 ### Fixed
 
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#353]).
 
+[#354]: https://github.com/stackabletech/airflow-operator/pull/354
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
 
 ## [23.11.0] - 2023-11-24
