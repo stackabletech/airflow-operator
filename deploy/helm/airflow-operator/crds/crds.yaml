@@ -23,7 +23,10 @@ spec:
           description: Auto-generated derived type for AirflowClusterSpec via `CustomResource`
           properties:
             spec:
-              description: An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/airflow/).
+              description: |-
+                An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/airflow/).
+
+                The CRD contains three roles: webserver, scheduler and worker/celeryExecutor. Alternatively to the celeryExecutor you can use the kubernetesExecutor.
               oneOf:
                 - required:
                     - celeryExecutors
@@ -31,7 +34,7 @@ spec:
                     - kubernetesExecutors
               properties:
                 celeryExecutors:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: The celery executor. Deployed with an explicit number of replicas.
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -7021,6 +7024,7 @@ spec:
                       type: array
                     exposeConfig:
                       default: false
+                      description: for internal use only - not for production use.
                       type: boolean
                     listenerClass:
                       default: cluster-internal
@@ -7041,12 +7045,14 @@ spec:
                       type: string
                     loadExamples:
                       default: false
+                      description: Wether to load example DAGs or not; defaults to false. The examples are used in the [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                       type: boolean
                     vectorAggregatorConfigMapName:
                       description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
                       nullable: true
                       type: string
                     volumeMounts:
+                      description: Additional volumes to mount. Use together with `volumes` to define volumes.
                       items:
                         description: VolumeMount describes a mounting of a Volume within a container.
                         properties:
@@ -7075,6 +7081,7 @@ spec:
                       nullable: true
                       type: array
                     volumes:
+                      description: Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
                       items:
                         description: Volume represents a named volume in a pod that may be accessed by any container in the pod.
                         properties:
@@ -8215,6 +8222,7 @@ spec:
                       type: string
                   type: object
                 kubernetesExecutors:
+                  description: With the Kuberentes executor, executor Pods are created on demand.
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -18081,7 +18089,7 @@ spec:
                     - roleGroups
                   type: object
                 webservers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: The `webserver` role provides the main UI for user interaction.
                   nullable: true
                   properties:
                     cliOverrides:

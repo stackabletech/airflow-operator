@@ -135,6 +135,9 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
 /// Find more information on how to use it and the resources that the operator generates in the
 /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
+///
+/// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
+/// Alternatively to the celeryExecutor you can use the kubernetesExecutor.
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
@@ -154,16 +157,21 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 pub struct AirflowClusterSpec {
     // no doc string - See ProductImage struct
     pub image: ProductImage,
+
     /// Configuration that applies to all roles and role groups.
     /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
     pub cluster_config: AirflowClusterConfig,
+
     // no doc string - See ClusterOperation struct
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 
+    /// The `webserver` role provides the main UI for user interaction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfigFragment>>,
 
+    // The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+    // Jobs are scheduled on the workers/executors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
 
@@ -186,9 +194,11 @@ pub struct AirflowClusterConfig {
     /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
-    // undocumented on purpose - not for production use
+    /// for internal use only - not for production use.
     #[serde(default)]
     pub expose_config: bool,
+    /// Wether to load example DAGs or not; defaults to false. The examples are used in the
+    /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
     #[serde(default)]
     pub load_examples: bool,
     /// This field controls which type of Service the Operator creates for this AirflowCluster:
@@ -212,9 +222,11 @@ pub struct AirflowClusterConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
 
+    /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
 
+    /// Additional volumes to mount. Use together with `volumes` to define volumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volume_mounts: Option<Vec<VolumeMount>>,
 }
@@ -359,12 +371,15 @@ impl AirflowRole {
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
 pub enum AirflowExecutor {
+    /// The celery executor.
+    /// Deployed with an explicit number of replicas.
     #[serde(rename = "celeryExecutors")]
     CeleryExecutor {
         #[serde(flatten)]
         config: Role<AirflowConfigFragment>,
     },
 
+    /// With the Kuberentes executor, executor Pods are created on demand.
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
