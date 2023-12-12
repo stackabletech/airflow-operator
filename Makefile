@@ -16,8 +16,8 @@ VERSION := $(shell cargo metadata --format-version 1 | jq -r '.packages[] | sele
 DOCKER_REPO := docker.stackable.tech
 ORGANIZATION := stackable
 OCI_REGISTRY_HOSTNAME := oci.stackable.tech
-OCI_REGISTRY_PROJECT_IMAGES := ${ORGANIZATION}
-OCI_REGISTRY_PROJECT_CHARTS := ${ORGANIZATION}-charts
+OCI_REGISTRY_PROJECT_IMAGES := sdp
+OCI_REGISTRY_PROJECT_CHARTS := sdp-charts
 # This will be overwritten by an environmental variable if called from the github action
 HELM_REPO := https://repo.stackable.tech/repository/helm-dev
 HELM_CHART_NAME := ${OPERATOR_NAME}
@@ -54,7 +54,7 @@ docker-publish:
 	# Obtain the digest of the pushed image from the output of `docker push`, because signing by tag is deprecated and will be removed from cosign in the future\
 	REPO_DIGEST_OF_IMAGE=$$(echo "$$DOCKER_OUTPUT" | awk '/^${VERSION}: digest: sha256:[0-9a-f]{64} size: [0-9]+$$/ { print $$3 }');\
 	if [ -z "$$REPO_DIGEST_OF_IMAGE" ]; then\
-		echo 'Could not find repo digest for container image: ${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}';\
+		echo 'Could not find repo digest for container image: ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}';\
 		exit 1;\
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the image\
