@@ -49,7 +49,7 @@ docker-publish:
 
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
-	docker login --username '${value OCI_REGISTRY_STACKABLE_USERNAME}' --password '${OCI_REGISTRY_STACKABLE_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
+	docker login --username '${value OCI_REGISTRY_SDP_USERNAME}' --password '${OCI_REGISTRY_SDP_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
 	DOCKER_OUTPUT=$$(docker push --all-tags '${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}');\
 	# Obtain the digest of the pushed image from the output of `docker push`, because signing by tag is deprecated and will be removed from cosign in the future\
 	REPO_DIGEST_OF_IMAGE=$$(echo "$$DOCKER_OUTPUT" | awk '/^${VERSION}: digest: sha256:[0-9a-f]{64} size: [0-9]+$$/ { print $$3 }');\
@@ -73,7 +73,7 @@ helm-publish:
 
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
-	helm registry login --username '${value OCI_REGISTRY_STACKABLE_CHARTS_USERNAME}' --password '${OCI_REGISTRY_STACKABLE_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
+	helm registry login --username '${value OCI_REGISTRY_SDP_CHARTS_USERNAME}' --password '${OCI_REGISTRY_SDP_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}'
 	# Obtain the digest of the pushed artifact from the output of `helm push`, because signing by tag is deprecated and will be removed from cosign in the future\
 	HELM_OUTPUT=$$(helm push '${HELM_CHART_ARTIFACT}' 'oci://${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}' 2>&1);\
 	REPO_DIGEST_OF_ARTIFACT=$$(echo "$$HELM_OUTPUT" | awk '/^Digest: sha256:[0-9a-f]{64}$$/ { print $$2 }');\
@@ -82,7 +82,7 @@ helm-publish:
 		exit 1;\
 	fi;\
 	# Login to Harbor, needed for cosign to be able to push the signature for the Helm chart\
-	docker login --username '${value OCI_REGISTRY_STACKABLE_CHARTS_USERNAME}' --password '${OCI_REGISTRY_STACKABLE_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}';\
+	docker login --username '${value OCI_REGISTRY_SDP_CHARTS_USERNAME}' --password '${OCI_REGISTRY_SDP_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}';\
 	# This generates a signature and publishes it to the registry, next to the chart artifact\
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}:@$$REPO_DIGEST_OF_ARTIFACT
