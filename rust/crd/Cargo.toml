@@ -16,7 +16,9 @@ stackable-operator.workspace = true
 product-config.workspace = true
 strum.workspace = true
 tracing.workspace = true
+json-patch.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true
 rstest.workspace = true
+json-patch.workspace = true
