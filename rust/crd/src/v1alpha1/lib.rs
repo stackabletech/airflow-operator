@@ -1,6 +1,8 @@
 use crate::authentication::AirflowAuthentication;
 use crate::git_sync::GitSync;
-use crate::{AirflowConfigFragment, AirflowExecutor, CurrentlySupportedListenerClasses};
+use crate::{
+    AirflowClusterStatus, AirflowConfigFragment, AirflowExecutor, CurrentlySupportedListenerClasses,
+};
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     commons::{cluster_operation::ClusterOperation, product_image_selection::ProductImage},
@@ -8,7 +10,6 @@ use stackable_operator::{
     kube::CustomResource,
     role_utils::Role,
     schemars::{self, JsonSchema},
-    status::condition::ClusterCondition,
 };
 
 /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
@@ -111,10 +112,3 @@ pub struct AirflowClusterConfig {
 }
 
 impl AirflowCluster {}
-
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterStatus {
-    #[serde(default)]
-    pub conditions: Vec<ClusterCondition>,
-}

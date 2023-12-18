@@ -1,4 +1,4 @@
-use crate::{AirflowCluster, AirflowClusterConfig, AirflowClusterSpec, AirflowClusterStatus};
+use crate::{AirflowCluster, AirflowClusterConfig, AirflowClusterSpec};
 
 trait ConvertibleToV1Beta {
     fn v1alpha1_to_v1beta1(&self) -> AirflowCluster;
@@ -29,15 +29,14 @@ impl ConvertibleToV1Beta for crate::v1alpha1::lib::AirflowCluster {
                 schedulers: self.spec.schedulers.clone(),
                 executor: self.spec.executor.clone(),
             },
-            status: Some(AirflowClusterStatus {
-                conditions: self.status.clone().unwrap().conditions,
-            }),
+            status: self.status.clone(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::patch::ConvertibleToV1Beta;
     use crate::AirflowCluster;
     use json_patch;
     use json_patch::{patch, Patch};
@@ -157,5 +156,48 @@ spec:
         let mut doc = original.clone();
         patch(&mut doc, &p).unwrap();
         assert_eq!(doc, patched);
+    }
+
+    #[test]
+    fn test_conversion() {
+        let cluster = r#"
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: 2.7.2
+  clusterConfig:
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: simple-airflow-credentials
+  webservers:
+    roleGroups:
+      default: {}
+  celeryExecutors:
+    roleGroups:
+      default: {}
+  schedulers:
+    roleGroups:
+      default: {}
+          "#;
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let airflow_alpha: crate::v1alpha1::lib::AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let original = serde_json::json!(&airflow_alpha);
+        let alpha_beta = airflow_alpha.v1alpha1_to_v1beta1();
+        let patched = serde_json::json!(&alpha_beta);
+        let p = json_patch::diff(&original, &patched);
+
+        assert_eq!(
+            p,
+            from_value::<Patch>(serde_json::json!([
+              { "op": "replace", "path": "/apiVersion" , "value": "airflow.stackable.tech/v1beta1"},
+                { "op": "remove", "path": "/spec/clusterConfig/exposeConfig" },
+            ]))
+            .unwrap()
+        );
     }
 }
