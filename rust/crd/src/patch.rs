@@ -1,35 +1,34 @@
 use crate::{AirflowCluster, AirflowClusterConfig, AirflowClusterSpec};
 
 trait ConvertibleToV1Beta {
-    fn v1alpha1_to_v1beta1(&self) -> AirflowCluster;
+    fn v1alpha1_to_v1beta1(self) -> AirflowCluster;
 }
 
 impl ConvertibleToV1Beta for crate::v1alpha1::lib::AirflowCluster {
-    fn v1alpha1_to_v1beta1(&self) -> AirflowCluster {
+    fn v1alpha1_to_v1beta1(self) -> AirflowCluster {
         AirflowCluster {
-            metadata: self.metadata.clone(),
+            metadata: self.metadata,
             spec: AirflowClusterSpec {
-                image: self.spec.image.clone(),
+                image: self.spec.image,
                 cluster_config: AirflowClusterConfig {
-                    authentication: self.spec.cluster_config.authentication.clone(),
-                    credentials_secret: self.spec.cluster_config.credentials_secret.clone(),
-                    dags_git_sync: self.spec.cluster_config.dags_git_sync.clone(),
+                    authentication: self.spec.cluster_config.authentication,
+                    credentials_secret: self.spec.cluster_config.credentials_secret,
+                    dags_git_sync: self.spec.cluster_config.dags_git_sync,
                     load_examples: self.spec.cluster_config.load_examples,
-                    listener_class: self.spec.cluster_config.listener_class.clone(),
+                    listener_class: self.spec.cluster_config.listener_class,
                     vector_aggregator_config_map_name: self
                         .spec
                         .cluster_config
-                        .vector_aggregator_config_map_name
-                        .clone(),
-                    volumes: self.spec.cluster_config.volumes.clone(),
-                    volume_mounts: self.spec.cluster_config.volume_mounts.clone(),
+                        .vector_aggregator_config_map_name,
+                    volumes: self.spec.cluster_config.volumes,
+                    volume_mounts: self.spec.cluster_config.volume_mounts,
                 },
-                cluster_operation: self.spec.cluster_operation.clone(),
-                webservers: self.spec.webservers.clone(),
-                schedulers: self.spec.schedulers.clone(),
-                executor: self.spec.executor.clone(),
+                cluster_operation: self.spec.cluster_operation,
+                webservers: self.spec.webservers,
+                schedulers: self.spec.schedulers,
+                executor: self.spec.executor,
             },
-            status: self.status.clone(),
+            status: self.status,
         }
     }
 }
