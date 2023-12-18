@@ -1,3 +1,41 @@
+use crate::{AirflowCluster, AirflowClusterConfig, AirflowClusterSpec, AirflowClusterStatus};
+
+trait ConvertibleToV1Beta {
+    fn v1alpha1_to_v1beta1(&self) -> AirflowCluster;
+}
+
+impl ConvertibleToV1Beta for crate::v1alpha1::lib::AirflowCluster {
+    fn v1alpha1_to_v1beta1(&self) -> AirflowCluster {
+        AirflowCluster {
+            metadata: self.metadata.clone(),
+            spec: AirflowClusterSpec {
+                image: self.spec.image.clone(),
+                cluster_config: AirflowClusterConfig {
+                    authentication: self.spec.cluster_config.authentication.clone(),
+                    credentials_secret: self.spec.cluster_config.credentials_secret.clone(),
+                    dags_git_sync: self.spec.cluster_config.dags_git_sync.clone(),
+                    load_examples: self.spec.cluster_config.load_examples,
+                    listener_class: self.spec.cluster_config.listener_class.clone(),
+                    vector_aggregator_config_map_name: self
+                        .spec
+                        .cluster_config
+                        .vector_aggregator_config_map_name
+                        .clone(),
+                    volumes: self.spec.cluster_config.volumes.clone(),
+                    volume_mounts: self.spec.cluster_config.volume_mounts.clone(),
+                },
+                cluster_operation: self.spec.cluster_operation.clone(),
+                webservers: self.spec.webservers.clone(),
+                schedulers: self.spec.schedulers.clone(),
+                executor: self.spec.executor.clone(),
+            },
+            status: Some(AirflowClusterStatus {
+                conditions: self.status.clone().unwrap().conditions,
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::AirflowCluster;
@@ -22,15 +60,15 @@ mod tests {
         field_alpha: Option<Vec<TestStruct>>,
     }
 
-    trait ConvertibleToV1Beta {
+    trait TestConvertibleToV1Beta {
         fn v1alpha1_to_v1beta1(&self) -> CustomResourceV1Beta1;
     }
 
-    trait ConvertibleToV1 {
+    trait TestConvertibleToV1 {
         fn v1beta1_to_v1(&self) -> CustomResourceV1;
     }
 
-    impl ConvertibleToV1Beta for CustomResourceV1Alpha1 {
+    impl TestConvertibleToV1Beta for CustomResourceV1Alpha1 {
         fn v1alpha1_to_v1beta1(&self) -> CustomResourceV1Beta1 {
             CustomResourceV1Beta1 {
                 field_alpha: vec![self.field_alpha.clone()],
@@ -38,7 +76,7 @@ mod tests {
         }
     }
 
-    impl ConvertibleToV1 for CustomResourceV1Beta1 {
+    impl TestConvertibleToV1 for CustomResourceV1Beta1 {
         fn v1beta1_to_v1(&self) -> CustomResourceV1 {
             CustomResourceV1 {
                 field_alpha: Some(self.field_alpha.clone()),

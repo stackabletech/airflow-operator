@@ -1171,14 +1171,6 @@ fn build_mapped_envs(
         })
     }
 
-    if airflow.spec.cluster_config.expose_config {
-        env.push(EnvVar {
-            name: "AIRFLOW__WEBSERVER__EXPOSE_CONFIG".into(),
-            value: Some("True".into()),
-            ..Default::default()
-        })
-    }
-
     env.push(EnvVar {
         name: "AIRFLOW__CORE__EXECUTOR".into(),
         value: Some(executor.to_string()),

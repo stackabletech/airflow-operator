@@ -17,7 +17,7 @@ spec:
   scope: Namespaced
   versions:
     - additionalPrinterColumns: []
-      name: v1alpha1
+      name: v1beta1
       schema:
         openAPIV3Schema:
           description: Auto-generated derived type for AirflowClusterSpec via `CustomResource`
@@ -7022,10 +7022,6 @@ spec:
                           - repo
                         type: object
                       type: array
-                    exposeConfig:
-                      default: false
-                      description: for internal use only - not for production use.
-                      type: boolean
                     listenerClass:
                       default: cluster-internal
                       description: |-

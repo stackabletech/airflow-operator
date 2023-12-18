@@ -39,6 +39,7 @@ pub mod affinity;
 pub mod authentication;
 mod git_sync;
 mod patch;
+mod v1alpha1;
 
 use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
 
@@ -142,7 +143,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
-    version = "v1alpha1",
+    version = "v1beta1",
     kind = "AirflowCluster",
     plural = "airflowclusters",
     shortname = "airflow",
@@ -195,9 +196,6 @@ pub struct AirflowClusterConfig {
     /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
-    /// for internal use only - not for production use.
-    #[serde(default)]
-    pub expose_config: bool,
     /// Whether to load example DAGs or not; defaults to false. The examples are used in the
     /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
     #[serde(default)]
@@ -782,7 +780,6 @@ mod tests {
             productVersion: 2.7.2
           clusterConfig:
             loadExamples: true
-            exposeConfig: true
             credentialsSecret: simple-airflow-credentials
           webservers:
             roleGroups:
@@ -807,6 +804,5 @@ mod tests {
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);
-        assert!(cluster.spec.cluster_config.expose_config);
     }
 }
