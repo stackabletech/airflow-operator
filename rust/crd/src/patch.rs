@@ -143,7 +143,26 @@ spec:
 
         // get multi-version schema where v1beta1 is the stored version
         let crd_composite = merge_crds(crd_all_versions.clone(), "v1beta1").unwrap();
-        let yaml = serde_yaml::to_string(&crd_composite).unwrap().to_string();
-        println!("{}", yaml);
+
+        assert_eq!(2, crd_composite.spec.versions.len());
+
+        match crd_composite.spec.versions[0].name.as_str() {
+            "v1beta1" => {
+                assert_eq!(true, crd_composite.spec.versions[0].storage)
+            }
+            "v1alpha1" => {
+                assert_eq!(false, crd_composite.spec.versions[0].storage)
+            }
+            _ => {}
+        }
+        match crd_composite.spec.versions[1].name.as_str() {
+            "v1beta1" => {
+                assert_eq!(true, crd_composite.spec.versions[1].storage)
+            }
+            "v1alpha1" => {
+                assert_eq!(false, crd_composite.spec.versions[1].storage)
+            }
+            _ => {}
+        }
     }
 }
