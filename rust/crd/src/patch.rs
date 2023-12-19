@@ -1,41 +1,41 @@
 use crate::{AirflowCluster, AirflowClusterConfig, AirflowClusterSpec};
 
-trait ConvertibleToV1Beta {
-    fn v1alpha1_to_v1beta1(self) -> AirflowCluster;
+trait ConvertCrdFrom<T> {
+    fn convert_crd_from(cluster: T) -> Self;
 }
 
-impl ConvertibleToV1Beta for crate::v1alpha1::lib::AirflowCluster {
-    fn v1alpha1_to_v1beta1(self) -> AirflowCluster {
+impl ConvertCrdFrom<crate::v1alpha1::lib::AirflowCluster> for AirflowCluster {
+    fn convert_crd_from(alpha: crate::v1alpha1::lib::AirflowCluster) -> Self {
         AirflowCluster {
-            metadata: self.metadata,
+            metadata: alpha.metadata,
             spec: AirflowClusterSpec {
-                image: self.spec.image,
+                image: alpha.spec.image,
                 cluster_config: AirflowClusterConfig {
-                    authentication: self.spec.cluster_config.authentication,
-                    credentials_secret: self.spec.cluster_config.credentials_secret,
-                    dags_git_sync: self.spec.cluster_config.dags_git_sync,
-                    load_examples: self.spec.cluster_config.load_examples,
-                    listener_class: self.spec.cluster_config.listener_class,
-                    vector_aggregator_config_map_name: self
+                    authentication: alpha.spec.cluster_config.authentication,
+                    credentials_secret: alpha.spec.cluster_config.credentials_secret,
+                    dags_git_sync: alpha.spec.cluster_config.dags_git_sync,
+                    load_examples: alpha.spec.cluster_config.load_examples,
+                    listener_class: alpha.spec.cluster_config.listener_class,
+                    vector_aggregator_config_map_name: alpha
                         .spec
                         .cluster_config
                         .vector_aggregator_config_map_name,
-                    volumes: self.spec.cluster_config.volumes,
-                    volume_mounts: self.spec.cluster_config.volume_mounts,
+                    volumes: alpha.spec.cluster_config.volumes,
+                    volume_mounts: alpha.spec.cluster_config.volume_mounts,
                 },
-                cluster_operation: self.spec.cluster_operation,
-                webservers: self.spec.webservers,
-                schedulers: self.spec.schedulers,
-                executor: self.spec.executor,
+                cluster_operation: alpha.spec.cluster_operation,
+                webservers: alpha.spec.webservers,
+                schedulers: alpha.spec.schedulers,
+                executor: alpha.spec.executor,
             },
-            status: self.status,
+            status: alpha.status,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::patch::ConvertibleToV1Beta;
+    use crate::patch::ConvertCrdFrom;
     use crate::AirflowCluster;
     use json_patch;
     use json_patch::{patch, Patch};
@@ -186,7 +186,7 @@ spec:
         let airflow_alpha: crate::v1alpha1::lib::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
         let original = serde_json::json!(&airflow_alpha);
-        let airflow_beta = airflow_alpha.v1alpha1_to_v1beta1();
+        let airflow_beta = AirflowCluster::convert_crd_from(airflow_alpha);
         let patched = serde_json::json!(&airflow_beta);
         let p = json_patch::diff(&original, &patched);
 
