@@ -40,6 +40,8 @@ mod tests {
     use json_patch;
     use json_patch::{patch, Patch};
     use serde_json::from_value;
+    use stackable_operator::kube::core::crd::merge_crds;
+    use stackable_operator::kube::CustomResourceExt;
 
     #[derive(Clone, Debug, PartialEq)]
     struct TestStruct {
@@ -109,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_patch() {
+    fn test_cluster_patch() {
         let cluster = r#"
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -158,7 +160,7 @@ spec:
     }
 
     #[test]
-    fn test_conversion() {
+    fn test_cluster_conversion() {
         let cluster = r#"
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -198,5 +200,17 @@ spec:
             ]))
             .unwrap()
         );
+    }
+
+    #[test]
+    fn test_crd_merge() {
+        let crd_alpha = crate::v1alpha1::lib::AirflowCluster::crd();
+        let crd_beta = AirflowCluster::crd();
+        let crd_all_versions = vec![crd_alpha.clone(), crd_beta.clone()];
+
+        // get multi-version schema where v1beta1 is the stored version
+        let crd_composite = merge_crds(crd_all_versions.clone(), "v1beta1").unwrap();
+        let yaml = serde_yaml::to_string(&crd_composite).unwrap().to_string();
+        println!("{}", yaml);
     }
 }
