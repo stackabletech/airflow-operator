@@ -186,8 +186,8 @@ spec:
         let airflow_alpha: crate::v1alpha1::lib::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
         let original = serde_json::json!(&airflow_alpha);
-        let alpha_beta = airflow_alpha.v1alpha1_to_v1beta1();
-        let patched = serde_json::json!(&alpha_beta);
+        let airflow_beta = airflow_alpha.v1alpha1_to_v1beta1();
+        let patched = serde_json::json!(&airflow_beta);
         let p = json_patch::diff(&original, &patched);
 
         assert_eq!(
