@@ -15,6 +15,9 @@ use stackable_airflow_crd::{
     authentication::AirflowAuthentication, AirflowCluster, APP_NAME, OPERATOR_NAME,
 };
 use stackable_operator::error::{Error, OperatorResult};
+use stackable_operator::k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
+    CustomResourceConversion, ServiceReference, WebhookClientConfig, WebhookConversion,
+};
 use stackable_operator::kube::core::crd::merge_crds;
 use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{
@@ -137,16 +140,34 @@ fn print_multi_version_yaml_schema(operator_version: &str) -> OperatorResult<()>
     let mut writer = std::io::stdout();
     let crd_alpha = stackable_airflow_crd::v1alpha1::lib::AirflowCluster::crd();
     let crd_beta = AirflowCluster::crd();
-    let crd_composite = merge_crds(
+    let mut crd_composite = merge_crds(
         vec![crd_alpha.clone(), crd_beta.clone()],
         LATEST_API_VERSION,
     )
     .unwrap(); // TODO add error handling when this function is added to the framework
 
+    crd_composite.spec.conversion = Some(CustomResourceConversion {
+        strategy: "Webhook".to_string(),
+        webhook: Some(WebhookConversion {
+            client_config: Some(WebhookClientConfig {
+                ca_bundle: None, // TODO
+                service: Some(ServiceReference {
+                    name: "conversion-webhook-server".to_string(),
+                    namespace: "default".to_string(),
+                    path: Some("/convert".to_string()),
+                    port: None, // TODO
+                }),
+                url: None,
+            }),
+            conversion_review_versions: vec!["v1".to_string()],
+        }),
+    });
+
     let yaml = serde_yaml::to_string(&crd_composite)?.replace(
         "DOCS_BASE_URL_PLACEHOLDER",
         &docs_home_versioned_base_url(operator_version)?,
     );
+
     Ok(writer.write_all(yaml.as_bytes())?)
 }
 

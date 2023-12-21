@@ -5,6 +5,16 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
 spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: conversion-webhook-server
+          namespace: default
+          path: /convert
+      conversionReviewVersions:
+        - v1
   group: airflow.stackable.tech
   names:
     categories: []
