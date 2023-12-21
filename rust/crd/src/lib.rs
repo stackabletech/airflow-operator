@@ -39,7 +39,7 @@ pub mod affinity;
 pub mod authentication;
 mod git_sync;
 mod patch;
-mod v1alpha1;
+pub mod v1alpha1;
 
 use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
 

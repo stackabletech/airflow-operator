@@ -6,30 +6,39 @@ mod product_logging;
 mod util;
 
 use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
+use std::io::Write;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
+use snafu::Snafu;
 use stackable_airflow_crd::{
     authentication::AirflowAuthentication, AirflowCluster, APP_NAME, OPERATOR_NAME,
 };
+use stackable_operator::error::OperatorResult;
+use stackable_operator::kube::core::crd::merge_crds;
+use stackable_operator::kube::core::DynamicObject;
+use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    kube,
     kube::{
         runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
-    CustomResourceExt,
 };
 use std::sync::Arc;
+use strum::EnumDiscriminants;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
     pub const TARGET_PLATFORM: Option<&str> = option_env!("TARGET");
     pub const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 }
+
+const LATEST_API_VERSION: &str = "v1beta1";
 
 #[derive(Parser)]
 #[clap(about, author)]
@@ -44,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
 
     match opts.cmd {
         Command::Crd => {
-            AirflowCluster::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
+            print_multi_version_yaml_schema(built_info::CARGO_PKG_VERSION)?;
         }
         Command::Run(ProductOperatorRun {
             product_config,
@@ -125,6 +134,29 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Snafu, Debug, EnumDiscriminants)]
+enum Error {
+    #[snafu(display("failed to patch object {}", obj_ref))]
+    MergeFailed {
+        source: kube::Error,
+        obj_ref: Box<ObjectRef<DynamicObject>>,
+    },
+}
+
+fn print_multi_version_yaml_schema(_operator_version: &str) -> OperatorResult<()> {
+    let mut writer = std::io::stdout();
+    let crd_alpha = stackable_airflow_crd::v1alpha1::lib::AirflowCluster::crd();
+    let crd_beta = AirflowCluster::crd();
+    let crd_composite = merge_crds(
+        vec![crd_alpha.clone(), crd_beta.clone()],
+        LATEST_API_VERSION,
+    )?;
+
+    let yaml = serde_yaml::to_string(&crd_composite)?;
+    Ok(writer.write_all(yaml.as_bytes())?)
+    //AirflowCluster::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
 }
 
 fn references_authentication_class(
