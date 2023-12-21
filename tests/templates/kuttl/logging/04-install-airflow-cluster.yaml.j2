@@ -58,6 +58,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['airflow'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
     credentialsSecret: test-airflow-credentials
