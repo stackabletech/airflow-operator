@@ -184,23 +184,28 @@ pub struct AirflowClusterSpec {
 pub struct AirflowClusterConfig {
     #[serde(flatten)]
     pub authentication: AirflowAuthentication,
+
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the
     /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
     /// to find out more.
     pub credentials_secret: String,
+
     /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
     /// Learn more in the
     /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
+
     /// for internal use only - not for production use.
     #[serde(default)]
     pub expose_config: bool,
+
     /// Whether to load example DAGs or not; defaults to false. The examples are used in the
     /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
     #[serde(default)]
     pub load_examples: bool,
+
     /// This field controls which type of Service the Operator creates for this AirflowCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
