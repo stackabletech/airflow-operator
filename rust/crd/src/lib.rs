@@ -205,7 +205,7 @@ pub struct AirflowClusterConfig {
     /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
     #[serde(default)]
     pub load_examples: bool,
-    
+
     /// This field controls which type of Service the Operator creates for this AirflowCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
