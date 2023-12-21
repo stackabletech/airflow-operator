@@ -6,23 +6,21 @@ mod product_logging;
 mod util;
 
 use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
+use semver::Version;
 use std::io::Write;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
-use snafu::Snafu;
 use stackable_airflow_crd::{
     authentication::AirflowAuthentication, AirflowCluster, APP_NAME, OPERATOR_NAME,
 };
-use stackable_operator::error::OperatorResult;
+use stackable_operator::error::{Error, OperatorResult};
 use stackable_operator::kube::core::crd::merge_crds;
-use stackable_operator::kube::core::DynamicObject;
 use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
-    kube,
     kube::{
         runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
@@ -30,7 +28,6 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
 };
 use std::sync::Arc;
-use strum::EnumDiscriminants;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -136,27 +133,43 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(Snafu, Debug, EnumDiscriminants)]
-enum Error {
-    #[snafu(display("failed to patch object {}", obj_ref))]
-    MergeFailed {
-        source: kube::Error,
-        obj_ref: Box<ObjectRef<DynamicObject>>,
-    },
-}
-
-fn print_multi_version_yaml_schema(_operator_version: &str) -> OperatorResult<()> {
+fn print_multi_version_yaml_schema(operator_version: &str) -> OperatorResult<()> {
     let mut writer = std::io::stdout();
     let crd_alpha = stackable_airflow_crd::v1alpha1::lib::AirflowCluster::crd();
     let crd_beta = AirflowCluster::crd();
     let crd_composite = merge_crds(
         vec![crd_alpha.clone(), crd_beta.clone()],
         LATEST_API_VERSION,
-    )?;
+    )
+    .unwrap(); // TODO add error handling when this function is added to the framework
 
-    let yaml = serde_yaml::to_string(&crd_composite)?;
+    let yaml = serde_yaml::to_string(&crd_composite)?.replace(
+        "DOCS_BASE_URL_PLACEHOLDER",
+        &docs_home_versioned_base_url(operator_version)?,
+    );
     Ok(writer.write_all(yaml.as_bytes())?)
-    //AirflowCluster::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
+}
+
+// TODO remove when merge function is moved to framework
+fn docs_home_versioned_base_url(operator_version: &str) -> OperatorResult<String> {
+    Ok(format!(
+        "{}/{}",
+        "https://docs.stackable.tech/home",
+        docs_version(operator_version)?
+    ))
+}
+
+// TODO remove when merge function is moved to framework
+fn docs_version(operator_version: &str) -> OperatorResult<String> {
+    if operator_version == "0.0.0-dev" {
+        Ok("nightly".to_owned())
+    } else {
+        let v = Version::parse(operator_version).map_err(|err| Error::InvalidSemverVersion {
+            source: err,
+            version: operator_version.to_owned(),
+        })?;
+        Ok(format!("{}.{}", v.major, v.minor))
+    }
 }
 
 fn references_authentication_class(

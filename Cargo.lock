@@ -1963,6 +1963,7 @@ dependencies = [
  "fnv",
  "futures 0.3.28",
  "product-config",
+ "semver",
  "serde",
  "serde_yaml",
  "snafu 0.7.5",
