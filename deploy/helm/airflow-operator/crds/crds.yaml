@@ -34,7 +34,7 @@ spec:
                     - kubernetesExecutors
               properties:
                 celeryExecutors:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a key-value-map containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level. There is also a second form of config, which can only be configured at role level, the `roleConfig`. You can learn more about this in the [Roles and role group concept documentation](https://docs.stackable.tech/home/nightly/concepts/roles-and-role-groups).
+                  description: The celery executor. Deployed with an explicit number of replicas.
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -11142,7 +11142,7 @@ spec:
                       type: object
                   type: object
                 schedulers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a key-value-map containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level. There is also a second form of config, which can only be configured at role level, the `roleConfig`. You can learn more about this in the [Roles and role group concept documentation](https://docs.stackable.tech/home/nightly/concepts/roles-and-role-groups).
+                  description: The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database. Jobs are scheduled on the workers/executors.
                   nullable: true
                   properties:
                     cliOverrides:
@@ -18027,7 +18027,7 @@ spec:
                     - roleGroups
                   type: object
                 webservers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a key-value-map containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level. There is also a second form of config, which can only be configured at role level, the `roleConfig`. You can learn more about this in the [Roles and role group concept documentation](https://docs.stackable.tech/home/nightly/concepts/roles-and-role-groups).
+                  description: The `webserver` role provides the main UI for user interaction.
                   nullable: true
                   properties:
                     cliOverrides:
