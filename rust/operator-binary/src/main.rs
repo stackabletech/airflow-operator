@@ -7,7 +7,9 @@ mod util;
 
 use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 use semver::Version;
+use std::collections::BTreeMap;
 use std::io::Write;
+use std::string::ToString;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
@@ -40,6 +42,7 @@ mod built_info {
 }
 
 const LATEST_API_VERSION: &str = "v1beta1";
+const INJECTOR_ANNOTATION_KEY: &str = "cert-manager.io/inject-apiserver-ca";
 
 #[derive(Parser)]
 #[clap(about, author)]
@@ -163,6 +166,11 @@ fn print_multi_version_yaml_schema(operator_version: &str) -> OperatorResult<()>
             conversion_review_versions: vec!["v1".to_string()],
         }),
     });
+    crd_composite
+        .metadata
+        .annotations
+        .get_or_insert_with(BTreeMap::new)
+        .insert(INJECTOR_ANNOTATION_KEY.to_string(), "true".to_string());
 
     let yaml = serde_yaml::to_string(&crd_composite)?.replace(
         "DOCS_BASE_URL_PLACEHOLDER",

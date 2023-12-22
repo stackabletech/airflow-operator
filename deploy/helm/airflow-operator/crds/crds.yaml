@@ -1,9 +1,10 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: airflowclusters.airflow.stackable.tech
   annotations:
+    cert-manager.io/inject-apiserver-ca: 'true'
     helm.sh/resource-policy: keep
+  name: airflowclusters.airflow.stackable.tech
 spec:
   conversion:
     strategy: Webhook
