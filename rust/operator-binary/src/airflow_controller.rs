@@ -21,7 +21,9 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        authentication::{
+            ldap::AuthenticationProviderError, AuthenticationClass, AuthenticationClassProvider,
+        },
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -230,6 +232,11 @@ pub enum Error {
 
     #[snafu(display("failed to build object meta data"))]
     ObjectMeta { source: ObjectMetaBuilderError },
+
+    #[snafu(display(
+        "failed to build volume or volume mount spec for the LDAP backend TLS config"
+    ))]
+    VolumeAndMounts { source: AuthenticationProviderError },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -751,7 +758,7 @@ fn build_server_rolegroup_statefulset(
         authentication_config,
         &mut airflow_container,
         &mut pb,
-    );
+    )?;
 
     add_airflow_graceful_shutdown_config(merged_airflow_config, &mut pb)
         .context(GracefulShutdownSnafu)?;
@@ -1044,7 +1051,7 @@ fn build_executor_template_config_map(
         authentication_config,
         &mut airflow_container,
         &mut pb,
-    );
+    )?;
 
     airflow_container
         .image_from_product_image(resolved_product_image)
@@ -1379,7 +1386,7 @@ fn add_authentication_volumes_and_volume_mounts(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) {
+) -> Result<()> {
     // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
     //    Needs adaptation once FAB and airflow support multiple auth methods.
     // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
@@ -1387,10 +1394,12 @@ fn add_authentication_volumes_and_volume_mounts(
         if let Some(auth_class) = &config.authentication_class {
             match &auth_class.spec.provider {
                 AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb]);
+                    ldap.add_volumes_and_mounts(pb, vec![cb])
+                        .context(VolumeAndMountsSnafu)?;
                 }
-                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+                _ => {}
             }
         }
     }
+    Ok(())
 }
