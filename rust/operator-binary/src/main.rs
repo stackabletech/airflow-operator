@@ -172,7 +172,7 @@ fn print_multi_version_yaml_schema(operator_version: &str) -> OperatorResult<()>
         .get_or_insert_with(BTreeMap::new)
         // if the cert-manager components are installed, this will populate the caBundle
         // field with the CA certificate used by the Kubernetes API server
-        .insert(INJECTOR_ANNOTATION_KEY.to_string(), "true".to_string());
+        .insert(INJECTOR_ANNOTATION_KEY.to_string(), true.to_string());
 
     let yaml = serde_yaml::to_string(&crd_composite)?.replace(
         "DOCS_BASE_URL_PLACEHOLDER",
