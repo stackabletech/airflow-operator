@@ -132,6 +132,12 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
     }
 }
 
+/// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
+/// Find more information on how to use it and the resources that the operator generates in the
+/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
+///
+/// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
+/// You can use either the celeryExecutor or the kubernetesExecutor.
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "airflow.stackable.tech",
@@ -149,34 +155,57 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterSpec {
-    /// The Airflow image to use
+    // no doc string - See ProductImage struct
     pub image: ProductImage,
-    /// Global cluster configuration that applies to all roles and role groups
-    #[serde(default)]
+
+    /// Configuration that applies to all roles and role groups.
+    /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
     pub cluster_config: AirflowClusterConfig,
-    /// Cluster operations like pause reconciliation or cluster stop.
+
+    // no doc string - See ClusterOperation struct
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
+    /// The `webserver` role provides the main UI for user interaction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webservers: Option<Role<AirflowConfigFragment>>,
+
+    /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+    /// Jobs are scheduled on the workers/executors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedulers: Option<Role<AirflowConfigFragment>>,
+
     #[serde(flatten)]
     pub executor: AirflowExecutor,
 }
 
-#[derive(Clone, Deserialize, Default, Debug, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
     #[serde(flatten)]
     pub authentication: AirflowAuthentication,
+
+    /// The name of the Secret object containing the admin user credentials and database connection details.
+    /// Read the
+    /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
+    /// to find out more.
     pub credentials_secret: String,
+
+    /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
+    /// Learn more in the
+    /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
     #[serde(default)]
     pub dags_git_sync: Vec<GitSync>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expose_config: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub load_examples: Option<bool>,
+
+    /// for internal use only - not for production use.
+    #[serde(default)]
+    pub expose_config: bool,
+
+    /// Whether to load example DAGs or not; defaults to false. The examples are used in the
+    /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
+    #[serde(default)]
+    pub load_examples: bool,
+
     /// This field controls which type of Service the Operator creates for this AirflowCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
@@ -186,16 +215,23 @@ pub struct AirflowClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     ///
     /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
-    /// Name of the Vector aggregator discovery ConfigMap.
+
+    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+    /// to learn how to configure log aggregation with Vector.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
+
+    /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
+
+    /// Additional volumes to mount. Use together with `volumes` to define volumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volume_mounts: Option<Vec<VolumeMount>>,
 }
@@ -207,8 +243,10 @@ pub enum CurrentlySupportedListenerClasses {
     #[default]
     #[serde(rename = "cluster-internal")]
     ClusterInternal,
+
     #[serde(rename = "external-unstable")]
     ExternalUnstable,
+
     #[serde(rename = "external-stable")]
     ExternalStable,
 }
@@ -263,6 +301,7 @@ pub struct Connections {
 pub enum AirflowRole {
     #[strum(serialize = "webserver")]
     Webserver,
+
     #[strum(serialize = "scheduler")]
     Scheduler,
     #[strum(serialize = "worker")]
@@ -337,11 +376,15 @@ impl AirflowRole {
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
 pub enum AirflowExecutor {
+    /// The celery executor.
+    /// Deployed with an explicit number of replicas.
     #[serde(rename = "celeryExecutors")]
     CeleryExecutor {
         #[serde(flatten)]
         config: Role<AirflowConfigFragment>,
     },
+
+    /// With the Kuberentes executor, executor Pods are created on demand.
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
@@ -601,18 +644,18 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     let (cpu, memory) = match role {
         AirflowRole::Worker => (
             CpuLimitsFragment {
-                min: Some(Quantity("200m".into())),
-                max: Some(Quantity("800m".into())),
+                min: Some(Quantity("500m".into())),
+                max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("1750Mi".into())),
+                limit: Some(Quantity("2Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
         AirflowRole::Webserver => (
             CpuLimitsFragment {
-                min: Some(Quantity("100m".into())),
-                max: Some(Quantity("400m".into())),
+                min: Some(Quantity("500m".into())),
+                max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".into())),
@@ -621,8 +664,8 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         ),
         AirflowRole::Scheduler => (
             CpuLimitsFragment {
-                min: Some(Quantity("100m".to_owned())),
-                max: Some(Quantity("400m".to_owned())),
+                min: Some(Quantity("500m".to_owned())),
+                max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
                 limit: Some(Quantity("512Mi".to_owned())),
@@ -715,16 +758,6 @@ pub fn build_recommended_labels<'a, T>(
     }
 }
 
-/// A reference to a [`AirflowCluster`]
-#[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterRef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use crate::AirflowCluster;
@@ -766,7 +799,7 @@ mod tests {
         assert_eq!("2.7.2", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
-        assert!(cluster.spec.cluster_config.load_examples.unwrap_or(false));
-        assert!(cluster.spec.cluster_config.expose_config.unwrap_or(false));
+        assert!(cluster.spec.cluster_config.load_examples);
+        assert!(cluster.spec.cluster_config.expose_config);
     }
 }

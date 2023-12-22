@@ -39,13 +39,13 @@ pub struct AirflowAuthenticationConfigResolved {
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowAuthentication {
-    /// The Airflow authentication settings.
+    /// The Airflow [authentication](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security.html) settings.
     /// Currently the underlying Flask App Builder only supports one authentication mechanism
     /// at a time. This means the operator will error out if multiple references to an
-    /// `AuthenticationClass` are provided.
+    /// AuthenticationClass are provided.
     #[serde(default)]
     authentication: Vec<AirflowAuthenticationConfig>,
 }
@@ -53,7 +53,7 @@ pub struct AirflowAuthentication {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowAuthenticationConfig {
-    /// Name of the AuthenticationClass used to authenticate the users.
+    /// Name of the [AuthenticationClass](DOCS_BASE_URL_PLACEHOLDER/concepts/authentication.html#authenticationclass) used to authenticate the users.
     /// At the moment only LDAP is supported.
     /// If not specified the default authentication (AUTH_DB) will be used.
     pub authentication_class: Option<String>,

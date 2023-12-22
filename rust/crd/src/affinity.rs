@@ -62,9 +62,8 @@ mod tests {
         spec:
           image:
             productVersion: 2.7.2
-          loadExamples: true
-          exposeConfig: false
-          credentialsSecret: simple-airflow-credentials
+          clusterConfig:
+            credentialsSecret: airflow-credentials
           webservers:
             roleGroups:
               default:

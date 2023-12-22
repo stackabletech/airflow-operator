@@ -14,12 +14,11 @@ spec:
     stopped: false
   image:
     productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    loadExamples: true
-    exposeConfig: false
     credentialsSecret: test-airflow-credentials
   webservers:
     config:
