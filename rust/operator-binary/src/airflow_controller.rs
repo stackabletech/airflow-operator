@@ -540,7 +540,7 @@ fn build_role_service(
         .build();
 
     let service_selector_labels =
-        Labels::role_selector(airflow, APP_NAME, &role_name).context(BuildLabelSnafu)?;
+        Labels::role_selector(airflow, APP_NAME, role_name).context(BuildLabelSnafu)?;
 
     let service_spec = ServiceSpec {
         type_: Some(
@@ -556,7 +556,7 @@ fn build_role_service(
     };
 
     Ok(Service {
-        metadata: metadata,
+        metadata,
         spec: Some(service_spec),
         status: None,
     })
