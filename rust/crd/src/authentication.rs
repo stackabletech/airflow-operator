@@ -126,8 +126,7 @@ impl AirflowAuthentication {
                 // make sense to iterate further after finding an unsupported AuthenticationClass.
                 Some(match resolved.spec.provider {
                     AuthenticationClassProvider::Ldap(_) => resolved,
-                    AuthenticationClassProvider::Tls(_)
-                    | AuthenticationClassProvider::Static(_) => {
+                    _ => {
                         return Err(Error::AuthenticationProviderNotSupported {
                             authentication_class: ObjectRef::from_obj(&resolved),
                             provider: resolved.spec.provider.to_string(),
