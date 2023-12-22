@@ -25,6 +25,7 @@
 ### Removed
 
 - Removed support for 2.2.3, 2.2.4, 2.2.5, 2.4.1 ([#334]).
+- [BREAKING] Removed legacy node affinity selectors ([#364]).
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
@@ -35,6 +36,7 @@
 [#334]: https://github.com/stackabletech/airflow-operator/pull/334
 [#335]: https://github.com/stackabletech/airflow-operator/pull/335
 [#343]: https://github.com/stackabletech/airflow-operator/pull/343
+[#364]: https://github.com/stackabletech/airflow-operator/pull/364
 
 ## [23.7.0] - 2023-07-14
 
