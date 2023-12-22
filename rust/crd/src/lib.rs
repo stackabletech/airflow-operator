@@ -18,7 +18,7 @@ use stackable_operator::{
         apimachinery::pkg::api::resource::Quantity,
     },
     kube::{CustomResource, ResourceExt},
-    labels::ObjectLabels,
+    kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{
