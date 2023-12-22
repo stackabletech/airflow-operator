@@ -18,6 +18,7 @@ use stackable_operator::error::{Error, OperatorResult};
 use stackable_operator::k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceConversion, ServiceReference, WebhookClientConfig, WebhookConversion,
 };
+use stackable_operator::k8s_openapi::ByteString;
 use stackable_operator::kube::core::crd::merge_crds;
 use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{
@@ -146,11 +147,17 @@ fn print_multi_version_yaml_schema(operator_version: &str) -> OperatorResult<()>
     )
     .unwrap(); // TODO add error handling when this function is added to the framework
 
+    let output = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}'")
+            .output()
+            .expect("failed to execute process").stdout;
+
     crd_composite.spec.conversion = Some(CustomResourceConversion {
         strategy: "Webhook".to_string(),
         webhook: Some(WebhookConversion {
             client_config: Some(WebhookClientConfig {
-                ca_bundle: None, // TODO
+                ca_bundle: Some(ByteString(output)),
                 service: Some(ServiceReference {
                     name: "conversion-webhook-server".to_string(),
                     namespace: "default".to_string(),
