@@ -16,6 +16,10 @@
 
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#353]).
 
+### Removed
+
+- [BREAKING] Removed legacy node affinity selectors ([#364]).
+
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
 [#354]: https://github.com/stackabletech/airflow-operator/pull/354
@@ -46,7 +50,6 @@
 ### Removed
 
 - Removed support for 2.2.3, 2.2.4, 2.2.5, 2.4.1 ([#334]).
-- [BREAKING] Removed legacy node affinity selectors ([#364]).
 
 [#303]: https://github.com/stackabletech/airflow-operator/pull/303
 [#308]: https://github.com/stackabletech/airflow-operator/pull/308
