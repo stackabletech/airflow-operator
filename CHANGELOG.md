@@ -10,7 +10,7 @@
 
 - `operator-rs` `0.56.1` -> `0.57.0` ([#354]).
 - Increase resource defaults ([#352]).
-- Use new label builders ([#364]).
+- Use new label builders ([#366]).
 
 ### Fixed
 
@@ -18,12 +18,12 @@
 
 ### Removed
 
-- [BREAKING] Removed legacy node selector on roleGroups ([#364]).
+- [BREAKING] Removed legacy node selector on roleGroups ([#366]).
 
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
 [#354]: https://github.com/stackabletech/airflow-operator/pull/354
-[#364]: https://github.com/stackabletech/airflow-operator/pull/364
+[#366]: https://github.com/stackabletech/airflow-operator/pull/366
 
 ## [23.11.0] - 2023-11-24
 
