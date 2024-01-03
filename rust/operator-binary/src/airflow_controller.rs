@@ -21,9 +21,7 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{
-            ldap::AuthenticationProviderError, AuthenticationClass, AuthenticationClassProvider,
-        },
+        authentication::{ldap, AuthenticationClass, AuthenticationClassProvider},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -236,7 +234,7 @@ pub enum Error {
     #[snafu(display(
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
     ))]
-    VolumeAndMounts { source: AuthenticationProviderError },
+    VolumeAndMounts { source: ldap::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
