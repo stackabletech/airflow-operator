@@ -18,7 +18,7 @@
 
 ### Removed
 
-- [BREAKING] Removed legacy node affinity selectors ([#364]).
+- [BREAKING] Removed legacy node selector on roleGroups ([#364]).
 
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
