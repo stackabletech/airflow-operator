@@ -10,6 +10,7 @@
 
 - `operator-rs` `0.56.1` -> `0.57.0` ([#354]).
 - Increase resource defaults ([#352]).
+- Use new label builders ([#364]).
 
 ### Fixed
 
@@ -18,6 +19,7 @@
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
 [#354]: https://github.com/stackabletech/airflow-operator/pull/354
+[#364]: https://github.com/stackabletech/airflow-operator/pull/364
 
 ## [23.11.0] - 2023-11-24
 
@@ -28,7 +30,6 @@
 - Support PodDisruptionBudgets ([#330]).
 - Added support for versions 2.6.3, 2.7.2 ([#334]).
 - Support graceful shutdown ([#343]).
-- Use new label builders ([#364]).
 
 ### Changed
 
@@ -56,7 +57,6 @@
 [#334]: https://github.com/stackabletech/airflow-operator/pull/334
 [#335]: https://github.com/stackabletech/airflow-operator/pull/335
 [#343]: https://github.com/stackabletech/airflow-operator/pull/343
-[#364]: https://github.com/stackabletech/airflow-operator/pull/364
 
 ## [23.7.0] - 2023-07-14
 
