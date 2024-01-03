@@ -1397,7 +1397,9 @@ fn add_authentication_volumes_and_volume_mounts(
                     ldap.add_volumes_and_mounts(pb, vec![cb])
                         .context(VolumeAndMountsSnafu)?;
                 }
-                _ => {}
+                AuthenticationClassProvider::Tls(_)
+                | AuthenticationClassProvider::Oidc(_)
+                | AuthenticationClassProvider::Static(_) => {}
             }
         }
     }
