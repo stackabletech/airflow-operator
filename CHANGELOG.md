@@ -11,6 +11,7 @@
 - `operator-rs` `0.56.1` -> `0.57.0` ([#354]).
 - Increase resource defaults ([#352]).
 - Use new label builders ([#366]).
+- Use new ldap::AuthenticationClassProvider `endpoint_url()` method ([#366]).
 
 ### Fixed
 
