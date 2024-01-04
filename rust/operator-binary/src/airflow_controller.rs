@@ -892,7 +892,7 @@ fn build_server_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![vec![
+        .args(vec![[
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             "prepare_signal_handlers".to_string(),
             "/stackable/statsd_exporter &".to_string(),
