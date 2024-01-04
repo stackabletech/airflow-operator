@@ -235,6 +235,9 @@ pub enum Error {
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
     ))]
     VolumeAndMounts { source: ldap::Error },
+
+    #[snafu(display("failed to construct config"))]
+    ConstructConfig { source: config::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -590,7 +593,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_airflow_config(&mut config, authentication_config);
+    config::add_airflow_config(&mut config, authentication_config).context(ConstructConfigSnafu)?;
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
