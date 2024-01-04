@@ -94,56 +94,69 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
+
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
+
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("Failed to transform configs"))]
     ProductConfigTransform {
         source: stackable_operator::product_config_utils::ConfigError,
     },
+
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+
     #[snafu(display(
         "Airflow doesn't support the AuthenticationClass provider
     {authentication_class_provider} from AuthenticationClass {authentication_class}"
@@ -152,74 +165,92 @@ pub enum Error {
         authentication_class_provider: String,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig {
         source: stackable_airflow_crd::Error,
     },
+
     #[snafu(display("could not parse Airflow role [{role}]"))]
     UnidentifiedAirflowRole {
         source: strum::ParseError,
         role: String,
     },
+
     #[snafu(display("invalid executor name"))]
     UnidentifiedAirflowExecutor {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
     },
+
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+
     #[snafu(display("failed to update status"))]
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply authentication configuration"))]
     InvalidAuthenticationConfig {
         source: stackable_airflow_crd::authentication::Error,
     },
+
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
+
     #[snafu(display("failed to build the pod template config map"))]
     PodTemplateConfigMap {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply executor template ConfigMap"))]
     ApplyExecutorTemplateConfig {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
     },
+
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::operations::graceful_shutdown::Error,
