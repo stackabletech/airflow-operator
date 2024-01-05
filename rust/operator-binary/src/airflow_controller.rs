@@ -16,11 +16,12 @@ use stackable_airflow_crd::{
 use stackable_operator::{
     builder::{
         resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
-        ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder, VolumeBuilder,
+        ObjectMetaBuilder, ObjectMetaBuilderError, PodBuilder, PodSecurityContextBuilder,
+        VolumeBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        authentication::{ldap, AuthenticationClass, AuthenticationClassProvider},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -40,7 +41,7 @@ use stackable_operator::{
         runtime::{controller::Action, reflector::ObjectRef},
         Resource, ResourceExt,
     },
-    labels::{role_group_selector_labels, role_selector_labels},
+    kvp::{Label, LabelError, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
@@ -93,56 +94,69 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
+
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
+
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("Failed to transform configs"))]
     ProductConfigTransform {
         source: stackable_operator::product_config_utils::ConfigError,
     },
+
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+
     #[snafu(display(
         "Airflow doesn't support the AuthenticationClass provider
     {authentication_class_provider} from AuthenticationClass {authentication_class}"
@@ -151,78 +165,110 @@ pub enum Error {
         authentication_class_provider: String,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
+
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig {
         source: stackable_airflow_crd::Error,
     },
+
     #[snafu(display("could not parse Airflow role [{role}]"))]
     UnidentifiedAirflowRole {
         source: strum::ParseError,
         role: String,
     },
+
     #[snafu(display("invalid executor name"))]
     UnidentifiedAirflowExecutor {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
     },
+
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+
     #[snafu(display("failed to update status"))]
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply authentication configuration"))]
     InvalidAuthenticationConfig {
         source: stackable_airflow_crd::authentication::Error,
     },
+
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
+
     #[snafu(display("failed to build the pod template config map"))]
     PodTemplateConfigMap {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply executor template ConfigMap"))]
     ApplyExecutorTemplateConfig {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
     },
+
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::operations::graceful_shutdown::Error,
     },
+
+    #[snafu(display("failed to build label"))]
+    BuildLabel { source: LabelError },
+
+    #[snafu(display("failed to build object meta data"))]
+    ObjectMeta { source: ObjectMetaBuilderError },
+
+    #[snafu(display(
+        "failed to build volume or volume mount spec for the LDAP backend TLS config"
+    ))]
+    VolumeAndMounts { source: ldap::Error },
+
+    #[snafu(display("failed to construct config"))]
+    ConstructConfig { source: config::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -303,12 +349,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     )
     .context(CreateClusterResourcesSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
-        airflow.as_ref(),
-        APP_NAME,
-        cluster_resources.get_required_labels(),
-    )
-    .context(BuildRBACObjectsSnafu)?;
+    let required_labels = cluster_resources
+        .get_required_labels()
+        .context(BuildLabelSnafu)?;
+
+    let (rbac_sa, rbac_rolebinding) =
+        build_rbac_resources(airflow.as_ref(), APP_NAME, required_labels)
+            .context(BuildRBACObjectsSnafu)?;
 
     let rbac_sa = cluster_resources
         .add(client, rbac_sa)
@@ -509,32 +556,40 @@ fn build_role_service(
     let role_svc_name = format!("{}-{}", airflow.name_any(), role_name);
     let ports = role_ports(port);
 
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(airflow)
+        .name(&role_svc_name)
+        .ownerreference_from_resource(airflow, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            airflow,
+            AIRFLOW_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            role_name,
+            "global",
+        ))
+        .context(ObjectMetaSnafu)?
+        .build();
+
+    let service_selector_labels =
+        Labels::role_selector(airflow, APP_NAME, role_name).context(BuildLabelSnafu)?;
+
+    let service_spec = ServiceSpec {
+        type_: Some(
+            airflow
+                .spec
+                .cluster_config
+                .listener_class
+                .k8s_service_type(),
+        ),
+        ports: Some(ports),
+        selector: Some(service_selector_labels.into()),
+        ..ServiceSpec::default()
+    };
+
     Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
-            .name(&role_svc_name)
-            .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                airflow,
-                AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                role_name,
-                "global",
-            ))
-            .build(),
-        spec: Some(ServiceSpec {
-            type_: Some(
-                airflow
-                    .spec
-                    .cluster_config
-                    .listener_class
-                    .k8s_service_type(),
-            ),
-            ports: Some(ports),
-            selector: Some(role_selector_labels(airflow, APP_NAME, role_name)),
-            ..ServiceSpec::default()
-        }),
+        metadata,
+        spec: Some(service_spec),
         status: None,
     })
 }
@@ -569,7 +624,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_airflow_config(&mut config, authentication_config);
+    config::add_airflow_config(&mut config, authentication_config).context(ConstructConfigSnafu)?;
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
@@ -597,6 +652,7 @@ fn build_rolegroup_config_map(
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
+                .context(ObjectMetaSnafu)?
                 .build(),
         )
         .add_data(
@@ -642,35 +698,42 @@ fn build_rolegroup_service(
         ports.append(&mut role_ports(http_port));
     }
 
+    let prometheus_label =
+        Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
+
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(airflow)
+        .name(&rolegroup.object_name())
+        .ownerreference_from_resource(airflow, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            airflow,
+            AIRFLOW_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .with_label(prometheus_label)
+        .build();
+
+    let service_selector_labels =
+        Labels::role_group_selector(airflow, APP_NAME, &rolegroup.role, &rolegroup.role_group)
+            .context(BuildLabelSnafu)?;
+
+    let service_spec = ServiceSpec {
+        // Internal communication does not need to be exposed
+        type_: Some("ClusterIP".to_string()),
+        cluster_ip: Some("None".to_string()),
+        ports: Some(ports),
+        selector: Some(service_selector_labels.into()),
+        publish_not_ready_addresses: Some(true),
+        ..ServiceSpec::default()
+    };
+
     Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
-            .name(&rolegroup.object_name())
-            .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                airflow,
-                AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
-            .with_label("prometheus.io/scrape", "true")
-            .build(),
-        spec: Some(ServiceSpec {
-            // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
-            ports: Some(ports),
-            selector: Some(role_group_selector_labels(
-                airflow,
-                APP_NAME,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            )),
-            publish_not_ready_addresses: Some(true),
-            ..ServiceSpec::default()
-        }),
+        metadata,
+        spec: Some(service_spec),
         status: None,
     })
 }
@@ -696,25 +759,29 @@ fn build_server_rolegroup_statefulset(
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
     let mut pb = PodBuilder::new();
-    pb.metadata_builder(|m| {
-        m.with_recommended_labels(build_recommended_labels(
+
+    let pb_metadata = ObjectMetaBuilder::new()
+        .with_recommended_labels(build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
             &resolved_product_image.app_version_label,
             &rolegroup_ref.role,
             &rolegroup_ref.role_group,
         ))
-    })
-    .image_pull_secrets_from_product_image(resolved_product_image)
-    .affinity(&merged_airflow_config.affinity)
-    .service_account_name(sa_name)
-    .security_context(
-        PodSecurityContextBuilder::new()
-            .run_as_user(AIRFLOW_UID)
-            .run_as_group(0)
-            .fs_group(1000)
-            .build(),
-    );
+        .context(ObjectMetaSnafu)?
+        .build();
+
+    pb.metadata(pb_metadata)
+        .image_pull_secrets_from_product_image(resolved_product_image)
+        .affinity(&merged_airflow_config.affinity)
+        .service_account_name(sa_name)
+        .security_context(
+            PodSecurityContextBuilder::new()
+                .run_as_user(AIRFLOW_UID)
+                .run_as_group(0)
+                .fs_group(1000)
+                .build(),
+        );
 
     let mut airflow_container = ContainerBuilder::new(&Container::Airflow.to_string())
         .context(InvalidContainerNameSnafu)?;
@@ -723,7 +790,7 @@ fn build_server_rolegroup_statefulset(
         authentication_config,
         &mut airflow_container,
         &mut pb,
-    );
+    )?;
 
     add_airflow_graceful_shutdown_config(merged_airflow_config, &mut pb)
         .context(GracefulShutdownSnafu)?;
@@ -825,7 +892,7 @@ fn build_server_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![vec![
+        .args(vec![[
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             "prepare_signal_handlers".to_string(),
             "/stackable/statsd_exporter &".to_string(),
@@ -917,45 +984,56 @@ fn build_server_rolegroup_statefulset(
         pod_template.merge_from(rolegroup.config.pod_overrides.clone());
     }
 
-    Ok(StatefulSet {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
-            .name(&rolegroup_ref.object_name())
-            .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                airflow,
-                AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-            .with_label("restarter.stackable.tech/enabled", "true")
-            .build(),
-        spec: Some(StatefulSetSpec {
-            pod_management_policy: Some(
-                match airflow_role {
-                    AirflowRole::Scheduler => {
-                        "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
-                    }
-                    AirflowRole::Webserver | AirflowRole::Worker => "Parallel",
+    let restarter_label =
+        Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
+
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(airflow)
+        .name(&rolegroup_ref.object_name())
+        .ownerreference_from_resource(airflow, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            airflow,
+            AIRFLOW_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup_ref.role,
+            &rolegroup_ref.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .with_label(restarter_label)
+        .build();
+
+    let statefulset_match_labels = Labels::role_group_selector(
+        airflow,
+        APP_NAME,
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    )
+    .context(BuildLabelSnafu)?;
+
+    let statefulset_spec = StatefulSetSpec {
+        pod_management_policy: Some(
+            match airflow_role {
+                AirflowRole::Scheduler => {
+                    "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
                 }
-                .to_string(),
-            ),
-            replicas: rolegroup.and_then(|rg| rg.replicas).map(i32::from),
-            selector: LabelSelector {
-                match_labels: Some(role_group_selector_labels(
-                    airflow,
-                    APP_NAME,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
-                )),
-                ..LabelSelector::default()
-            },
-            service_name: rolegroup_ref.object_name(),
-            template: pod_template,
-            ..StatefulSetSpec::default()
-        }),
+                AirflowRole::Webserver | AirflowRole::Worker => "Parallel",
+            }
+            .to_string(),
+        ),
+        replicas: rolegroup.and_then(|rg| rg.replicas).map(i32::from),
+        selector: LabelSelector {
+            match_labels: Some(statefulset_match_labels.into()),
+            ..LabelSelector::default()
+        },
+        service_name: rolegroup_ref.object_name(),
+        template: pod_template,
+        ..StatefulSetSpec::default()
+    };
+
+    Ok(StatefulSet {
+        metadata,
+        spec: Some(statefulset_spec),
         status: None,
     })
 }
@@ -971,25 +1049,28 @@ fn build_executor_template_config_map(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
-    pb.metadata_builder(|m| {
-        m.with_recommended_labels(build_recommended_labels(
+    let pb_metadata = ObjectMetaBuilder::new()
+        .with_recommended_labels(build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
             &resolved_product_image.app_version_label,
             "executor",
             "executor-template",
         ))
-    })
-    .image_pull_secrets_from_product_image(resolved_product_image)
-    .service_account_name(sa_name)
-    .restart_policy("Never")
-    .security_context(
-        PodSecurityContextBuilder::new()
-            .run_as_user(AIRFLOW_UID)
-            .run_as_group(0)
-            .fs_group(1000)
-            .build(),
-    );
+        .context(ObjectMetaSnafu)?
+        .build();
+
+    pb.metadata(pb_metadata)
+        .image_pull_secrets_from_product_image(resolved_product_image)
+        .service_account_name(sa_name)
+        .restart_policy("Never")
+        .security_context(
+            PodSecurityContextBuilder::new()
+                .run_as_user(AIRFLOW_UID)
+                .run_as_group(0)
+                .fs_group(1000)
+                .build(),
+        );
 
     add_executor_graceful_shutdown_config(config, &mut pb).context(GracefulShutdownSnafu)?;
 
@@ -1002,7 +1083,7 @@ fn build_executor_template_config_map(
         authentication_config,
         &mut airflow_container,
         &mut pb,
-    );
+    )?;
 
     airflow_container
         .image_from_product_image(resolved_product_image)
@@ -1083,6 +1164,9 @@ fn build_executor_template_config_map(
     let pod_template = pb.build_template();
     let mut cm_builder = ConfigMapBuilder::new();
 
+    let restarter_label =
+        Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
+
     cm_builder
         .metadata(
             ObjectMetaBuilder::new()
@@ -1097,7 +1181,8 @@ fn build_executor_template_config_map(
                     "executor",
                     "executor-template",
                 ))
-                .with_label("restarter.stackable.tech/enabled", "true")
+                .context(ObjectMetaSnafu)?
+                .with_label(restarter_label)
                 .build(),
         )
         .add_data(
@@ -1333,7 +1418,7 @@ fn add_authentication_volumes_and_volume_mounts(
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) {
+) -> Result<()> {
     // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
     //    Needs adaptation once FAB and airflow support multiple auth methods.
     // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
@@ -1341,10 +1426,14 @@ fn add_authentication_volumes_and_volume_mounts(
         if let Some(auth_class) = &config.authentication_class {
             match &auth_class.spec.provider {
                 AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb]);
+                    ldap.add_volumes_and_mounts(pb, vec![cb])
+                        .context(VolumeAndMountsSnafu)?;
                 }
-                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+                AuthenticationClassProvider::Tls(_)
+                | AuthenticationClassProvider::Oidc(_)
+                | AuthenticationClassProvider::Static(_) => {}
             }
         }
     }
+    Ok(())
 }

@@ -127,6 +127,7 @@ impl AirflowAuthentication {
                 Some(match resolved.spec.provider {
                     AuthenticationClassProvider::Ldap(_) => resolved,
                     AuthenticationClassProvider::Tls(_)
+                    | AuthenticationClassProvider::Oidc(_)
                     | AuthenticationClassProvider::Static(_) => {
                         return Err(Error::AuthenticationProviderNotSupported {
                             authentication_class: ObjectRef::from_obj(&resolved),

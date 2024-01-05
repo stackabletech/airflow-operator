@@ -1,9 +1,10 @@
+use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, authentication::FlaskRolesSyncMoment,
     AirflowConfigOptions,
 };
 use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
+    ldap::AuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
 };
 use std::collections::BTreeMap;
 
@@ -14,10 +15,20 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "WTF_CSRF_ENABLED = True",
 ];
 
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("Failed to create LDAP endpoint url."))]
+    FailedToCreateLdapEndpointUrl {
+        source: stackable_operator::commons::authentication::ldap::Error,
+    },
+}
+
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
-) {
+) -> Result<()> {
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
             // should default to AUTH_TYPE = AUTH_DB
@@ -26,20 +37,22 @@ pub fn add_airflow_config(
         );
     }
 
-    append_authentication_config(config, authentication_config);
+    append_authentication_config(config, authentication_config)?;
+
+    Ok(())
 }
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
-) {
+) -> Result<()> {
     // TODO: we make sure in crd/src/authentication.rs that currently there is only one
     //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
     //    to adapt the config here accordingly
     for auth_config in authentication_config {
         if let Some(auth_class) = &auth_config.authentication_class {
             if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
-                append_ldap_config(config, ldap);
+                append_ldap_config(config, ldap)?;
             }
         }
 
@@ -56,24 +69,22 @@ fn append_authentication_config(
             (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
         );
     }
+    Ok(())
 }
 
-fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
+fn append_ldap_config(
+    config: &mut BTreeMap<String, String>,
+    ldap: &AuthenticationProvider,
+) -> Result<()> {
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
     );
     config.insert(
         AirflowConfigOptions::AuthLdapServer.to_string(),
-        format!(
-            "{protocol}{server_hostname}:{server_port}",
-            protocol = match ldap.tls {
-                None => "ldap://",
-                Some(_) => "ldaps://",
-            },
-            server_hostname = ldap.hostname,
-            server_port = ldap.port.unwrap_or_else(|| ldap.default_port()),
-        ),
+        ldap.endpoint_url()
+            .context(FailedToCreateLdapEndpointUrlSnafu)?
+            .to_string(),
     );
     config.insert(
         AirflowConfigOptions::AuthLdapSearch.to_string(),
@@ -101,7 +112,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
     );
 
     // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250
-    match &ldap.tls {
+    match &ldap.tls.tls {
         None => {
             config.insert(
                 AirflowConfigOptions::AuthLdapTlsDemand.to_string(),
@@ -125,7 +136,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
                         AirflowConfigOptions::AuthLdapAllowSelfSigned.to_string(),
                         false.to_string(),
                     );
-                    if let Some(ca_path) = ldap.tls_ca_cert_mount_path() {
+                    if let Some(ca_path) = ldap.tls.tls_ca_cert_mount_path() {
                         config.insert(
                             AirflowConfigOptions::AuthLdapTlsCacertfile.to_string(),
                             ca_path,
@@ -146,6 +157,8 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
             format!("open('{password_path}').read()"),
         );
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -161,7 +174,7 @@ mod tests {
     #[test]
     fn test_no_ldap() {
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &vec![]);
+        add_airflow_config(&mut result, &vec![]).expect("Ok");
         assert_eq!(
             BTreeMap::from([("AUTH_TYPE".into(), "AUTH_DB".into())]),
             result
@@ -203,7 +216,7 @@ mod tests {
         };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &vec![resolved_config]);
+        add_airflow_config(&mut result, &vec![resolved_config]).expect("Ok");
 
         assert_eq!(
             "AUTH_LDAP",
