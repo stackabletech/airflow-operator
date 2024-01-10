@@ -17,13 +17,13 @@ It is part of the Stackable Data Platform, a curated selection of the best open 
 
 ## Installation
 
-You can install the operator using [stackablectl or helm](https://docs.stackable.tech/airflow/stable/getting_started/installation.html).
+You can install the operator using [stackablectl or helm](https://docs.stackable.tech/home/stable/airflow/getting_started/installation).
 
 Read on to get started with it, or see it in action in one of our [demos](https://stackable.tech/en/demos/).
 
 ## Getting Started
 
-You can follow this [tutorial](https://docs.stackable.tech/airflow/stable/getting_started/first_steps.html).
+You can follow this [tutorial](https://docs.stackable.tech/home/stable/airflow/getting_started/first_steps).
 
 ## Documentation
 
