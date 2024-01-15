@@ -1331,7 +1331,8 @@ fn build_template_envs(
         ..Default::default()
     });
 
-    for (k, v) in env_overrides {
+    // iterate over a BTreeMap to ensure the vars are written in a predictable order
+    for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
         env.push(EnvVar {
             name: k.to_string(),
             value: Some(v.to_string()),
