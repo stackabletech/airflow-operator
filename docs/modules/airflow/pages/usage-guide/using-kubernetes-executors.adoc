@@ -1,0 +1,29 @@
+= Using Kubernetes executors
+
+Instead of using the Celery workers you can let Airflow run the tasks using Kubernetes executors, where pods are created dynamically as needed without jobs being routed through a redis queue to the workers.
+
+To achieve this, swap `spec.celeryExecutors` with `spec.kubernetesExecutors`.
+E.g. you would change the following example
+
+[source,yaml]
+----
+spec:
+  celeryExecutors:
+    roleGroups:
+      default:
+        replicas: 2
+    config:
+      resources:
+        # ...
+----
+
+to
+
+[source,yaml]
+----
+spec:
+  kubernetesExecutors:
+    config:
+      resources:
+        # ...
+----

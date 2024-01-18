@@ -21,7 +21,7 @@ spec:
           max: "2"
         memory:
           limit: 512Mi
-  workers:
+  celeryExecutors:
     config:
       resources:
         cpu:
