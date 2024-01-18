@@ -10,6 +10,7 @@
 ** xref:airflow:usage-guide/security.adoc[]
 ** xref:airflow:usage-guide/logging.adoc[]
 ** xref:airflow:usage-guide/monitoring.adoc[]
+** xref:airflow:usage-guide/using-kubernetes-executors.adoc[]
 ** xref:airflow:usage-guide/overrides.adoc[]
 ** xref:airflow:usage-guide/operations/index.adoc[]
 *** xref:airflow:usage-guide/operations/cluster-operations.adoc[]
