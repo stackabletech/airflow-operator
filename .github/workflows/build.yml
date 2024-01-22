@@ -11,6 +11,7 @@ on:
       - main
       - staging
       - trying
+      - spike/attest-sbom
       - "renovate/**"
     tags:
       - '[0-9][0-9].[0-9]+.[0-9]+'
@@ -87,7 +88,7 @@ jobs:
           elif [[ $TRIGGER == "push" && $GITHUB_REF == "refs/heads/main" ]]; then
             echo "exporting dev as target helm repo: ${{ env.DEV_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.DEV_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && $GITHUB_REF == refs/tags/* ]]; then
+          elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && ($GITHUB_REF == refs/tags/* || $GITHUB_REF == refs/heads/spike/attest-sbom) ]]; then
             echo "exporting stable as target helm repo: ${{ env.STABLE_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.STABLE_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
           else
@@ -336,6 +337,8 @@ jobs:
         # default value in the makefile if called from this action, but not otherwise (i.e. when called locally).
         # This is needed for the HELM_REPO variable.
       - uses: sigstore/cosign-installer@9614fae9e5c5eddabb09f90a270fcb487c9f7149 # tag=v3.3.0
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0.15.5
       - name: Publish Docker image and Helm chart
         run: make -e publish
         # Output the name of the published image to the Job output for later use
