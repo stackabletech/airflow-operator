@@ -60,7 +60,14 @@ docker-publish:
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE;\
-	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
+	# Generate the SBOM for the operator, this leverages the already generated SBOM\
+	syft scan -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE > sbom.json;\
+	# Determine the PURL for the container image\
+	PURL="pkg:docker/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${OCI_REGISTRY_HOSTNAME}";\
+	# Merge the SBOM with the metadata for the operator\
+	jq -s '{"metadata":{"component":{"supplier":{"name":"Stackable GmbH","url":"https://stackable.tech/"},"author":"Stackable GmbH","purl":"$$PURL","publisher":"Stackable GmbH"}}} * .[0]' sbom.json > sbom.merged.json;\
+	# Attest the SBOM to the image\
+	cosign attest --predicate sbom.merged.json --type cyclonedx ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
