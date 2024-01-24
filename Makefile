@@ -59,8 +59,7 @@ docker-publish:
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
-
+	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE\
 	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
