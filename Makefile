@@ -61,7 +61,7 @@ docker-publish:
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
 
-	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-airflow-operator" --scope all-layers --source-name "airflow-operator" --source-version "0.0.0-dev" oci.stackable.tech/sdp/airflow-operator:0.0.0-dev
+	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
