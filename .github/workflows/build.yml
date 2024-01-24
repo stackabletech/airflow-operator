@@ -85,10 +85,10 @@ jobs:
           if [[ $TRIGGER == "pull_request" ]]; then
             echo "exporting test as target helm repo: ${{ env.TEST_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.TEST_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ $TRIGGER == "push" && $GITHUB_REF == "refs/heads/main" ]]; then
+          elif [[ $TRIGGER == "push" && ($GITHUB_REF == "refs/heads/main" || $GITHUB_REF == refs/heads/spike/attest-sbom) ]]; then
             echo "exporting dev as target helm repo: ${{ env.DEV_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.DEV_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && ($GITHUB_REF == refs/tags/* || $GITHUB_REF == refs/heads/spike/attest-sbom) ]]; then
+          elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && $GITHUB_REF == refs/tags/* ]]; then
             echo "exporting stable as target helm repo: ${{ env.STABLE_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.STABLE_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
           else

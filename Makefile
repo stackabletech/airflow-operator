@@ -34,7 +34,6 @@ docker-build:
 	docker tag "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}" "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}"
 
 docker-publish:
-	# testcomment
 	# Push to Nexus
 	echo "${NEXUS_PASSWORD}" | docker login --username github --password-stdin "${DOCKER_REPO}"
 	DOCKER_OUTPUT=$$(docker push --all-tags "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}");\
