@@ -45,7 +45,7 @@ docker-publish:
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
+	cosign sign -y ${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
 
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
@@ -59,8 +59,8 @@ docker-publish:
 	fi;\
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE;\
-	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:@$$REPO_DIGEST_OF_IMAGE
+	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE\
+	syft attest -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
@@ -86,7 +86,7 @@ helm-publish:
 	docker login --username '${value OCI_REGISTRY_SDP_CHARTS_USERNAME}' --password '${OCI_REGISTRY_SDP_CHARTS_PASSWORD}' '${OCI_REGISTRY_HOSTNAME}';\
 	# This generates a signature and publishes it to the registry, next to the chart artifact\
 	# Uses the keyless signing flow with Github Actions as identity provider\
-	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}:@$$REPO_DIGEST_OF_ARTIFACT
+	cosign sign -y ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}@$$REPO_DIGEST_OF_ARTIFACT
 
 helm-package:
 	mkdir -p target/helm && helm package --destination target/helm deploy/helm/${OPERATOR_NAME}
