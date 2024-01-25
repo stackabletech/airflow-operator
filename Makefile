@@ -67,7 +67,7 @@ docker-publish:
 	# Merge the SBOM with the metadata for the operator\
 	jq -s '{"metadata":{"component":{"supplier":{"name":"Stackable GmbH","url":"https://stackable.tech/"},"author":"Stackable GmbH","purl":"$$PURL","publisher":"Stackable GmbH"}}} * .[0]' sbom.json > sbom.merged.json;\
 	# Attest the SBOM to the image\
-	cosign attest --predicate sbom.merged.json --type cyclonedx ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
+	cosign attest -y --predicate sbom.merged.json --type cyclonedx ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
 
 # TODO remove if not used/needed
 docker: docker-build docker-publish
