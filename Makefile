@@ -64,8 +64,11 @@ docker-publish:
 	syft scan -o cyclonedx-json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE > sbom.json;\
 	# Determine the PURL for the container image\
 	PURL="pkg:docker/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${OCI_REGISTRY_HOSTNAME}";\
+	# Get metadata from the image\
+	IMAGE_DESCRIPTION=$(docker inspect --format='{{.Config.Labels.description}}' ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE);\
+	IMAGE_NAME=$(docker inspect --format='{{.Config.Labels.name}}' ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE);\
 	# Merge the SBOM with the metadata for the operator\
-	jq -s '{"metadata":{"component":{"supplier":{"name":"Stackable GmbH","url":"https://stackable.tech/"},"author":"Stackable GmbH","purl":"$$PURL","publisher":"Stackable GmbH"}}} * .[0]' sbom.json > sbom.merged.json;\
+	jq -s '{"metadata":{"component":{"description":"'"$$IMAGE_NAME. $$IMAGE_DESCRIPTION"'","supplier":{"name":"Stackable GmbH","url":"https://stackable.tech/"},"author":"Stackable GmbH","purl":"'"$$PURL"'","publisher":"Stackable GmbH"}}} * .[0]' sbom.json > sbom.merged.json;\
 	# Attest the SBOM to the image\
 	cosign attest -y --predicate sbom.merged.json --type cyclonedx ${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE
 
