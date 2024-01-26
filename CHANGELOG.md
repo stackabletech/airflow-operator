@@ -5,6 +5,7 @@
 ### Added
 
 - More CRD documentation ([#354]).
+- Helm: support labels in values.yaml ([#374]).
 
 ### Changed
 
@@ -27,6 +28,7 @@
 [#354]: https://github.com/stackabletech/airflow-operator/pull/354
 [#366]: https://github.com/stackabletech/airflow-operator/pull/366
 [#372]: https://github.com/stackabletech/airflow-operator/pull/372
+[#374]: https://github.com/stackabletech/airflow-operator/pull/374
 
 ## [23.11.0] - 2023-11-24
 
