@@ -61,7 +61,7 @@ docker-publish:
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE";\
 	# Generate the SBOM for the operator image, this leverages the already generated SBOM for the operator binary by cargo-cyclonedx\
-	syft scan --output cyclonedx-json=sbom.json --exclude "/usr/local/bin/stackable-${OPERATOR_NAME}" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE";\
+	syft scan --output cyclonedx-json=sbom.json --select-catalogers "-cargo-auditable-binary-cataloger" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE";\
 	# Determine the PURL for the container image\
 	PURL="pkg:docker/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${OCI_REGISTRY_HOSTNAME}";\
 	# Get metadata from the image\
