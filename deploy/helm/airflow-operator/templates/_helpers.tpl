@@ -55,8 +55,10 @@ Selector labels
 {{- define "operator.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "operator.appname" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- with .Values.labels }}
+{{ toYaml . }}
 {{- end }}
-
+{{- end }}
 {{/*
 Create the name of the service account to use
 */}}
