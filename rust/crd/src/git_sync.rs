@@ -5,7 +5,7 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 
-use crate::{AirflowExecutor, GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
+use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,7 +182,7 @@ mod tests {
         assert!(cluster
             .git_sync()
             .unwrap()
-            .get_args()
+            .get_args(false)
             .iter()
             .any(|c| c.contains("--rev=c63921857618a8c392ad757dda13090fff3d879a")));
     }
@@ -256,7 +256,7 @@ mod tests {
         assert!(cluster
             .git_sync()
             .unwrap()
-            .get_args()
+            .get_args(false)
             .iter()
             .any(|c| c.contains(output)));
     }

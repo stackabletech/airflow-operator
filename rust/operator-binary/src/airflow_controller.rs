@@ -1126,9 +1126,7 @@ fn build_executor_template_config_map(
                 "pipefail".to_string(),
                 "-c".to_string(),
             ])
-            .args(vec![gitsync
-                .get_args(true)
-                .join("\n")])
+            .args(vec![gitsync.get_args(true).join("\n")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .resources(
                 ResourceRequirementsBuilder::new()
