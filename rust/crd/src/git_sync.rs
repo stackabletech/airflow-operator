@@ -29,7 +29,13 @@ pub struct GitSync {
     /// Read the [git sync example](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_example).
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }
+
 impl GitSync {
+    /// Returns the command arguments for calling git-sync. If git-sync is called when using the
+    /// KubernetesExecutor it should only be called once, and from an initContainer; otherwise, the container
+    /// is not terminated and the job can not be cleaned up properly (the job/task is created by airflow from
+    /// a pod template and is terminated by airflow itself). The `one_time` parameter is used
+    /// to indicate this.
     pub fn get_args(&self, one_time: bool) -> Vec<String> {
         let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
         let mut git_sync_command = vec![
