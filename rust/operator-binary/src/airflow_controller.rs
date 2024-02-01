@@ -940,7 +940,7 @@ fn build_server_rolegroup_statefulset(
                 "pipefail".to_string(),
                 "-c".to_string(),
             ])
-            .args(vec![gitsync.get_args().join("\n")])
+            .args(vec![gitsync.get_args(false).join("\n")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .resources(
                 ResourceRequirementsBuilder::new()
@@ -1126,7 +1126,9 @@ fn build_executor_template_config_map(
                 "pipefail".to_string(),
                 "-c".to_string(),
             ])
-            .args(vec![gitsync.get_args().join("\n")])
+            .args(vec![gitsync
+                .get_args(true)
+                .join("\n")])
             .add_volume_mount(GIT_CONTENT, GIT_ROOT)
             .resources(
                 ResourceRequirementsBuilder::new()
@@ -1143,7 +1145,7 @@ fn build_executor_template_config_map(
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         );
-        pb.add_container(gitsync_container);
+        pb.add_init_container(gitsync_container);
     }
 
     if config.logging.enable_vector_agent {
