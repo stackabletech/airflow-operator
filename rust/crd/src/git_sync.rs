@@ -29,13 +29,14 @@ pub struct GitSync {
     /// Read the [git sync example](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_example).
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }
-impl GitSync {
-    pub fn get_args(&self) -> Vec<String> {
-        let mut args: Vec<String> = vec![
-            COMMON_BASH_TRAP_FUNCTIONS.to_string(),
-            "prepare_signal_handlers".to_string(),
-        ];
 
+impl GitSync {
+    /// Returns the command arguments for calling git-sync. If git-sync is called when using the
+    /// KubernetesExecutor it should only be called once, and from an initContainer; otherwise, the container
+    /// is not terminated and the job can not be cleaned up properly (the job/task is created by airflow from
+    /// a pod template and is terminated by airflow itself). The `one_time` parameter is used
+    /// to indicate this.
+    pub fn get_args(&self, one_time: bool) -> Vec<String> {
         let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
         let mut git_sync_command = vec![
             "/stackable/git-sync".to_string(),
@@ -70,11 +71,25 @@ impl GitSync {
             }
             git_sync_command.push(format!("--git-config='{git_config}'"));
         }
-        // send process to background
-        git_sync_command.push("&".to_string());
 
-        args.push(git_sync_command.join(" "));
-        args.push("wait_for_termination $!".to_string());
+        let mut args: Vec<String> = vec![];
+
+        if one_time {
+            // for one-time git-sync calls (which is the case when git-sync runs as an init
+            // container in a job created by the KubernetesExecutor), specify this with the relevant
+            // parameter and do not push the process into the background
+            git_sync_command.push("--one-time=true".to_string());
+            args.push(git_sync_command.join(" "));
+        } else {
+            // otherwise, we need the signal termination code and the process pushed to the background
+            git_sync_command.push("&".to_string());
+            args.append(&mut vec![
+                COMMON_BASH_TRAP_FUNCTIONS.to_string(),
+                "prepare_signal_handlers".to_string(),
+            ]);
+            args.push(git_sync_command.join(" "));
+            args.push("wait_for_termination $!".to_string());
+        }
         args
     }
 }
@@ -173,7 +188,7 @@ mod tests {
         assert!(cluster
             .git_sync()
             .unwrap()
-            .get_args()
+            .get_args(false)
             .iter()
             .any(|c| c.contains("--rev=c63921857618a8c392ad757dda13090fff3d879a")));
     }
@@ -247,7 +262,7 @@ mod tests {
         assert!(cluster
             .git_sync()
             .unwrap()
-            .get_args()
+            .get_args(false)
             .iter()
             .any(|c| c.contains(output)));
     }

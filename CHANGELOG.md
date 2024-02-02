@@ -18,6 +18,7 @@
 
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#353]).
 - Fixed ordering of variables written to the kubernetes executor pod template ([#372]).
+- Fixed git-sync container running with KubernetesExecutor ([#381]).
 
 ### Removed
 
@@ -29,6 +30,7 @@
 [#366]: https://github.com/stackabletech/airflow-operator/pull/366
 [#372]: https://github.com/stackabletech/airflow-operator/pull/372
 [#374]: https://github.com/stackabletech/airflow-operator/pull/374
+[#381]: https://github.com/stackabletech/airflow-operator/pull/381
 
 ## [23.11.0] - 2023-11-24
 
