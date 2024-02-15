@@ -5,7 +5,7 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 
-use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
+use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_PERIOD_SECONDS};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,7 +46,7 @@ impl GitSync {
                 self.branch.clone().unwrap_or_else(|| "main".to_string())
             ),
             format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
-            format!("--period={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
+            format!("--period={}s", self.wait.unwrap_or(GIT_SYNC_PERIOD_SECONDS)),
             format!("--link={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
         ];

@@ -62,7 +62,7 @@ pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
 const GIT_SYNC_DEPTH: u8 = 1u8;
-const GIT_SYNC_WAIT: u16 = 20u16;
+const GIT_SYNC_PERIOD_SECONDS: u16 = 20u16;
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
