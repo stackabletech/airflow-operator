@@ -27,7 +27,7 @@ The advantage of this approach is that a DAG can be provided "in-line", as it we
 
 === Overview
 
-https://github.com/kubernetes/git-sync/tree/v4.2.1[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronisation details are required. An example of this usage is given in the next section.
+https://github.com/kubernetes/git-sync/tree/v4.2.1[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronization details are required. An example of this usage is given in the next section.
 
 === Example
 

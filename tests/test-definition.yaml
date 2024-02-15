@@ -8,7 +8,6 @@ dimensions:
   - name: airflow
     values:
       - 2.6.3
-      #- 2.7.2 -> testing 2.7.3 should be sufficiant
       - 2.7.3
       - 2.8.1
   - name: airflow-latest
