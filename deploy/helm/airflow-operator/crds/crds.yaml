@@ -6955,7 +6955,7 @@ spec:
                       items:
                         properties:
                           branch:
-                            description: The branch to clone. Defaults to `main`.
+                            description: The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             nullable: true
                             type: string
                           credentialsSecret:
@@ -6982,7 +6982,7 @@ spec:
                             description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.'
                             type: string
                           wait:
-                            description: The synchronization interval in seconds; defaults to 20 seconds.
+                            description: The synchronization interval in seconds; defaults to 20 seconds. Since git-sync v4.x.x this field is mapped to the flag `--period`.
                             format: uint16
                             minimum: 0.0
                             nullable: true
