@@ -1105,12 +1105,12 @@ fn build_executor_template_config_map(
         let mut env = vec![];
         if let Some(credentials_secret) = &gitsync.credentials_secret {
             env.push(env_var_from_secret(
-                "GIT_SYNC_USERNAME",
+                "GITSYNC_USERNAME",
                 credentials_secret,
                 "user",
             ));
             env.push(env_var_from_secret(
-                "GIT_SYNC_PASSWORD",
+                "GITSYNC_PASSWORD",
                 credentials_secret,
                 "password",
             ));
@@ -1276,20 +1276,8 @@ fn build_mapped_envs(
             value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
             ..Default::default()
         });
-        // TODO: version < 2.5, delete when these versions are no longer supported
-        env.push(EnvVar {
-            name: "AIRFLOW__KUBERNETES__POD_TEMPLATE_FILE".into(),
-            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
-            ..Default::default()
-        });
         env.push(EnvVar {
             name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
-            value: airflow.namespace(),
-            ..Default::default()
-        });
-        // TODO: version < 2.5, delete when these versions are no longer supported
-        env.push(EnvVar {
-            name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
             value: airflow.namespace(),
             ..Default::default()
         });
@@ -1324,12 +1312,6 @@ fn build_template_envs(
         value: airflow.namespace(),
         ..Default::default()
     });
-    // TODO: version < 2.5, delete when these versions are no longer supported
-    env.push(EnvVar {
-        name: "AIRFLOW__KUBERNETES__NAMESPACE".into(),
-        value: airflow.namespace(),
-        ..Default::default()
-    });
 
     // iterate over a BTreeMap to ensure the vars are written in a predictable order
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
@@ -1361,9 +1343,9 @@ fn build_gitsync_envs(
         .get(&PropertyNameKind::Env)
         .and_then(|vars| vars.get(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY))
     {
-        env.push(env_var_from_secret("GIT_SYNC_USERNAME", git_secret, "user"));
+        env.push(env_var_from_secret("GITSYNC_USERNAME", git_secret, "user"));
         env.push(env_var_from_secret(
-            "GIT_SYNC_PASSWORD",
+            "GITSYNC_PASSWORD",
             git_secret,
             "password",
         ));

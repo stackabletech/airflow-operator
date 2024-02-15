@@ -2,6 +2,7 @@
 // This is a separate file, since it is used by both the direct Airflow-Operator documentation, and the overarching
 // Stackable Platform documentation.
 
-- 2.7.2
-- 2.6.3
-- 2.6.1 (deprecated)
+- 2.8.1
+- 2.7.3 (deprecated)
+- 2.7.2 (deprecated)
+- 2.6.3 (LTS)
