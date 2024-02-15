@@ -27,7 +27,7 @@ The advantage of this approach is that a DAG can be provided "in-line", as it we
 
 === Overview
 
-https://github.com/kubernetes/git-sync/tree/release-3.x[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronisation details are required. An example of this usage is given in the next section.
+https://github.com/kubernetes/git-sync/tree/v4.2.1[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. The Stackable implementation is a wrapper around this such that the binary and image requirements are included in the Stackable Airflow product images and do not need to be specified or handled in the `AirflowCluster` custom resource. Internal details such as image names and volume mounts are handled by the operator, so that only the repository and synchronization details are required. An example of this usage is given in the next section.
 
 === Example
 
@@ -44,7 +44,7 @@ include::example$example-airflow-gitsync.yaml[]
 <6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
 <7> The synchronisation interval in seconds (defaults to 20 seconds)
 <8> The name of the `Secret` used to access the repository if it is not public. This should include two fields: `user` and `password` (which can be either a password - which is not recommended - or a github token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
-<9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags[this] configuration section (and the ones that follow on that link)
+<9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v4.2.1?tab=readme-ov-file#manual[this] configuration section (and the ones that follow on that link)
 <10> An example showing how to specify a target revision (the default is HEAD). The revision can also a be tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`. If a tag or commit hash is specified, then git-sync will recognise that and not perform further cloning.
 <11> Git-sync settings can be provided inline, although some of these (`--dest`, `--root`) are specified internally in the operator and will be ignored if provided by the user. Git-config settings can also be specified, although a warning will be logged if `safe.directory` is specified as this is defined internally, and should not be defined by the user.
 

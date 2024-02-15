@@ -62,7 +62,7 @@ pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
 const GIT_SYNC_DEPTH: u8 = 1u8;
-const GIT_SYNC_WAIT: u16 = 20u16;
+const GIT_SYNC_PERIOD_SECONDS: u16 = 20u16;
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -772,7 +772,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.7.2
+            productVersion: 2.8.1
           clusterConfig:
             loadExamples: true
             exposeConfig: true
@@ -796,7 +796,7 @@ mod tests {
         let resolved_airflow_image: ResolvedProductImage =
             cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
-        assert_eq!("2.7.2", &resolved_airflow_image.product_version);
+        assert_eq!("2.8.1", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);

@@ -6,6 +6,7 @@
 
 - More CRD documentation ([#354]).
 - Helm: support labels in values.yaml ([#374]).
+- Support for version `2.7.3`, `2.8.1` ([#387]).
 
 ### Changed
 
@@ -13,6 +14,7 @@
 - Increase resource defaults ([#352]).
 - Use new label builders ([#366]).
 - Use new ldap::AuthenticationClassProvider `endpoint_url()` method ([#366]).
+- Support git-sync `4.2.1` ([#387]).
 
 ### Fixed
 
@@ -23,6 +25,7 @@
 ### Removed
 
 - [BREAKING] Removed legacy node selector on roleGroups ([#366]).
+- Removed support for version `2.6.1`, `2.7.1` ([#387]).
 
 [#352]: https://github.com/stackabletech/airflow-operator/pull/352
 [#353]: https://github.com/stackabletech/airflow-operator/pull/353
@@ -31,6 +34,7 @@
 [#372]: https://github.com/stackabletech/airflow-operator/pull/372
 [#374]: https://github.com/stackabletech/airflow-operator/pull/374
 [#381]: https://github.com/stackabletech/airflow-operator/pull/381
+[#387]: https://github.com/stackabletech/airflow-operator/pull/387
 
 ## [23.11.0] - 2023-11-24
 

@@ -5,20 +5,20 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 
-use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_WAIT};
+use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_PERIOD_SECONDS};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitSync {
     /// The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.
     pub repo: String,
-    /// The branch to clone. Defaults to `main`.
+    /// The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
     pub branch: Option<String>,
     /// The location of the DAG folder, relative to the synced repository root.
     pub git_folder: Option<String>,
     /// The depth of syncing i.e. the number of commits to clone; defaults to 1.
     pub depth: Option<u8>,
-    /// The synchronization interval in seconds; defaults to 20 seconds.
+    /// The synchronization interval in seconds; defaults to 20 seconds. Since git-sync v4.x.x this field is mapped to the flag `--period`.
     pub wait: Option<u16>,
     /// The name of the Secret used to access the repository if it is not public.
     /// This should include two fields: `user` and `password`.
@@ -42,12 +42,12 @@ impl GitSync {
             "/stackable/git-sync".to_string(),
             format!("--repo={}", self.repo.clone()),
             format!(
-                "--branch={}",
+                "--ref={}",
                 self.branch.clone().unwrap_or_else(|| "main".to_string())
             ),
             format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
-            format!("--wait={}", self.wait.unwrap_or(GIT_SYNC_WAIT)),
-            format!("--dest={GIT_LINK}"),
+            format!("--period={}s", self.wait.unwrap_or(GIT_SYNC_PERIOD_SECONDS)),
+            format!("--link={GIT_LINK}"),
             format!("--root={GIT_ROOT}"),
         ];
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
@@ -108,7 +108,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.7.2
+            productVersion: 2.8.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -154,7 +154,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.7.2
+            productVersion: 2.8.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -165,7 +165,7 @@ mod tests {
                 branch: feat/git-sync
                 wait: 20
                 gitSyncConf:
-                  --rev: c63921857618a8c392ad757dda13090fff3d879a
+                  --ref: c63921857618a8c392ad757dda13090fff3d879a
                 gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
           webservers:
             roleGroups:
@@ -190,7 +190,7 @@ mod tests {
             .unwrap()
             .get_args(false)
             .iter()
-            .any(|c| c.contains("--rev=c63921857618a8c392ad757dda13090fff3d879a")));
+            .any(|c| c.contains("--ref=c63921857618a8c392ad757dda13090fff3d879a")));
     }
 
     #[rstest]
@@ -227,7 +227,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.7.2
+            productVersion: 2.8.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
