@@ -99,6 +99,7 @@ rec {
 
   regenerateNixLockfiles = pkgs.writeScriptBin "regenerate-nix-lockfiles"
   ''
+    #!/usr/bin/env bash
     set -euo pipefail
     echo Running crate2nix
     ${crate2nix}/bin/crate2nix generate
