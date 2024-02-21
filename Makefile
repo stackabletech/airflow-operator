@@ -46,6 +46,17 @@ docker-publish:
 	# This generates a signature and publishes it to the registry, next to the image\
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE"
+	# Generate the SBOM for the operator image, this leverages the already generated SBOM for the operator binary by cargo-cyclonedx\
+	syft scan --output cyclonedx-json=sbom.json --select-catalogers "-cargo-auditable-binary-cataloger" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE";\
+	# Determine the PURL for the container image\
+	PURL="pkg:docker/${DOCKER_REPO}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${DOCKER_REPO}";\
+	# Get metadata from the image\
+	IMAGE_DESCRIPTION=$$(docker inspect --format='{{.Config.Labels.description}}' "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}");\
+	IMAGE_NAME=$$(docker inspect --format='{{.Config.Labels.name}}' "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}");\
+	# Merge the SBOM with the metadata for the operator\
+	jq -s '{"metadata":{"component":{"description":"'"$$IMAGE_NAME. $$IMAGE_DESCRIPTION"'","supplier":{"name":"Stackable GmbH","url":["https://stackable.tech/"]},"author":"Stackable GmbH","purl":"'"$$PURL"'","publisher":"Stackable GmbH"}}} * .[0]' sbom.json > sbom.merged.json;\
+	# Attest the SBOM to the image\
+	cosign attest -y --predicate sbom.merged.json --type cyclonedx "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE"
 
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
@@ -132,7 +143,10 @@ clean: chart-clean
 
 regenerate-charts: chart-clean compile-chart
 
-build: regenerate-charts helm-package docker-build
+regenerate-nix:
+	nix run -f . regenerateNixLockfiles
+
+build: regenerate-charts regenerate-nix helm-package docker-build
 
 publish: build docker-publish helm-publish
 
