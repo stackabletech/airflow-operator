@@ -49,7 +49,7 @@ docker-publish:
 	# Generate the SBOM for the operator image, this leverages the already generated SBOM for the operator binary by cargo-cyclonedx\
 	syft scan --output cyclonedx-json=sbom.json --select-catalogers "-cargo-auditable-binary-cataloger" --scope all-layers --source-name "${OPERATOR_NAME}" --source-version "${VERSION}" "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE";\
 	# Determine the PURL for the container image\
-	PURL="pkg:docker/${DOCKER_REPO}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${DOCKER_REPO}";\
+	PURL="pkg:docker/${ORGANIZATION}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE?repository_url=${DOCKER_REPO}";\
 	# Get metadata from the image\
 	IMAGE_DESCRIPTION=$$(docker inspect --format='{{.Config.Labels.description}}' "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}");\
 	IMAGE_NAME=$$(docker inspect --format='{{.Config.Labels.name}}' "${DOCKER_REPO}/${ORGANIZATION}/${OPERATOR_NAME}:${VERSION}");\
