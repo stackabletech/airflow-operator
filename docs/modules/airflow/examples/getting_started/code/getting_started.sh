@@ -119,7 +119,7 @@ fi
 enable_dag() {
   # tag::enable-dag[]
   curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XPATCH http://localhost:8080/api/v1/dags/example_complex \
+    -XPATCH http://localhost:8080/api/v1/dags/example_trigger_target_dag \
     -d '{"is_paused": false}'
   # end::enable-dag[]
 }
@@ -129,8 +129,8 @@ enable_dag
 run_dag() {
   # tag::run-dag[]
   curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XPOST http://localhost:8080/api/v1/dags/example_complex/dagRuns \
-    -d '{}' | jq -r '.dag_run_id'
+    -XPOST http://localhost:8080/api/v1/dags/example_trigger_target_dag/dagRuns \
+    -d '{"message": "Hello World"}' | jq -r '.dag_run_id'
   # end::run-dag[]
 }
 
@@ -139,7 +139,7 @@ dag_id=$(run_dag)
 request_dag_status() {
   # tag::check-dag[]
   curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XGET http://localhost:8080/api/v1/dags/example_complex/dagRuns/"$dag_id" | jq -r '.state'
+    -XGET http://localhost:8080/api/v1/dags/example_trigger_target_dag/dagRuns/"$dag_id" | jq -r '.state'
   # end::check-dag[]
 }
 
