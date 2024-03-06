@@ -130,7 +130,7 @@ run_dag() {
   # tag::run-dag[]
   curl -s --user airflow:airflow -H 'Content-Type:application/json' \
     -XPOST http://localhost:8080/api/v1/dags/example_trigger_target_dag/dagRuns \
-    -d '{"message": "Hello World"}' | jq -r '.dag_run_id'
+    -d '{}' | jq -r '.dag_run_id'
   # end::run-dag[]
 }
 
