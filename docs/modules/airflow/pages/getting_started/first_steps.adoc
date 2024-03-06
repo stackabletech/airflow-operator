@@ -102,7 +102,7 @@ Since the examples were loaded in the cluster definition, they will appear under
 
 image::getting_started/airflow_dags.png[Example Airflow DAGs]
 
-Select one of these DAGs by clicking on the name in the left-hand column e.g. `example_complex`. Click on the arrow in the top right of the screen, select "Trigger DAG" and the DAG nodes will be automatically highlighted as the job works through its phases.
+Select one of these DAGs by clicking on the name in the left-hand column e.g. `example_trigger_target_dag`. Click on the arrow in the top right of the screen, select "Trigger DAG" and the DAG nodes will be automatically highlighted as the job works through its phases.
 
 image::getting_started/airflow_running.png[Airflow DAG in action]
 
@@ -112,11 +112,11 @@ Great! You have set up an Airflow cluster, connected to it and run your first DA
 .Alternative: Using the command line
 [%collapsible]
 ====
-If you prefer to interact directly with the API instead of using the web interface, you can use the following commands. The DAG is one of the example DAGs named `example_complex`. To trigger a DAG run via the API requires an initial extra step to ensure that the DAG is not in a paused state:
+If you prefer to interact directly with the API instead of using the web interface, you can use the following commands. The DAG is one of the example DAGs named `example_trigger_target_dag`. To trigger a DAG run via the API requires an initial extra step to ensure that the DAG is not in a paused state:
 [source,bash]
 include::example$getting_started/code/getting_started.sh[tag=enable-dag]
 
-A DAG can then be triggered by providing the DAG name (in this case, `example_complex`). The response identifies the DAG identifier, which we can parse out of the JSON like this:
+A DAG can then be triggered by providing the DAG name (in this case, `example_trigger_target_dag`). The response identifies the DAG identifier, which we can parse out of the JSON like this:
 [source,bash]
 include::example$getting_started/code/getting_started.sh[tag=run-dag]
 

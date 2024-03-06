@@ -15,6 +15,7 @@
 - Use new label builders ([#366]).
 - Use new ldap::AuthenticationClassProvider `endpoint_url()` method ([#366]).
 - Support git-sync `4.2.1` ([#387]).
+- Use a lightweight DAG for the getting started guide to avoid OOM issues ([#401])
 
 ### Fixed
 
@@ -35,6 +36,7 @@
 [#374]: https://github.com/stackabletech/airflow-operator/pull/374
 [#381]: https://github.com/stackabletech/airflow-operator/pull/381
 [#387]: https://github.com/stackabletech/airflow-operator/pull/387
+[#401]: https://github.com/stackabletech/airflow-operator/pull/401
 
 ## [23.11.0] - 2023-11-24
 
