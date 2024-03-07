@@ -38,6 +38,8 @@ commands:
               app.kubernetes.io/name: openldap
           spec:
             serviceAccountName: "ldap-sa"
+            securityContext:
+              fsGroup: 1000
             containers:
               - name: openldap
                 image: docker.io/bitnami/openldap:2.5

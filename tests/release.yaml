@@ -13,4 +13,4 @@ releases:
       listener:
         operatorVersion: 0.0.0-dev
       airflow:
-        operatorVersion: 0.0.0-dev
+        operatorVersion: 0.0.0-pr402
