@@ -38,6 +38,10 @@ commands:
               app.kubernetes.io/name: openldap
           spec:
             serviceAccountName: "ldap-sa"
+            #
+            # The security context below is necessary to avoid the following error on OpenShift:
+            #    /opt/bitnami/scripts/openldap/setup.sh: line 102: /opt/bitnami/openldap/sbin/slappasswd: Operation not permitted
+            #
             securityContext:
               fsGroup: 1000
             containers:
