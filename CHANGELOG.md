@@ -16,6 +16,7 @@
 - Use new ldap::AuthenticationClassProvider `endpoint_url()` method ([#366]).
 - Support git-sync `4.2.1` ([#387]).
 - Use a lightweight DAG for the getting started guide to avoid OOM issues ([#401])
+- Raise the default readiness and liveness probe timeouts of the webserver to 120s ([#402])
 
 ### Fixed
 
@@ -37,6 +38,7 @@
 [#381]: https://github.com/stackabletech/airflow-operator/pull/381
 [#387]: https://github.com/stackabletech/airflow-operator/pull/387
 [#401]: https://github.com/stackabletech/airflow-operator/pull/401
+[#402]: https://github.com/stackabletech/airflow-operator/pull/402
 
 ## [23.11.0] - 2023-11-24
 

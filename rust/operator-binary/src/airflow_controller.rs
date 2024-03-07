@@ -871,8 +871,9 @@ fn build_server_rolegroup_statefulset(
                 port: IntOrString::Int(resolved_port.into()),
                 ..TCPSocketAction::default()
             }),
-            initial_delay_seconds: Some(20),
-            period_seconds: Some(5),
+            initial_delay_seconds: Some(60),
+            period_seconds: Some(10),
+            failure_threshold: Some(6),
             ..Probe::default()
         };
         airflow_container.readiness_probe(probe.clone());
