@@ -17,6 +17,7 @@
 - Support git-sync `4.2.1` ([#387]).
 - Use a lightweight DAG for the getting started guide to avoid OOM issues ([#401])
 - Raise the default readiness and liveness probe timeouts of the webserver to 120s ([#402])
+  Also raise the memory request of the webserver from 2Gi to 3Gi.
 
 ### Fixed
 
