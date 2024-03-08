@@ -13,6 +13,7 @@ use stackable_airflow_crd::{
     GIT_SYNC_DIR, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
     TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
+use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
         resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
@@ -701,21 +702,12 @@ fn build_rolegroup_service(
     let prometheus_label =
         Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
 
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
-        .name(&rolegroup.object_name())
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            airflow,
-            AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
-        .with_label(prometheus_label)
-        .build();
+    let metadata = build_rolegroup_metadata(
+        airflow,
+        &resolved_product_image,
+        &rolegroup,
+        prometheus_label,
+    )?;
 
     let service_selector_labels =
         Labels::role_group_selector(airflow, APP_NAME, &rolegroup.role, &rolegroup.role_group)
@@ -736,6 +728,30 @@ fn build_rolegroup_service(
         spec: Some(service_spec),
         status: None,
     })
+}
+
+fn build_rolegroup_metadata(
+    airflow: &AirflowCluster,
+    resolved_product_image: &&ResolvedProductImage,
+    rolegroup: &&RoleGroupRef<AirflowCluster>,
+    prometheus_label: Label,
+) -> Result<ObjectMeta, Error> {
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(airflow)
+        .name(&rolegroup.object_name())
+        .ownerreference_from_resource(airflow, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            airflow,
+            AIRFLOW_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .with_label(prometheus_label)
+        .build();
+    Ok(metadata)
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -962,20 +978,12 @@ fn build_server_rolegroup_statefulset(
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
-        pb.add_container(product_logging::framework::vector_container(
+        pb.add_container(build_logging_container(
             resolved_product_image,
-            CONFIG_VOLUME_NAME,
-            LOG_VOLUME_NAME,
             merged_airflow_config
                 .logging
                 .containers
                 .get(&Container::Vector),
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("250m")
-                .with_cpu_limit("500m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
-                .build(),
         ));
     }
 
@@ -988,21 +996,12 @@ fn build_server_rolegroup_statefulset(
     let restarter_label =
         Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
 
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
-        .name(&rolegroup_ref.object_name())
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            airflow,
-            AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
-        .with_label(restarter_label)
-        .build();
+    let metadata = build_rolegroup_metadata(
+        airflow,
+        &resolved_product_image,
+        &rolegroup_ref,
+        restarter_label,
+    )?;
 
     let statefulset_match_labels = Labels::role_group_selector(
         airflow,
@@ -1037,6 +1036,24 @@ fn build_server_rolegroup_statefulset(
         spec: Some(statefulset_spec),
         status: None,
     })
+}
+
+fn build_logging_container(
+    resolved_product_image: &ResolvedProductImage,
+    log_config: Option<&ContainerLogConfig>,
+) -> stackable_operator::k8s_openapi::api::core::v1::Container {
+    product_logging::framework::vector_container(
+        resolved_product_image,
+        CONFIG_VOLUME_NAME,
+        LOG_VOLUME_NAME,
+        log_config,
+        ResourceRequirementsBuilder::new()
+            .with_cpu_request("250m")
+            .with_cpu_limit("500m")
+            .with_memory_request("128Mi")
+            .with_memory_limit("128Mi")
+            .build(),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1090,6 +1107,7 @@ fn build_executor_template_config_map(
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
         .add_env_vars(build_template_envs(airflow, env_overrides))
+        .add_env_vars(build_static_envs())
         .add_volume_mounts(airflow.volume_mounts())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
@@ -1148,17 +1166,9 @@ fn build_executor_template_config_map(
     }
 
     if config.logging.enable_vector_agent {
-        pb.add_container(product_logging::framework::vector_container(
+        pb.add_container(build_logging_container(
             resolved_product_image,
-            CONFIG_VOLUME_NAME,
-            LOG_VOLUME_NAME,
             config.logging.containers.get(&Container::Vector),
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("250m")
-                .with_cpu_limit("500m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
-                .build(),
         ));
     }
 
@@ -1234,15 +1244,8 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
-    if let Some(git_sync) = &airflow.git_sync() {
-        if let Some(dags_folder) = &git_sync.git_folder {
-            env.push(EnvVar {
-                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
-                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-                ..Default::default()
-            })
-        }
-    }
+    add_git_sync_folder(&airflow, &mut env);
+
     if airflow.spec.cluster_config.load_examples {
         env.push(EnvVar {
             name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
@@ -1323,6 +1326,12 @@ fn build_template_envs(
         });
     }
 
+    add_git_sync_folder(&airflow, &mut env);
+
+    env
+}
+
+fn add_git_sync_folder(airflow: &&AirflowCluster, env: &mut Vec<EnvVar>) {
     if let Some(git_sync) = &airflow.git_sync() {
         if let Some(dags_folder) = &git_sync.git_folder {
             env.push(EnvVar {
@@ -1332,8 +1341,6 @@ fn build_template_envs(
             })
         }
     }
-
-    env
 }
 
 fn build_gitsync_envs(
