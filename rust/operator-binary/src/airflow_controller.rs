@@ -1336,8 +1336,6 @@ fn build_template_envs(
         });
     }
 
-    // TODO add git sync envs in one place and ensure PYTHONPATH is extended and that this happens after static
-    // envs are set
     if let Some(git_sync) = airflow.git_sync() {
         add_git_sync_folder(git_sync, &mut env);
     }
@@ -1351,7 +1349,14 @@ fn add_git_sync_folder(git_sync: &GitSync, env: &mut Vec<EnvVar>) {
             name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
             value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
             ..Default::default()
-        })
+        });
+        env.push(EnvVar {
+            // PYTHONPATH has already been set to LOG_CONFIG_DIR for logging. It must be extended to include
+            // the dags folder used for gitsync-ed artifacts so that airflow can find dag-dependencies.
+            name: "PYTHONPATH".into(),
+            value: Some("$PYTHONPATH;$AIRFLOW__CORE__DAGS_FOLDER".into()),
+            ..Default::default()
+        });
     }
 }
 

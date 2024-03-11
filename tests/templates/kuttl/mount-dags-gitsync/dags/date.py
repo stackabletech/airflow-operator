@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
+import time
+
 
 with DAG(
     dag_id='date_demo',
@@ -15,6 +17,7 @@ with DAG(
     params={},
 ) as dag:
 
+    time.sleep(20)
     run_this = BashOperator(
         task_id='run_every_minute',
         bash_command='date',
