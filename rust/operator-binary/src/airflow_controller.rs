@@ -5,6 +5,7 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
     AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
@@ -83,6 +84,9 @@ pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+
+const GITSYNC_USERNAME: &str = "GITSYNC_USERNAME";
+const GITSYNC_PASSWORD: &str = "GITSYNC_PASSWORD";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -547,7 +551,7 @@ async fn build_executor_template(
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
-/// including targets outside of the cluster.
+/// including targets outside the cluster.
 fn build_role_service(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
@@ -1123,16 +1127,7 @@ fn build_executor_template_config_map(
     if let Some(gitsync) = airflow.git_sync() {
         let mut env = vec![];
         if let Some(credentials_secret) = &gitsync.credentials_secret {
-            env.push(env_var_from_secret(
-                "GITSYNC_USERNAME",
-                credentials_secret,
-                "user",
-            ));
-            env.push(env_var_from_secret(
-                "GITSYNC_PASSWORD",
-                credentials_secret,
-                "password",
-            ));
+            add_git_credentials(&mut env, credentials_secret);
         }
         let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
             .context(InvalidContainerNameSnafu)?
@@ -1204,6 +1199,19 @@ fn build_executor_template_config_map(
     cm_builder.build().context(PodTemplateConfigMapSnafu)
 }
 
+fn add_git_credentials(env: &mut Vec<EnvVar>, credentials_secret: &str) {
+    env.push(env_var_from_secret(
+        GITSYNC_USERNAME,
+        credentials_secret,
+        "user",
+    ));
+    env.push(env_var_from_secret(
+        GITSYNC_PASSWORD,
+        credentials_secret,
+        "password",
+    ));
+}
+
 /// This builds a collection of environment variables some require some minimal mapping,
 /// such as executor type, contents of the secret etc.
 fn build_mapped_envs(
@@ -1244,7 +1252,9 @@ fn build_mapped_envs(
         })
         .unwrap_or_default();
 
-    add_git_sync_folder(&airflow, &mut env);
+    if let Some(git_sync) = airflow.git_sync() {
+        add_git_sync_folder(git_sync, &mut env);
+    }
 
     if airflow.spec.cluster_config.load_examples {
         env.push(EnvVar {
@@ -1326,20 +1336,22 @@ fn build_template_envs(
         });
     }
 
-    add_git_sync_folder(&airflow, &mut env);
+    // TODO add git sync envs in one place and ensure PYTHONPATH is extended and that this happens after static
+    // envs are set
+    if let Some(git_sync) = airflow.git_sync() {
+        add_git_sync_folder(git_sync, &mut env);
+    }
 
     env
 }
 
-fn add_git_sync_folder(airflow: &&AirflowCluster, env: &mut Vec<EnvVar>) {
-    if let Some(git_sync) = &airflow.git_sync() {
-        if let Some(dags_folder) = &git_sync.git_folder {
-            env.push(EnvVar {
-                name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
-                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-                ..Default::default()
-            })
-        }
+fn add_git_sync_folder(git_sync: &GitSync, env: &mut Vec<EnvVar>) {
+    if let Some(dags_folder) = &git_sync.git_folder {
+        env.push(EnvVar {
+            name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
+            value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+            ..Default::default()
+        })
     }
 }
 
@@ -1351,12 +1363,7 @@ fn build_gitsync_envs(
         .get(&PropertyNameKind::Env)
         .and_then(|vars| vars.get(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY))
     {
-        env.push(env_var_from_secret("GITSYNC_USERNAME", git_secret, "user"));
-        env.push(env_var_from_secret(
-            "GITSYNC_PASSWORD",
-            git_secret,
-            "password",
-        ));
+        add_git_credentials(&mut env, git_secret);
     }
 
     env
