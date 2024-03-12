@@ -855,7 +855,7 @@ fn build_server_rolegroup_statefulset(
         })
         .collect::<Vec<_>>();
 
-    // mapped environment variables
+    // mapped environment variables: this includes setting the dag folder if gitsync is being used
     let env_mapped = build_mapped_envs(airflow, rolegroup_config, executor);
 
     airflow_container.add_env_vars(env_config);
@@ -979,6 +979,13 @@ fn build_server_rolegroup_statefulset(
                 .build(),
         );
         pb.add_container(gitsync_container);
+    } else {
+        // this has been set for the gitsync case earlier
+        airflow_container.add_env_vars(vec![EnvVar {
+            name: "PYTHONPATH".into(),
+            value: Some(LOG_CONFIG_DIR.into()),
+            ..Default::default()
+        }]);
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
@@ -1110,6 +1117,7 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
+        // this sets the dags folder and PYTHONPATH if gitsync is being used
         .add_env_vars(build_template_envs(airflow, env_overrides))
         .add_env_vars(build_static_envs())
         .add_volume_mounts(airflow.volume_mounts())
@@ -1158,6 +1166,13 @@ fn build_executor_template_config_map(
                 .build(),
         );
         pb.add_init_container(gitsync_container);
+    } else {
+        // this has been set for the gitsync case earlier
+        airflow_container.add_env_vars(vec![EnvVar {
+            name: "PYTHONPATH".into(),
+            value: Some(LOG_CONFIG_DIR.into()),
+            ..Default::default()
+        }]);
     }
 
     if config.logging.enable_vector_agent {
@@ -1350,14 +1365,20 @@ fn add_git_sync_folder(git_sync: &GitSync, env: &mut Vec<EnvVar>) {
             value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
             ..Default::default()
         });
+
         env.push(EnvVar {
-            // PYTHONPATH has already been set to LOG_CONFIG_DIR for logging. It must be extended to include
-            // the dags folder used for gitsync-ed artifacts so that airflow can find dag-dependencies.
+            // PYTHONPATH must be extended to include the dags folder used for gitsync-ed
+            // artifacts so that airflow can find dag-dependencies.
             name: "PYTHONPATH".into(),
-            value: Some("$PYTHONPATH;$AIRFLOW__CORE__DAGS_FOLDER".into()),
+            value: Some(format!("{LOG_CONFIG_DIR}:$AIRFLOW__CORE__DAGS_FOLDER")),
             ..Default::default()
         });
     }
+    env.push(EnvVar {
+        name: "PYTHONPATH".into(),
+        value: Some(LOG_CONFIG_DIR.into()),
+        ..Default::default()
+    });
 }
 
 fn build_gitsync_envs(
@@ -1376,11 +1397,6 @@ fn build_gitsync_envs(
 
 fn build_static_envs() -> Vec<EnvVar> {
     [
-        EnvVar {
-            name: "PYTHONPATH".into(),
-            value: Some(LOG_CONFIG_DIR.into()),
-            ..Default::default()
-        },
         EnvVar {
             name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
             value: Some("log_config.LOGGING_CONFIG".into()),
