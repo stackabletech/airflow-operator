@@ -5,14 +5,13 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
     AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
     AirflowExecutor, AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment,
-    AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_LINK, GIT_ROOT,
-    GIT_SYNC_DIR, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
-    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT,
+    GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
+    TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
@@ -66,9 +65,13 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
+use crate::env_vars::{
+    build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
+};
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    env_vars,
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -76,7 +79,6 @@ use crate::{
         pdb::add_pdbs,
     },
     product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
-    util::env_var_from_secret,
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -84,9 +86,6 @@ pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
-
-const GITSYNC_USERNAME: &str = "GITSYNC_USERNAME";
-const GITSYNC_PASSWORD: &str = "GITSYNC_PASSWORD";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -855,25 +854,13 @@ fn build_server_rolegroup_statefulset(
         })
         .collect::<Vec<_>>();
 
-    // mapped environment variables: this includes setting the dag folder if gitsync is being used
-    let env_mapped = build_mapped_envs(airflow, rolegroup_config, executor);
-
     airflow_container.add_env_vars(env_config);
-    airflow_container.add_env_vars(env_mapped);
-
-    // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
-    if airflow_role == &AirflowRole::Scheduler {
-        let secret = &airflow.spec.cluster_config.credentials_secret;
-        airflow_container.add_env_vars(vec![
-            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
-        ]);
-    }
-
-    airflow_container.add_env_vars(build_static_envs());
+    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
+        airflow,
+        airflow_role,
+        rolegroup_config,
+        executor,
+    ));
 
     let volume_mounts = airflow.volume_mounts();
     airflow_container.add_volume_mounts(volume_mounts);
@@ -952,7 +939,7 @@ fn build_server_rolegroup_statefulset(
     if let Some(gitsync) = airflow.git_sync() {
         let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
             .context(InvalidContainerNameSnafu)?
-            .add_env_vars(build_gitsync_envs(rolegroup_config))
+            .add_env_vars(build_gitsync_statefulset_envs(rolegroup_config))
             .image_from_product_image(resolved_product_image)
             .command(vec![
                 "/bin/bash".to_string(),
@@ -979,13 +966,6 @@ fn build_server_rolegroup_statefulset(
                 .build(),
         );
         pb.add_container(gitsync_container);
-    } else {
-        // this has been set for the gitsync case earlier
-        airflow_container.add_env_vars(vec![EnvVar {
-            name: "PYTHONPATH".into(),
-            value: Some(LOG_CONFIG_DIR.into()),
-            ..Default::default()
-        }]);
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
@@ -1118,8 +1098,7 @@ fn build_executor_template_config_map(
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
         // this sets the dags folder and PYTHONPATH if gitsync is being used
-        .add_env_vars(build_template_envs(airflow, env_overrides))
-        .add_env_vars(build_static_envs())
+        .add_env_vars(build_airflow_template_envs(airflow, env_overrides))
         .add_volume_mounts(airflow.volume_mounts())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
@@ -1133,13 +1112,9 @@ fn build_executor_template_config_map(
     ));
 
     if let Some(gitsync) = airflow.git_sync() {
-        let mut env = vec![];
-        if let Some(credentials_secret) = &gitsync.credentials_secret {
-            add_git_credentials(&mut env, credentials_secret);
-        }
         let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
             .context(InvalidContainerNameSnafu)?
-            .add_env_vars(env)
+            .add_env_vars(build_gitsync_template(&gitsync.credentials_secret))
             .image_from_product_image(resolved_product_image)
             .command(vec![
                 "/bin/bash".to_string(),
@@ -1166,13 +1141,6 @@ fn build_executor_template_config_map(
                 .build(),
         );
         pb.add_init_container(gitsync_container);
-    } else {
-        // this has been set for the gitsync case earlier
-        airflow_container.add_env_vars(vec![EnvVar {
-            name: "PYTHONPATH".into(),
-            value: Some(LOG_CONFIG_DIR.into()),
-            ..Default::default()
-        }]);
     }
 
     if config.logging.enable_vector_agent {
@@ -1212,221 +1180,6 @@ fn build_executor_template_config_map(
         );
 
     cm_builder.build().context(PodTemplateConfigMapSnafu)
-}
-
-fn add_git_credentials(env: &mut Vec<EnvVar>, credentials_secret: &str) {
-    env.push(env_var_from_secret(
-        GITSYNC_USERNAME,
-        credentials_secret,
-        "user",
-    ));
-    env.push(env_var_from_secret(
-        GITSYNC_PASSWORD,
-        credentials_secret,
-        "password",
-    ));
-}
-
-/// This builds a collection of environment variables some require some minimal mapping,
-/// such as executor type, contents of the secret etc.
-fn build_mapped_envs(
-    airflow: &AirflowCluster,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    executor: &AirflowExecutor,
-) -> Vec<EnvVar> {
-    let secret_prop = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
-
-    let mut env = secret_prop
-        .map(|secret| {
-            vec![
-                // The secret key is used to run the webserver flask app and also used to authorize
-                // requests to Celery workers when logs are retrieved.
-                env_var_from_secret(
-                    "AIRFLOW__WEBSERVER__SECRET_KEY",
-                    secret,
-                    "connections.secretKey",
-                ),
-                env_var_from_secret(
-                    "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
-                    secret,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
-                env_var_from_secret(
-                    "AIRFLOW__CELERY__RESULT_BACKEND",
-                    secret,
-                    "connections.celeryResultBackend",
-                ),
-                env_var_from_secret(
-                    "AIRFLOW__CELERY__BROKER_URL",
-                    secret,
-                    "connections.celeryBrokerUrl",
-                ),
-            ]
-        })
-        .unwrap_or_default();
-
-    if let Some(git_sync) = airflow.git_sync() {
-        add_git_sync_folder(git_sync, &mut env);
-    }
-
-    if airflow.spec.cluster_config.load_examples {
-        env.push(EnvVar {
-            name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
-            value: Some("True".into()),
-            ..Default::default()
-        })
-    } else {
-        env.push(EnvVar {
-            name: "AIRFLOW__CORE__LOAD_EXAMPLES".into(),
-            value: Some("False".into()),
-            ..Default::default()
-        })
-    }
-
-    if airflow.spec.cluster_config.expose_config {
-        env.push(EnvVar {
-            name: "AIRFLOW__WEBSERVER__EXPOSE_CONFIG".into(),
-            value: Some("True".into()),
-            ..Default::default()
-        })
-    }
-
-    env.push(EnvVar {
-        name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: Some(executor.to_string()),
-        ..Default::default()
-    });
-
-    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
-        env.push(EnvVar {
-            name: "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE".into(),
-            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
-            ..Default::default()
-        });
-        env.push(EnvVar {
-            name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
-            value: airflow.namespace(),
-            ..Default::default()
-        });
-    }
-
-    env
-}
-
-fn build_template_envs(
-    airflow: &AirflowCluster,
-    env_overrides: &HashMap<String, String>,
-) -> Vec<EnvVar> {
-    let secret_prop = Some(airflow.spec.cluster_config.credentials_secret.as_str());
-
-    let mut env = secret_prop
-        .map(|secret| {
-            vec![env_var_from_secret(
-                "AIRFLOW__CORE__SQL_ALCHEMY_CONN",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            )]
-        })
-        .unwrap_or_default();
-
-    env.push(EnvVar {
-        name: "AIRFLOW__CORE__EXECUTOR".into(),
-        value: Some("LocalExecutor".to_string()),
-        ..Default::default()
-    });
-    env.push(EnvVar {
-        name: "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE".into(),
-        value: airflow.namespace(),
-        ..Default::default()
-    });
-
-    // iterate over a BTreeMap to ensure the vars are written in a predictable order
-    for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        env.push(EnvVar {
-            name: k.to_string(),
-            value: Some(v.to_string()),
-            ..Default::default()
-        });
-    }
-
-    if let Some(git_sync) = airflow.git_sync() {
-        add_git_sync_folder(git_sync, &mut env);
-    }
-
-    env
-}
-
-fn add_git_sync_folder(git_sync: &GitSync, env: &mut Vec<EnvVar>) {
-    if let Some(dags_folder) = &git_sync.git_folder {
-        env.push(EnvVar {
-            name: "AIRFLOW__CORE__DAGS_FOLDER".into(),
-            value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-            ..Default::default()
-        });
-
-        env.push(EnvVar {
-            // PYTHONPATH must be extended to include the dags folder used for gitsync-ed
-            // artifacts so that airflow can find dag-dependencies.
-            name: "PYTHONPATH".into(),
-            value: Some(format!("{LOG_CONFIG_DIR}:$AIRFLOW__CORE__DAGS_FOLDER")),
-            ..Default::default()
-        });
-    }
-    env.push(EnvVar {
-        name: "PYTHONPATH".into(),
-        value: Some(LOG_CONFIG_DIR.into()),
-        ..Default::default()
-    });
-}
-
-fn build_gitsync_envs(
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-) -> Vec<EnvVar> {
-    let mut env = vec![];
-    if let Some(git_secret) = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY))
-    {
-        add_git_credentials(&mut env, git_secret);
-    }
-
-    env
-}
-
-fn build_static_envs() -> Vec<EnvVar> {
-    [
-        EnvVar {
-            name: "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS".into(),
-            value: Some("log_config.LOGGING_CONFIG".into()),
-            ..Default::default()
-        },
-        EnvVar {
-            name: "AIRFLOW__METRICS__STATSD_ON".into(),
-            value: Some("True".into()),
-            ..Default::default()
-        },
-        EnvVar {
-            name: "AIRFLOW__METRICS__STATSD_HOST".into(),
-            value: Some("0.0.0.0".into()),
-            ..Default::default()
-        },
-        EnvVar {
-            name: "AIRFLOW__METRICS__STATSD_PORT".into(),
-            value: Some("9125".into()),
-            ..Default::default()
-        },
-        // Authentication for the API is handled separately to the Web Authentication.
-        // Basic authentication is used by the integration tests.
-        // The default is to deny all requests to the API.
-        EnvVar {
-            name: "AIRFLOW__API__AUTH_BACKEND".into(),
-            value: Some("airflow.api.auth.backend.basic_auth".into()),
-            ..Default::default()
-        },
-    ]
-    .into()
 }
 
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
