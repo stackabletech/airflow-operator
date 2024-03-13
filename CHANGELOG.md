@@ -6,7 +6,7 @@
 
 - More CRD documentation ([#354]).
 - Helm: support labels in values.yaml ([#374]).
-- Support for version `2.7.3`, `2.8.3` ([#387], [#xxx]).
+- Support for version `2.7.3`, `2.8.3` ([#387], [#403]).
 
 ### Changed
 
