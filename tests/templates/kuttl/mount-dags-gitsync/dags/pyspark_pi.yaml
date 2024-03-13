@@ -1,0 +1,35 @@
+---
+apiVersion: spark.stackable.tech/v1alpha1
+kind: SparkApplication
+metadata:
+  name: pyspark-pi
+spec:
+  sparkImage:
+    productVersion: 3.5.0
+  mode: cluster
+  mainApplicationFile: local:///stackable/spark/examples/src/main/python/pi.py
+  job:
+    config:
+      resources:
+        cpu:
+          min: 500m
+          max: 500m
+        memory:
+          limit: 512Mi
+  driver:
+    config:
+      resources:
+        cpu:
+          min: 1000m
+          max: 1200m
+        memory:
+          limit: 1024Mi
+  executor:
+    config:
+      resources:
+        cpu:
+          min: 500m
+          max: 1000m
+        memory:
+          limit: 1024Mi
+    replicas: 3

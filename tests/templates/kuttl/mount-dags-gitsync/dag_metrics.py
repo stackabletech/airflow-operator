@@ -11,6 +11,7 @@ def exception_handler(exception_type, exception, traceback):
 
 sys.excepthook = exception_handler
 
+
 def assert_metric(role, metric):
     response = requests.get(f'http://airflow-{role}-default:9102/metrics')
     assert response.status_code == 200, \
@@ -20,7 +21,7 @@ def assert_metric(role, metric):
 
 
 # Trigger a DAG run to create metrics
-dag_id = 'date_demo'
+dag_id = 'sparkapp_dag'
 
 rest_url = 'http://airflow-webserver-default:8080/api/v1'
 auth = ('airflow', 'airflow')
@@ -39,4 +40,4 @@ time.sleep(4)
 assert_metric('scheduler', 'airflow_scheduler_heartbeat')
 
 # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
-assert_metric('scheduler', 'airflow_dagrun_duration_success_date_demo_count')
+assert_metric('scheduler', 'airflow_dagrun_duration_success_sparkapp_dag_count')
