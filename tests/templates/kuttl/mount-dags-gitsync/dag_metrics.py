@@ -21,7 +21,7 @@ def assert_metric(role, metric):
 
 
 # Trigger a DAG run to create metrics
-dag_id = 'sparkapp_dag'
+dag_id = 'date_demo'
 
 rest_url = 'http://airflow-webserver-default:8080/api/v1'
 auth = ('airflow', 'airflow')
@@ -40,4 +40,4 @@ time.sleep(4)
 assert_metric('scheduler', 'airflow_scheduler_heartbeat')
 
 # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
-assert_metric('scheduler', 'airflow_dagrun_duration_success_sparkapp_dag_count')
+assert_metric('scheduler', 'airflow_dagrun_duration_success_date_demo_count')

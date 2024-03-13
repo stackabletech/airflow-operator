@@ -135,7 +135,7 @@ with DAG(
         catchup=False,
         dagrun_timeout=timedelta(minutes=60),
         tags=['example'],
-        params={"example_key": "example_value"},
+        params={},
 ) as dag:
 
     def load_body_to_dict(body):
@@ -155,6 +155,8 @@ with DAG(
     document = load_body_to_dict(crd)
     application_name = 'pyspark-pi-' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
     document.update({'metadata': {'name': application_name, 'namespace': ns}})
+    print(f"application_name: {application_name}")
+    print(f"document: {document}")
 
     t1 = SparkKubernetesOperator(
         task_id='spark_pi_submit',
