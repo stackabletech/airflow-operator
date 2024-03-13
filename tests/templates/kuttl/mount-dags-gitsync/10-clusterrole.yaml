@@ -1,0 +1,49 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: airflow-spark-clusterrole
+rules:
+  - apiGroups:
+      - spark.stackable.tech
+    resources:
+      - sparkapplications
+    verbs:
+      - create
+      - get
+      - list
+  - apiGroups:
+      - airflow.stackable.tech
+    resources:
+      - airflowdbs
+    verbs:
+      - create
+      - get
+      - list
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: airflow-spark-clusterrole-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: airflow-spark-clusterrole
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts

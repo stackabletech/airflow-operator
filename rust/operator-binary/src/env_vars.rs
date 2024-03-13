@@ -201,7 +201,6 @@ pub fn build_airflow_statefulset_envs(
 
     // apply overrides last of all with a fixed ordering
     if let Some(env_vars) = env_vars {
-        tracing::info!("env_vars [{:?}]", &env_vars);
         for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
             env.insert(
                 k.into(),
@@ -214,7 +213,7 @@ pub fn build_airflow_statefulset_envs(
         }
     }
 
-    tracing::info!("Final Env [{:?}]", env);
+    tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
 }
 
@@ -298,6 +297,7 @@ pub fn build_gitsync_statefulset_envs(
         ));
     }
 
+    tracing::debug!("Env-var set [{:?}]", env);
     env
 }
 
@@ -349,6 +349,7 @@ pub fn build_airflow_template_envs(
         );
     }
 
+    tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
 }
 
@@ -367,6 +368,7 @@ pub fn build_gitsync_template(credentials_secret: &Option<String>) -> Vec<EnvVar
             "password",
         ));
     }
+    tracing::debug!("Env-var set [{:?}]", env);
     env
 }
 
