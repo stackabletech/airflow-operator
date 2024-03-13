@@ -40,123 +40,189 @@ pub fn build_airflow_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
 ) -> Vec<EnvVar> {
-    let mut env = vec![];
+    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.extend(static_envs());
 
-    let secret_prop = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
+    // environment variables
+    let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
 
-    let secret_env = secret_prop
-        .map(|secret| {
-            vec![
-                // The secret key is used to run the webserver flask app and also used to authorize
-                // requests to Celery workers when logs are retrieved.
-                env_var_from_secret(
-                    AIRFLOW__WEBSERVER__SECRET_KEY,
-                    secret,
-                    "connections.secretKey",
-                ),
-                env_var_from_secret(
-                    AIRFLOW__CORE__SQL_ALCHEMY_CONN,
-                    secret,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
-                env_var_from_secret(
-                    AIRFLOW__CELERY__RESULT_BACKEND,
-                    secret,
-                    "connections.celeryResultBackend",
-                ),
-                env_var_from_secret(
-                    AIRFLOW__CELERY__BROKER_URL,
-                    secret,
-                    "connections.celeryBrokerUrl",
-                ),
-            ]
-        })
-        .unwrap_or_default();
+    let secret_prop =
+        env_vars.and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
 
-    env.extend(secret_env);
+    if let Some(secret) = secret_prop {
+        env.insert(
+            AIRFLOW__WEBSERVER__SECRET_KEY.into(),
+            // The secret key is used to run the webserver flask app and also used to authorize
+            // requests to Celery workers when logs are retrieved.
+            env_var_from_secret(
+                AIRFLOW__WEBSERVER__SECRET_KEY,
+                secret,
+                "connections.secretKey",
+            ),
+        );
+        env.insert(
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN.into(),
+            env_var_from_secret(
+                AIRFLOW__CORE__SQL_ALCHEMY_CONN,
+                secret,
+                "connections.sqlalchemyDatabaseUri",
+            ),
+        );
+        env.insert(
+            AIRFLOW__CELERY__RESULT_BACKEND.into(),
+            env_var_from_secret(
+                AIRFLOW__CELERY__RESULT_BACKEND,
+                secret,
+                "connections.celeryResultBackend",
+            ),
+        );
+        env.insert(
+            AIRFLOW__CELERY__BROKER_URL.into(),
+            env_var_from_secret(
+                AIRFLOW__CELERY__BROKER_URL,
+                secret,
+                "connections.celeryBrokerUrl",
+            ),
+        );
+    }
 
     if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
     {
-        env.push(EnvVar {
-            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-            value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW__CORE__DAGS_FOLDER.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            },
+        );
     } else {
-        // if this has not been set for dag-provisioning visa gitsync (above), set the default value so that
-        // PYTHONPATH can refer to this. See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-        env.push(EnvVar {
-            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-            value: Some("$AIRFLOW_HOME/dags".to_string()),
-            ..Default::default()
-        });
+        // if this has not been set for dag-provisioning visa gitsync (above), set the default value
+        // so that PYTHONPATH can refer to this.
+        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+        env.insert(
+            AIRFLOW__CORE__DAGS_FOLDER.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+                value: Some("$AIRFLOW_HOME/dags".to_string()),
+                ..Default::default()
+            },
+        );
     }
 
     if airflow.spec.cluster_config.load_examples {
-        env.push(EnvVar {
-            name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
-            value: Some("True".into()),
-            ..Default::default()
-        })
+        env.insert(
+            AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+                value: Some("True".into()),
+                ..Default::default()
+            },
+        );
     } else {
-        env.push(EnvVar {
-            name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
-            value: Some("False".into()),
-            ..Default::default()
-        })
+        env.insert(
+            AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+                value: Some("False".into()),
+                ..Default::default()
+            },
+        );
     }
 
     if airflow.spec.cluster_config.expose_config {
-        env.push(EnvVar {
-            name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG.into(),
-            value: Some("True".into()),
-            ..Default::default()
-        })
+        env.insert(
+            AIRFLOW__WEBSERVER__EXPOSE_CONFIG.into(),
+            EnvVar {
+                name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG.into(),
+                value: Some("True".into()),
+                ..Default::default()
+            },
+        );
     }
 
-    env.push(EnvVar {
-        name: AIRFLOW__CORE__EXECUTOR.into(),
-        value: Some(executor.to_string()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW__CORE__EXECUTOR.into(),
+        EnvVar {
+            name: AIRFLOW__CORE__EXECUTOR.into(),
+            value: Some(executor.to_string()),
+            ..Default::default()
+        },
+    );
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
-        env.push(EnvVar {
-            name: AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE.into(),
-            value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
-            ..Default::default()
-        });
-        env.push(EnvVar {
-            name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
-            value: airflow.namespace(),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE.into(),
+            EnvVar {
+                name: AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE.into(),
+                value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
+                ..Default::default()
+            },
+        );
+        env.insert(
+            AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+            EnvVar {
+                name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+                value: airflow.namespace(),
+                ..Default::default()
+            },
+        );
     }
 
-    // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
+    // Database initialization is limited to the scheduler.
+    // See https://github.com/stackabletech/airflow-operator/issues/259
     if airflow_role == &AirflowRole::Scheduler {
         let secret = &airflow.spec.cluster_config.credentials_secret;
-        env.extend(vec![
+        env.insert(
+            ADMIN_USERNAME.into(),
             env_var_from_secret(ADMIN_USERNAME, secret, "adminUser.username"),
+        );
+        env.insert(
+            ADMIN_FIRSTNAME.into(),
             env_var_from_secret(ADMIN_FIRSTNAME, secret, "adminUser.firstname"),
+        );
+        env.insert(
+            ADMIN_LASTNAME.into(),
             env_var_from_secret(ADMIN_LASTNAME, secret, "adminUser.lastname"),
+        );
+        env.insert(
+            ADMIN_EMAIL.into(),
             env_var_from_secret(ADMIN_EMAIL, secret, "adminUser.email"),
+        );
+        env.insert(
+            ADMIN_PASSWORD.into(),
             env_var_from_secret(ADMIN_PASSWORD, secret, "adminUser.password"),
-        ]);
+        );
     }
 
-    env
+    // apply overrides last of all with a fixed ordering
+    if let Some(env_vars) = env_vars {
+        tracing::info!("env_vars [{:?}]", &env_vars);
+        for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
+            env.insert(
+                k.into(),
+                EnvVar {
+                    name: k.to_string(),
+                    value: Some(v.to_string()),
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    tracing::info!("Final Env [{:?}]", env);
+    transform_map_to_vec(env)
 }
 
-fn static_envs() -> Vec<EnvVar> {
-    [
+fn static_envs() -> BTreeMap<String, EnvVar> {
+    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+    env.insert(
+        PYTHONPATH.into(),
         EnvVar {
             // PYTHONPATH must be extended to include the dags folder so that dag
             // dependencies can be found.
@@ -164,26 +230,45 @@ fn static_envs() -> Vec<EnvVar> {
             value: Some(format!("{LOG_CONFIG_DIR}:${AIRFLOW__CORE__DAGS_FOLDER}")),
             ..Default::default()
         },
+    );
+    env.insert(
+        AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS.into(),
         EnvVar {
             name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS.into(),
             value: Some("log_config.LOGGING_CONFIG".into()),
             ..Default::default()
         },
+    );
+
+    env.insert(
+        AIRFLOW__METRICS__STATSD_ON.into(),
         EnvVar {
             name: AIRFLOW__METRICS__STATSD_ON.into(),
             value: Some("True".into()),
             ..Default::default()
         },
+    );
+
+    env.insert(
+        AIRFLOW__METRICS__STATSD_HOST.into(),
         EnvVar {
             name: AIRFLOW__METRICS__STATSD_HOST.into(),
             value: Some("0.0.0.0".into()),
             ..Default::default()
         },
+    );
+
+    env.insert(
+        AIRFLOW__METRICS__STATSD_PORT.into(),
         EnvVar {
             name: AIRFLOW__METRICS__STATSD_PORT.into(),
             value: Some("9125".into()),
             ..Default::default()
         },
+    );
+
+    env.insert(
+        AIRFLOW__API__AUTH_BACKEND.into(),
         // Authentication for the API is handled separately to the Web Authentication.
         // Basic authentication is used by the integration tests.
         // The default is to deny all requests to the API.
@@ -192,8 +277,8 @@ fn static_envs() -> Vec<EnvVar> {
             value: Some("airflow.api.auth.backend.basic_auth".into()),
             ..Default::default()
         },
-    ]
-    .into()
+    );
+    env
 }
 
 pub fn build_gitsync_statefulset_envs(
@@ -220,41 +305,51 @@ pub fn build_airflow_template_envs(
     airflow: &AirflowCluster,
     env_overrides: &HashMap<String, String>,
 ) -> Vec<EnvVar> {
-    let secret_prop = Some(airflow.spec.cluster_config.credentials_secret.as_str());
+    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
-    let mut env = secret_prop
-        .map(|secret| {
-            vec![env_var_from_secret(
-                AIRFLOW__CORE__SQL_ALCHEMY_CONN,
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            )]
-        })
-        .unwrap_or_default();
+    env.insert(
+        AIRFLOW__CORE__SQL_ALCHEMY_CONN.into(),
+        env_var_from_secret(
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN,
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        ),
+    );
 
-    env.push(EnvVar {
-        name: AIRFLOW__CORE__EXECUTOR.into(),
-        value: Some("LocalExecutor".to_string()),
-        ..Default::default()
-    });
-    env.push(EnvVar {
-        name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
-        value: airflow.namespace(),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW__CORE__EXECUTOR.into(),
+        EnvVar {
+            name: AIRFLOW__CORE__EXECUTOR.into(),
+            value: Some("LocalExecutor".to_string()),
+            ..Default::default()
+        },
+    );
+
+    env.insert(
+        AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+        EnvVar {
+            name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        },
+    );
 
     env.extend(static_envs());
 
     // iterate over a BTreeMap to ensure the vars are written in a predictable order
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        env.push(EnvVar {
-            name: k.to_string(),
-            value: Some(v.to_string()),
-            ..Default::default()
-        });
+        env.insert(
+            k.to_string(),
+            EnvVar {
+                name: k.to_string(),
+                value: Some(v.to_string()),
+                ..Default::default()
+            },
+        );
     }
 
-    env
+    transform_map_to_vec(env)
 }
 
 pub fn build_gitsync_template(credentials_secret: &Option<String>) -> Vec<EnvVar> {
@@ -273,4 +368,8 @@ pub fn build_gitsync_template(credentials_secret: &Option<String>) -> Vec<EnvVar
         ));
     }
     env
+}
+
+fn transform_map_to_vec(env_map: BTreeMap<String, EnvVar>) -> Vec<EnvVar> {
+    env_map.into_values().collect::<Vec<EnvVar>>()
 }

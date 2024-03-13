@@ -31,7 +31,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EmptyDirVolumeSource, EnvVar, Probe, Service, ServicePort, ServiceSpec,
+                ConfigMap, EmptyDirVolumeSource, Probe, Service, ServicePort, ServiceSpec,
                 TCPSocketAction,
             },
         },
@@ -842,19 +842,6 @@ fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    // environment variables
-    let env_config = rolegroup_config
-        .get(&PropertyNameKind::Env)
-        .iter()
-        .flat_map(|env_vars| env_vars.iter())
-        .map(|(k, v)| EnvVar {
-            name: k.clone(),
-            value: Some(v.clone()),
-            ..EnvVar::default()
-        })
-        .collect::<Vec<_>>();
-
-    airflow_container.add_env_vars(env_config);
     airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
         airflow,
         airflow_role,
