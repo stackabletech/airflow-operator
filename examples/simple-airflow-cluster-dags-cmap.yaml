@@ -81,7 +81,7 @@ metadata:
   name: airflow-dags-cmap
 spec:
   image:
-    productVersion: 2.8.1
+    productVersion: 2.8.3
     stackableVersion: 0.0.0-dev
   clusterConfig:
     loadExamples: false
