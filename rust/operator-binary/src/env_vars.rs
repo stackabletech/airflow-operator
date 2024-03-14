@@ -87,32 +87,8 @@ pub fn build_airflow_statefulset_envs(
         );
     }
 
-    if let Some(GitSync {
-        git_folder: Some(dags_folder),
-        ..
-    }) = airflow.git_sync()
-    {
-        env.insert(
-            AIRFLOW__CORE__DAGS_FOLDER.into(),
-            EnvVar {
-                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-                ..Default::default()
-            },
-        );
-    } else {
-        // if this has not been set for dag-provisioning visa gitsync (above), set the default value
-        // so that PYTHONPATH can refer to this.
-        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-        env.insert(
-            AIRFLOW__CORE__DAGS_FOLDER.into(),
-            EnvVar {
-                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-                value: Some("$AIRFLOW_HOME/dags".to_string()),
-                ..Default::default()
-            },
-        );
-    }
+    let (var_name, dags_folder) = get_dags_folder(airflow);
+    env.insert(var_name, dags_folder);
 
     if airflow.spec.cluster_config.load_examples {
         env.insert(
@@ -215,6 +191,35 @@ pub fn build_airflow_statefulset_envs(
 
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
+}
+
+fn get_dags_folder(airflow: &AirflowCluster) -> (String, EnvVar) {
+    return if let Some(GitSync {
+        git_folder: Some(dags_folder),
+        ..
+    }) = airflow.git_sync()
+    {
+        (
+            AIRFLOW__CORE__DAGS_FOLDER.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
+                ..Default::default()
+            },
+        )
+    } else {
+        // if this has not been set for dag-provisioning visa gitsync (above), set the default value
+        // so that PYTHONPATH can refer to this.
+        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+        (
+            AIRFLOW__CORE__DAGS_FOLDER.into(),
+            EnvVar {
+                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+                value: Some("$AIRFLOW_HOME/dags".to_string()),
+                ..Default::default()
+            },
+        )
+    };
 }
 
 fn static_envs() -> BTreeMap<String, EnvVar> {
@@ -334,6 +339,9 @@ pub fn build_airflow_template_envs(
             ..Default::default()
         },
     );
+
+    let (var_name, dags_folder) = get_dags_folder(airflow);
+    env.insert(var_name, dags_folder);
 
     env.extend(static_envs());
 
