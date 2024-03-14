@@ -32,4 +32,4 @@ spec:
           max: 1000m
         memory:
           limit: 1024Mi
-    replicas: 3
+    replicas: 1
