@@ -8,6 +8,7 @@ from airflow.models import BaseOperator
 from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 from airflow.utils import yaml
 import os
+import json
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
@@ -39,7 +40,7 @@ class SparkKubernetesOperator(BaseOperator):
     def execute(self, context: 'Context'):
         hook = KubernetesHook(conn_id=self.kubernetes_conn_id)
         self.log.info("Creating SparkApplication...")
-        self.log.info("File: " + self.application_file)
+        self.log.info(json.dumps(self.application_file, indent=4))
         response = hook.create_custom_object(
             group=self.api_group,
             version=self.api_version,
