@@ -35,7 +35,7 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
-/// for clusters utilising `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
+/// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
 pub fn build_airflow_statefulset_envs(
     airflow: &AirflowCluster,
@@ -291,7 +291,7 @@ fn static_envs() -> BTreeMap<String, EnvVar> {
 }
 
 /// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
-/// webserver (and worker, for clusters utilising `celeryExecutor`).
+/// webserver (and worker, for clusters utilizing `celeryExecutor`).
 pub fn build_gitsync_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
