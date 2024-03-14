@@ -34,6 +34,9 @@ const ADMIN_LASTNAME: &str = "ADMIN_LASTNAME";
 const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
 
+/// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
+/// for clusters utilising `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
+/// used which is defined in [`build_airflow_template_envs`]).
 pub fn build_airflow_statefulset_envs(
     airflow: &AirflowCluster,
     airflow_role: &AirflowRole,
@@ -222,6 +225,8 @@ fn get_dags_folder(airflow: &AirflowCluster) -> (String, EnvVar) {
     };
 }
 
+// This set of environment variables is a standard set that is not dependent on any
+// conditional logic and should be applied to the statefulset or the executor template config map.
 fn static_envs() -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -285,6 +290,8 @@ fn static_envs() -> BTreeMap<String, EnvVar> {
     env
 }
 
+/// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
+/// webserver (and worker, for clusters utilising `celeryExecutor`).
 pub fn build_gitsync_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Vec<EnvVar> {
@@ -306,6 +313,8 @@ pub fn build_gitsync_statefulset_envs(
     env
 }
 
+/// Return environment variables to be applied to the configuration map used in conjunction with
+/// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
     airflow: &AirflowCluster,
     env_overrides: &HashMap<String, String>,
@@ -340,6 +349,8 @@ pub fn build_airflow_template_envs(
         },
     );
 
+    // the config map also requires the dag-folder location as this will be passed on
+    // to the pods started by airflow.
     let (var_name, dags_folder) = get_dags_folder(airflow);
     env.insert(var_name, dags_folder);
 
@@ -361,6 +372,8 @@ pub fn build_airflow_template_envs(
     transform_map_to_vec(env)
 }
 
+/// Return environment variables to be applied to the configuration map used in conjunction with
+/// the `kubernetesExecutor` worker: applied to the gitsync `initContainer`.
 pub fn build_gitsync_template(credentials_secret: &Option<String>) -> Vec<EnvVar> {
     let mut env = vec![];
 
@@ -380,6 +393,8 @@ pub fn build_gitsync_template(credentials_secret: &Option<String>) -> Vec<EnvVar
     env
 }
 
+// Internally the environment variable collection uses a map so that overrides can actually
+// override existing keys. The returned collection will be a vector.
 fn transform_map_to_vec(env_map: BTreeMap<String, EnvVar>) -> Vec<EnvVar> {
     env_map.into_values().collect::<Vec<EnvVar>>()
 }
