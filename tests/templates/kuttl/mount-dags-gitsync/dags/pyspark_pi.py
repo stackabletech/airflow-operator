@@ -39,6 +39,7 @@ class SparkKubernetesOperator(BaseOperator):
     def execute(self, context: 'Context'):
         hook = KubernetesHook(conn_id=self.kubernetes_conn_id)
         self.log.info("Creating SparkApplication...")
+        self.log.info("File: " + self.application_file)
         response = hook.create_custom_object(
             group=self.api_group,
             version=self.api_version,
@@ -155,8 +156,6 @@ with DAG(
     document = load_body_to_dict(crd)
     application_name = 'pyspark-pi-' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
     document.update({'metadata': {'name': application_name, 'namespace': ns}})
-    print(f"application_name: {application_name}")
-    print(f"document: {document}")
 
     t1 = SparkKubernetesOperator(
         task_id='spark_pi_submit',
