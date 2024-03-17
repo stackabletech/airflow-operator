@@ -6,6 +6,7 @@ import collections.abc
 import contextlib
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -182,13 +183,13 @@ def release_file(
             patch_version = ""
             for line in f:
                 if patch_version:
-                    line = line.replace("0.0.0-dev", patch_version)
+                    line = re.sub(":.+$", f": {patch_version}", line)
                     patch_version = ""
                 else:
                     for op, version in ops_copy:
                         if op in line:
                             patch_version = version
-                            ops_copy.remove((op, version))
+                            ops_copy.remove((op, version))  # found an operator to patch
                             break
                 patched_release.append(line)
         if ops_copy:
@@ -287,14 +288,18 @@ def gen_tests(test_suite: str) -> None:
         raise TestRunnerException()
 
 
-def run_tests(test: str, parallel: int) -> None:
+def run_tests(test: str, parallel: int, skip_delete: bool) -> None:
     try:
         kuttl_cmd = ["kubectl-kuttl", "test"]
         if test:
             kuttl_cmd.extend(["--test", test])
         if parallel:
             kuttl_cmd.extend(["--parallel", str(parallel)])
+        if skip_delete:
+            kuttl_cmd.extend(["--skip-delete"])
+
         logging.debug(f"Running : {kuttl_cmd}")
+
         subprocess.run(
             kuttl_cmd,
             cwd="tests/_work",
@@ -314,7 +319,7 @@ def main(argv) -> int:
         gen_tests(opts.test_suite)
         with release_file(opts.operator) as f:
             maybe_install_release(opts.skip_release, f)
-        run_tests(opts.test, opts.parallel)
+        run_tests(opts.test, opts.parallel, opts.skip_delete)
     except TestRunnerException:
         ret = 1
     return ret
