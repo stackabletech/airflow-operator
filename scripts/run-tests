@@ -2,6 +2,7 @@
 # vim: filetype=python syntax=python tabstop=4 expandtab
 
 import argparse
+import contextlib
 import logging
 import os
 import shutil
@@ -123,70 +124,104 @@ def have_requirements() -> None:
         raise TestRunnerException()
 
 
-def maybe_patch_release(operators: list[tuple[str, str]] = []) -> str:
+@contextlib.contextmanager
+def maybe_patch_release(skip_release: bool, operators: list[tuple[str, str]] = []):
     release_file = os.path.join(
         os.path.dirname(sys.argv[0]), "..", "tests", "release.yaml"
     )
-    if not operators:
-        logging.debug("No operators to patch")
-        return release_file
-    # Make a copy so we can mutate it without affecting the original
-    ops_copy = operators.copy()
-    patched_release = []
-    with open(release_file, "r") as f:
-        patch_version = ""
-        for line in f:
-            if patch_version:
-                line = line.replace("0.0.0-dev", patch_version)
-                patch_version = ""
-            else:
-                for op, version in ops_copy:
-                    if op in line:
-                        patch_version = version
-                        ops_copy.remove((op, version))
-                        break
-            patched_release.append(line)
-    if ops_copy:
-        logging.error(
-            f"Operators {', '.join([op for op, _ in ops_copy])} not found in release.yaml"
-        )
-        raise TestRunnerException()
-    with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, delete_on_close=False
-    ) as f:
-        pcontents = "".join(patched_release)
-        logging.debug(f"Writing patched release to {f.name}: {pcontents}\n")
-        f.write(pcontents)
-        return f.name
+    if skip_release or not operators:
+        logging.debug("No operators to patch or skipping release installation")
+    else:
+        # Make a copy so we can mutate it without affecting the original
+        ops_copy = operators.copy()
+        patched_release = []
+        with open(release_file, "r") as f:
+            patch_version = ""
+            for line in f:
+                if patch_version:
+                    line = line.replace("0.0.0-dev", patch_version)
+                    patch_version = ""
+                else:
+                    for op, version in ops_copy:
+                        if op in line:
+                            patch_version = version
+                            ops_copy.remove((op, version))
+                            break
+                patched_release.append(line)
+        if ops_copy:
+            logging.error(
+                f"Operators {', '.join([op for op, _ in ops_copy])} not found in release.yaml"
+            )
+            raise TestRunnerException()
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            delete=False,
+            delete_on_close=False,
+            prefix="patched",
+        ) as f:
+            pcontents = "".join(patched_release)
+            logging.debug(f"Writing patched release to {f.name}: {pcontents}\n")
+            f.write(pcontents)
+            release_file = f.name
+    try:
+        yield release_file
+    except TestRunnerException as e:
+        logging.error(f"Caught exception: {e}")
+        raise
+    finally:
+        if "patched" in release_file:
+            try:
+                logging.debug(f"Removing patched release file : {release_file}")
+                os.remove(release_file)
+            except FileNotFoundError | OSError:
+                logging.error(f"Failed to delete patched release file: {release_file}")
 
 
 def maybe_install_release(skip_release: bool, release_file: str) -> None:
     if skip_release:
         logging.debug("Skipping release installation")
         return
-    logging.debug(
-        f"Installing release: stackablectl release install --release-file {release_file} tests"
-    )
+    stackablectl_err = ""
     try:
-        subprocess.run(
-            [
-                "stackablectl",
-                "release",
-                "install",
-                "--release-file",
-                release_file,
-                "tests",
-            ],
+        stackablectl_cmd = [
+            "stackablectl",
+            "release",
+            "install",
+            "--release-file",
+            release_file,
+            "tests",
+        ]
+        logging.debug(f"Installing release: {stackablectl_cmd}")
+
+        completed_proc = subprocess.run(
+            stackablectl_cmd,
+            capture_output=True,
             check=True,
         )
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to install release: {e.stderr}")
+        # stackablectl doesn't return a non-zero exit code on failure
+        # so we need to check stderr for errors
+        stackablectl_err = completed_proc.stderr.decode("utf-8")
+        if "error" in stackablectl_err.lower():
+            logging.error(f"Failed to install release: {stackablectl_err}")
+            raise TestRunnerException()
+    except subprocess.CalledProcessError:
+        logging.error(f"Failed to install release: {stackablectl_err}")
         raise TestRunnerException()
 
 
 def gen_tests(test_suite: str) -> None:
     try:
-        beku_cmd = ["beku"]
+        beku_cmd = [
+            "beku",
+            "--test_definition",
+            "tests/test-definition.yaml",
+            "--kuttl_test",
+            "tests/kuttl-test.yaml.jinja2",
+            "--template_dir",
+            "tests/templates/kuttl",
+            "--output_dir",
+            "tests/_work",
+        ]
         if test_suite:
             beku_cmd.extend(["--suite", test_suite])
 
@@ -210,6 +245,7 @@ def run_tests(test: str, parallel: int) -> None:
         logging.debug(f"Running tests: {kuttl_cmd}")
         subprocess.run(
             kuttl_cmd,
+            cwd="tests/_work",
             check=True,
         )
     except subprocess.CalledProcessError as e:
@@ -224,8 +260,8 @@ def main(argv) -> int:
         logging.basicConfig(encoding="utf-8", level=opts.log_level)
         have_requirements()
         gen_tests(opts.test_suite)
-        release_file = maybe_patch_release(opts.operator)
-        maybe_install_release(opts.skip_release, release_file)
+        with maybe_patch_release(opts.skip_release, opts.operator) as release_file:
+            maybe_install_release(opts.skip_release, release_file)
         run_tests(opts.test, opts.parallel)
     except TestRunnerException:
         ret = 1
