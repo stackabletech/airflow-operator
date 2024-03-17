@@ -85,6 +85,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Patch operator version in release.yaml. Format <operator>=<version>",
         nargs="*",
         type=cli_parse_operator_args,
+        default=[],
     )
 
     parser.add_argument(
@@ -158,23 +159,22 @@ def have_requirements() -> None:
 
 
 @contextlib.contextmanager
-def maybe_patch_release(
-    skip_release: bool, operators: list[tuple[str, str]] = []
+def release_file(
+    operators: list[tuple[str, str]] = [],
 ) -> collections.abc.Generator[str, None, None]:
     """Patch release.yaml with operator versions if needed.
 
-    If no --operator or --skip-release is set, the default release file is used.
+    If no --operator is set, the default release file is used.
 
-    If an invalid operator name is provided, a TestRunnerException is raised.
+    If an invalid operator name is provided (i.e. one that doesn't exist in the
+    original release file), a TestRunnerException is raised.
 
-    Yields the name of the release file. This can be a patched file or the original release file.
-
-    If a patched file is created, it will be deleted after the context manager exits.
+    Yields the name of the (potentially patched) release file. This is a temporary
+    file that will be deleted when the context manager exits.
     """
-    release_file = os.path.join("tests", "release.yaml")
-    if skip_release or not operators:
-        logging.debug("No operators to patch or skipping release installation")
-    else:
+
+    def _patch():
+        release_file = os.path.join("tests", "release.yaml")
         # Make a copy so we can mutate it without affecting the original
         ops_copy = operators.copy()
         patched_release = []
@@ -192,6 +192,9 @@ def maybe_patch_release(
                             break
                 patched_release.append(line)
         if ops_copy:
+            # Some --operator args were not found in the release file. This is
+            # most likely a typo and CI pipelines should terminate early in such
+            # cases.
             logging.error(
                 f"Operators {', '.join([op for op, _ in ops_copy])} not found in {release_file}"
             )
@@ -205,7 +208,9 @@ def maybe_patch_release(
             pcontents = "".join(patched_release)
             logging.debug(f"Writing patched release to {f.name}: {pcontents}\n")
             f.write(pcontents)
-            release_file = f.name
+            return f.name
+
+    release_file = _patch()
     try:
         yield release_file
     except TestRunnerException as e:
@@ -222,7 +227,7 @@ def maybe_patch_release(
 
 def maybe_install_release(skip_release: bool, release_file: str) -> None:
     if skip_release:
-        logging.debug("Skipping release installation")
+        logging.debug("Skip release installation")
         return
     stackablectl_err = ""
     try:
@@ -234,7 +239,7 @@ def maybe_install_release(skip_release: bool, release_file: str) -> None:
             release_file,
             "tests",
         ]
-        logging.debug(f"Installing release: {stackablectl_cmd}")
+        logging.debug(f"Running : {stackablectl_cmd}")
 
         completed_proc = subprocess.run(
             stackablectl_cmd,
@@ -245,10 +250,14 @@ def maybe_install_release(skip_release: bool, release_file: str) -> None:
         # so we need to check stderr for errors
         stackablectl_err = completed_proc.stderr.decode("utf-8")
         if "error" in stackablectl_err.lower():
-            logging.error(f"Failed to install release: {stackablectl_err}")
+            logging.error(stackablectl_err)
+            logging.error("stackablectl failed")
             raise TestRunnerException()
+
     except subprocess.CalledProcessError:
-        logging.error(f"Failed to install release: {stackablectl_err}")
+        # in case stackablectl starts returning non-zero exit codes
+        logging.error(stackablectl_err)
+        logging.error("stackablectl failed")
         raise TestRunnerException()
 
 
@@ -268,13 +277,13 @@ def gen_tests(test_suite: str) -> None:
         if test_suite:
             beku_cmd.extend(["--suite", test_suite])
 
-        logging.debug(f"Generating tests : {beku_cmd}")
+        logging.debug(f"Running : {beku_cmd}")
         subprocess.run(
             beku_cmd,
             check=True,
         )
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to generate tests: {e.stderr}")
+    except subprocess.CalledProcessError:
+        logging.error("beku failed")
         raise TestRunnerException()
 
 
@@ -285,14 +294,14 @@ def run_tests(test: str, parallel: int) -> None:
             kuttl_cmd.extend(["--test", test])
         if parallel:
             kuttl_cmd.extend(["--parallel", str(parallel)])
-        logging.debug(f"Running tests: {kuttl_cmd}")
+        logging.debug(f"Running : {kuttl_cmd}")
         subprocess.run(
             kuttl_cmd,
             cwd="tests/_work",
             check=True,
         )
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to run tests: {e.stderr}")
+    except subprocess.CalledProcessError:
+        logging.error("kuttl failed")
         raise TestRunnerException()
 
 
@@ -303,8 +312,8 @@ def main(argv) -> int:
         logging.basicConfig(encoding="utf-8", level=opts.log_level)
         have_requirements()
         gen_tests(opts.test_suite)
-        with maybe_patch_release(opts.skip_release, opts.operator) as release_file:
-            maybe_install_release(opts.skip_release, release_file)
+        with release_file(opts.operator) as f:
+            maybe_install_release(opts.skip_release, f)
         run_tests(opts.test, opts.parallel)
     except TestRunnerException:
         ret = 1
