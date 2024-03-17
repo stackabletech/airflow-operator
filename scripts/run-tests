@@ -2,15 +2,46 @@
 # vim: filetype=python syntax=python tabstop=4 expandtab
 
 import argparse
+import collections.abc
 import contextlib
 import logging
 import os
 import shutil
-import sys
 import subprocess
+import sys
 import tempfile
 
 __version__ = "0.0.1"
+
+DESCRIPTION = """
+Run integration tests. Call this script from the root of the repository.
+
+Exits with 0 on success, 1 on failure.
+
+Requires the following commands to be installed:
+* beku
+* stackablectl
+* kubectl
+* kubectl-kuttl
+
+Examples:
+
+1. Install operators, run all tests and clean up test namespaces:
+
+    ./scripts/run-tests --parallel 4
+
+2. Install operators but for Airflow use version "0.0.0-pr123" instead of "0.0.0-dev" and run all tests as above:
+
+    ./scripts/run-tests --operator airflow=0.0.0-pr123 --parallel 4
+
+3. Do not install any operators, run the smoke test suite and keep namespace:
+
+    ./scripts/run-tests --skip-release --skip-delete --test-suite smoke-latest
+
+4. Run the ldap test(s) from the openshift test suite and keep namespace:
+
+    ./scripts/run-tests --skip-release --skip-delete --test-suite openshift --test ldap
+"""
 
 
 class TestRunnerException(Exception):
@@ -19,7 +50,9 @@ class TestRunnerException(Exception):
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line args."""
-    parser = argparse.ArgumentParser(description="Run integration tests.")
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "--version",
         help="Display application version",
@@ -125,10 +158,20 @@ def have_requirements() -> None:
 
 
 @contextlib.contextmanager
-def maybe_patch_release(skip_release: bool, operators: list[tuple[str, str]] = []):
-    release_file = os.path.join(
-        os.path.dirname(sys.argv[0]), "..", "tests", "release.yaml"
-    )
+def maybe_patch_release(
+    skip_release: bool, operators: list[tuple[str, str]] = []
+) -> collections.abc.Generator[str, None, None]:
+    """Patch release.yaml with operator versions if needed.
+
+    If no --operator or --skip-release is set, the default release file is used.
+
+    If an invalid operator name is provided, a TestRunnerException is raised.
+
+    Yields the name of the release file. This can be a patched file or the original release file.
+
+    If a patched file is created, it will be deleted after the context manager exits.
+    """
+    release_file = os.path.join("tests", "release.yaml")
     if skip_release or not operators:
         logging.debug("No operators to patch or skipping release installation")
     else:
@@ -150,7 +193,7 @@ def maybe_patch_release(skip_release: bool, operators: list[tuple[str, str]] = [
                 patched_release.append(line)
         if ops_copy:
             logging.error(
-                f"Operators {', '.join([op for op, _ in ops_copy])} not found in release.yaml"
+                f"Operators {', '.join([op for op, _ in ops_copy])} not found in {release_file}"
             )
             raise TestRunnerException()
         with tempfile.NamedTemporaryFile(
@@ -214,13 +257,13 @@ def gen_tests(test_suite: str) -> None:
         beku_cmd = [
             "beku",
             "--test_definition",
-            "tests/test-definition.yaml",
+            os.path.join("tests", "test-definition.yaml"),
             "--kuttl_test",
-            "tests/kuttl-test.yaml.jinja2",
+            os.path.join("tests", "kuttl-test.yaml.jinja2"),
             "--template_dir",
-            "tests/templates/kuttl",
+            os.path.join("tests", "templates", "kuttl"),
             "--output_dir",
-            "tests/_work",
+            os.path.join("tests", "_work"),
         ]
         if test_suite:
             beku_cmd.extend(["--suite", test_suite])
