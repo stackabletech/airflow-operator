@@ -45,7 +45,7 @@ pub fn build_airflow_statefulset_envs(
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    env.extend(static_envs());
+    env.extend(static_envs(airflow));
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -90,8 +90,15 @@ pub fn build_airflow_statefulset_envs(
         );
     }
 
-    let (var_name, dags_folder) = get_dags_folder(airflow);
-    env.insert(var_name, dags_folder);
+    let dags_folder = get_dags_folder(airflow);
+    env.insert(
+        AIRFLOW__CORE__DAGS_FOLDER.into(),
+        EnvVar {
+            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+            value: Some(dags_folder),
+            ..Default::default()
+        },
+    );
 
     if airflow.spec.cluster_config.load_examples {
         env.insert(
@@ -196,47 +203,39 @@ pub fn build_airflow_statefulset_envs(
     transform_map_to_vec(env)
 }
 
-fn get_dags_folder(airflow: &AirflowCluster) -> (String, EnvVar) {
+fn get_dags_folder(airflow: &AirflowCluster) -> String {
     return if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
     {
-        (
-            AIRFLOW__CORE__DAGS_FOLDER.into(),
-            EnvVar {
-                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-                value: Some(format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")),
-                ..Default::default()
-            },
-        )
+        format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")
     } else {
         // if this has not been set for dag-provisioning visa gitsync (above), set the default value
-        // so that PYTHONPATH can refer to this.
+        // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
+        // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-        (
-            AIRFLOW__CORE__DAGS_FOLDER.into(),
-            EnvVar {
-                name: AIRFLOW__CORE__DAGS_FOLDER.into(),
-                value: Some("$AIRFLOW_HOME/dags".to_string()),
-                ..Default::default()
-            },
-        )
+        "/stackable/airflow/dags".to_string()
     };
 }
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs() -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+    let dags_folder = get_dags_folder(airflow);
 
     env.insert(
         PYTHONPATH.into(),
         EnvVar {
             // PYTHONPATH must be extended to include the dags folder so that dag
-            // dependencies can be found.
+            // dependencies can be found: this must be the actual path and not a variable.
+            // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
             name: PYTHONPATH.into(),
-            value: Some(format!("{LOG_CONFIG_DIR}:$AIRFLOW__CORE__DAGS_FOLDER")),
+            value: Some(format!(
+                "{LOG_CONFIG_DIR}:{dags_folder}:/stackable/app/lib/python3.9/site-packages"
+            )),
             ..Default::default()
         },
     );
@@ -351,10 +350,17 @@ pub fn build_airflow_template_envs(
 
     // the config map also requires the dag-folder location as this will be passed on
     // to the pods started by airflow.
-    let (var_name, dags_folder) = get_dags_folder(airflow);
-    env.insert(var_name, dags_folder);
+    let dags_folder = get_dags_folder(airflow);
+    env.insert(
+        AIRFLOW__CORE__DAGS_FOLDER.into(),
+        EnvVar {
+            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+            value: Some(dags_folder),
+            ..Default::default()
+        },
+    );
 
-    env.extend(static_envs());
+    env.extend(static_envs(airflow));
 
     // iterate over a BTreeMap to ensure the vars are written in a predictable order
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {

@@ -3,8 +3,11 @@ from airflow import DAG
 from airflow.exceptions import AirflowException
 from airflow.utils import yaml
 import os
-from stackable.spark_kubernetes_sensor import SparkKubernetesSensor
-from stackable.spark_kubernetes_operator import SparkKubernetesOperator
+import sys
+print(sys.path)
+
+from stackable.spark_kubernetes_sensor import SparkKubernetesSensor  # noqa: E402
+from stackable.spark_kubernetes_operator import SparkKubernetesOperator  # noqa: E402
 
 
 with DAG(
