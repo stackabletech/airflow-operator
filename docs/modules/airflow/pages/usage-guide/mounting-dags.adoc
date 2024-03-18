@@ -52,3 +52,5 @@ include::example$example-airflow-gitsync.yaml[]
 
 
 IMPORTANT: The example above shows a _*list*_ of git-sync definitions, with a single element. This is to avoid breaking-changes in future releases. Currently, only one such git-sync definition is considered and processed.
+
+NOTE: git-sync can be used with DAGs that make use of modularized files, as python will be configured internally to use the git-sync target folder as the "root" location when looking for referenced files. See the xref:usage-guide/applying-custom-resources.adoc[] example for more details.

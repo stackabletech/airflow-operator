@@ -236,7 +236,7 @@ fn static_envs() -> BTreeMap<String, EnvVar> {
             // PYTHONPATH must be extended to include the dags folder so that dag
             // dependencies can be found.
             name: PYTHONPATH.into(),
-            value: Some(format!("{LOG_CONFIG_DIR}:${AIRFLOW__CORE__DAGS_FOLDER}")),
+            value: Some(format!("{LOG_CONFIG_DIR}:$AIRFLOW__CORE__DAGS_FOLDER")),
             ..Default::default()
         },
     );
