@@ -24,6 +24,8 @@
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#353]).
 - Fixed ordering of variables written to the kubernetes executor pod template ([#372]).
 - Fixed git-sync container running with KubernetesExecutor ([#381]).
+- Add missing `pods/log` RBAC permission for airflow. Previously this caused brief error
+  messages in the airflow task logs (`User "system:serviceaccount:default:airflow-serviceaccount" cannot get resource "pods/log" in API group "" in the namespace "default".`) ([#406]).
 
 ### Removed
 
@@ -40,6 +42,7 @@
 [#387]: https://github.com/stackabletech/airflow-operator/pull/387
 [#401]: https://github.com/stackabletech/airflow-operator/pull/401
 [#402]: https://github.com/stackabletech/airflow-operator/pull/402
+[#406]: https://github.com/stackabletech/airflow-operator/pull/406
 
 ## [23.11.0] - 2023-11-24
 
