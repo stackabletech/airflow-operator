@@ -34,8 +34,7 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
-      - name: git-sync
-        repo: https://github.com/stackabletech/airflow-operator
+      - repo: https://github.com/stackabletech/airflow-operator
         branch: "fix/dag-plugins" #"main"
         wait: 20
         gitSyncConf:

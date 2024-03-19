@@ -5,6 +5,7 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
     AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
@@ -13,6 +14,7 @@ use stackable_airflow_crd::{
     GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
     TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
+use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
 use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
@@ -27,6 +29,7 @@ use stackable_operator::{
         rbac::build_rbac_resources,
     },
     config::fragment::ValidationError,
+    k8s_openapi,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -924,35 +927,37 @@ fn build_server_rolegroup_statefulset(
     }
 
     if let Some(gitsync) = airflow.git_sync() {
-        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
-            .context(InvalidContainerNameSnafu)?
-            .add_env_vars(build_gitsync_statefulset_envs(rolegroup_config))
-            .image_from_product_image(resolved_product_image)
-            .command(vec![
-                "/bin/bash".to_string(),
-                "-x".to_string(),
-                "-euo".to_string(),
-                "pipefail".to_string(),
-                "-c".to_string(),
-            ])
-            .args(vec![gitsync.get_args(false).join("\n")])
-            .add_volume_mount(GIT_CONTENT, GIT_ROOT)
-            .resources(
-                ResourceRequirementsBuilder::new()
-                    .with_cpu_request("100m")
-                    .with_cpu_limit("200m")
-                    .with_memory_request("64Mi")
-                    .with_memory_limit("64Mi")
-                    .build(),
-            )
-            .build();
+        let gitsync_container = build_gitsync_container(
+            resolved_product_image,
+            &gitsync,
+            false,
+            &format!("{}-{}", GIT_SYNC_NAME, 1),
+            build_gitsync_statefulset_envs(rolegroup_config),
+        )?;
 
         pb.add_volume(
             VolumeBuilder::new(GIT_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         );
+
         pb.add_container(gitsync_container);
+
+        if let AirflowExecutor::CeleryExecutor { .. } = executor {
+            let gitsync_init_container = build_gitsync_container(
+                resolved_product_image,
+                &gitsync,
+                true,
+                &format!("{}-{}", GIT_SYNC_NAME, 0),
+                build_gitsync_statefulset_envs(rolegroup_config),
+            )?;
+            // If the DAG is modularized we may encounter a timing issue whereby the celery worker has started
+            // *before* all modules referenced by the DAG have been fetched by gitsync and registered. This
+            // will result in ModuleNotFoundError errors. This can be avoided by running a one-off git-sync
+            // process in an init-container so that all DAG dependencies are fully loaded. The sidecar
+            // git-sync is then used for regular updates.
+            pb.add_init_container(gitsync_init_container);
+        }
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
@@ -1084,7 +1089,6 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
-        // this sets the dags folder and PYTHONPATH if gitsync is being used
         .add_env_vars(build_airflow_template_envs(airflow, env_overrides))
         .add_volume_mounts(airflow.volume_mounts())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
@@ -1099,29 +1103,13 @@ fn build_executor_template_config_map(
     ));
 
     if let Some(gitsync) = airflow.git_sync() {
-        let gitsync_container = ContainerBuilder::new(&format!("{}-{}", GIT_SYNC_NAME, 1))
-            .context(InvalidContainerNameSnafu)?
-            .add_env_vars(build_gitsync_template(&gitsync.credentials_secret))
-            .image_from_product_image(resolved_product_image)
-            .command(vec![
-                "/bin/bash".to_string(),
-                "-x".to_string(),
-                "-euo".to_string(),
-                "pipefail".to_string(),
-                "-c".to_string(),
-            ])
-            .args(vec![gitsync.get_args(true).join("\n")])
-            .add_volume_mount(GIT_CONTENT, GIT_ROOT)
-            .resources(
-                ResourceRequirementsBuilder::new()
-                    .with_cpu_request("100m")
-                    .with_cpu_limit("200m")
-                    .with_memory_request("64Mi")
-                    .with_memory_limit("64Mi")
-                    .build(),
-            )
-            .build();
-
+        let gitsync_container = build_gitsync_container(
+            resolved_product_image,
+            &gitsync,
+            true,
+            &format!("{}-{}", GIT_SYNC_NAME, 0),
+            build_gitsync_template(&gitsync.credentials_secret),
+        )?;
         pb.add_volume(
             VolumeBuilder::new(GIT_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
@@ -1167,6 +1155,38 @@ fn build_executor_template_config_map(
         );
 
     cm_builder.build().context(PodTemplateConfigMapSnafu)
+}
+
+fn build_gitsync_container(
+    resolved_product_image: &ResolvedProductImage,
+    gitsync: &&GitSync,
+    one_time: bool,
+    name: &str,
+    env_vars: Vec<EnvVar>,
+) -> Result<k8s_openapi::api::core::v1::Container, Error> {
+    let gitsync_container = ContainerBuilder::new(name)
+        .context(InvalidContainerNameSnafu)?
+        .add_env_vars(env_vars)
+        .image_from_product_image(resolved_product_image)
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![gitsync.get_args(one_time).join("\n")])
+        .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("100m")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
+                .build(),
+        )
+        .build();
+    Ok(gitsync_container)
 }
 
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

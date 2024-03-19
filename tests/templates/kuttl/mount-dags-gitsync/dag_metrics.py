@@ -31,14 +31,14 @@ time.sleep(10)
 response = requests.patch(f'{rest_url}/dags/{dag_id}', auth=auth, json={'is_paused': False})
 response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth=auth, json={})
 
+# Wait for the metrics to be consumed by the statsd-exporter
+time.sleep(5)
 # Test the DAG in a loop. Each time we call the script a new job will be started: we can avoid
 # or minimize this by looping over the check instead.
-iterations = 4
+iterations = 9
 loop = 0
 while True:
     assert response.status_code == 200, "DAG run could not be triggered."
-    # Wait for the metrics to be consumed by the statsd-exporter
-    time.sleep(5)
     # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
     # (disable line-break flake checks)
     if ((assert_metric('scheduler', 'airflow_scheduler_heartbeat'))
