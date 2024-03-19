@@ -233,9 +233,7 @@ fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
             // dependencies can be found: this must be the actual path and not a variable.
             // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
             name: PYTHONPATH.into(),
-            value: Some(format!(
-                "{LOG_CONFIG_DIR}:{dags_folder}:/stackable/app/lib/python3.9/site-packages"
-            )),
+            value: Some(format!("{LOG_CONFIG_DIR}:{dags_folder}")),
             ..Default::default()
         },
     );
