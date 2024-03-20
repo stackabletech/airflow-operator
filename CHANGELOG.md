@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for modularized DAGs ([#404]).
+
+[#404]: https://github.com/stackabletech/airflow-operator/pull/404
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
@@ -9,7 +15,6 @@
 - More CRD documentation ([#354]).
 - Helm: support labels in values.yaml ([#374]).
 - Support for version `2.7.3`, `2.8.1` ([#387]).
-- Support for modularized DAGs ([#404]).
 
 ### Changed
 
@@ -45,7 +50,6 @@
 [#387]: https://github.com/stackabletech/airflow-operator/pull/387
 [#401]: https://github.com/stackabletech/airflow-operator/pull/401
 [#402]: https://github.com/stackabletech/airflow-operator/pull/402
-[#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#406]: https://github.com/stackabletech/airflow-operator/pull/406
 
 ## [23.11.0] - 2023-11-24
