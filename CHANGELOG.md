@@ -7,6 +7,7 @@
 - More CRD documentation ([#354]).
 - Helm: support labels in values.yaml ([#374]).
 - Support for version `2.7.3`, `2.8.1` ([#387]).
+- Support for modularized DAGs ([#404]).
 
 ### Changed
 
@@ -42,6 +43,7 @@
 [#387]: https://github.com/stackabletech/airflow-operator/pull/387
 [#401]: https://github.com/stackabletech/airflow-operator/pull/401
 [#402]: https://github.com/stackabletech/airflow-operator/pull/402
+[#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#406]: https://github.com/stackabletech/airflow-operator/pull/406
 
 ## [23.11.0] - 2023-11-24
@@ -252,6 +254,7 @@
 ## [0.2.0] - 2022-02-14
 
 ### Changed
+
 - Fixed a bug in the namespace resolution for the Init job that resulted in it not being triggered in non-default
 namespaces. ([#23]).
 
