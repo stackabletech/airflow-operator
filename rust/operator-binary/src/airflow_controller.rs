@@ -1024,7 +1024,7 @@ fn build_server_rolegroup_statefulset(
 fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
     log_config: Option<&ContainerLogConfig>,
-) -> stackable_operator::k8s_openapi::api::core::v1::Container {
+) -> k8s_openapi::api::core::v1::Container {
     product_logging::framework::vector_container(
         resolved_product_image,
         CONFIG_VOLUME_NAME,
@@ -1089,7 +1089,7 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(config.resources.clone().into())
-        .add_env_vars(build_airflow_template_envs(airflow, env_overrides))
+        .add_env_vars(build_airflow_template_envs(airflow, env_overrides, config))
         .add_volume_mounts(airflow.volume_mounts())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)

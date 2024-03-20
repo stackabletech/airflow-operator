@@ -2,11 +2,13 @@ use crate::util::env_var_from_secret;
 use product_config::types::PropertyNameKind;
 use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
-    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, LOG_CONFIG_DIR,
+    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
+    STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{GIT_LINK, GIT_SYNC_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME};
 use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
 use stackable_operator::kube::ResourceExt;
+use stackable_operator::product_logging::framework::create_vector_shutdown_file_command;
 use std::collections::{BTreeMap, HashMap};
 
 const AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
@@ -315,6 +317,7 @@ pub fn build_gitsync_statefulset_envs(
 pub fn build_airflow_template_envs(
     airflow: &AirflowCluster,
     env_overrides: &HashMap<String, String>,
+    config: &ExecutorConfig,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
@@ -359,6 +362,27 @@ pub fn build_airflow_template_envs(
     );
 
     env.extend(static_envs(airflow));
+
+    // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
+    // evaluated in the wrapper for each stackable spark container: this is necessary for pods
+    // that are created and then terminated (we do a similar thing for spark-k8s).
+    if config.logging.enable_vector_agent {
+        env.insert(
+            "_STACKABLE_POST_HOOK".into(),
+            EnvVar {
+                name: "_STACKABLE_POST_HOOK".into(),
+                value: Some(
+                    [
+                        // Wait for Vector to gather the logs.
+                        "sleep 10",
+                        &create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+                    ]
+                    .join("; "),
+                ),
+                ..Default::default()
+            },
+        );
+    }
 
     // iterate over a BTreeMap to ensure the vars are written in a predictable order
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
