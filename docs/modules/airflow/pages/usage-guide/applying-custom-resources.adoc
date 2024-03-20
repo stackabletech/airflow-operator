@@ -97,3 +97,9 @@ image::airflow_dag_log.png[Airflow Connections]
 NOTE: If the `KubernetesExecutor` is employed the logs are only accessible via the SDP logging mechanism, described https://docs.stackable.tech/home/stable/concepts/logging[here].
 
 TIP: A full example of the above is used as an integration test https://github.com/stackabletech/airflow-operator/tree/main/tests/templates/kuttl/mount-dags-gitsync[here].
+
+== Logging
+
+As mentioned above, the logs are available from the webserver UI if the jobs run with the `celeryExecutor`. If the SDP logging mechanism has been deployed, log information can also be retrieved from the vector backend (e.g. Opensearch):
+
+image::airflow_dag_log_opensearch.png[Opensearch]
