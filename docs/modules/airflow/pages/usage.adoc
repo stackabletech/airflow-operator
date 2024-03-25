@@ -136,7 +136,7 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html#access-control[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:reference:authenticationclass.adoc[] reference.
+You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:reference:authenticationclass.adoc[] reference.
 
 The users and roles can be viewed as before in the Webserver UI, but note that the blue "+" button is not available when authenticating against LDAP:
 
