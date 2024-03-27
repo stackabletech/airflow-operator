@@ -20,8 +20,7 @@ def assert_metric(role, metric):
 
 
 # Trigger a DAG run to create metrics
-dag_id = 'example_trigger_target_dag'
-dag_conf = {'message': "Hello World"}
+dag_id = 'sparkapp_dag'
 
 rest_url = 'http://airflow-webserver-default:8080/api/v1'
 auth = ('airflow', 'airflow')
@@ -30,20 +29,20 @@ auth = ('airflow', 'airflow')
 time.sleep(10)
 
 response = requests.patch(f'{rest_url}/dags/{dag_id}', auth=auth, json={'is_paused': False})
-response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth=auth, json={'conf': dag_conf})
+response = requests.post(f'{rest_url}/dags/{dag_id}/dagRuns', auth=auth, json={})
 
+# Wait for the metrics to be consumed by the statsd-exporter
+time.sleep(5)
 # Test the DAG in a loop. Each time we call the script a new job will be started: we can avoid
 # or minimize this by looping over the check instead.
-iterations = 4
+iterations = 9
 loop = 0
 while True:
     assert response.status_code == 200, "DAG run could not be triggered."
-    # Wait for the metrics to be consumed by the statsd-exporter
-    time.sleep(5)
+    # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
     # (disable line-break flake checks)
     if ((assert_metric('scheduler', 'airflow_scheduler_heartbeat'))
-            and (assert_metric('webserver', 'airflow_task_instance_created_BashOperator'))  # noqa: W503, W504
-            and (assert_metric('scheduler', 'airflow_dagrun_duration_success_example_trigger_target_dag_count'))):  # noqa: W503, W504
+            and (assert_metric('scheduler', 'airflow_dagrun_duration_success_sparkapp_dag_count'))):  # noqa: W503, W504
         break
     time.sleep(10)
     loop += 1

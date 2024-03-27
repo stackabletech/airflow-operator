@@ -1,32 +1,16 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-
-"""Example DAG demonstrating how to apply a Kubernetes Resource from Airflow running in-cluster"""
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.exceptions import AirflowException
 from airflow.utils import yaml
 import os
-from stackable.spark_kubernetes_sensor import SparkKubernetesSensor
-from stackable.spark_kubernetes_operator import SparkKubernetesOperator
+import sys
+print(sys.path)
+
+from stackable.spark_kubernetes_sensor import SparkKubernetesSensor  # noqa: E402
+from stackable.spark_kubernetes_operator import SparkKubernetesOperator  # noqa: E402
 
 
-with DAG(  # <4>
+with DAG(
         dag_id='sparkapp_dag',
         schedule_interval=None,
         start_date=datetime(2022, 1, 1),
@@ -54,7 +38,7 @@ with DAG(  # <4>
     application_name = 'pyspark-pi-' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
     document.update({'metadata': {'name': application_name, 'namespace': ns}})
 
-    t1 = SparkKubernetesOperator(  # <5>
+    t1 = SparkKubernetesOperator(
         task_id='spark_pi_submit',
         namespace=ns,
         application_file=document,
@@ -62,7 +46,7 @@ with DAG(  # <4>
         dag=dag,
     )
 
-    t2 = SparkKubernetesSensor(  # <6>
+    t2 = SparkKubernetesSensor(
         task_id='spark_pi_monitor',
         namespace=ns,
         application_name="{{ task_instance.xcom_pull(task_ids='spark_pi_submit')['metadata']['name'] }}",
@@ -70,4 +54,4 @@ with DAG(  # <4>
         dag=dag,
     )
 
-    t1 >> t2  # <7>
+    t1 >> t2

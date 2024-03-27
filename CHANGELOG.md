@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for modularized DAGs ([#404]).
+
+[#404]: https://github.com/stackabletech/airflow-operator/pull/404
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
@@ -254,6 +260,7 @@
 ## [0.2.0] - 2022-02-14
 
 ### Changed
+
 - Fixed a bug in the namespace resolution for the Init job that resulted in it not being triggered in non-default
 namespaces. ([#23]).
 
