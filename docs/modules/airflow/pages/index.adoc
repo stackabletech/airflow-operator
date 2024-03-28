@@ -89,8 +89,10 @@ about the different ways of loading your custom DAGs into Airflow.
 You can install the xref:demos:airflow-scheduled-job.adoc[] demo and explore an Airflow installation, as
 well as how it interacts with xref:spark-k8s:index.adoc[Apache Spark].
 
-== Supported Versions
+== Supported versions
 
-The Stackable Operator for Apache Airflow currently supports the following versions of Airflow:
+The Stackable Operator for Apache Airflow currently supports the Airflow versions listed below.
+To use a specific Airflow version in your AirflowCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
+The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
