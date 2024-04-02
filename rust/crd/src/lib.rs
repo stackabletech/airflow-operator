@@ -37,7 +37,7 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub mod affinity;
 pub mod authentication;
-mod git_sync;
+pub mod git_sync;
 
 use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
 

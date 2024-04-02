@@ -1,6 +1,6 @@
 = Mounting DAGs
 
-DAGs can be mounted by using a `ConfigMap` or a `PersistentVolumeClaim`. This is best illustrated with an example of each, shown in the next section.
+DAGs can be mounted by using a `ConfigMap` or `git-sync`. This is best illustrated with an example of each, shown in the sections below.
 
 == via `ConfigMap`
 
@@ -20,6 +20,8 @@ include::example$example-airflow-dags-configmap.yaml[]
 <6> The path of the mounted resource. Note that should map to a single DAG.
 <7> The resource has to be defined using `subPath`: this is to prevent the versioning of configuration map elements which may cause a conflict with how Airflow propagates DAGs between its components.
 <8> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.
+
+WARNING: If a DAG mounted via ConfigMap consists of modularized files then using the standard location is mandatory as python will use this as a "root" folder when looking for referenced files.
 
 The advantage of this approach is that a DAG can be provided "in-line", as it were. This becomes cumbersome when multiple DAGs are to be made available in this way, as each one has to be mapped individually. For multiple DAGs it is probably easier to expose them all via a mounted volume, which is shown below.
 
@@ -50,3 +52,6 @@ include::example$example-airflow-gitsync.yaml[]
 
 
 IMPORTANT: The example above shows a _*list*_ of git-sync definitions, with a single element. This is to avoid breaking-changes in future releases. Currently, only one such git-sync definition is considered and processed.
+
+NOTE: git-sync can be used with DAGs that make use of Python modules, as Python will be configured  to use the git-sync target folder as the "root" location when looking for referenced files. See the xref:usage-guide/applying-custom-resources.adoc[] example for more details.
+
