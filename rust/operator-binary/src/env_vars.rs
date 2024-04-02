@@ -213,7 +213,7 @@ fn get_dags_folder(airflow: &AirflowCluster) -> String {
     {
         format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")
     } else {
-        // if this has not been set for dag-provisioning visa gitsync (above), set the default value
+        // if this has not been set for dag-provisioning via gitsync (above), set the default value
         // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
         // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
