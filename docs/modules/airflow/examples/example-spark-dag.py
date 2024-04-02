@@ -51,7 +51,7 @@ with DAG(  # <4>
         ns = file.read()
 
     document = load_body_to_dict(crd)
-    application_name = 'pyspark-pi-' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
+    application_name = 'pyspark-pi-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
     document.update({'metadata': {'name': application_name, 'namespace': ns}})
 
     t1 = SparkKubernetesOperator(  # <5>
