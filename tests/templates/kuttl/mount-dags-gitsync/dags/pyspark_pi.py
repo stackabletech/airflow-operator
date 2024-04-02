@@ -6,7 +6,7 @@ import os
 import sys
 print(sys.path)
 
-from .stackable.spark_kubernetes_sensor import SparkKubernetesSensor  # noqa: E402
+from stackable.spark_kubernetes_sensor import SparkKubernetesSensor  # noqa: E402
 from stackable.spark_kubernetes_operator import SparkKubernetesOperator  # noqa: E402
 
 
