@@ -3,13 +3,7 @@
 import requests
 import time
 import sys
-
-
-def exception_handler(exception_type, exception, traceback):
-    print(f"{exception_type.__name__}: {exception.args}")
-
-
-sys.excepthook = exception_handler
+import logging
 
 
 def assert_metric(role, metric):
@@ -38,14 +32,19 @@ time.sleep(5)
 iterations = 9
 loop = 0
 while True:
-    assert response.status_code == 200, "DAG run could not be triggered."
-    # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
-    # (disable line-break flake checks)
-    if ((assert_metric('scheduler', 'airflow_scheduler_heartbeat'))
-            and (assert_metric('scheduler', 'airflow_dagrun_duration_success_sparkapp_dag_count'))):  # noqa: W503, W504
-        break
-    time.sleep(10)
-    loop += 1
-    if loop == iterations:
-        # force re-try of script
-        sys.exit(1)
+    try:
+        logging.info(f"Response code: {response.status_code}")
+        assert response.status_code == 200, "DAG run could not be triggered."
+        # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
+        # (disable line-break flake checks)
+        if ((assert_metric('scheduler', 'airflow_scheduler_heartbeat'))
+                and (assert_metric('scheduler', 'airflow_dagrun_duration_success_sparkapp_dag_count'))):  # noqa: W503, W504
+            break
+        time.sleep(10)
+        loop += 1
+        if loop == iterations:
+            logging.error("Still waiting for metrics. Exiting to start a new loop....")
+            # force re-try of script
+            sys.exit(1)
+    except AssertionError as error:
+        logging.warning(f"Encountered: {error}")
