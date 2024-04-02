@@ -62,7 +62,7 @@ This will be called from within a DAG by using the connection that was defined e
 - start the job
 - monitor the status of the job
 
-The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are in dedicated files as they will typically be used for all custom resources and thus are best defined separately from that the DAG that calls them. This also demonstrates that modularized DAG structures can be used for defining jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
+The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they will typically be used for all custom resources and thus are best decoupled from the DAG that calls them. This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
 
 [source,python]
 ----
