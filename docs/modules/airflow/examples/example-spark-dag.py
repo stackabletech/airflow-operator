@@ -17,7 +17,7 @@
 # under the License.
 
 """Example DAG demonstrating how to apply a Kubernetes Resource from Airflow running in-cluster"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from airflow import DAG
 from airflow.exceptions import AirflowException
 from airflow.utils import yaml
