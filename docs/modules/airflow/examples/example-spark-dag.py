@@ -43,7 +43,7 @@ with DAG(  # <4>
             raise AirflowException(f"Exception when loading resource definition: {e}\n")
         return body_dict
 
-    yaml_path = os.path.join(os.environ.get('AIRFLOW__CORE__DAGS_FOLDER'), 'pyspark_pi.yaml')
+    yaml_path = os.path.join(os.environ.get('AIRFLOW__CORE__DAGS_FOLDER', ''), 'pyspark_pi.yaml')
 
     with open(yaml_path, 'r') as file:
         crd = file.read()
