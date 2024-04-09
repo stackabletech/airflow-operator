@@ -1,27 +1,41 @@
 = Stackable Operator for Apache Airflow
 :description: The Stackable Operator for Apache Airflow is a Kubernetes operator that can manage Apache Airflow clusters. Learn about its features, resources, dependencies and demos, and see the list of supported Airflow versions.
 :keywords: Stackable Operator, Apache Airflow, Kubernetes, k8s, operator, engineer, big data, metadata, job pipeline, scheduler, workflow, ETL
-
+:airflow: https://airflow.apache.org/
+:dags: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
 :k8s-crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+:github: https://github.com/stackabletech/airflow-operator/
+:crd: {crd-docs-base-url}/airflow-operator/{crd-docs-version}/
+:crd-airflowcluster: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/
+:feature-tracker: https://features.stackable.tech/unified
 
-The Stackable Operator for Apache Airflow manages https://airflow.apache.org/[Apache Airflow] instances on Kubernetes.
-Apache Airflow is an open-source application for creating, scheduling, and monitoring workflows. Workflows are defined
-as code, with tasks that can be run on a variety of platforms, including Hadoop, Spark, and Kubernetes itself. Airflow
-is a popular choice to orchestrate ETL workflows and data pipelines.
+[.link-bar]
+* {github}[GitHub {external-link-icon}^]
+* {feature-tracker}[Feature Tracker {external-link-icon}^]
+* {crd}[CRD documentation {external-link-icon}^]
+
+The Stackable Operator for Apache Airflow manages {airflow}[Apache Airflow] instances on Kubernetes.
+Apache Airflow is an open-source application for creating, scheduling, and monitoring workflows.
+Workflows are defined as code, with tasks that can be run on a variety of platforms, including Hadoop, Spark, and Kubernetes itself.
+Airflow is a popular choice to orchestrate ETL workflows and data pipelines.
 
 == Getting started
 
-Get started using Airflow with the Stackable Operator by following the xref:getting_started/index.adoc[] guide. It
-guides you through installing the Operator alongside a PostgreSQL database and Redis instance, connecting to your
-Airflow instance and running your first workflow.
+Get started using Airflow with the Stackable Operator by following the xref:getting_started/index.adoc[] guide.
+It guides you through installing the Operator alongside a PostgreSQL database and Redis instance, connecting to your Airflow instance and running your first workflow.
 
 === Custom resources
 
-The AirflowCluster is the resource for the configuration of the Airflow instance. The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section). The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
+The AirflowCluster is the resource for the configuration of the Airflow instance.
+The resource defines three xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker` and `scheduler` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section).
+The various configuration options are explained in the xref:usage-guide/index.adoc[].
+It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
 
 === Executors
 
-The `worker` role is deployed when `spec.celeryExecutors` is specified (the alternative is `spec.kubernetesExecutors`, whereby pods are created dynamically as needed without jobs being routed through a redis queue to the workers). This means that for `kubernetesExecutors` there exists an implicit single role which does not appear in resource definition. This is illustrated below:
+The `worker` role is deployed when `spec.celeryExecutors` is specified (the alternative is `spec.kubernetesExecutors`, whereby pods are created dynamically as needed without jobs being routed through a redis queue to the workers).
+This means that for `kubernetesExecutors` there exists an implicit single role which does not appear in resource definition.
+This is illustrated below:
 
 ==== `celeryExecutors`
 
@@ -80,9 +94,8 @@ NOTE: Redis is only needed if the executors have been set to `spec.celeryExecuto
 
 == Using custom workflows/DAGs
 
-https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html[Direct acyclic graphs (DAGs) of tasks] are
-the core entities you will use in Airflow. Have a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn
-about the different ways of loading your custom DAGs into Airflow.
+{dags}[Direct acyclic graphs (DAGs) of tasks] are the core entities you will use in Airflow.
+Have a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn about the different ways of loading your custom DAGs into Airflow.
 
 == Demo
 
@@ -96,3 +109,9 @@ To use a specific Airflow version in your AirflowCluster, you have to specify an
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
+
+== Useful links
+
+* The {github}[airflow-operator {external-link-icon}^] GitHub repository
+* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
+* The {crd-airflowcluster}[AirflowCluster {external-link-icon}^] CRD documentation
