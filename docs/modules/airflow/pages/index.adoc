@@ -5,7 +5,8 @@
 :dags: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
 :k8s-crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 :github: https://github.com/stackabletech/airflow-operator/
-:crd: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/
+:crd: {crd-docs-base-url}/airflow-operator/{crd-docs-version}/
+:crd-airflowcluster: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
@@ -113,4 +114,4 @@ include::partial$supported-versions.adoc[]
 
 * The {github}[airflow-operator {external-link-icon}^] GitHub repository
 * The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
-* The {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/[AirflowCluster {external-link-icon}^] CRD documentation
+* The {crd-airflowcluster}[AirflowCluster {external-link-icon}^] CRD documentation
