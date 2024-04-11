@@ -2,7 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: test-airflow-webserver-health-check
+  name: test-airflow-postgresql
 timeout: 480
-commands:
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-postgresql
+status:
+  readyReplicas: 1
+  replicas: 1
