@@ -19,6 +19,8 @@ Apache Airflow is an open-source application for creating, scheduling, and monit
 Workflows are defined as code, with tasks that can be run on a variety of platforms, including Hadoop, Spark, and Kubernetes itself.
 Airflow is a popular choice to orchestrate ETL workflows and data pipelines.
 
+DUMMY CHANGE
+
 == Getting started
 
 Get started using Airflow with the Stackable Operator by following the xref:getting_started/index.adoc[] guide.
