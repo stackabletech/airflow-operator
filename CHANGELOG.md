@@ -6,6 +6,10 @@
 
 - Support for modularized DAGs ([#404]).
 
+### Fixed
+
+- Add missing affinities for Kubernetes executors ([#XXX]).
+
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
 
 ## [24.3.0] - 2024-03-20

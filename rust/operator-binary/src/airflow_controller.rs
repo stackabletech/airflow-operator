@@ -1045,7 +1045,7 @@ fn build_executor_template_config_map(
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
     sa_name: &str,
-    config: &ExecutorConfig,
+    merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
@@ -1063,6 +1063,7 @@ fn build_executor_template_config_map(
 
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
+        .affinity(&merged_executor_config.affinity)
         .service_account_name(sa_name)
         .restart_policy("Never")
         .security_context(
@@ -1073,7 +1074,8 @@ fn build_executor_template_config_map(
                 .build(),
         );
 
-    add_executor_graceful_shutdown_config(config, &mut pb).context(GracefulShutdownSnafu)?;
+    add_executor_graceful_shutdown_config(merged_executor_config, &mut pb)
+        .context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
@@ -1088,8 +1090,12 @@ fn build_executor_template_config_map(
 
     airflow_container
         .image_from_product_image(resolved_product_image)
-        .resources(config.resources.clone().into())
-        .add_env_vars(build_airflow_template_envs(airflow, env_overrides, config))
+        .resources(merged_executor_config.resources.clone().into())
+        .add_env_vars(build_airflow_template_envs(
+            airflow,
+            env_overrides,
+            merged_executor_config,
+        ))
         .add_volume_mounts(airflow.volume_mounts())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
@@ -1099,7 +1105,10 @@ fn build_executor_template_config_map(
     pb.add_volumes(airflow.volumes());
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
-        config.logging.containers.get(&Container::Airflow),
+        merged_executor_config
+            .logging
+            .containers
+            .get(&Container::Airflow),
     ));
 
     if let Some(gitsync) = airflow.git_sync() {
@@ -1118,10 +1127,13 @@ fn build_executor_template_config_map(
         pb.add_init_container(gitsync_container);
     }
 
-    if config.logging.enable_vector_agent {
+    if merged_executor_config.logging.enable_vector_agent {
         pb.add_container(build_logging_container(
             resolved_product_image,
-            config.logging.containers.get(&Container::Vector),
+            merged_executor_config
+                .logging
+                .containers
+                .get(&Container::Vector),
         ));
     }
 
