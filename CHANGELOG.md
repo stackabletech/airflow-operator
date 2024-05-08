@@ -8,9 +8,10 @@
 
 ### Fixed
 
-- Add missing affinities for Kubernetes executors ([#XXX]).
+- Add missing affinities for Kubernetes executors ([#439]).
 
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
+[#439]: https://github.com/stackabletech/airflow-operator/pull/439
 
 ## [24.3.0] - 2024-03-20
 
