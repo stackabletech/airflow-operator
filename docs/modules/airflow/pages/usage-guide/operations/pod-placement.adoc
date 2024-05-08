@@ -6,3 +6,7 @@ The default affinities created by the operator are:
 
 1. Co-locate all the Airflow Pods (weight 20)
 2. Distribute all Pods within the same role (worker, webserver, scheduler) (weight 70)
+
+== Kubernetes executors
+
+The Kubernetes executors are no different, they will try to co-locate with other Airflow Pods and (with a higher priority) distribute all executors.
