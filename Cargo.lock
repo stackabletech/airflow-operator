@@ -1892,15 +1892,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snafu"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75976f4748ab44f6e5332102be424e7c2dc18daeaf7e725f2040c3ebb133512e"
-dependencies = [
- "snafu-derive 0.8.2",
-]
-
-[[package]]
 name = "snafu-derive"
 version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1921,18 +1912,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "snafu-derive"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4b19911debfb8c2fb1107bc6cb2d61868aaf53a988449213959bb1b5b1ed95f"
-dependencies = [
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "syn 2.0.61",
 ]
 
 [[package]]
@@ -1960,7 +1939,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "snafu 0.8.2",
+ "snafu 0.7.5",
  "stackable-operator",
  "strum",
  "tracing",
@@ -1978,7 +1957,7 @@ dependencies = [
  "product-config",
  "serde",
  "serde_yaml",
- "snafu 0.8.2",
+ "snafu 0.7.5",
  "stackable-airflow-crd",
  "stackable-operator",
  "strum",
