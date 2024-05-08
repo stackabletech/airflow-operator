@@ -7,10 +7,19 @@ use stackable_operator::{
 
 use crate::{AirflowRole, APP_NAME};
 
+/// Used for all [`AirflowRole`]s besides executors.
 pub fn get_affinity(cluster_name: &str, role: &AirflowRole) -> StackableAffinityFragment {
+    get_affinity_for_role(cluster_name, &role.to_string())
+}
+
+/// There is no [`AirflowRole`] for executors (only for workers), so let's have a special case here.
+pub fn get_executor_affinity(cluster_name: &str) -> StackableAffinityFragment {
+    get_affinity_for_role(cluster_name, "executor")
+}
+
+fn get_affinity_for_role(cluster_name: &str, role: &str) -> StackableAffinityFragment {
     let affinity_between_cluster_pods = affinity_between_cluster_pods(APP_NAME, cluster_name, 20);
-    let affinity_between_role_pods =
-        affinity_between_role_pods(APP_NAME, cluster_name, &role.to_string(), 70);
+    let affinity_between_role_pods = affinity_between_role_pods(APP_NAME, cluster_name, role, 70);
 
     StackableAffinityFragment {
         pod_affinity: Some(PodAffinity {
@@ -50,7 +59,7 @@ mod tests {
     use crate::{AirflowCluster, AirflowRole};
 
     #[rstest]
-    // #[case(AirflowRole::Worker)]
+    #[case(AirflowRole::Worker)]
     #[case(AirflowRole::Scheduler)]
     #[case(AirflowRole::Webserver)]
     fn test_affinity_defaults(#[case] role: AirflowRole) {
@@ -146,6 +155,102 @@ mod tests {
 
         let affinity = airflow
             .merged_config(&role, &rolegroup_ref)
+            .unwrap()
+            .affinity;
+
+        assert_eq!(affinity, expected);
+    }
+
+    #[test]
+    fn test_executor_affinity_defaults() {
+        let cluster = "
+        apiVersion: airflow.stackable.tech/v1alpha1
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 2.8.1
+          clusterConfig:
+            credentialsSecret: airflow-credentials
+          webservers:
+            roleGroups:
+              default:
+                replicas: 1
+          schedulers:
+            roleGroups:
+              default:
+                replicas: 1
+          kubernetesExecutors: {}
+          ";
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let airflow: AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let expected: StackableAffinity = StackableAffinity {
+            node_affinity: None,
+            node_selector: None,
+            pod_affinity: Some(PodAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 20,
+                    },
+                ]),
+            }),
+            pod_anti_affinity: Some(PodAntiAffinity {
+                required_during_scheduling_ignored_during_execution: None,
+                preferred_during_scheduling_ignored_during_execution: Some(vec![
+                    WeightedPodAffinityTerm {
+                        pod_affinity_term: PodAffinityTerm {
+                            label_selector: Some(LabelSelector {
+                                match_expressions: None,
+                                match_labels: Some(BTreeMap::from([
+                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                                    (
+                                        "app.kubernetes.io/instance".to_string(),
+                                        "airflow".to_string(),
+                                    ),
+                                    (
+                                        "app.kubernetes.io/component".to_string(),
+                                        "executor".to_string(),
+                                    ),
+                                ])),
+                            }),
+                            namespace_selector: None,
+                            namespaces: None,
+                            topology_key: "kubernetes.io/hostname".to_string(),
+                        },
+                        weight: 70,
+                    },
+                ]),
+            }),
+        };
+
+        let executor_config = match &airflow.spec.executor {
+            crate::AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
+            crate::AirflowExecutor::KubernetesExecutor {
+                common_configuration,
+            } => &common_configuration.config,
+        };
+        let affinity = airflow
+            .merged_executor_config(executor_config)
             .unwrap()
             .affinity;
 

@@ -39,7 +39,10 @@ pub mod affinity;
 pub mod authentication;
 pub mod git_sync;
 
-use crate::{affinity::get_affinity, authentication::AirflowAuthentication};
+use crate::{
+    affinity::{get_affinity, get_executor_affinity},
+    authentication::AirflowAuthentication,
+};
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -304,6 +307,7 @@ pub enum AirflowRole {
 
     #[strum(serialize = "scheduler")]
     Scheduler,
+
     #[strum(serialize = "worker")]
     Worker,
 }
@@ -517,10 +521,13 @@ impl AirflowCluster {
         // use the worker defaults for executor pods
         let resources = default_resources(&AirflowRole::Worker);
         let logging = product_logging::spec::default_logging();
+        let affinity = get_executor_affinity(&self.name_any());
         let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
+
         let executor_defaults = ExecutorConfigFragment {
             resources,
             logging,
+            affinity,
             graceful_shutdown_timeout,
         };
 
@@ -588,10 +595,13 @@ pub enum Container {
 pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
+
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
@@ -614,8 +624,13 @@ pub struct AirflowConfig {
 pub struct ExecutorConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
+
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+
+    #[fragment_attrs(serde(default))]
+    pub affinity: StackableAffinity,
+
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
