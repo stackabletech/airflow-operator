@@ -46,10 +46,10 @@ spec:
                       properties:
                         affinity:
                           default:
-                            nodeAffinity: null
-                            nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
+                            nodeAffinity: null
+                            nodeSelector: null
                           description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
@@ -522,8 +522,8 @@ spec:
                           type: string
                         logging:
                           default:
-                            containers: {}
                             enableVectorAgent: null
+                            containers: {}
                           description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                           properties:
                             containers:
@@ -606,19 +606,19 @@ spec:
                           type: object
                         resources:
                           default:
-                            cpu:
-                              max: null
-                              min: null
                             memory:
                               limit: null
                               runtimeLimits: {}
+                            cpu:
+                              min: null
+                              max: null
                             storage: {}
                           description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                           properties:
                             cpu:
                               default:
-                                max: null
                                 min: null
+                                max: null
                               properties:
                                 max:
                                   description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -3498,10 +3498,10 @@ spec:
                             properties:
                               affinity:
                                 default:
-                                  nodeAffinity: null
-                                  nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
+                                  nodeAffinity: null
+                                  nodeSelector: null
                                 description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
@@ -3974,8 +3974,8 @@ spec:
                                 type: string
                               logging:
                                 default:
-                                  containers: {}
                                   enableVectorAgent: null
+                                  containers: {}
                                 description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                                 properties:
                                   containers:
@@ -4058,19 +4058,19 @@ spec:
                                 type: object
                               resources:
                                 default:
-                                  cpu:
-                                    max: null
-                                    min: null
                                   memory:
                                     limit: null
                                     runtimeLimits: {}
+                                  cpu:
+                                    min: null
+                                    max: null
                                   storage: {}
                                 description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                                 properties:
                                   cpu:
                                     default:
-                                      max: null
                                       min: null
+                                      max: null
                                     properties:
                                       max:
                                         description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -8131,8 +8131,8 @@ spec:
                   type: object
                 clusterOperation:
                   default:
-                    reconciliationPaused: false
                     stopped: false
+                    reconciliationPaused: false
                   description: '[Cluster operations](https://docs.stackable.tech/home/nightly/concepts/operations/cluster_operations) properties, allow stopping the product instance as well as pausing reconciliation.'
                   properties:
                     reconciliationPaused:
@@ -8203,10 +8203,10 @@ spec:
                       properties:
                         affinity:
                           default:
-                            nodeAffinity: null
-                            nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
+                            nodeAffinity: null
+                            nodeSelector: null
                           description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
@@ -8679,8 +8679,8 @@ spec:
                           type: string
                         logging:
                           default:
-                            containers: {}
                             enableVectorAgent: null
+                            containers: {}
                           description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                           properties:
                             containers:
@@ -8763,19 +8763,19 @@ spec:
                           type: object
                         resources:
                           default:
-                            cpu:
-                              max: null
-                              min: null
                             memory:
                               limit: null
                               runtimeLimits: {}
+                            cpu:
+                              min: null
+                              max: null
                             storage: {}
                           description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                           properties:
                             cpu:
                               default:
-                                max: null
                                 min: null
+                                max: null
                               properties:
                                 max:
                                   description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -11627,10 +11627,10 @@ spec:
                       properties:
                         affinity:
                           default:
-                            nodeAffinity: null
-                            nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
+                            nodeAffinity: null
+                            nodeSelector: null
                           description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
@@ -12103,8 +12103,8 @@ spec:
                           type: string
                         logging:
                           default:
-                            containers: {}
                             enableVectorAgent: null
+                            containers: {}
                           description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                           properties:
                             containers:
@@ -12187,19 +12187,19 @@ spec:
                           type: object
                         resources:
                           default:
-                            cpu:
-                              max: null
-                              min: null
                             memory:
                               limit: null
                               runtimeLimits: {}
+                            cpu:
+                              min: null
+                              max: null
                             storage: {}
                           description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                           properties:
                             cpu:
                               default:
-                                max: null
                                 min: null
+                                max: null
                               properties:
                                 max:
                                   description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -15079,10 +15079,10 @@ spec:
                             properties:
                               affinity:
                                 default:
-                                  nodeAffinity: null
-                                  nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
+                                  nodeAffinity: null
+                                  nodeSelector: null
                                 description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
@@ -15555,8 +15555,8 @@ spec:
                                 type: string
                               logging:
                                 default:
-                                  containers: {}
                                   enableVectorAgent: null
+                                  containers: {}
                                 description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                                 properties:
                                   containers:
@@ -15639,19 +15639,19 @@ spec:
                                 type: object
                               resources:
                                 default:
-                                  cpu:
-                                    max: null
-                                    min: null
                                   memory:
                                     limit: null
                                     runtimeLimits: {}
+                                  cpu:
+                                    min: null
+                                    max: null
                                   storage: {}
                                 description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                                 properties:
                                   cpu:
                                     default:
-                                      max: null
                                       min: null
+                                      max: null
                                     properties:
                                       max:
                                         description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -18512,10 +18512,10 @@ spec:
                       properties:
                         affinity:
                           default:
-                            nodeAffinity: null
-                            nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
+                            nodeAffinity: null
+                            nodeSelector: null
                           description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
@@ -18988,8 +18988,8 @@ spec:
                           type: string
                         logging:
                           default:
-                            containers: {}
                             enableVectorAgent: null
+                            containers: {}
                           description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                           properties:
                             containers:
@@ -19072,19 +19072,19 @@ spec:
                           type: object
                         resources:
                           default:
-                            cpu:
-                              max: null
-                              min: null
                             memory:
                               limit: null
                               runtimeLimits: {}
+                            cpu:
+                              min: null
+                              max: null
                             storage: {}
                           description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                           properties:
                             cpu:
                               default:
-                                max: null
                                 min: null
+                                max: null
                               properties:
                                 max:
                                   description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -21964,10 +21964,10 @@ spec:
                             properties:
                               affinity:
                                 default:
-                                  nodeAffinity: null
-                                  nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
+                                  nodeAffinity: null
+                                  nodeSelector: null
                                 description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
@@ -22440,8 +22440,8 @@ spec:
                                 type: string
                               logging:
                                 default:
-                                  containers: {}
                                   enableVectorAgent: null
+                                  containers: {}
                                 description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                                 properties:
                                   containers:
@@ -22524,19 +22524,19 @@ spec:
                                 type: object
                               resources:
                                 default:
-                                  cpu:
-                                    max: null
-                                    min: null
                                   memory:
                                     limit: null
                                     runtimeLimits: {}
+                                  cpu:
+                                    min: null
+                                    max: null
                                   storage: {}
                                 description: Resource usage is configured here, this includes CPU usage, memory usage and disk storage usage, if this role needs any.
                                 properties:
                                   cpu:
                                     default:
-                                      max: null
                                       min: null
+                                      max: null
                                     properties:
                                       max:
                                         description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
