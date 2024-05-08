@@ -20,7 +20,7 @@ use stackable_operator::{
     kube::{CustomResource, ResourceExt},
     kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{ConfigError, Configuration},
+    product_config_utils::{Configuration, Error as ConfigError},
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
