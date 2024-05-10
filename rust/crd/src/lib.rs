@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -20,7 +22,7 @@ use stackable_operator::{
     kube::{CustomResource, ResourceExt},
     kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{Configuration, Error as ConfigError},
+    product_config_utils::{self, Configuration},
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
@@ -32,17 +34,16 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-
-pub mod affinity;
-pub mod authentication;
-pub mod git_sync;
 
 use crate::{
     affinity::{get_affinity, get_executor_affinity},
     authentication::AirflowAuthentication,
 };
+
+pub mod affinity;
+pub mod authentication;
+pub mod git_sync;
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -703,7 +704,7 @@ impl Configuration for AirflowConfigFragment {
         &self,
         cluster: &Self::Configurable,
         _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
         env.insert(
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
@@ -724,7 +725,7 @@ impl Configuration for AirflowConfigFragment {
         &self,
         _cluster: &Self::Configurable,
         _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         Ok(BTreeMap::new())
     }
 
@@ -733,7 +734,7 @@ impl Configuration for AirflowConfigFragment {
         _cluster: &Self::Configurable,
         _role_name: &str,
         _file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         Ok(BTreeMap::new())
     }
 }

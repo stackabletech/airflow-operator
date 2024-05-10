@@ -298,7 +298,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let resolved_product_image: ResolvedProductImage = airflow
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);

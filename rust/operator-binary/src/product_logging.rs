@@ -2,8 +2,8 @@ use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::STACKABLE_LOG_DIR;
-use stackable_operator::builder::configmap::ConfigMapBuilder;
 use stackable_operator::{
+    builder::configmap::ConfigMapBuilder,
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::Resource,
