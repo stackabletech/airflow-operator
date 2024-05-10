@@ -1,6 +1,6 @@
 use stackable_airflow_crd::MAX_LOG_FILES_SIZE;
-use stackable_operator::builder::pod::volume::VolumeBuilder;
 use stackable_operator::{
+    builder::pod::volume::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
     product_logging::{
         self,
