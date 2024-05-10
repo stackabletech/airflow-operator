@@ -18,9 +18,12 @@ use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
 use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
-        resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
-        ObjectMetaBuilder, ObjectMetaBuilderError, PodBuilder, PodSecurityContextBuilder,
-        VolumeBuilder,
+        configmap::ConfigMapBuilder,
+        meta::ObjectMetaBuilder,
+        pod::{
+            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, volume::VolumeBuilder, PodBuilder,
+        },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -107,60 +110,60 @@ pub enum Error {
 
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
 
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
 
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
 
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::product_config_utils::Error,
     },
 
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("Failed to transform configs"))]
     ProductConfigTransform {
-        source: stackable_operator::product_config_utils::ConfigError,
+        source: stackable_operator::product_config_utils::Error,
     },
 
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to patch role binding: {source}"))]
     ApplyRoleBinding {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::commons::rbac::Error,
     },
 
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
 
@@ -181,7 +184,7 @@ pub enum Error {
 
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::configmap::Error,
         rolegroup: RoleGroupRef<AirflowCluster>,
     },
 
@@ -198,22 +201,22 @@ pub enum Error {
 
     #[snafu(display("invalid executor name"))]
     UnidentifiedAirflowExecutor {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::pod::container::Error,
     },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to resolve the Vector aggregator address"))]
@@ -229,7 +232,7 @@ pub enum Error {
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to apply authentication configuration"))]
@@ -242,12 +245,12 @@ pub enum Error {
 
     #[snafu(display("failed to build the pod template config map"))]
     PodTemplateConfigMap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::configmap::Error,
     },
 
     #[snafu(display("failed to apply executor template ConfigMap"))]
     ApplyExecutorTemplateConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("fragment validation failure"))]
@@ -267,7 +270,9 @@ pub enum Error {
     BuildLabel { source: LabelError },
 
     #[snafu(display("failed to build object meta data"))]
-    ObjectMeta { source: ObjectMetaBuilderError },
+    ObjectMeta {
+        source: stackable_operator::builder::meta::Error,
+    },
 
     #[snafu(display(
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
@@ -293,7 +298,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let resolved_product_image: ResolvedProductImage = airflow
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);

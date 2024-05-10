@@ -115,9 +115,8 @@ mod tests {
                                     ),
                                 ])),
                             }),
-                            namespace_selector: None,
-                            namespaces: None,
                             topology_key: "kubernetes.io/hostname".to_string(),
+                            ..PodAffinityTerm::default()
                         },
                         weight: 20,
                     },
@@ -139,9 +138,8 @@ mod tests {
                                     ("app.kubernetes.io/component".to_string(), role.to_string()),
                                 ])),
                             }),
-                            namespace_selector: None,
-                            namespaces: None,
                             topology_key: "kubernetes.io/hostname".to_string(),
+                            ..PodAffinityTerm::default()
                         },
                         weight: 70,
                     },
@@ -202,9 +200,8 @@ mod tests {
                                     ),
                                 ])),
                             }),
-                            namespace_selector: None,
-                            namespaces: None,
                             topology_key: "kubernetes.io/hostname".to_string(),
+                            ..PodAffinityTerm::default()
                         },
                         weight: 20,
                     },
@@ -229,9 +226,8 @@ mod tests {
                                     ),
                                 ])),
                             }),
-                            namespace_selector: None,
-                            namespaces: None,
                             topology_key: "kubernetes.io/hostname".to_string(),
+                            ..PodAffinityTerm::default()
                         },
                         weight: 70,
                     },

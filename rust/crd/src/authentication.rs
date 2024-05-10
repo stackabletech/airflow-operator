@@ -14,7 +14,7 @@ const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 1] = ["LDAP"];
 pub enum Error {
     #[snafu(display("Failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
     // TODO: Adapt message if multiple authentication classes are supported simultaneously
