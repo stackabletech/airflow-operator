@@ -9,6 +9,7 @@
 ### Fixed
 
 - Add missing affinities for Kubernetes executors ([#439]).
+- Remove requirement of celery configs when using kubernetes executors ([#XXX]).
 
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#439]: https://github.com/stackabletech/airflow-operator/pull/439
