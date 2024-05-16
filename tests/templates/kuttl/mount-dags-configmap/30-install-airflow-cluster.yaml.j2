@@ -17,8 +17,10 @@ stringData:
   adminUser.password: airflow
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+{% if test_scenario['values']['executor'] == 'celery' %}
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+{% endif %}
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -74,22 +74,27 @@ pub fn build_airflow_statefulset_envs(
                 "connections.sqlalchemyDatabaseUri",
             ),
         );
-        env.insert(
-            AIRFLOW__CELERY__RESULT_BACKEND.into(),
-            env_var_from_secret(
-                AIRFLOW__CELERY__RESULT_BACKEND,
-                secret,
-                "connections.celeryResultBackend",
-            ),
-        );
-        env.insert(
-            AIRFLOW__CELERY__BROKER_URL.into(),
-            env_var_from_secret(
-                AIRFLOW__CELERY__BROKER_URL,
-                secret,
-                "connections.celeryBrokerUrl",
-            ),
-        );
+
+        // Redis is only needed when celery executors are used
+        // see https://github.com/stackabletech/airflow-operator/issues/424 for details
+        if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
+            env.insert(
+                AIRFLOW__CELERY__RESULT_BACKEND.into(),
+                env_var_from_secret(
+                    AIRFLOW__CELERY__RESULT_BACKEND,
+                    secret,
+                    "connections.celeryResultBackend",
+                ),
+            );
+            env.insert(
+                AIRFLOW__CELERY__BROKER_URL.into(),
+                env_var_from_secret(
+                    AIRFLOW__CELERY__BROKER_URL,
+                    secret,
+                    "connections.celeryBrokerUrl",
+                ),
+            );
+        }
     }
 
     let dags_folder = get_dags_folder(airflow);
