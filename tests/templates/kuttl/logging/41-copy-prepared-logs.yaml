@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >
+      kubectl cp ./prepared-logs.py.json
+      $NAMESPACE/airflow-webserver-automatic-log-config-0:/stackable/log/airflow/prepared-logs.py.json
+      --container vector
