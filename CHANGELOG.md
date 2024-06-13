@@ -10,10 +10,13 @@
 
 - Add missing affinities for Kubernetes executors ([#439]).
 - Remove requirement of celery configs when using kubernetes executors ([#445]).
+- Processing of corrupted log events fixed; If errors occur, the error
+  messages are added to the log event ([#449]).
 
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#439]: https://github.com/stackabletech/airflow-operator/pull/439
 [#445]: https://github.com/stackabletech/airflow-operator/pull/445
+[#449]: https://github.com/stackabletech/airflow-operator/pull/449
 
 ## [24.3.0] - 2024-03-20
 
