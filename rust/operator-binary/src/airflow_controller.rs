@@ -14,7 +14,7 @@ use stackable_airflow_crd::{
     GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
     TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
-use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, VolumeMount};
+use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, PodTemplateSpec, VolumeMount};
 use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
@@ -548,6 +548,7 @@ async fn build_executor_template(
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
         &common_config.env_overrides,
+        &common_config.pod_overrides,
         &rolegroup,
     )?;
     cluster_resources
@@ -1054,6 +1055,7 @@ fn build_executor_template_config_map(
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
+    pod_overrides: &PodTemplateSpec,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
@@ -1145,7 +1147,9 @@ fn build_executor_template_config_map(
         ));
     }
 
-    let pod_template = pb.build_template();
+    let mut pod_template = pb.build_template();
+    pod_template.merge_from(pod_overrides.clone());
+
     let mut cm_builder = ConfigMapBuilder::new();
 
     let restarter_label =
