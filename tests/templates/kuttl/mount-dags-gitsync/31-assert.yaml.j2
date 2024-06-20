@@ -1,0 +1,21 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: metrics
+timeout: 30
+commands:
+
+{% if test_scenario['values']['executor'] == 'kubernetes' %}
+  # check that the executor template configmap contains mounts and envs
+  # will expect 4 (2 from from the volume declaration + mounts to two containers, base and gitsync)
+  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "test-cm-gitsync" | wc -l | grep 4
+  # will expect 2 (two containers, base and gitsync)
+  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "AIRFLOW_TEST_VAR" | wc -l | grep 2
+{% else %}
+  # check that the statefulset contains mounts and envs
+  # will expect 6 (2 from from the volume declaration + mounts to 3 containers, base and 2 gitsyncs, plus configmap restarter)
+  - script: kubectl -n $NAMESPACE get sts airflow-worker-default -o json | grep "test-cm-gitsync" | wc -l | grep 6
+  # will expect 3 (two containers, base and gitsync-1, and one initContainer gitsync-0)
+  - script: kubectl -n $NAMESPACE get sts airflow-worker-default -o json | grep "AIRFLOW_TEST_VAR" | wc -l | grep 3
+{% endif %}

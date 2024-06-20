@@ -22,6 +22,14 @@ stringData:
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 {% endif %}
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-cm-gitsync
+data:
+  test.txt: |
+    some test text here
+---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
@@ -43,6 +51,13 @@ spec:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false
         gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
+    volumeMounts:
+      - name: test-cm-gitsync
+        mountPath: /tmp/test.txt
+    volumes:
+      - name: test-cm-gitsync
+        configMap:
+          name: test-cm-gitsync
   webservers:
     config:
       logging:
@@ -61,11 +76,13 @@ spec:
       default:
         envOverrides:
           AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: "kubernetes://?__extra__=%7B%22extra__kubernetes__in_cluster%22%3A+true%2C+%22extra__kubernetes__kube_config%22%3A+%22%22%2C+%22extra__kubernetes__kube_config_path%22%3A+%22%22%2C+%22extra__kubernetes__namespace%22%3A+%22%22%7D"
+          AIRFLOW_TEST_VAR: "test"
         replicas: 1
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     envOverrides:
       AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: "kubernetes://?__extra__=%7B%22extra__kubernetes__in_cluster%22%3A+true%2C+%22extra__kubernetes__kube_config%22%3A+%22%22%2C+%22extra__kubernetes__kube_config_path%22%3A+%22%22%2C+%22extra__kubernetes__namespace%22%3A+%22%22%7D"
+      AIRFLOW_TEST_VAR: "test"
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
