@@ -1181,6 +1181,7 @@ fn build_gitsync_container(
     name: &str,
     env_vars: Vec<EnvVar>,
 ) -> Result<k8s_openapi::api::core::v1::Container, Error> {
+    let volume_mounts = airflow.volume_mounts();
     let gitsync_container = ContainerBuilder::new(name)
         .context(InvalidContainerNameSnafu)?
         .add_env_vars(env_vars)
@@ -1194,7 +1195,7 @@ fn build_gitsync_container(
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
         .add_volume_mount(GIT_CONTENT, GIT_ROOT)
-        .add_volume_mount(airflow.volume_mounts())
+        .add_volume_mount(volume_mounts)
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
