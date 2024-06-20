@@ -1194,6 +1194,7 @@ fn build_gitsync_container(
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
         .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .add_volume_mount(airflow.volume_mounts())
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
