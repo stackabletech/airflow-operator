@@ -14,7 +14,7 @@ use stackable_airflow_crd::{
     GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
     TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
-use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
+use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, PodTemplateSpec, VolumeMount};
 use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
@@ -548,6 +548,7 @@ async fn build_executor_template(
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
         &common_config.env_overrides,
+        &common_config.pod_overrides,
         &rolegroup,
     )?;
     cluster_resources
@@ -938,6 +939,7 @@ fn build_server_rolegroup_statefulset(
             false,
             &format!("{}-{}", GIT_SYNC_NAME, 1),
             build_gitsync_statefulset_envs(rolegroup_config),
+            airflow.volume_mounts(),
         )?;
 
         pb.add_volume(
@@ -955,6 +957,7 @@ fn build_server_rolegroup_statefulset(
                 true,
                 &format!("{}-{}", GIT_SYNC_NAME, 0),
                 build_gitsync_statefulset_envs(rolegroup_config),
+                airflow.volume_mounts(),
             )?;
             // If the DAG is modularized we may encounter a timing issue whereby the celery worker has started
             // *before* all modules referenced by the DAG have been fetched by gitsync and registered. This
@@ -1052,6 +1055,7 @@ fn build_executor_template_config_map(
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
+    pod_overrides: &PodTemplateSpec,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
@@ -1122,7 +1126,8 @@ fn build_executor_template_config_map(
             &gitsync,
             true,
             &format!("{}-{}", GIT_SYNC_NAME, 0),
-            build_gitsync_template(&gitsync.credentials_secret),
+            build_gitsync_template(env_overrides),
+            airflow.volume_mounts(),
         )?;
         pb.add_volume(
             VolumeBuilder::new(GIT_CONTENT)
@@ -1142,7 +1147,9 @@ fn build_executor_template_config_map(
         ));
     }
 
-    let pod_template = pb.build_template();
+    let mut pod_template = pb.build_template();
+    pod_template.merge_from(pod_overrides.clone());
+
     let mut cm_builder = ConfigMapBuilder::new();
 
     let restarter_label =
@@ -1180,6 +1187,7 @@ fn build_gitsync_container(
     one_time: bool,
     name: &str,
     env_vars: Vec<EnvVar>,
+    volume_mounts: Vec<VolumeMount>,
 ) -> Result<k8s_openapi::api::core::v1::Container, Error> {
     let gitsync_container = ContainerBuilder::new(name)
         .context(InvalidContainerNameSnafu)?
@@ -1194,6 +1202,7 @@ fn build_gitsync_container(
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
         .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .add_volume_mounts(volume_mounts)
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
