@@ -303,25 +303,7 @@ pub fn build_gitsync_statefulset_envs(
 
     if let Some(git_env) = rolegroup_config.get(&PropertyNameKind::Env) {
         for (k, v) in git_env.iter() {
-            if k.eq_ignore_ascii_case(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY) {
-                env.insert(
-                    GITSYNC_USERNAME.to_string(),
-                    env_var_from_secret(GITSYNC_USERNAME, k, "user"),
-                );
-                env.insert(
-                    GITSYNC_PASSWORD.to_string(),
-                    env_var_from_secret(GITSYNC_PASSWORD, k, "password"),
-                );
-            } else {
-                env.insert(
-                    k.to_string(),
-                    EnvVar {
-                        name: k.to_string(),
-                        value: Some(v.to_string()),
-                        ..Default::default()
-                    },
-                );
-            }
+            gitsync_vars_map(k, &mut env, v);
         }
     }
 
@@ -423,29 +405,33 @@ pub fn build_gitsync_template(env_overrides: &HashMap<String, String>) -> Vec<En
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        if k.eq_ignore_ascii_case(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY) {
-            env.insert(
-                GITSYNC_USERNAME.to_string(),
-                env_var_from_secret(GITSYNC_USERNAME, k, "user"),
-            );
-            env.insert(
-                GITSYNC_PASSWORD.to_string(),
-                env_var_from_secret(GITSYNC_PASSWORD, k, "password"),
-            );
-        } else {
-            env.insert(
-                k.to_string(),
-                EnvVar {
-                    name: k.to_string(),
-                    value: Some(v.to_string()),
-                    ..Default::default()
-                },
-            );
-        }
+        gitsync_vars_map(k, &mut env, v);
     }
 
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
+}
+
+fn gitsync_vars_map(k: &String, env: &mut BTreeMap<String, EnvVar>, v: &String) {
+    if k.eq_ignore_ascii_case(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY) {
+        env.insert(
+            GITSYNC_USERNAME.to_string(),
+            env_var_from_secret(GITSYNC_USERNAME, k, "user"),
+        );
+        env.insert(
+            GITSYNC_PASSWORD.to_string(),
+            env_var_from_secret(GITSYNC_PASSWORD, k, "password"),
+        );
+    } else {
+        env.insert(
+            k.to_string(),
+            EnvVar {
+                name: k.to_string(),
+                value: Some(v.to_string()),
+                ..Default::default()
+            },
+        );
+    }
 }
 
 // Internally the environment variable collection uses a map so that overrides can actually
