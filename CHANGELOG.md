@@ -5,6 +5,7 @@
 ### Added
 
 - Support for modularized DAGs ([#404]).
+- Support for 2.8.4 and 2.9.2 ([#461]).
 
 ### Fixed
 
@@ -13,12 +14,14 @@
 - Processing of corrupted log events fixed; If errors occur, the error
   messages are added to the log event ([#449]).
 - Add volumes/volumeMounts/envOverrides to gitsync containers ([#456]).
+- Removed support for 2.7.2 and 2.7.3 ([#461]).
 
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#439]: https://github.com/stackabletech/airflow-operator/pull/439
 [#445]: https://github.com/stackabletech/airflow-operator/pull/445
 [#449]: https://github.com/stackabletech/airflow-operator/pull/449
 [#456]: https://github.com/stackabletech/airflow-operator/pull/456
+[#461]: https://github.com/stackabletech/airflow-operator/pull/461
 
 ## [24.3.0] - 2024-03-20
 
