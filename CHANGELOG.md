@@ -6,6 +6,13 @@
 
 - Support for modularized DAGs ([#404]).
 
+### Changed
+
+- Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#xxx]).
+- Bump `product-config` from `0.6.0` to `0.7.0` ([#xxx]).
+
+[#xxx]: https://github.com/stackabletech/airflow-operator/pull/xxx
+
 ### Fixed
 
 - Add missing affinities for Kubernetes executors ([#439]).
