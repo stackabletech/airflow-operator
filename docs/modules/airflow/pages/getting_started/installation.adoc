@@ -44,10 +44,10 @@ include::example$getting_started/code/getting_started.sh[tag=stackablectl-instal
 The tool will show
 
 ----
-[INFO ] Installing commons operator
-[INFO ] Installing secret operator
-[INFO ] Installing listener operator
-[INFO ] Installing airflow operator
+Installed commons operator
+Installed secret operator
+Installed listener operator
+Installed airflow operator
 ----
 
 TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use stackablectl. For
