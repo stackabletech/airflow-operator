@@ -57,7 +57,12 @@ metadata:
   name: airflow
 spec:
   image:
+{% if test_scenario['values']['airflow'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% else %}
     productVersion: "{{ test_scenario['values']['airflow'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
