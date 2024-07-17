@@ -8,8 +8,9 @@ dimensions:
   - name: airflow
     values:
       - 2.6.3
-      - 2.7.3
       - 2.8.1
+      - 2.8.4
+      - 2.9.2
       # To use a custom image, add a comma and the full name after the product version
       # - 2.8.1,docker.stackable.tech/sandbox/airflow:2.8.1-stackable0.0.0-dev
   - name: airflow-latest
