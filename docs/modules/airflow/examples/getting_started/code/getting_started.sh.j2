@@ -98,10 +98,12 @@ kubectl rollout status --watch --timeout=5m statefulset/airflow-scheduler-defaul
 # end::watch-airflow-rollout[]
 
 echo "Starting port-forwarding of port 8080"
+# shellcheck disable=2069 # we want all output to be blackholed
 # tag::port-forwarding[]
 kubectl port-forward svc/airflow-webserver 8080 2>&1 >/dev/null &
 # end::port-forwarding[]
 PORT_FORWARD_PID=$!
+# shellcheck disable=2064 # we want the PID evaluated now, not at the time the trap is called
 trap "kill $PORT_FORWARD_PID" EXIT
 sleep 5
 
