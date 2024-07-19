@@ -53,8 +53,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
-        framework::capture_shell_output,
-        spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
+        spec::{ContainerLogConfig, Logging},
     },
     role_utils::{CommonConfiguration, GenericRoleConfig, RoleGroupRef},
     status::condition::{
@@ -824,19 +823,6 @@ fn build_server_rolegroup_statefulset(
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = merged_airflow_config
-        .logging
-        .containers
-        .get(&Container::Airflow)
-    {
-        airflow_container_args.push(capture_shell_output(
-            STACKABLE_LOG_DIR,
-            &Container::Airflow.to_string(),
-            log_config,
-        ));
-    }
     airflow_container_args.extend(airflow_role.get_commands());
 
     airflow_container

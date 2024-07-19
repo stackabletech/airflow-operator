@@ -64,6 +64,7 @@ tests:
     dimensions:
       - airflow
       - openshift
+      - executor
   - name: cluster-operation
     dimensions:
       - airflow-latest
