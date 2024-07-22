@@ -26,19 +26,19 @@ if TYPE_CHECKING:
 
 
 class SparkKubernetesOperator(BaseOperator):  # <1>
-    template_fields: Sequence[str] = ('application_file', 'namespace')
-    template_ext: Sequence[str] = ('.yaml', '.yml', '.json')
-    ui_color = '#f4a460'
+    template_fields: Sequence[str] = ("application_file", "namespace")
+    template_ext: Sequence[str] = (".yaml", ".yml", ".json")
+    ui_color = "#f4a460"
 
     def __init__(
-            self,
-            *,
-            application_file: str,
-            namespace: Optional[str] = None,
-            kubernetes_conn_id: str = 'kubernetes_in_cluster',  # <2>
-            api_group: str = 'spark.stackable.tech',
-            api_version: str = 'v1alpha1',
-            **kwargs,
+        self,
+        *,
+        application_file: str,
+        namespace: Optional[str] = None,
+        kubernetes_conn_id: str = "kubernetes_in_cluster",  # <2>
+        api_group: str = "spark.stackable.tech",
+        api_version: str = "v1alpha1",
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.application_file = application_file
@@ -48,7 +48,7 @@ class SparkKubernetesOperator(BaseOperator):  # <1>
         self.api_version = api_version
         self.plural = "sparkapplications"
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: "Context"):
         hook = KubernetesHook(conn_id=self.kubernetes_conn_id)
         self.log.info("Creating SparkApplication...")
         self.log.info(json.dumps(self.application_file, indent=4))
