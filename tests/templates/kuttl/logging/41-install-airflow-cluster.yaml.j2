@@ -116,6 +116,12 @@ spec:
                   configMap: airflow-log-config
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
+    config:
+      resources:
+        cpu:
+          min: 50m
+        memory:
+          limit: 512Mi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -151,6 +157,11 @@ spec:
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
+      resources:
+        cpu:
+          min: 50m
+        memory:
+          limit: 512Mi
       #  automatic-log-config
       logging:
         enableVectorAgent: true
