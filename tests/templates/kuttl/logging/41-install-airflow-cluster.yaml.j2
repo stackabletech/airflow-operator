@@ -17,8 +17,10 @@ stringData:
   adminUser.password: airflow
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+{% if test_scenario['values']['executor'] == 'celery' %}
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+{% endif %}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -66,8 +68,16 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
+    loadExamples: true
     credentialsSecret: test-airflow-credentials
   webservers:
+    config:
+      resources:
+        cpu:
+          min: 200m
+          max: 1000m
+        memory:
+          limit: 1Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -111,7 +121,13 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
+{% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
+    config:
+      resources:
+        cpu:
+          min: 50m
+          max: 250m
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -144,7 +160,44 @@ spec:
               airflow:
                 custom:
                   configMap: airflow-log-config
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+  kubernetesExecutors:
+    config:
+      resources:
+        cpu:
+          min: 50m
+          max: 250m
+        memory:
+          limit: 512Mi
+      #  automatic-log-config
+      logging:
+        enableVectorAgent: true
+        containers:
+          base:
+            console:
+              level: INFO
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+          vector:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
+      # custom-log-config is not tested for kubernetesExecutors because
+      # there are no roleGroups to test both
+{% endif %}
   schedulers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 500m
     roleGroups:
       automatic-log-config:
         replicas: 1

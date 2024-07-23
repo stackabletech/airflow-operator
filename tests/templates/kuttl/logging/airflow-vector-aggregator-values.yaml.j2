@@ -48,30 +48,6 @@ customConfig:
       condition: >-
         .pod == "airflow-webserver-custom-log-config-0" &&
         .container == "vector"
-    filteredAutomaticLogConfigWorkerAirflow:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
-        .container == "airflow"
-    filteredAutomaticLogConfigWorkerVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
-        .container == "vector"
-    filteredCustomLogConfigWorkerAirflow:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "airflow-worker-custom-log-config-0" &&
-        .container == "airflow"
-    filteredCustomLogConfigWorkerVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "airflow-worker-custom-log-config-0" &&
-        .container == "vector"
     filteredAutomaticLogConfigSchedulerAirflow:
       type: filter
       inputs: [validEvents]
@@ -96,6 +72,57 @@ customConfig:
       condition: >-
         .pod == "airflow-scheduler-custom-log-config-0" &&
         .container == "vector"
+{% if test_scenario['values']['executor'] == 'celery' %}
+    filteredAutomaticLogConfigWorkerAirflow:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "airflow"
+    filteredAutomaticLogConfigWorkerVector:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "vector"
+    filteredCustomLogConfigWorkerAirflow:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-custom-log-config-0" &&
+        .container == "airflow"
+    filteredCustomLogConfigWorkerVector:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-custom-log-config-0" &&
+        .container == "vector"
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+    filteredExampleTriggerTargetDagBashTaskBase:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
+        .container == "base"
+    filteredExampleTriggerTargetDagBashTaskVector:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
+        .container == "vector"
+    filteredExampleTriggerTargetDagRunThisBase:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
+        .container == "base"
+    filteredExampleTriggerTargetDagRunThisVector:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
+        .container == "vector"
+{% endif %}
     filteredInvalidEvents:
       type: filter
       inputs: [vector]

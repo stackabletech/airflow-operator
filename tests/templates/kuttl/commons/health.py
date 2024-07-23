@@ -12,7 +12,12 @@ if __name__ == "__main__":
         stream=sys.stdout,
     )
 
-    url = "http://airflow-webserver-default:8080/api/v1/health"
+    try:
+        role_group = sys.argv[1]
+    except IndexError:
+        role_group = "default"
+
+    url = f"http://airflow-webserver-{role_group}:8080/api/v1/health"
     count = 0
 
     while True:

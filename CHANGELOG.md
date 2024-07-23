@@ -24,6 +24,7 @@
   messages are added to the log event ([#449]).
 - Add volumes/volumeMounts/envOverrides to gitsync containers ([#456]).
 - Removed support for 2.7.2 and 2.7.3 ([#461]).
+- Prevent double logging of the airflow container logs ([#474]).
 
 [#404]: https://github.com/stackabletech/airflow-operator/pull/404
 [#439]: https://github.com/stackabletech/airflow-operator/pull/439
@@ -31,6 +32,7 @@
 [#449]: https://github.com/stackabletech/airflow-operator/pull/449
 [#456]: https://github.com/stackabletech/airflow-operator/pull/456
 [#461]: https://github.com/stackabletech/airflow-operator/pull/461
+[#474]: https://github.com/stackabletech/airflow-operator/pull/474
 
 ## [24.3.0] - 2024-03-20
 

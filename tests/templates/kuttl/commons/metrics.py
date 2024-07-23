@@ -12,19 +12,24 @@ def exception_handler(exception_type, exception, traceback):
 sys.excepthook = exception_handler
 
 
-def assert_metric(role, metric):
-    metric_response = requests.get(f"http://airflow-{role}-default:9102/metrics")
+def assert_metric(role, role_group, metric):
+    metric_response = requests.get(f"http://airflow-{role}-{role_group}:9102/metrics")
     assert (
         metric_response.status_code == 200
-    ), f"Metrics could not be retrieved from the {role}."
+    ), f"Metrics could not be retrieved from the {role}-{role_group}."
     return metric in metric_response.text
 
+
+try:
+    role_group = sys.argv[1]
+except IndexError:
+    role_group = "default"
 
 # Trigger a DAG run to create metrics
 dag_id = "example_trigger_target_dag"
 dag_conf = {"message": "Hello World"}
 
-rest_url = "http://airflow-webserver-default:8080/api/v1"
+rest_url = f"http://airflow-webserver-{role_group}:8080/api/v1"
 auth = ("airflow", "airflow")
 
 # allow a few moments for the DAGs to be registered to all roles
@@ -47,11 +52,12 @@ while True:
     time.sleep(5)
     # (disable line-break flake checks)
     if (
-        (assert_metric("scheduler", "airflow_scheduler_heartbeat"))
-        and (assert_metric("webserver", "airflow_task_instance_created_BashOperator"))  # noqa: W503, W504
+        (assert_metric("scheduler", role_group, "airflow_scheduler_heartbeat"))
+        and (assert_metric("webserver", role_group, "airflow_task_instance_created_BashOperator"))  # noqa: W503, W504
         and (
             assert_metric(
                 "scheduler",
+                role_group,
                 "airflow_dagrun_duration_success_example_trigger_target_dag_count",
             )
         )
