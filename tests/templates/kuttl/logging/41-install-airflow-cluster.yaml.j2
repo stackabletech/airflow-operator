@@ -71,6 +71,13 @@ spec:
     loadExamples: true
     credentialsSecret: test-airflow-credentials
   webservers:
+    config:
+      resources:
+        cpu:
+          min: 200m
+          max: 1000m
+        memory:
+          limit: 1Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -120,8 +127,7 @@ spec:
       resources:
         cpu:
           min: 50m
-        memory:
-          limit: 512Mi
+          max: 250m
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -160,6 +166,7 @@ spec:
       resources:
         cpu:
           min: 50m
+          max: 250m
         memory:
           limit: 512Mi
       #  automatic-log-config
@@ -186,6 +193,11 @@ spec:
       # there are no roleGroups to test both
 {% endif %}
   schedulers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 500m
     roleGroups:
       automatic-log-config:
         replicas: 1

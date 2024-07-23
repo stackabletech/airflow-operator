@@ -29,7 +29,7 @@ except IndexError:
 dag_id = "example_trigger_target_dag"
 dag_conf = {"message": "Hello World"}
 
-rest_url = "http://airflow-webserver-{role_group}:8080/api/v1"
+rest_url = f"http://airflow-webserver-{role_group}:8080/api/v1"
 auth = ("airflow", "airflow")
 
 # allow a few moments for the DAGs to be registered to all roles
