@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.7.0] - 2024-07-24
+
 ### Added
 
 - Support for modularized DAGs ([#404]).
