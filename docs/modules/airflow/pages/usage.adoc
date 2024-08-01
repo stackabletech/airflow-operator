@@ -3,7 +3,7 @@
 == Monitoring
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See
-xref:home:operators:monitoring.adoc[] for more details.
+xref:operators:monitoring.adoc[] for more details.
 
 == Configuration & Environment Overrides
 
@@ -53,7 +53,7 @@ The Airflow Operator currently does not support using https://kubernetes.io/docs
 
 === Resource Requests
 
-include::home:concepts:stackable_resource_requests.adoc[]
+include::concepts:stackable_resource_requests.adoc[]
 
 If no resource requests are configured explicitely, the operator uses the following defaults:
 
@@ -112,7 +112,7 @@ image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+Airflow supports xref:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
 The AuthenticationClass is then referenced in the AirflowCluster resource as follows:
 
 [source,yaml]
@@ -136,7 +136,7 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html#access-control[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:reference:authenticationclass.adoc[] reference.
+You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:reference:authenticationclass.adoc[] reference.
 
 The users and roles can be viewed as before in the Webserver UI, but note that the blue "+" button is not available when authenticating against LDAP:
 
@@ -171,7 +171,7 @@ spec:
 == Monitoring
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See
-xref:home:operators:monitoring.adoc[] for more details
+xref:operators:monitoring.adoc[] for more details
 
 == Mounting DAGs
 
