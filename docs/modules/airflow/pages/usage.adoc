@@ -3,7 +3,7 @@
 == Monitoring
 
 The managed Airflow instances are automatically configured to export Prometheus metrics. See
-xref:home:operators:monitoring.adoc[] for more details.
+xref:operators:monitoring.adoc[] for more details.
 
 == Log aggregation
 
@@ -47,7 +47,7 @@ spec:
 ----
 
 Further information on how to configure logging, can be found in
-xref:home:concepts:logging.adoc[].
+xref:concepts:logging.adoc[].
 
 == Configuration & Environment Overrides
 
@@ -97,7 +97,7 @@ The Airflow Operator currently does not support using https://kubernetes.io/docs
 
 === Resource Requests
 
-include::home:concepts:stackable_resource_requests.adoc[]
+include::concepts:stackable_resource_requests.adoc[]
 
 If no resource requests are configured explicitely, the operator uses the following defaults:
 
