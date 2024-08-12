@@ -749,7 +749,7 @@ fn build_rolegroup_metadata(
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(airflow)
-        .name(&rolegroup.object_name())
+        .name(rolegroup.object_name())
         .ownerreference_from_resource(airflow, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(

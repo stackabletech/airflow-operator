@@ -23,6 +23,15 @@ stringData:
 {% endif %}
 ---
 apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials
+type: Opaque
+stringData:
+  user: airflow
+  password: airflow
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: test-cm-gitsync
@@ -52,6 +61,7 @@ spec:
       - repo: https://github.com/stackabletech/airflow-operator
         branch: "main"
         wait: 20
+        credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false

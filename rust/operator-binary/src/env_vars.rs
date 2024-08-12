@@ -416,11 +416,11 @@ fn gitsync_vars_map(k: &String, env: &mut BTreeMap<String, EnvVar>, v: &String) 
     if k.eq_ignore_ascii_case(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY) {
         env.insert(
             GITSYNC_USERNAME.to_string(),
-            env_var_from_secret(GITSYNC_USERNAME, k, "user"),
+            env_var_from_secret(GITSYNC_USERNAME, v, "user"),
         );
         env.insert(
             GITSYNC_PASSWORD.to_string(),
-            env_var_from_secret(GITSYNC_PASSWORD, k, "password"),
+            env_var_from_secret(GITSYNC_PASSWORD, v, "password"),
         );
     } else {
         env.insert(
