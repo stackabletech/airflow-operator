@@ -901,7 +901,7 @@ fn build_server_rolegroup_statefulset(
         .build();
     pb.add_container(metrics_container);
 
-    pb.add_volumes(airflow.volumes());
+    pb.add_volumes(airflow.volumes().clone());
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_airflow_config
@@ -1097,7 +1097,7 @@ fn build_executor_template_config_map(
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     pb.add_container(airflow_container.build());
-    pb.add_volumes(airflow.volumes());
+    pb.add_volumes(airflow.volumes().clone());
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_executor_config
