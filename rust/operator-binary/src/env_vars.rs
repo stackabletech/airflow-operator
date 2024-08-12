@@ -298,8 +298,11 @@ fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
 /// webserver (and worker, for clusters utilizing `celeryExecutor`).
 pub fn build_gitsync_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    git_credentials_secret: &Option<String>,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+    add_gitsync_credentials(git_credentials_secret, &mut env);
 
     if let Some(git_env) = rolegroup_config.get(&PropertyNameKind::Env) {
         for (k, v) in git_env.iter() {
@@ -309,6 +312,22 @@ pub fn build_gitsync_statefulset_envs(
 
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
+}
+
+fn add_gitsync_credentials(
+    git_credentials_secret: &Option<String>,
+    env: &mut BTreeMap<String, EnvVar>,
+) {
+    if let Some(git_credentials_secret) = &git_credentials_secret {
+        env.insert(
+            GITSYNC_USERNAME.to_string(),
+            env_var_from_secret(GITSYNC_USERNAME, git_credentials_secret, "user"),
+        );
+        env.insert(
+            GITSYNC_PASSWORD.to_string(),
+            env_var_from_secret(GITSYNC_PASSWORD, git_credentials_secret, "password"),
+        );
+    }
 }
 
 /// Return environment variables to be applied to the configuration map used in conjunction with
@@ -401,8 +420,13 @@ pub fn build_airflow_template_envs(
 
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker: applied to the gitsync `initContainer`.
-pub fn build_gitsync_template(env_overrides: &HashMap<String, String>) -> Vec<EnvVar> {
+pub fn build_gitsync_template(
+    env_overrides: &HashMap<String, String>,
+    git_credentials_secret: &Option<String>,
+) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+    add_gitsync_credentials(git_credentials_secret, &mut env);
 
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
         gitsync_vars_map(k, &mut env, v);
@@ -413,25 +437,14 @@ pub fn build_gitsync_template(env_overrides: &HashMap<String, String>) -> Vec<En
 }
 
 fn gitsync_vars_map(k: &String, env: &mut BTreeMap<String, EnvVar>, v: &String) {
-    if k.eq_ignore_ascii_case(AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY) {
-        env.insert(
-            GITSYNC_USERNAME.to_string(),
-            env_var_from_secret(GITSYNC_USERNAME, v, "user"),
-        );
-        env.insert(
-            GITSYNC_PASSWORD.to_string(),
-            env_var_from_secret(GITSYNC_PASSWORD, v, "password"),
-        );
-    } else {
-        env.insert(
-            k.to_string(),
-            EnvVar {
-                name: k.to_string(),
-                value: Some(v.to_string()),
-                ..Default::default()
-            },
-        );
-    }
+    env.insert(
+        k.to_string(),
+        EnvVar {
+            name: k.to_string(),
+            value: Some(v.to_string()),
+            ..Default::default()
+        },
+    );
 }
 
 // Internally the environment variable collection uses a map so that overrides can actually
