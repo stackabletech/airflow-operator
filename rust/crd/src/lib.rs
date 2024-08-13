@@ -32,7 +32,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
-    utils::COMMON_BASH_TRAP_FUNCTIONS,
+    utils::{crds::raw_object_list_schema, COMMON_BASH_TRAP_FUNCTIONS},
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
@@ -232,12 +232,14 @@ pub struct AirflowClusterConfig {
     pub vector_aggregator_config_map_name: Option<String>,
 
     /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volumes: Option<Vec<Volume>>,
+    #[serde(default)]
+    #[schemars(schema_with = "raw_object_list_schema")]
+    pub volumes: Vec<Volume>,
 
     /// Additional volumes to mount. Use together with `volumes` to define volumes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volume_mounts: Option<Vec<VolumeMount>>,
+    #[serde(default)]
+    #[schemars(schema_with = "raw_object_list_schema")]
+    pub volume_mounts: Vec<VolumeMount>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -418,15 +420,12 @@ impl AirflowCluster {
         self.get_role(role).map(|r| &r.role_config)
     }
 
-    /// this will extract a `Vec<Volume>` from `Option<Vec<Volume>>`
-    pub fn volumes(&self) -> Vec<Volume> {
-        let tmp = self.spec.cluster_config.volumes.as_ref();
-        tmp.iter().flat_map(|v| (*v).clone()).collect()
+    pub fn volumes(&self) -> &Vec<Volume> {
+        &self.spec.cluster_config.volumes
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        let tmp = self.spec.cluster_config.volume_mounts.as_ref();
-        let mut mounts: Vec<VolumeMount> = tmp.iter().flat_map(|v| (*v).clone()).collect();
+        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
                 name: GIT_CONTENT.into(),
