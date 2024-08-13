@@ -23,9 +23,9 @@ pub struct GitSync {
     /// The name of the Secret used to access the repository if it is not public.
     /// This should include two fields: `user` and `password`.
     /// The `password` field can either be an actual password (not recommended) or a GitHub token,
-    /// as described [here](https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication).
+    /// as described [here](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual).
     pub credentials_secret: Option<String>,
-    /// A map of optional configuration settings that are listed in the [git-sync documentation](https://github.com/kubernetes/git-sync/tree/v3.6.4#primary-flags).
+    /// A map of optional configuration settings that are listed in the [git-sync documentation](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual).
     /// Read the [git sync example](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_example).
     pub git_sync_conf: Option<BTreeMap<String, String>>,
 }

@@ -709,14 +709,6 @@ impl Configuration for AirflowConfigFragment {
             AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.cluster_config.credentials_secret.clone()),
         );
-        if let Some(git_sync) = &cluster.git_sync() {
-            if let Some(credentials_secret) = &git_sync.credentials_secret {
-                env.insert(
-                    AirflowConfig::GIT_CREDENTIALS_SECRET_PROPERTY.to_string(),
-                    Some(credentials_secret.to_string()),
-                );
-            }
-        }
         Ok(env)
     }
 

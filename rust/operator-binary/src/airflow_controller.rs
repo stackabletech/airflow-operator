@@ -749,7 +749,7 @@ fn build_rolegroup_metadata(
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(airflow)
-        .name(&rolegroup.object_name())
+        .name(rolegroup.object_name())
         .ownerreference_from_resource(airflow, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -924,7 +924,7 @@ fn build_server_rolegroup_statefulset(
             &gitsync,
             false,
             &format!("{}-{}", GIT_SYNC_NAME, 1),
-            build_gitsync_statefulset_envs(rolegroup_config),
+            build_gitsync_statefulset_envs(rolegroup_config, &gitsync.credentials_secret),
             airflow.volume_mounts(),
         )?;
 
@@ -942,7 +942,7 @@ fn build_server_rolegroup_statefulset(
                 &gitsync,
                 true,
                 &format!("{}-{}", GIT_SYNC_NAME, 0),
-                build_gitsync_statefulset_envs(rolegroup_config),
+                build_gitsync_statefulset_envs(rolegroup_config, &gitsync.credentials_secret),
                 airflow.volume_mounts(),
             )?;
             // If the DAG is modularized we may encounter a timing issue whereby the celery worker has started
@@ -1112,7 +1112,7 @@ fn build_executor_template_config_map(
             &gitsync,
             true,
             &format!("{}-{}", GIT_SYNC_NAME, 0),
-            build_gitsync_template(env_overrides),
+            build_gitsync_template(env_overrides, &gitsync.credentials_secret),
             airflow.volume_mounts(),
         )?;
         pb.add_volume(
