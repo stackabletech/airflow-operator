@@ -28,8 +28,8 @@ metadata:
   name: git-credentials
 type: Opaque
 stringData:
-  user: airflow
-  password: airflow
+  user: stackable-airflow
+  password: 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
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -58,14 +58,14 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
-      - repo: https://github.com/stackabletech/airflow-operator
+      - repo: https://github.com/stackabletech/airflow-dags
         branch: "main"
         wait: 20
         credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false
-        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
+        gitFolder: "mount-dags-gitsync/dags"
     volumeMounts:
       - name: test-cm-gitsync
         mountPath: /tmp/test.txt
