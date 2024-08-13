@@ -27,9 +27,12 @@ kind: Secret
 metadata:
   name: git-credentials
 type: Opaque
-stringData:
-  user: stackable-airflow
-  password: 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
+data:
+  # This is fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
+  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
+  # It is valid for one year and will expire on 13.08.2025.
+  user: c3RhY2thYmxlLWFpcmZsb3c=
+  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwTzRjMUhBT1pnbDZGXzdtTWdPYnY3aFpmUVVHMTR2WTlQcDRWUUJWVkQ2NWYyZlZEVXdmOWt2QmhRVEVIVkJZV2EyRU00ZEN3
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -58,7 +61,7 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
-      - repo: https://github.com/stackabletech/airflow-dags
+      - repo: https://github.com/stackable-airflow/dags
         branch: "main"
         wait: 20
         credentialsSecret: git-credentials

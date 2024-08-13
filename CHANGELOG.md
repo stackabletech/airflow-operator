@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
+
+[#489]: https://github.com/stackabletech/airflow-operator/pull/489
+
 ## [24.7.0] - 2024-07-24
 
 ### Added
