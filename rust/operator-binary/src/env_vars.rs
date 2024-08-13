@@ -295,7 +295,9 @@ fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
 }
 
 /// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
-/// webserver (and worker, for clusters utilizing `celeryExecutor`).
+/// webserver (and worker, for clusters utilizing `celeryExecutor`). N.B. the git credentials-secret is passed
+/// explicitly here: it is no longer added to the role config (lib/compute_env) as the kubenertes executor wraps
+/// CommonConfiguration<ExecutorConfigFragment> that is not linked to a role.
 pub fn build_gitsync_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     git_credentials_secret: &Option<String>,
