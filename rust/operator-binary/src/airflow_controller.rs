@@ -969,7 +969,8 @@ fn build_server_rolegroup_statefulset(
     if let Some(rolegroup) = rolegroup {
         pod_template.merge_from(rolegroup.config.pod_overrides.clone());
     }
-    // Caution: Don't change `pod_template` after this point, since this might impact the overrides
+    // Recapturing `pod_template` to immutable, since no changes to `pod_template` should be made after applying overrides
+    let pod_template = pod_template;
 
     let restarter_label =
         Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
@@ -1136,8 +1137,8 @@ fn build_executor_template_config_map(
 
     let mut pod_template = pb.build_template();
     pod_template.merge_from(pod_overrides.clone());
-
-    // Caution: Don't change `pod_template` after this point, since this might impact the overrides
+    // Recapturing `pod_template` to immutable, since no changes to `pod_template` should be made after applying overrides
+    let pod_template = pod_template;
 
     let mut cm_builder = ConfigMapBuilder::new();
 
