@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+spec:
+  template:
+    spec:
+      containers:
+      - name: airflow
+        resources:
+          limits:
+            cpu: 810m
+          requests:
+            cpu: 350m
+      - name: metrics
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-2-webserver-default
+spec:
+  template:
+    spec:
+      containers:
+      - name: airflow
+        resources:
+          limits:
+            cpu: 810m
+          requests:
+            cpu: 350m
+      - name: metrics
