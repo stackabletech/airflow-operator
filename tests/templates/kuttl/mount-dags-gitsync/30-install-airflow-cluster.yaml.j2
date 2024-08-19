@@ -23,6 +23,18 @@ stringData:
 {% endif %}
 ---
 apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials
+type: Opaque
+data:
+  # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
+  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
+  # It is valid for one year and will expire on 12.08.2025.
+  user: c3RhY2thYmxlLWFpcmZsb3c=
+  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSFFPMkpjRlJ1ekxLX0FLTGhqT0xvZ0JQMzZnTENFUFo0RUNETTM2TndjdTJDQUJvVVFueFBiVGhDTTZKQkhJNFFIZVdJb1dECg==
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: test-cm-gitsync
@@ -49,13 +61,14 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
-      - repo: https://github.com/stackabletech/airflow-operator
+      - repo: https://github.com/stackable-airflow/dags
         branch: "main"
         wait: 20
+        credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false
-        gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags"
+        gitFolder: "mount-dags-gitsync/dags"
     volumeMounts:
       - name: test-cm-gitsync
         mountPath: /tmp/test.txt

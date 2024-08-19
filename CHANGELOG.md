@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce CRD size from `1.7MB` to `111KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#488]):
+  - `podOverrides`
+  - `affinity`
+  - `volumes`
+  - `volumeMounts`
+
+### Fixed
+
+- Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
+
+[#488]: https://github.com/stackabletech/airflow-operator/pull/488
+[#489]: https://github.com/stackabletech/airflow-operator/pull/489
+
 ## [24.7.0] - 2024-07-24
 
 ### Added
