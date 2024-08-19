@@ -11,9 +11,24 @@ stringData:
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
   connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
-  # Only needed when using celery workers (instead of Kubernetes executors)
-  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql.default.svc.cluster.local/airflow
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-override
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
@@ -29,7 +44,7 @@ spec:
     listenerClass: external-unstable
     credentialsSecret: airflow-credentials
   webservers:
-    envOverride:
+    envOverrides:
       credentialsSecret: test-override
     roleGroups:
       default:
