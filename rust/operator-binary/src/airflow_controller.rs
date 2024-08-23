@@ -50,7 +50,10 @@ use stackable_operator::{
     },
     kvp::{Label, LabelError, Labels},
     logging::controller::ReconcilerError,
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_config_utils::{
+        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+        CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
+    },
     product_logging::{
         self,
         spec::{ContainerLogConfig, Logging},
@@ -65,6 +68,7 @@ use stackable_operator::{
 };
 use std::{
     collections::{BTreeMap, HashMap},
+    io::Write,
     str::FromStr,
     sync::Arc,
 };
@@ -280,6 +284,11 @@ pub enum Error {
 
     #[snafu(display("failed to construct config"))]
     ConstructConfig { source: config::Error },
+
+    #[snafu(display(
+        "failed to write to String (Vec<u8> to be precise) containing superset config"
+    ))]
+    WriteToConfigFileString { source: std::io::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -639,6 +648,15 @@ fn build_rolegroup_config_map(
     config::add_airflow_config(&mut config, authentication_config).context(ConstructConfigSnafu)?;
 
     let mut config_file = Vec::new();
+
+    // By removing the keys from `config_properties`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
+    if let Some(header) = config.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
+        writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
+    }
+
+    let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
+
     flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
@@ -647,6 +665,10 @@ fn build_rolegroup_config_map(
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
     })?;
+
+    if let Some(footer) = temp_file_footer {
+        writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
+    }
 
     let mut cm_builder = ConfigMapBuilder::new();
 
