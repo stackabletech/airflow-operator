@@ -1135,8 +1135,6 @@ fn build_executor_template_config_map(
 
     let mut pod_template = pb.build_template();
     pod_template.merge_from(pod_overrides.clone());
-    // Recapturing `pod_template` to immutable, since no changes to `pod_template` should be made after applying overrides
-    let pod_template = pod_template;
 
     let mut cm_builder = ConfigMapBuilder::new();
 
