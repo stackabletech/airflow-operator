@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-available-condition
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow-celery --timeout 301s
