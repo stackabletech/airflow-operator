@@ -779,7 +779,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.9.2
+            productVersion: 2.9.3
           clusterConfig:
             loadExamples: true
             exposeConfig: true
@@ -803,7 +803,7 @@ mod tests {
         let resolved_airflow_image: ResolvedProductImage =
             cluster.spec.image.resolve("airflow", "0.0.0-dev");
 
-        assert_eq!("2.9.2", &resolved_airflow_image.product_version);
+        assert_eq!("2.9.3", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);
