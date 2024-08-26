@@ -34,7 +34,7 @@ stringData:
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
-  name: airflow
+  name: airflow-celery
 spec:
   image:
     productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
@@ -45,11 +45,18 @@ spec:
     credentialsSecret: airflow-credentials
   webservers:
     envOverrides:
-      credentialsSecret: test-override
+      COMMON_VAR: role-value # overridden by role group below
+      ROLE_VAR: role-value   # only defined here at role level
     roleGroups:
       default:
         replicas: 1
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
   celeryExecutors:
+    envOverrides:
+      COMMON_VAR: role-value # overridden by role group below
+      ROLE_VAR: role-value   # only defined here at role level
     roleGroups:
       default:
         replicas: 2
@@ -64,6 +71,9 @@ spec:
               resources:
                 limits:
                   cpu: 810m
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
     config:
       resources:
         cpu:

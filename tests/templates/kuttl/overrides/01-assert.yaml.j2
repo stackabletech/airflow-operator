@@ -1,60 +1,23 @@
-# TODO Not ideal way to test for a single env since partial comparison is not implemented yet in kuttl https://github.com/kudobuilder/kuttl/issues/76
-# also the test might fail if the order of the envs isn't exactly as in the deployed StatefulSet
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: airflow-webserver-default
-spec:
-  template:
-    spec:
-      containers:
-      - name: airflow
-        env:
-        - name: AIRFLOW__API__AUTH_BACKEND
-        - name: AIRFLOW__CELERY__BROKER_URL
-        - name: AIRFLOW__CELERY__RESULT_BACKEND
-        - name: AIRFLOW__CORE__DAGS_FOLDER
-        - name: AIRFLOW__CORE__EXECUTOR
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-        - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-        - name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS
-        - name: AIRFLOW__METRICS__STATSD_HOST
-        - name: AIRFLOW__METRICS__STATSD_ON
-        - name: AIRFLOW__METRICS__STATSD_PORT
-        - name: AIRFLOW__WEBSERVER__SECRET_KEY
-        - name: PYTHONPATH
-        - name: credentialsSecret
-          value: test-override
-      - name: metrics
 ---
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: airflow-scheduler-default
-spec:
-  template:
-    spec:
-      containers:
-      - name: airflow
-        env:
-        - name: ADMIN_EMAIL
-        - name: ADMIN_FIRSTNAME
-        - name: ADMIN_LASTNAME
-        - name: ADMIN_PASSWORD
-        - name: ADMIN_USERNAME
-        - name: AIRFLOW__API__AUTH_BACKEND
-        - name: AIRFLOW__CELERY__BROKER_URL
-        - name: AIRFLOW__CELERY__RESULT_BACKEND
-        - name: AIRFLOW__CORE__DAGS_FOLDER
-        - name: AIRFLOW__CORE__EXECUTOR
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-        - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-        - name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS
-        - name: AIRFLOW__METRICS__STATSD_HOST
-        - name: AIRFLOW__METRICS__STATSD_ON
-        - name: AIRFLOW__METRICS__STATSD_PORT
-        - name: AIRFLOW__WEBSERVER__SECRET_KEY
-        - name: PYTHONPATH
-        - name: credentialsSecret
-          value: test-override
-      - name: metrics
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  #
+  # Test envOverrides
+  #
+  - script: |
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+
+  - script: |
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+  #
+  #- script: |
+  #    kubectl -n $NAMESPACE get cm hive-metastore-default -o yaml | yq -e '.data."hive-env.sh"' | grep "export ROLE_VAR=role-value"
+  #    kubectl -n $NAMESPACE get cm hive-metastore-default -o yaml | yq -e '.data."hive-env.sh"' | grep "export GROUP_VAR=group-value"
+  #    kubectl -n $NAMESPACE get cm hive-metastore-default -o yaml | yq -e '.data."hive-env.sh"' | grep "export COMMON_VAR=group-value"
+ 
