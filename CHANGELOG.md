@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for `2.9.3` ([#494]).
+
 ### Changed
 
 - Reduce CRD size from `1.7MB` to `111KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#488]):
@@ -9,6 +13,7 @@
   - `affinity`
   - `volumes`
   - `volumeMounts`
+- Deprecate `2.9.2`, remove `2.6.x` and `2.8.x` ([#494]).
 
 ### Fixed
 
@@ -16,6 +21,7 @@
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
+[#494]: https://github.com/stackabletech/airflow-operator/pull/494
 
 ## [24.7.0] - 2024-07-24
 
