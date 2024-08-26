@@ -47,6 +47,7 @@ spec:
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level
+      credentialsSecret: test-override
     roleGroups:
       default:
         replicas: 1

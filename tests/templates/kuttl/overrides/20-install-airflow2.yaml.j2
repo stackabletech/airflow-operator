@@ -57,6 +57,9 @@ spec:
           resources:
             limits:
               cpu: 750m
+    envOverrides:
+      ROLE_VAR: role-value   # there are no role groups for kubernetes executors
+      AIRFLOW__METRICS__STATSD_ON: "False" # also set by the operator
   schedulers:
     roleGroups:
       default:
