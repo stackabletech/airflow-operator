@@ -969,8 +969,6 @@ fn build_server_rolegroup_statefulset(
     if let Some(rolegroup) = rolegroup {
         pod_template.merge_from(rolegroup.config.pod_overrides.clone());
     }
-    // Recapturing `pod_template` to immutable, since no changes to `pod_template` should be made after applying overrides
-    let pod_template = pod_template;
 
     let restarter_label =
         Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
