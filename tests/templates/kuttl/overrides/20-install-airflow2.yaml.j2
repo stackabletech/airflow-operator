@@ -1,0 +1,66 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-kubernetes
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+  clusterConfig:
+    loadExamples: true
+    exposeConfig: false
+    listenerClass: external-unstable
+    credentialsSecret: airflow-credentials
+  webservers:
+    roleGroups:
+      default:
+        replicas: 1
+        config:
+          resources:
+            cpu:
+              min: 410m
+        podOverrides:
+          spec:
+            containers:
+            - name: airflow
+              resources:
+                limits:
+                  cpu: 810m
+    config:
+      resources:
+        cpu:
+          min: 400m
+          max: 800m
+        memory:
+          limit: 2Gi
+    podOverrides:
+      spec:
+        containers:
+        - name: airflow
+          resources:
+            limits:
+              cpu: 750m
+            requests:
+              cpu: 350m
+  kubernetesExecutors:
+    config:
+      resources:
+        cpu:
+          min: 400m
+          max: 800m
+        memory:
+          limit: 2Gi
+    podOverrides:
+      spec:
+        containers:
+        - name: base
+          resources:
+            limits:
+              cpu: 750m
+    envOverrides:
+      ROLE_VAR: role-value   # there are no role groups for kubernetes executors
+      AIRFLOW__METRICS__STATSD_ON: "False" # also set by the operator
+  schedulers:
+    roleGroups:
+      default:
+        replicas: 1
