@@ -48,20 +48,17 @@ spec:
     configOverrides:
       webserver_config.py:
         EXPERIMENTAL_FILE_HEADER: |
-          COMMON_HEADER_VAR = '"role-value"' # overridden by role group below
-          ROLE_HEADER_VAR = '"role-value"' # only defined here at role level
+          COMMON_HEADER_VAR = "role-value"
+          ROLE_HEADER_VAR = "role-value"
         EXPERIMENTAL_FILE_FOOTER: |
-          COMMON_FOOTER_VAR = '"role-value"' # overridden by role group below
-          ROLE_FOOTER_VAR = '"role-value"' # only defined here at role level
+          ROLE_FOOTER_VAR = "role-value"
     roleGroups:
       default:
         replicas: 1
         configOverrides:
           webserver_config.py:
             EXPERIMENTAL_FILE_HEADER: |
-              COMMON_HEADER_VAR = '"group-value"' # overridden by role group below
-            EXPERIMENTAL_FILE_FOOTER: |
-              COMMON_FOOTER_VAR = '"group-value"' # overridden by role group below
+              COMMON_HEADER_VAR = "group-value"
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     config:

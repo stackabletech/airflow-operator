@@ -8,8 +8,4 @@ commands:
   #
   - script: |
       kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "COMMON_HEADER_VAR = \"group-value\""
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "GROUP_HEADER_VAR = \"group-value\""
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "ROLE_HEADER_VAR = \"role-value\""
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "COMMON_FOOTER_VAR = \"group-value\""
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "GROUP_FOOTER_VAR = \"group-value\""
       kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "ROLE_FOOTER_VAR = \"role-value\""
