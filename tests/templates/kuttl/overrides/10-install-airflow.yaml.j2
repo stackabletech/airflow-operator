@@ -1,0 +1,99 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-override
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-celery
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+  clusterConfig:
+    loadExamples: true
+    exposeConfig: false
+    listenerClass: external-unstable
+    credentialsSecret: airflow-credentials
+  webservers:
+    envOverrides:
+      COMMON_VAR: role-value # overridden by role group below
+      ROLE_VAR: role-value   # only defined here at role level
+      credentialsSecret: test-override
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
+  celeryExecutors:
+    envOverrides:
+      COMMON_VAR: role-value # overridden by role group below
+      ROLE_VAR: role-value   # only defined here at role level
+    roleGroups:
+      default:
+        replicas: 2
+        config:
+          resources:
+            cpu:
+              min: 410m
+        podOverrides:
+          spec:
+            containers:
+            - name: airflow
+              resources:
+                limits:
+                  cpu: 810m
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
+    config:
+      resources:
+        cpu:
+          min: 400m
+          max: 800m
+        memory:
+          limit: 2Gi
+    podOverrides:
+      spec:
+        containers:
+        - name: airflow
+          resources:
+            limits:
+              cpu: 750m
+            requests:
+              cpu: 350m
+  schedulers:
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          credentialsSecret: test-override

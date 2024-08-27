@@ -69,6 +69,10 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
+  - name: overrides
+    dimensions:
+      - airflow-latest
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow

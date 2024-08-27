@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-postgresql
+status:
+  availableReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-redis-master
+status:
+  availableReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-redis-replicas
+status:
+  availableReplicas: 1

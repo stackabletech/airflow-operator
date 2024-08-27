@@ -1,0 +1,19 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  #
+  # Test envOverrides
+  #
+  - script: |
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "credentialsSecret" and .value == "test-override")'
+
+
+  - script: |
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+      kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
