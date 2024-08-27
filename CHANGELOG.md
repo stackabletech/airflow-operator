@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Allowing arbitrary python code as `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` ([#493]).
+
 ### Changed
 
 - Reduce CRD size from `1.7MB` to `111KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#488]):
@@ -16,6 +20,7 @@
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
+[#493]: https://github.com/stackabletech/airflow-operator/pull/493
 
 ## [24.7.0] - 2024-07-24
 

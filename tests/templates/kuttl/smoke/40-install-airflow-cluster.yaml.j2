@@ -45,9 +45,20 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    configOverrides:
+      webserver_config.py:
+        EXPERIMENTAL_FILE_HEADER: |
+          COMMON_HEADER_VAR = "role-value"
+          ROLE_HEADER_VAR = "role-value"
+        EXPERIMENTAL_FILE_FOOTER: |
+          ROLE_FOOTER_VAR = "role-value"
     roleGroups:
       default:
         replicas: 1
+        configOverrides:
+          webserver_config.py:
+            EXPERIMENTAL_FILE_HEADER: |
+              COMMON_HEADER_VAR = "group-value"
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     config:
