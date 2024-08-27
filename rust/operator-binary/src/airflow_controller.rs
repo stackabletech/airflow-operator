@@ -286,7 +286,7 @@ pub enum Error {
     ConstructConfig { source: config::Error },
 
     #[snafu(display(
-        "failed to write to String (Vec<u8> to be precise) containing superset config"
+        "failed to write to String (Vec<u8> to be precise) containing Airflow config"
     ))]
     WriteToConfigFileString { source: std::io::Error },
 }
