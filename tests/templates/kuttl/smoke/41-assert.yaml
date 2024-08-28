@@ -7,5 +7,16 @@ commands:
   # Test envOverrides
   #
   - script: |
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "COMMON_HEADER_VAR = \"group-value\""
-      kubectl -n $NAMESPACE get cm airflow-webserver-default -o yaml | yq -e '.data."webserver_config.py"' | grep "ROLE_FOOTER_VAR = \"role-value\""
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # Config Test Data
+      SUPERSET_CONFIG=$(
+          kubectl -n "$NAMESPACE" get cm superset-node-default -o yaml \
+          | yq -e '.data["superset_config.py"]'
+      )
+
+      # Config Test Assertions
+      echo "$SUPERSET_CONFIG" | grep 'COMMON_HEADER_VAR = "group-value"'
+      echo "$SUPERSET_CONFIG" | grep 'ROLE_FOOTER_VAR = "role-value"'
+      echo "$SUPERSET_CONFIG" | grep -v 'ROLE_HEADER_VAR = "role-value"'
