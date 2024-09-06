@@ -1095,7 +1095,7 @@ fn build_executor_template_config_map(
         .context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
-    // See https://airflow.apache.org/docs/apache-airflow/2.6.1/core-concepts/executor/kubernetes.html#base-image
+    // See https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/8.4.0/kubernetes_executor.html#base-image
     let mut airflow_container =
         ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
 
