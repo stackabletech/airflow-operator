@@ -4,6 +4,7 @@
 
 ### Added
 
+- Allowing arbitrary python code as `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` ([#493]).
 - Support for `2.9.3` ([#494]).
 
 ### Changed
@@ -21,6 +22,7 @@
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
+[#493]: https://github.com/stackabletech/airflow-operator/pull/493
 [#494]: https://github.com/stackabletech/airflow-operator/pull/494
 
 ## [24.7.0] - 2024-07-24

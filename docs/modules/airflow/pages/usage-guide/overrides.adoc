@@ -10,6 +10,33 @@ that each component has the same configuration: not all components use each sett
 
 Airflow exposes an environment variable for every Airflow configuration setting, a list of which can be found in the https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html[Configuration Reference].
 
+As Airflow can be configured with python code too, arbitrary code can be added to the `webserver_config.py`.
+You can use either `EXPERIMENTAL_FILE_HEADER` to add code to the top or `EXPERIMENTAL_FILE_FOOTER` to add to the bottom.
+
+IMPORTANT: This is an experimental feature
+
+[source,yaml]
+----
+webservers:
+  configOverrides:
+    webserver_config.py:
+      CSV_EXPORT: "{'encoding': 'utf-8'}"
+      EXPERIMENTAL_FILE_HEADER: |
+        from modules.my_module import my_class
+      EXPERIMENTAL_FILE_FOOTER: |
+        import logging
+        from airflow.security import AirflowSecurityManager
+
+        class myCustomSecurityManger(AirflowSecurityManager):
+          def __init__():
+            init()
+
+        CUSTOM_SECURITY_MANAGER = myCustomSecurityManger
+  roleGroups:
+    default:
+      config: {}
+----
+
 Although Kubernetes can override these settings in one of two ways (Configuration overrides, or Environment Variable overrides), the affect is the same
 and currently only the latter is implemented. This is described in the following section.
 
