@@ -1,4 +1,5 @@
 = Using Kubernetes executors
+:description: Configure Kubernetes executors in Airflow to dynamically create pods for tasks, replacing Celery executors and bypassing Redis for job routing.
 
 Instead of using the Celery workers you can let Airflow run the tasks using Kubernetes executors, where pods are created dynamically as needed without jobs being routed through a redis queue to the workers.
 

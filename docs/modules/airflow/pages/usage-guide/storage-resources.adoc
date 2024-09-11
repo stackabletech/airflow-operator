@@ -1,4 +1,5 @@
 = Resource Requests
+:description: Find out about minimal HA Airflow requirements for CPU and memory, with defaults for schedulers, Celery executors, webservers using Kubernetes resource limits.
 
 include::home:concepts:stackable_resource_requests.adoc[]
 
