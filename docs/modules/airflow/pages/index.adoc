@@ -1,6 +1,6 @@
 = Stackable Operator for Apache Airflow
-:description: The Stackable Operator for Apache Airflow is a Kubernetes operator that can manage Apache Airflow clusters. Learn about its features, resources, dependencies and demos, and see the list of supported Airflow versions.
-:keywords: Stackable Operator, Apache Airflow, Kubernetes, k8s, operator, engineer, big data, metadata, job pipeline, scheduler, workflow, ETL
+:description: The Stackable Operator for Apache Airflow manages Airflow clusters on Kubernetes, supporting custom workflows, executors, and external databases for efficient orchestration.
+:keywords: Stackable Operator, Apache Airflow, Kubernetes, k8s, operator, job pipeline, scheduler, ETL
 :airflow: https://airflow.apache.org/
 :dags: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
 :k8s-crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/

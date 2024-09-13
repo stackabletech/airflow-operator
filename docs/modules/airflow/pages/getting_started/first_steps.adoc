@@ -1,4 +1,5 @@
 = First steps
+:description: Set up an Apache Airflow cluster using Stackable Operator, PostgreSQL, and Redis. Run and monitor example workflows (DAGs) via the web UI or command line.
 
 Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the Operator and its dependencies, you will now deploy a Airflow cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by running and tracking an example DAG.
 

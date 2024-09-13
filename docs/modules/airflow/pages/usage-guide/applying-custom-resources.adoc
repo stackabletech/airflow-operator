@@ -1,6 +1,10 @@
 = Applying Custom Resources
+:description: Learn to apply custom resources in Airflow, such as Spark jobs, using Kubernetes connections, roles, and modular DAGs with git-sync integration.
 
-Airflow can be used to apply custom resources from within a cluster. An example of this could be a SparkApplication job that is to be triggered by Airflow. The steps below describe how this can be done. The DAG will consist of modularized python files and will be provisioned using the git-sync facility.
+Airflow can be used to apply custom resources from within a cluster.
+An example of this could be a SparkApplication job that is to be triggered by Airflow.
+The steps below describe how this can be done.
+The DAG will consist of modularized Python files and will be provisioned using the git-sync facility.
 
 == Define an in-cluster Kubernetes connection
 
@@ -38,7 +42,9 @@ include::example$example-airflow-spark-clusterrolebinding.yaml[]
 
 == DAG code
 
-Now for the DAG itself. The job to be started is a modularized DAG that uses starts a one-off Spark job that calculates the value of pi. The file structure fetched to the root git-sync folder looks like this:
+Now for the DAG itself.
+The job to be started is a modularized DAG that uses starts a one-off Spark job that calculates the value of pi.
+The file structure fetched to the root git-sync folder looks like this:
 
 ----
 dags
@@ -57,12 +63,15 @@ The Spark job will calculate the value of pi using one of the example scripts th
 include::example$example-pyspark-pi.yaml[]
 ----
 
-This will be called from within a DAG by using the connection that was defined earlier. It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].There are two classes that are used to:
+This will be called from within a DAG by using the connection that was defined earlier.
+It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].
+There are two classes that are used to:
 
-- start the job
-- monitor the status of the job
+* start the job
+* monitor the status of the job
 
-The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they will typically be used for all custom resources and thus are best decoupled from the DAG that calls them. This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
+The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they will typically be used for all custom resources and thus are best decoupled from the DAG that calls them.
+This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
 
 [source,python]
 ----
@@ -100,6 +109,7 @@ TIP: A full example of the above is used as an integration test https://github.c
 
 == Logging
 
-As mentioned above, the logs are available from the webserver UI if the jobs run with the `celeryExecutor`. If the SDP logging mechanism has been deployed, log information can also be retrieved from the vector backend (e.g. Opensearch):
+As mentioned above, the logs are available from the webserver UI if the jobs run with the `celeryExecutor`.
+If the SDP logging mechanism has been deployed, log information can also be retrieved from the vector backend (e.g. Opensearch):
 
 image::airflow_dag_log_opensearch.png[Opensearch]

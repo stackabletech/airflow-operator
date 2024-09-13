@@ -1,1 +1,4 @@
 = Usage guide
+:description: Practical instructions to make the most out of the Stackable operator for Apache Airflow.
+
+Practical instructions to make the most out of the Stackable operator for Apache Airflow.

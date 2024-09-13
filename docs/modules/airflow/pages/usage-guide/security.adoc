@@ -1,4 +1,5 @@
 = Security
+:description: Airflow supports authentication via Web UI or LDAP, with role-based access control managed by Flask AppBuilder, and LDAP users assigned default roles.
 
 == Authentication
 
@@ -6,13 +7,15 @@ Every user has to authenticate themselves before using Airflow and there are sev
 
 === Webinterface
 
-The default setting is to view and manually set up users via the Webserver UI. Note the blue "+" button where users can be added directly:
+The default setting is to view and manually set up users via the Webserver UI.
+Note the blue "+" button where users can be added directly:
 
 image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an AuthenticationClass for the LDAP server.
+Airflow supports xref:concepts:authentication.adoc[authentication] of users against an LDAP server.
+This requires setting up an AuthenticationClass for the LDAP server.
 The AuthenticationClass is then referenced in the AirflowCluster resource as follows:
 
 [source,yaml]
