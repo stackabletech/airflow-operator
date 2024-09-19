@@ -4,8 +4,9 @@ use stackable_airflow_crd::{
     AirflowConfigOptions,
 };
 use stackable_operator::commons::authentication::{
-    ldap::AuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
+    ldap::AuthenticationProvider, AuthenticationClassProvider,
 };
+use stackable_operator::commons::tls_verification::TlsVerification;
 use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
