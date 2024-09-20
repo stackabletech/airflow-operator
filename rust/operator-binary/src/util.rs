@@ -5,7 +5,7 @@ pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> En
         name: String::from(var_name),
         value_from: Some(EnvVarSource {
             secret_key_ref: Some(SecretKeySelector {
-                name: Some(String::from(secret)),
+                name: String::from(secret),
                 key: String::from(secret_key),
                 ..Default::default()
             }),
