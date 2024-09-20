@@ -19,13 +19,11 @@
 ### Fixed
 
 - Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
-- BREAKING: The fields `connection` and `host` on `S3Connection` as well as `bucketName` on `S3Bucket`are now mandatory. Previously operators errored out in case these fields where missing ([#510]).
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
 [#493]: https://github.com/stackabletech/airflow-operator/pull/493
 [#494]: https://github.com/stackabletech/airflow-operator/pull/494
-[#510]: https://github.com/stackabletech/airflow-operator/pull/510
 
 ## [24.7.0] - 2024-07-24
 
