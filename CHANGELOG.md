@@ -6,6 +6,7 @@
 
 - Allowing arbitrary python code as `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` ([#493]).
 - Support for `2.9.3` ([#494]).
+- Experimental Support for `2.10.2` ([#512]).
 
 ### Changed
 
