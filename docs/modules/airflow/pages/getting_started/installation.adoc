@@ -2,13 +2,13 @@
 :description: Install the Stackable operator for Apache Airflow with PostgreSQL, Redis, and required components using Helm or stackablectl.
 :kind: https://kind.sigs.k8s.io/
 
-On this page you will install the Stackable Airflow operator, the software that Airflow depends on -- PostgreSQL and Redis -- as well as the commons, secret and listener operator which are required by all Stackable operators.
+Install the Stackable Airflow operator, the software that Airflow depends on -- PostgreSQL and Redis -- as well as the commons, secret and listener operator which are required by all Stackable operators.
 
 == Required external components: PostgreSQL and Redis
 
 PostgreSQL is required by Airflow to store metadata about DAG runs, and Redis is required by the Celery executor to schedule and/or queue DAG jobs.
 They are components that may well already be available for customers, in which case we treat them here as pre-requisites for an Airflow cluster and hence as part of the installation process.
-These components will be installed using Helm.
+Install these components using Helm.
 Note that specific versions are declared:
 
 [source,bash]
@@ -49,7 +49,7 @@ After you have installed stackablectl run the following command to install all o
 include::example$getting_started/code/getting_started.sh[tag=stackablectl-install-operators]
 ----
 
-The tool will show
+The tool shows
 
 [source]
 include::example$getting_started/code/install_output.txt[]

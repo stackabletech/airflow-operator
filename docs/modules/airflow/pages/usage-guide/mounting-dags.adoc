@@ -24,7 +24,7 @@ include::example$example-airflow-dags-configmap.yaml[]
 <7> The resource has to be defined using `subPath`: this is to prevent the versioning of ConfigMap elements which may cause a conflict with how Airflow propagates DAGs between its components.
 <8> If the mount path described above is anything other than the standard location (the default is `$AIRFLOW_HOME/dags`), then the location should be defined using the relevant environment variable.
 
-WARNING: If a DAG mounted via ConfigMap consists of modularized files then using the standard location is mandatory as Python will use this as a "root" directory when looking for referenced files.
+WARNING: If a DAG mounted via ConfigMap consists of modularized files then using the standard location is mandatory as Python uses this as a "root" directory when looking for referenced files.
 
 The advantage of this approach is that DAGs are provided "in-line".
 However, handling multiple DAGs this way becomes cumbersome, as each must be mapped individually.
@@ -43,7 +43,7 @@ include::example$example-airflow-gitsync.yaml[]
 
 <1> A Secret used for accessing database and admin user details (included here to illustrate where different credential secrets are defined)
 <2> The git-gync configuration block that contains list of git-sync elements
-<3> The repository that will be cloned (required)
+<3> The repository to clone (required)
 <4> The branch name (defaults to `main`)
 <5> The location of the DAG folder, relative to the synced repository root (required)
 <6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
@@ -53,14 +53,14 @@ include::example$example-airflow-gitsync.yaml[]
 <9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v4.2.1?tab=readme-ov-file#manual[this] configuration section (and the ones that follow on that link)
 <10> An example showing how to specify a target revision (the default is HEAD).
      The revision can also be a tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`.
-     If a tag or commit hash is specified, then git-sync will recognize that and not perform further cloning.
-<11> Git-sync settings can be provided inline, although some of these (`--dest`, `--root`) are specified internally in the operator and will be ignored if provided by the user.
-     Git-config settings can also be specified, although a warning will be logged if `safe.directory` is specified as this is defined internally, and should not be defined by the user.
+     If a tag or commit hash is specified, then git-sync recognizes this and does not perform further cloning.
+<11> Git-sync settings can be provided inline, although some of these (`--dest`, `--root`) are specified internally in the operator and are ignored if provided by the user.
+     Git-config settings can also be specified, although a warning is logged if `safe.directory` is specified as this is defined internally, and should not be defined by the user.
 
 
 IMPORTANT: The example shows a _list_ of git-sync definitions, with a single element.
 This is to avoid breaking-changes in future releases.
 Currently, only one such git-sync definition is considered and processed.
 
-NOTE: git-sync can be used with DAGs that make use of Python modules, as Python will be configured to use the git-sync target folder as the "root" location when looking for referenced files.
+NOTE: git-sync can be used with DAGs that make use of Python modules, as Python is configured to use the git-sync target folder as the "root" location when looking for referenced files.
 See the xref:usage-guide/applying-custom-resources.adoc[] example for more details.

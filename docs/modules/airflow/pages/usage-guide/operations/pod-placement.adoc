@@ -9,4 +9,4 @@ The default affinities created by the operator are:
 
 == Kubernetes executors
 
-The Kubernetes executors are no different, they will try to co-locate with other Airflow Pods and (with a higher priority) distribute all executors.
+The Kubernetes executors are no different, they try to co-locate with other Airflow Pods and (with a higher priority) distribute all executors.

@@ -4,7 +4,7 @@
 Airflow can be used to apply custom resources from within a cluster.
 An example of this could be a SparkApplication job that is to be triggered by Airflow.
 The steps below describe how this can be done.
-The DAG will consist of modularized Python files and will be provisioned using the git-sync facility.
+The DAG consists of modularized Python files and is provisioned using the git-sync facility.
 
 == Define an in-cluster Kubernetes connection
 
@@ -56,21 +56,21 @@ dags
 |_ pyspark_pi.yaml
 ----
 
-The Spark job will calculate the value of pi using one of the example scripts that comes bundled with Spark:
+The Spark job calculates the value of pi using one of the example scripts that comes bundled with Spark:
 
 [source,yaml]
 ----
 include::example$example-pyspark-pi.yaml[]
 ----
 
-This will be called from within a DAG by using the connection that was defined earlier.
-It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].
+This is called from within a DAG by using the connection that was defined earlier.
+It is wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].
 There are two classes that are used to:
 
 * start the job
 * monitor the status of the job
 
-The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they will typically be used for all custom resources and thus are best decoupled from the DAG that calls them.
+The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they are typically used for all custom resources and thus are best decoupled from the DAG that calls them.
 This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
 
 [source,python]
