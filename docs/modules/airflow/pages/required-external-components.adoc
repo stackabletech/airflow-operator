@@ -1,8 +1,9 @@
 = Required external components
 :description: Airflow requires PostgreSQL, MySQL, or SQLite for database support, and Redis for Celery executors. MSSQL has experimental support.
+:airflow-prerequisites: https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html
 
 Airflow requires an SQL database to operate.
-The https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html[Airflow documentation] specifies:
+The {airflow-prerequisites}[Airflow documentation] specifies:
 
 Fully supported for production usage:
 

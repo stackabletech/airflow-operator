@@ -7,7 +7,7 @@ Install the Stackable Airflow operator, the software that Airflow depends on -- 
 == Required external components: PostgreSQL and Redis
 
 PostgreSQL is required by Airflow to store metadata about DAG runs, and Redis is required by the Celery executor to schedule and/or queue DAG jobs.
-They are components that may well already be available for customers, in which case we treat them here as pre-requisites for an Airflow cluster and hence as part of the installation process.
+They are components that may well already be available for customers, in which case they are treated as prerequisites for an Airflow cluster and hence as part of the installation process.
 Install these components using Helm.
 Note that specific versions are declared:
 
@@ -26,7 +26,7 @@ include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-re
 
 WARNING: Do not use this setup in production!
 Supported databases and versions are listed on the xref:required-external-components.adoc[required external components] page for this operator.
-Please follow the instructions of those components for a production setup.
+Follow the instructions of those components for a production setup.
 
 == Stackable operators
 

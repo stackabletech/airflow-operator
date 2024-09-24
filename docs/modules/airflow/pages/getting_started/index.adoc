@@ -12,7 +12,7 @@ You need:
 * kubectl
 * Helm
 
-Resource sizing depends on cluster type(s), usage and scope, but as a starting point we recommend a minimum of the following resources for this operator:
+Resource sizing depends on cluster type(s), usage and scope, but as a minimum starting point the following resources are recommended for this operator:
 
 include::partial$hardware-requirements.adoc[]
 
