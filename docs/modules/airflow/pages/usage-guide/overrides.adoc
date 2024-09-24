@@ -1,14 +1,17 @@
 
 = Configuration & Environment Overrides
 :description: Airflow supports configuration and environment variable overrides per role or role group, with role group settings taking precedence. Be cautious with overrides.
+:airflow-config-docs: https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html
 
-The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
+The cluster definition allows overriding configuration properties and environment variables per role or role group, with role group overrides taking precedence.
 
-IMPORTANT: Overriding certain properties which are set by operator (such as the HTTP port) can interfere with the operator and can lead to problems. Additionally, for Airflow it is recommended that each component has the same configuration: not all components use each setting, but some things - such as external end-points - need to be consistent for things to work as expected.
+IMPORTANT: Overriding operator-set properties (e.g., HTTP port) may cause issues.
+Additionally, ensure consistent configurations across roles.
+Not all roles use each setting, but some things -- such as external endpoints -- need to be consistent to avoid problems.
 
 == Configuration Properties
 
-Airflow exposes an environment variable for every Airflow configuration setting, a list of which can be found in the https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html[Configuration Reference].
+Airflow exposes an environment variable for every Airflow configuration setting, a list of which can be found in the {airflow-config-docs}[Configuration Reference].
 
 As Airflow can be configured with python code too, arbitrary code can be added to the `webserver_config.py`.
 You can use either `EXPERIMENTAL_FILE_HEADER` to add code to the top or `EXPERIMENTAL_FILE_FOOTER` to add to the bottom.
@@ -37,12 +40,13 @@ webservers:
       config: {}
 ----
 
-Although Kubernetes can override these settings in one of two ways (Configuration overrides, or Environment Variable overrides), the affect is the same
-and currently only the latter is implemented. This is described in the following section.
+Although Kubernetes can override these settings in one of two ways (Configuration overrides, or Environment Variable overrides), the effect is the same
+and currently only the latter is implemented.
+This is described in the following section.
 
 == Environment Variables
 
-These can be set - or overwritten - at either the role level:
+These can be set -- or overwritten -- at either the role level:
 
 [source,yaml]
 ----
@@ -66,4 +70,10 @@ webservers:
       replicas: 1
 ----
 
-In both examples above we are replacing the default value of the UI DAG refresh (3s) with 8s. Note that all override property values must be strings.
+In both examples, the UI DAG refresh default (3s) is replaced with 8s.
+All override property values must be strings.
+
+== Pod overrides
+
+The Airflow operator also supports Pod overrides, enabling you to modify any Kubernetes Pod property.
+Refer to the xref:concepts:overrides.adoc#pod-overrides[Pod overrides documentation] for details.
