@@ -1,5 +1,5 @@
 = Stackable Operator for Apache Airflow
-:description: The Stackable Operator for Apache Airflow manages Airflow clusters on Kubernetes, supporting custom workflows, executors, and external databases for efficient orchestration.
+:description: The Stackable operator for Apache Airflow manages Airflow clusters on Kubernetes, supporting custom workflows, executors, and external databases for efficient orchestration.
 :keywords: Stackable Operator, Apache Airflow, Kubernetes, k8s, operator, job pipeline, scheduler, ETL
 :airflow: https://airflow.apache.org/
 :dags: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
@@ -14,15 +14,15 @@
 * {feature-tracker}[Feature Tracker {external-link-icon}^]
 * {crd}[CRD documentation {external-link-icon}^]
 
-The Stackable Operator for Apache Airflow manages {airflow}[Apache Airflow] instances on Kubernetes.
+The Stackable operator for Apache Airflow manages {airflow}[Apache Airflow] instances on Kubernetes.
 Apache Airflow is an open-source application for creating, scheduling, and monitoring workflows.
 Workflows are defined as code, with tasks that can be run on a variety of platforms, including Hadoop, Spark, and Kubernetes itself.
 Airflow is a popular choice to orchestrate ETL workflows and data pipelines.
 
 == Getting started
 
-Get started using Airflow with the Stackable Operator by following the xref:getting_started/index.adoc[] guide.
-It guides you through installing the Operator alongside a PostgreSQL database and Redis instance, connecting to your Airflow instance and running your first workflow.
+Get started using Airflow with the Stackable operator by following the xref:getting_started/index.adoc[] guide.
+It guides you through installing the operator alongside a PostgreSQL database and Redis instance, connecting to your Airflow instance and running your first workflow.
 
 === Custom resources
 
@@ -72,39 +72,40 @@ kubernetesExecutors:
 
 === Kubernetes resources
 
-Based on the custom resources you define, the Operator creates ConfigMaps, StatefulSets and Services.
+Based on the custom resources you define, the operator creates ConfigMaps, StatefulSets and Services.
 
 image::airflow_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
 
-For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the Operator creates a
-StatefulSet with the amount of replicas defined in the RoleGroup. Every Pod in the StatefulSet has two containers: the
-main container running Airflow and a sidecar container gathering metrics for xref:operators:monitoring.adoc[]. The
-Operator creates a Service per role group as well as a single service for the whole `webserver` role called
-`<clustername>-webserver`.
+For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the RoleGroup.
+Every Pod in the StatefulSet has two containers: the main container running Airflow and a sidecar container gathering metrics for xref:operators:monitoring.adoc[].
+The operator creates a Service per role group as well as a single service for the whole `webserver` role called `<clustername>-webserver`.
 
-Additionally, a ConfigMap is created for each RoleGroup. These ConfigMaps contain two files, `log_config.py` and `webserver_config.py`, which contain logging and general Airflow configuration respectively.
+Additionally, a ConfigMap is created for each RoleGroup.
+These ConfigMaps contain two files, `log_config.py` and `webserver_config.py`, which contain logging and general Airflow configuration respectively.
 
 == Required external components
 
-Airflow requires an SQL database in which to store its metadata as well as Redis for job execution. The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production. You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
+Airflow requires an SQL database in which to store its metadata as well as Redis for job execution.
+The xref:required-external-components.adoc[required external components] page lists all supported databases and Redis versions to use in production.
+You need to provide these components for production use, but the xref:getting_started/index.adoc[] guides you through installing an example database and Redis instance with an Airflow instance that you can use to get started.
 
-NOTE: Redis is only needed if the executors have been set to `spec.celeryExecutors` as the jobs will be queued via Redis before being assigned to a `worker` pod. When using `spec.kubernetesExecutors` the scheduler will take direct responsibility for this.
+NOTE: Redis is only needed if the executors have been set to `spec.celeryExecutors` as the jobs are queued via Redis before being assigned to a `worker` pod.
+When using `spec.kubernetesExecutors` the scheduler takes direct responsibility for this.
 
 == Using custom workflows/DAGs
 
-{dags}[Direct acyclic graphs (DAGs) of tasks] are the core entities you will use in Airflow.
-Have a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn about the different ways of loading your custom DAGs into Airflow.
+{dags}[Direct acyclic graphs (DAGs) of tasks] are the core entities you use in Airflow.
+Take a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn about the different ways of loading your custom DAGs into Airflow.
 
 == Demo
 
-You can install the xref:demos:airflow-scheduled-job.adoc[] demo and explore an Airflow installation, as
-well as how it interacts with xref:spark-k8s:index.adoc[Apache Spark].
+You can install the xref:demos:airflow-scheduled-job.adoc[] demo and explore an Airflow installation, as well as how it interacts with xref:spark-k8s:index.adoc[Apache Spark].
 
 == Supported versions
 
-The Stackable Operator for Apache Airflow currently supports the Airflow versions listed below.
+The Stackable operator for Apache Airflow currently supports the Airflow versions listed below.
 To use a specific Airflow version in your AirflowCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 

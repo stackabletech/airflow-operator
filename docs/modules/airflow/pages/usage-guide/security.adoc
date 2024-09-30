@@ -1,22 +1,26 @@
 = Security
-:description: Airflow supports authentication via Web UI or LDAP, with role-based access control managed by Flask AppBuilder, and LDAP users assigned default roles.
+:description: Secure Apache Airflow by configuring user authentication and authorization, either with built-in methods or LDAP.
+:airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html
+
+Secure Apache Airflow by configuring user authentication and authorization.
+Airflow provides built-in user and role management, but can also connect to a LDAP server to manage users centrally instead.
 
 == Authentication
 
-Every user has to authenticate themselves before using Airflow and there are several ways of doing this.
+Users need to authenticate themselves before using Airflow, and there are two ways to configure users:
+The built-in user management or LDAP.
 
-=== Webinterface
+=== Built-in user management
 
-The default setting is to view and manually set up users via the Webserver UI.
-Note the blue "+" button where users can be added directly:
+By default, users are manually set up in the Webserver UI.
+Use the blue "+" button to create users.
 
 image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:concepts:authentication.adoc[authentication] of users against an LDAP server.
-This requires setting up an AuthenticationClass for the LDAP server.
-The AuthenticationClass is then referenced in the AirflowCluster resource as follows:
+Airflow supports xref:concepts:authentication.adoc[user authentication] via LDAP.
+Set up an AuthenticationClass for the LDAP server and reference it in the Airflow Stacklet resource as shown:
 
 [source,yaml]
 ----
@@ -36,24 +40,24 @@ spec:
 <1> The reference to an AuthenticationClass called `ldap`
 <2> The default role that all users are assigned to
 
-Users that log in with LDAP are assigned to a default https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html#access-control[Role] which is specified with the `userRegistrationRole` property.
+Users that log in with LDAP are assigned to a default {airflow-access-control-docs}[role] which is specified with the `userRegistrationRole` property.
 
 You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-docs}/authentication.stackable.tech/authenticationclass/v1alpha1/[AuthenticationClass reference {external-link-icon}^].
 
-The users and roles can be viewed as before in the Webserver UI, but note that the blue "+" button is not available when authenticating against LDAP:
+The users and roles can be viewed as before in the Webserver UI, but the blue "+" button is not available when authenticating via LDAP:
 
 image::airflow_security_ldap.png[Airflow Security menu]
 
 == Authorization
-The Airflow Webserver delegates the https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
+The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
 
 === Webinterface
 You can view, add to, and assign the roles displayed in the Airflow Webserver UI to existing users.
 
 === LDAP
 
-Airflow supports assigning https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html#access-control[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
-All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `AirflowCluster` object:
+Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
+All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the AirflowCluster object:
 
 [source,yaml]
 ----

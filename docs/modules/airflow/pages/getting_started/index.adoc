@@ -1,18 +1,18 @@
 = Getting started
 :description: Get started with the Stackable Operator for Apache Airflow by installing the operator, SQL database, and Redis, then setting up and running your first DAG.
 
-This guide will get you started with Airflow using the Stackable Operator.
-It will guide you through the installation of the Operator as well as an SQL database and Redis instance for trial usage, setting up your first Airflow cluster and connecting to it, and viewing and running one of the example workflows (called DAGs = Direct Acyclic Graphs).
+This guide gets you started with Airflow using the Stackable Operator.
+It guides you through the installation of the Operator as well as an SQL database and Redis instance for trial usage, setting up your first Airflow cluster and connecting to it, and viewing and running one of the example workflows (called DAGs = Direct Acyclic Graphs).
 
 == Prerequisites for this guide
 
-You will need:
+You need:
 
 * a Kubernetes cluster
 * kubectl
 * Helm
 
-Resource sizing depends on cluster type(s), usage and scope, but as a starting point we recommend a minimum of the following resources for this operator:
+Resource sizing depends on cluster type(s), usage and scope, but as a minimum starting point the following resources are recommended for this operator:
 
 include::partial$hardware-requirements.adoc[]
 

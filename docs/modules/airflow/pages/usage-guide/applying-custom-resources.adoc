@@ -1,18 +1,19 @@
 = Applying Custom Resources
 :description: Learn to apply custom resources in Airflow, such as Spark jobs, using Kubernetes connections, roles, and modular DAGs with git-sync integration.
+:airflow-managing-connections: https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html
 
-Airflow can be used to apply custom resources from within a cluster.
-An example of this could be a SparkApplication job that is to be triggered by Airflow.
-The steps below describe how this can be done.
-The DAG will consist of modularized Python files and will be provisioned using the git-sync facility.
+Airflow can apply custom resources from within a cluster, such as triggering Spark job by applying a SparkApplication resource.
+The steps below outline this process.
+The DAG consists of modularized Python files and is provisioned using the git-sync feature.
 
 == Define an in-cluster Kubernetes connection
 
-To start a Spark job, Airflow needs to be able to communicate with Kubernetes and an in-cluster connection is required for this, which can be created from within the Webserver UI (note that the "in cluster configuration" box is ticked):
+To start a Spark job, Airflow must communicate with Kubernetes, requiring an in-cluster connection.
+This can be created through the Webserver UI by enabling the "in cluster configuration" setting:
 
-image::airflow_connection_ui.png[Airflow Connections]
+image::airflow_connection_ui.png[A screenshot of the 'Edit connection' window with the 'in cluster configuration' tick box ticked]
 
-Alternatively, the connection can be https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html[defined] by an environment variable in URI format:
+Alternatively, the connection can be {airflow-managing-connections}[defined] using an environment variable in URI format:
 
 [source]
 AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: "kubernetes://?__extra__=%7B%22extra__kubernetes__in_cluster%22%3A+true%2C+%22extra__kubernetes__kube_config%22%3A+%22%22%2C+%22extra__kubernetes__kube_config_path%22%3A+%22%22%2C+%22extra__kubernetes__namespace%22%3A+%22%22%7D"
@@ -42,9 +43,8 @@ include::example$example-airflow-spark-clusterrolebinding.yaml[]
 
 == DAG code
 
-Now for the DAG itself.
-The job to be started is a modularized DAG that uses starts a one-off Spark job that calculates the value of pi.
-The file structure fetched to the root git-sync folder looks like this:
+For the DAG itself, the job is a modularized DAG that starts a one-off Spark job to calculate the value of pi.
+The file structure, fetched to the root git-sync folder, looks like this:
 
 ----
 dags
@@ -56,21 +56,21 @@ dags
 |_ pyspark_pi.yaml
 ----
 
-The Spark job will calculate the value of pi using one of the example scripts that comes bundled with Spark:
+The Spark job calculates the value of pi using one of the example scripts that comes bundled with Spark:
 
 [source,yaml]
 ----
 include::example$example-pyspark-pi.yaml[]
 ----
 
-This will be called from within a DAG by using the connection that was defined earlier.
-It will be wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].
+This is called from within a DAG by using the connection that was defined earlier.
+It is wrapped by the `KubernetesHook` that the Airflow Kubernetes provider makes available https://github.com/apache/airflow/blob/main/airflow/providers/cncf/kubernetes/operators/spark_kubernetes.py[here].
 There are two classes that are used to:
 
 * start the job
 * monitor the status of the job
 
-The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they will typically be used for all custom resources and thus are best decoupled from the DAG that calls them.
+The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they are typically used for all custom resources and thus are best decoupled from the DAG that calls them.
 This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
 
 [source,python]

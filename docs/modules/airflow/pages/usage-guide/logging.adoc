@@ -1,8 +1,7 @@
 = Log aggregation
 :description: Forward Airflow logs to a Vector aggregator by configuring the ConfigMap and enabling the log agent.
 
-The logs can be forwarded to a Vector log aggregator by providing a discovery
-ConfigMap for the aggregator and by enabling the log agent:
+The logs can be forwarded to a Vector log aggregator by providing a discovery ConfigMap for the aggregator and by enabling the log agent:
 
 [source,yaml]
 ----
@@ -38,5 +37,4 @@ spec:
                 level: INFO
 ----
 
-Further information on how to configure logging, can be found in
-xref:concepts:logging.adoc[].
+Further information on how to configure logging, can be found in xref:concepts:logging.adoc[].
