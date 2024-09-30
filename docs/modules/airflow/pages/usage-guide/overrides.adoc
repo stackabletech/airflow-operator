@@ -5,7 +5,7 @@
 
 The cluster definition allows overriding configuration properties and environment variables per role or role group, with role group overrides taking precedence.
 
-IMPORTANT: Overriding operator-set properties (e.g., HTTP port) may cause issues.
+IMPORTANT: Overriding operator-set properties (e.g. HTTP port) may cause issues.
 Additionally, ensure consistent configurations across roles.
 Not all roles use each setting, but some things -- such as external endpoints -- need to be consistent to avoid problems.
 

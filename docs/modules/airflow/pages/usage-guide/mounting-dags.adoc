@@ -49,7 +49,7 @@ include::example$example-airflow-gitsync.yaml[]
 <6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
 <7> The synchronisation interval in seconds (defaults to 20 seconds)
 <8> The name of the Secret used to access the repository if it is not public.
-    This should include two fields: `user` and `password` (which can be either a password -- which is not recommended -- or a github token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
+    This should include two fields: `user` and `password` (which can be either a password -- which is not recommended -- or a GitHub token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
 <9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v4.2.1?tab=readme-ov-file#manual[this] configuration section (and the ones that follow on that link)
 <10> An example showing how to specify a target revision (the default is HEAD).
      The revision can also be a tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`.

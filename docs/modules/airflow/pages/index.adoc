@@ -97,7 +97,7 @@ When using `spec.kubernetesExecutors` the scheduler takes direct responsibility 
 == Using custom workflows/DAGs
 
 {dags}[Direct acyclic graphs (DAGs) of tasks] are the core entities you use in Airflow.
-Have a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn about the different ways of loading your custom DAGs into Airflow.
+Take a look at the page on xref:usage-guide/mounting-dags.adoc[] to learn about the different ways of loading your custom DAGs into Airflow.
 
 == Demo
 

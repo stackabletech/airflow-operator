@@ -3,7 +3,7 @@
 :airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html
 
 Secure Apache Airflow by configuring user authentication and authorization.
-Airflow provides built-in user and role management, but can also connected to an LDAP server to manage users centrally instead.
+Airflow provides built-in user and role management, but can also connect to a LDAP server to manage users centrally instead.
 
 == Authentication
 
@@ -19,7 +19,7 @@ image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:concepts:authentication.adoc[user authentication] via an LDAP server.
+Airflow supports xref:concepts:authentication.adoc[user authentication] via LDAP.
 Set up an AuthenticationClass for the LDAP server and reference it in the Airflow Stacklet resource as shown:
 
 [source,yaml]
