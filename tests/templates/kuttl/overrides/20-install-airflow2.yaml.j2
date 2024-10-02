@@ -5,7 +5,12 @@ metadata:
   name: airflow-kubernetes
 spec:
   image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
     productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
   clusterConfig:
     loadExamples: true
     exposeConfig: false
