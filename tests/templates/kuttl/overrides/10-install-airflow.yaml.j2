@@ -49,6 +49,8 @@ spec:
     listenerClass: external-unstable
     credentialsSecret: airflow-credentials
   webservers:
+    config:
+      gracefulShutdownTimeout: 1m
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level
@@ -81,6 +83,7 @@ spec:
           COMMON_VAR: group-value # overrides role value
           GROUP_VAR: group-value # only defined here at group level
     config:
+      gracefulShutdownTimeout: 1m
       resources:
         cpu:
           min: 400m
@@ -97,6 +100,8 @@ spec:
             requests:
               cpu: 350m
   schedulers:
+    config:
+      gracefulShutdownTimeout: 1m
     roleGroups:
       default:
         replicas: 1
