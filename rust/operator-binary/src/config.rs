@@ -1,8 +1,10 @@
+use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::{
     authentication::AirflowAuthenticationConfigResolved, authentication::FlaskRolesSyncMoment,
     AirflowConfigOptions,
 };
+use stackable_operator::commons::authentication::{ldap, oidc};
 use stackable_operator::commons::authentication::{
     ldap::AuthenticationProvider, AuthenticationClassProvider,
 };
@@ -160,6 +162,73 @@ fn append_ldap_config(
     }
 
     Ok(())
+}
+
+fn append_oidc_config(
+    config: &mut BTreeMap<String, String>,
+    providers: &[(
+        &oidc::AuthenticationProvider,
+        &oidc::ClientAuthenticationOptions<()>,
+    )],
+) {
+    // Debatable: AUTH_OAUTH or AUTH_OID
+    // Additionally can be set via config... dunno
+    config.insert(
+        AirflowConfigOptions::AuthType.to_string(),
+        "AUTH_OID".into(),
+    );
+
+    let mut oauth_providers_config = Vec::new();
+
+    for (oidc, client_options) in providers {
+        let (env_client_id, env_client_secret) =
+            oidc::AuthenticationProvider::client_credentials_env_names(
+                &client_options.client_credentials_secret_ref,
+            );
+        let mut scopes = oidc.scopes.clone();
+        scopes.extend_from_slice(&client_options.extra_scopes);
+
+        let oidc_provider = oidc
+            .provider_hint
+            .as_ref()
+            .unwrap_or(&DEFAULT_OIDC_PROVIDER);
+
+        let oauth_providers_config_entry = match oidc_provider {
+            oidc::IdentityProviderHint::Keycloak => {
+                formatdoc!(
+                    "
+                      {{ 'name': 'keycloak',
+                        'icon': 'fa-key',
+                        'token_key': 'access_token',
+                        'remote_app': {{
+                          'client_id': os.environ.get('{env_client_id}'),
+                          'client_secret': os.environ.get('{env_client_secret}'),
+                          'client_kwargs': {{
+                            'scope': '{scopes}'
+                          }},
+                          'api_base_url': '{url}/protocol/',
+                          'server_metadata_url': '{url}/.well-known/openid-configuration',
+                        }},
+                      }}",
+                    url = oidc.endpoint_url().unwrap(),
+                    scopes = scopes.join(" "),
+                )
+            }
+        };
+
+        oauth_providers_config.push(oauth_providers_config_entry);
+    }
+
+    config.insert(
+        AirflowConfigOptions::OauthProviders.to_string(),
+        formatdoc!(
+            "[
+             {joined_oauth_providers_config}
+             ]
+             ",
+            joined_oauth_providers_config = oauth_providers_config.join(",\n")
+        ),
+    );
 }
 
 #[cfg(test)]

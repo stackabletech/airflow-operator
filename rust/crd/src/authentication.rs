@@ -1,21 +1,36 @@
+use std::{future::Future, mem};
+
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::AuthenticationClassProvider;
+use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
-    commons::authentication::AuthenticationClass,
+    commons::authentication::{
+        ldap,
+        oidc::{self, IdentityProviderHint},
+        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
+    },
     kube::runtime::reflector::ObjectRef,
     schemars::{self, JsonSchema},
 };
+use std::collections::BTreeSet;
+use tracing::info;
 
-const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 1] = ["LDAP"];
+const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 2] = ["LDAP", "OIDC"];
+const SUPPORTED_OIDC_PROVIDERS: &[oidc::IdentityProviderHint] =
+    &[oidc::IdentityProviderHint::Keycloak];
+// The assumed OIDC provider if no hint is given in the AuthClass
+pub const DEFAULT_OIDC_PROVIDER: oidc::IdentityProviderHint = oidc::IdentityProviderHint::Keycloak;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("Failed to retrieve AuthenticationClass {authentication_class}"))]
-    AuthenticationClassRetrieval {
+    #[snafu(display(
+        "The AuthenticationClass {auth_class_name:?} is referenced several times which is not allowed."
+    ))]
+    DuplicateAuthenticationClassReferencesNotAllowed { auth_class_name: String },
+
+    #[snafu(display("Failed to retrieve AuthenticationClass"))]
+    AuthenticationClassRetrievalFailed {
         source: stackable_operator::client::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
     },
     // TODO: Adapt message if multiple authentication classes are supported simultaneously
     #[snafu(display("Only one authentication class is currently supported at a time"))]
@@ -24,50 +39,56 @@ pub enum Error {
         "Failed to use authentication provider [{provider}] for authentication class [{authentication_class}] - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
-        authentication_class: ObjectRef<AuthenticationClass>,
+        auth_class_name: String,
         provider: String,
+    },
+    #[snafu(display("Only one authentication type at a time is supported by Airflow, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924."))]
+    MultipleAuthenticationTypesNotSupported,
+    #[snafu(display("Only one LDAP provider at a time is supported by Airflow."))]
+    MultipleLdapProvidersNotSupported,
+    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})."))]
+    OidcProviderNotSupported {
+        auth_class_name: String,
+        oidc_provider: String,
+    },
+    #[snafu(display(
+        "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})."
+    ))]
+    TlsVerificationCannotBeDisabled { auth_class_name: String },
+    #[snafu(display("Invalid OIDC configuration"))]
+    OidcConfigurationInvalid {
+        source: stackable_operator::commons::authentication::Error,
+    },
+    #[snafu(display(
+        "{configured:?} is not a supported principalClaim in Airflow for the Keycloak OIDC provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
+    ))]
+    OidcPrincipalClaimNotSupported {
+        configured: String,
+        supported: String,
+        auth_class_name: String,
     },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
-
-/// Resolved counter part for `AirflowAuthenticationConfig`.
-pub struct AirflowAuthenticationConfigResolved {
-    pub authentication_class: Option<AuthenticationClass>,
-    pub user_registration: bool,
-    pub user_registration_role: String,
-    pub sync_roles_at: FlaskRolesSyncMoment,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowAuthentication {
-    /// The Airflow [authentication](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security.html) settings.
-    /// Currently the underlying Flask App Builder only supports one authentication mechanism
-    /// at a time. This means the operator will error out if multiple references to an
-    /// AuthenticationClass are provided.
-    #[serde(default)]
-    authentication: Vec<AirflowAuthenticationConfig>,
-}
+pub struct AirflowClientAuthenticationDetails {
+    #[serde(flatten)]
+    pub common: ClientAuthenticationDetails<()>,
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowAuthenticationConfig {
-    /// Name of the [AuthenticationClass](DOCS_BASE_URL_PLACEHOLDER/concepts/authentication.html#authenticationclass) used to authenticate the users.
-    /// At the moment only LDAP is supported.
-    /// If not specified the default authentication (AUTH_DB) will be used.
-    pub authentication_class: Option<String>,
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
     #[serde(default = "default_user_registration")]
     pub user_registration: bool,
+
     /// This role will be given in addition to any AUTH_ROLES_MAPPING.
     /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
     #[serde(default = "default_user_registration_role")]
     pub user_registration_role: String,
+
     /// If we should replace ALL the user's roles each login, or only on registration.
     /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-    #[serde(default = "default_sync_roles_at")]
+    #[serde(default)]
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
@@ -84,69 +105,164 @@ pub fn default_sync_roles_at() -> FlaskRolesSyncMoment {
     FlaskRolesSyncMoment::Registration
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, Default)]
 pub enum FlaskRolesSyncMoment {
+    #[default]
     Registration,
     Login,
 }
 
-impl AirflowAuthentication {
-    pub fn authentication_class_names(&self) -> Vec<&str> {
-        let mut auth_classes = vec![];
-        for config in &self.authentication {
-            if let Some(auth_config) = &config.authentication_class {
-                auth_classes.push(auth_config.as_str());
+/// Resolved and validated counter part for `AirflowClientAuthenticationDetails`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AirflowClientAuthenticationDetailsResolved {
+    pub authentication_classes_resolved: Vec<AirflowAuthenticationClassResolved>,
+    pub user_registration: bool,
+    pub user_registration_role: String,
+    pub sync_roles_at: FlaskRolesSyncMoment,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AirflowAuthenticationClassResolved {
+    Ldap {
+        provider: ldap::AuthenticationProvider,
+    },
+    Oidc {
+        provider: oidc::AuthenticationProvider,
+        oidc: oidc::ClientAuthenticationOptions<()>,
+    },
+}
+
+impl AirflowClientAuthenticationDetailsResolved {
+    pub async fn from(
+        auth_details: &[AirflowClientAuthenticationDetails],
+        client: &Client,
+    ) -> Result<AirflowClientAuthenticationDetailsResolved> {
+        let resolve_auth_class = |auth_details: ClientAuthenticationDetails| async move {
+            auth_details.resolve_class(client).await
+        };
+        AirflowClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
+    }
+    pub async fn resolve<R>(
+        auth_details: &[AirflowClientAuthenticationDetails],
+        resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
+    ) -> Result<AirflowClientAuthenticationDetailsResolved>
+    where
+        R: Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>,
+    {
+        let mut resolved_auth_classes: Vec<AirflowAuthenticationClassResolved> = Vec::new();
+        let mut user_registration = None;
+        let mut user_registration_role = None;
+        let mut sync_roles_at = None;
+
+        let mut auth_class_names = BTreeSet::new();
+
+        for entry in auth_details {
+            let auth_class_name = entry.common.authentication_class_name();
+
+            let is_new_auth_class = auth_class_names.insert(auth_class_name);
+            ensure!(
+                is_new_auth_class,
+                DuplicateAuthenticationClassReferencesNotAllowedSnafu { auth_class_name }
+            );
+
+            let auth_class = resolve_auth_class(entry.common.clone())
+                .await
+                .context(AuthenticationClassRetrievalFailedSnafu)?;
+
+            match &auth_class.spec.provider {
+                AuthenticationClassProvider::Ldap(provider) => {
+                    let resolved_auth_class = AirflowAuthenticationClassResolved::Ldap {
+                        provider: provider.to_owned(),
+                    };
+                    if let Some(other) = resolved_auth_classes.first() {
+                        ensure!(
+                            mem::discriminant(other) == mem::discriminant(&resolved_auth_class),
+                            MultipleAuthenticationTypesNotSupportedSnafu
+                        );
+                    }
+
+                    ensure!(
+                        resolved_auth_classes.is_empty(),
+                        MultipleLdapProvidersNotSupportedSnafu
+                    );
+
+                    resolved_auth_classes.push(resolved_auth_class);
+                }
+                AuthenticationClassProvider::Oidc(provider) => {
+                    let resolved_auth_class =
+                        AirflowClientAuthenticationDetailsResolved::from_oidc(
+                            auth_class_name,
+                            provider,
+                            entry,
+                        )?;
+
+                    if let Some(other) = resolved_auth_classes.first() {
+                        ensure!(
+                            mem::discriminant(other) == mem::discriminant(&resolved_auth_class),
+                            MultipleAuthenticationTypesNotSupportedSnafu
+                        );
+                    }
+                    resolved_auth_classes.push(resolved_auth_class);
+                }
+
+                _ => {
+                    return Err(Error::AuthenticationProviderNotSupported {
+                        auth_class_name: auth_class_name.to_owned(),
+                        provider: auth_class.spec.provider.to_string(),
+                    });
+                }
             }
         }
-        auth_classes
+        Ok(())
     }
 
-    /// Retrieve all provided `AuthenticationClass` references.
-    pub async fn resolve(
-        &self,
-        client: &Client,
-    ) -> Result<Vec<AirflowAuthenticationConfigResolved>> {
-        let mut resolved = vec![];
+    fn from_oidc(
+        auth_class_name: &str,
+        provider: &oidc::AuthenticationProvider,
+        auth_details: &AirflowClientAuthenticationDetails,
+    ) -> Result<AirflowAuthenticationClassResolved> {
+        let oidc_provider = match &provider.provider_hint {
+            None => {
+                info!("No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
+                default_oidc_provider_name = serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap());
+                DEFAULT_OIDC_PROVIDER
+            }
+            Some(oidc_provider) => oidc_provider.to_owned(),
+        };
 
-        // TODO: adapt if multiple authentication classes are supported by airflow.
-        //    This is currently not possible due to the Flask App Builder not supporting it.
-        if self.authentication.len() > 1 {
-            return Err(Error::MultipleAuthenticationClassesProvided);
-        }
+        ensure!(
+            SUPPORTED_OIDC_PROVIDERS.contains(&oidc_provider),
+            OidcProviderNotSupportedSnafu {
+                auth_class_name,
+                oidc_provider: serde_json::to_string(&oidc_provider).unwrap(),
+            }
+        );
 
-        for config in &self.authentication {
-            let auth_class = if let Some(auth_class) = &config.authentication_class {
-                let resolved = AuthenticationClass::resolve(client, auth_class)
-                    .await
-                    .context(AuthenticationClassRetrievalSnafu {
-                        authentication_class: ObjectRef::<AuthenticationClass>::new(auth_class),
-                    })?;
-
-                // Checking for supported AuthenticationClass here is a little out of place, but is does not
-                // make sense to iterate further after finding an unsupported AuthenticationClass.
-                Some(match resolved.spec.provider {
-                    AuthenticationClassProvider::Ldap(_) => resolved,
-                    AuthenticationClassProvider::Tls(_)
-                    | AuthenticationClassProvider::Oidc(_)
-                    | AuthenticationClassProvider::Static(_) => {
-                        return Err(Error::AuthenticationProviderNotSupported {
-                            authentication_class: ObjectRef::from_obj(&resolved),
-                            provider: resolved.spec.provider.to_string(),
-                        })
+        match oidc_provider {
+            IdentityProviderHint::Keycloak => {
+                ensure!(
+                    &provider.principal_claim == "preferred_username",
+                    OidcPrincipalClaimNotSupportedSnafu {
+                        configured: provider.principal_claim.clone(),
+                        supported: "preferred_username".to_owned(),
+                        auth_class_name,
                     }
-                })
-            } else {
-                None
-            };
-
-            resolved.push(AirflowAuthenticationConfigResolved {
-                authentication_class: auth_class,
-                user_registration: config.user_registration,
-                user_registration_role: config.user_registration_role.clone(),
-                sync_roles_at: config.sync_roles_at.clone(),
-            })
+                );
+            }
         }
 
-        Ok(resolved)
+        ensure!(
+            !provider.tls.uses_tls() || provider.tls.uses_tls_verification(),
+            TlsVerificationCannotBeDisabledSnafu { auth_class_name }
+        );
+
+        Ok(AirflowAuthenticationClassResolved::Oidc {
+            provider: provider.to_owned(),
+            oidc: auth_details
+                .common
+                .oidc_or_error(auth_class_name)
+                .context(OidcConfigurationInvalidSnafu)?
+                .clone(),
+        })
     }
 }
