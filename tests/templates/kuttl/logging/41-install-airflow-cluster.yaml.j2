@@ -72,7 +72,7 @@ spec:
     credentialsSecret: test-airflow-credentials
   webservers:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 200m
@@ -125,7 +125,7 @@ spec:
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 50m
@@ -165,7 +165,7 @@ spec:
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 50m
@@ -197,7 +197,7 @@ spec:
 {% endif %}
   schedulers:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 100m

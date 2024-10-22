@@ -32,7 +32,7 @@ spec:
                 limits:
                   cpu: 810m
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 400m
@@ -50,7 +50,7 @@ spec:
               cpu: 350m
   kubernetesExecutors:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
       resources:
         cpu:
           min: 400m
@@ -69,7 +69,7 @@ spec:
       AIRFLOW__METRICS__STATSD_ON: "False" # also set by the operator
   schedulers:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 5s
     roleGroups:
       default:
         replicas: 1
