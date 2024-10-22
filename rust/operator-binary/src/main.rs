@@ -18,7 +18,6 @@ use stackable_operator::{
     kube::{
         core::DeserializeGuard,
         runtime::{reflector::ObjectRef, watcher, Controller},
-        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -89,13 +88,10 @@ async fn main() -> anyhow::Result<()> {
                 .watches(
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
-                    move |authentication_class| {
+                    move |_| {
                         airflow_store_1
                             .state()
                             .into_iter()
-                            .filter(move |airflow: &Arc<DeserializeGuard<AirflowCluster>>| {
-                                references_authentication_class(airflow, &authentication_class)
-                            })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -120,30 +116,4 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-fn references_authentication_class(
-    airflow: &DeserializeGuard<AirflowCluster>,
-    authentication_class: &DeserializeGuard<AuthenticationClass>,
-) -> bool {
-    airflow
-        .0
-        .as_ref()
-        .expect("AirflowCluster object is invalid");
-    authentication_class
-        .0
-        .as_ref()
-        .expect("AuthenticationClass object is invalid");
-
-    if let Ok(airflow_cluster) = airflow.0.as_ref() {
-        let authentication_config = airflow_cluster.spec.clone().cluster_config.authentication;
-        authentication_config
-            .authentication_class_names()
-            .into_iter()
-            .filter(|c| *c == authentication_class.name_any())
-            .count()
-            > 0
-    } else {
-        false
-    }
 }
