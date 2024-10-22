@@ -20,11 +20,13 @@
 ### Fixed
 
 - Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
+- Failing to parse one `AirflowCluster`/`AuthenticationClass` should no longer cause the whole operator to stop functioning ([#520]).
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
 [#493]: https://github.com/stackabletech/airflow-operator/pull/493
 [#494]: https://github.com/stackabletech/airflow-operator/pull/494
+[#520]: https://github.com/stackabletech/airflow-operator/pull/520
 
 ## [24.7.0] - 2024-07-24
 

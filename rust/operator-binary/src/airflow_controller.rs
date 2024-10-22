@@ -45,6 +45,7 @@ use stackable_operator::{
         DeepMerge,
     },
     kube::{
+        core::{error_boundary, DeserializeGuard},
         runtime::{controller::Action, reflector::ObjectRef},
         Resource, ResourceExt,
     },
@@ -289,6 +290,11 @@ pub enum Error {
         "failed to write to String (Vec<u8> to be precise) containing Airflow config"
     ))]
     WriteToConfigFileString { source: std::io::Error },
+
+    #[snafu(display("AirflowCluster object is invalid"))]
+    InvalidAirflowCluster {
+        source: error_boundary::InvalidObject,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -299,8 +305,17 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> Result<Action> {
+pub async fn reconcile_airflow(
+    airflow: Arc<DeserializeGuard<AirflowCluster>>,
+    ctx: Arc<Ctx>,
+) -> Result<Action> {
     tracing::info!("Starting reconcile");
+
+    let airflow = airflow
+        .0
+        .as_ref()
+        .map_err(error_boundary::InvalidObject::clone)
+        .context(InvalidAirflowClusterSnafu)?;
 
     let client = &ctx.client;
     let resolved_product_image: ResolvedProductImage = airflow
@@ -338,7 +353,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
     }
 
-    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(&airflow, roles);
+    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -350,7 +365,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
-        airflow.as_ref(),
+        airflow,
         airflow
             .spec
             .cluster_config
@@ -374,8 +389,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(BuildLabelSnafu)?;
 
     let (rbac_sa, rbac_rolebinding) =
-        build_rbac_resources(airflow.as_ref(), APP_NAME, required_labels)
-            .context(BuildRBACObjectsSnafu)?;
+        build_rbac_resources(airflow, APP_NAME, required_labels).context(BuildRBACObjectsSnafu)?;
 
     let rbac_sa = cluster_resources
         .add(client, rbac_sa)
@@ -397,7 +411,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     } = &airflow_executor
     {
         build_executor_template(
-            &airflow,
+            airflow,
             common_configuration,
             &resolved_product_image,
             &authentication_config,
@@ -418,7 +432,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service =
-                build_role_service(&airflow, &resolved_product_image, role_name, resolved_port)?;
+                build_role_service(airflow, &resolved_product_image, role_name, resolved_port)?;
             cluster_resources
                 .add(client, role_service)
                 .await
@@ -427,7 +441,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
-                cluster: ObjectRef::from_obj(&*airflow),
+                cluster: ObjectRef::from_obj(airflow),
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
@@ -436,8 +450,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let rg_service =
-                build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
+            let rg_service = build_rolegroup_service(airflow, &resolved_product_image, &rolegroup)?;
             cluster_resources.add(client, rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -445,7 +458,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             )?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
-                &airflow,
+                airflow,
                 &resolved_product_image,
                 &airflow_role,
                 &rolegroup,
@@ -466,7 +479,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             );
 
             let rg_configmap = build_rolegroup_config_map(
-                &airflow,
+                airflow,
                 &resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
@@ -488,7 +501,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             pod_disruption_budget: pdb,
         }) = role_config
         {
-            add_pdbs(pdb, &airflow, &airflow_role, client, &mut cluster_resources)
+            add_pdbs(pdb, airflow, &airflow_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
@@ -501,13 +514,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let status = AirflowClusterStatus {
         conditions: compute_conditions(
-            airflow.as_ref(),
+            airflow,
             &[&ss_cond_builder, &cluster_operation_cond_builder],
         ),
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, &*airflow, &status)
+        .apply_patch_status(OPERATOR_NAME, airflow, &status)
         .await
         .context(ApplyStatusSnafu)?;
 
@@ -516,7 +529,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
-    airflow: &Arc<AirflowCluster>,
+    airflow: &AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
@@ -529,7 +542,7 @@ async fn build_executor_template(
         .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
     let rolegroup = RoleGroupRef {
-        cluster: ObjectRef::from_obj(&**airflow),
+        cluster: ObjectRef::from_obj(airflow),
         role: "executor".into(),
         role_group: "kubernetes".into(),
     };
@@ -1223,8 +1236,17 @@ fn build_gitsync_container(
     Ok(gitsync_container)
 }
 
-pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(*Duration::from_secs(5))
+pub fn error_policy(
+    _obj: Arc<DeserializeGuard<AirflowCluster>>,
+    error: &Error,
+    _ctx: Arc<Ctx>,
+) -> Action {
+    match error {
+        // root object is invalid, will be requeued when modified anyway
+        Error::InvalidAirflowCluster { .. } => Action::await_change(),
+
+        _ => Action::requeue(*Duration::from_secs(10)),
+    }
 }
 
 fn add_authentication_volumes_and_volume_mounts(
