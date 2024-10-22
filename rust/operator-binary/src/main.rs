@@ -17,7 +17,10 @@ use stackable_operator::{
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
-        runtime::{reflector::ObjectRef, watcher, Controller},
+        runtime::{
+            reflector::{Lookup, ObjectRef},
+            watcher, Controller,
+        },
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -88,10 +91,13 @@ async fn main() -> anyhow::Result<()> {
                 .watches(
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
-                    move |_| {
+                    move |authentication_class| {
                         airflow_store_1
                             .state()
                             .into_iter()
+                            .filter(move |airflow: &Arc<DeserializeGuard<AirflowCluster>>| {
+                                references_authentication_class(airflow, &authentication_class)
+                            })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -116,4 +122,22 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn references_authentication_class(
+    airflow: &DeserializeGuard<AirflowCluster>,
+    authentication_class: &DeserializeGuard<AuthenticationClass>,
+) -> bool {
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+    let Some(authn_class_name) = authentication_class.name() else {
+        return false;
+    };
+    airflow
+        .spec
+        .cluster_config
+        .authentication
+        .authentication_class_names()
+        .contains(&&*authn_class_name)
 }
