@@ -128,7 +128,8 @@ impl AirflowAuthentication {
                     AuthenticationClassProvider::Ldap(_) => resolved,
                     AuthenticationClassProvider::Tls(_)
                     | AuthenticationClassProvider::Oidc(_)
-                    | AuthenticationClassProvider::Static(_) => {
+                    | AuthenticationClassProvider::Static(_)
+                    | AuthenticationClassProvider::Kerberos(_) => {
                         return Err(Error::AuthenticationProviderNotSupported {
                             authentication_class: ObjectRef::from_obj(&resolved),
                             provider: resolved.spec.provider.to_string(),
