@@ -1,13 +1,13 @@
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::{
-    authentication::AirflowAuthenticationConfigResolved, authentication::FlaskRolesSyncMoment,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        FlaskRolesSyncMoment, DEFAULT_OIDC_PROVIDER,
+    },
     AirflowConfigOptions,
 };
-use stackable_operator::commons::authentication::{ldap, oidc};
-use stackable_operator::commons::authentication::{
-    ldap::AuthenticationProvider, AuthenticationClassProvider,
-};
+use stackable_operator::commons::authentication::{ldap::AuthenticationProvider, oidc};
 use stackable_operator::commons::tls_verification::TlsVerification;
 use std::collections::BTreeMap;
 
@@ -30,7 +30,7 @@ pub enum Error {
 
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
 ) -> Result<()> {
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
@@ -47,31 +47,53 @@ pub fn add_airflow_config(
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
-) -> Result<()> {
-    // TODO: we make sure in crd/src/authentication.rs that currently there is only one
-    //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
-    //    to adapt the config here accordingly
-    for auth_config in authentication_config {
-        if let Some(auth_class) = &auth_config.authentication_class {
-            if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
-                append_ldap_config(config, ldap)?;
+    auth_config: &AirflowClientAuthenticationDetailsResolved,
+) -> Result<(), Error> {
+    let ldap_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let AirflowAuthenticationClassResolved::Ldap { provider } = auth_class {
+                Some(provider)
+            } else {
+                None
             }
-        }
+        })
+        .collect::<Vec<_>>();
 
-        config.insert(
-            AirflowConfigOptions::AuthUserRegistration.to_string(),
-            auth_config.user_registration.to_string(),
-        );
-        config.insert(
-            AirflowConfigOptions::AuthUserRegistrationRole.to_string(),
-            auth_config.user_registration_role.to_string(),
-        );
-        config.insert(
-            AirflowConfigOptions::AuthRolesSyncAtLogin.to_string(),
-            (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
-        );
+    let oidc_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let AirflowAuthenticationClassResolved::Oidc { provider, oidc } = auth_class {
+                Some((provider, oidc))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(ldap_provider) = ldap_providers.first() {
+        append_ldap_config(config, ldap_provider)?;
     }
+
+    if !oidc_providers.is_empty() {
+        append_oidc_config(config, &oidc_providers);
+    }
+
+    config.insert(
+        AirflowConfigOptions::AuthUserRegistration.to_string(),
+        auth_config.user_registration.to_string(),
+    );
+    config.insert(
+        AirflowConfigOptions::AuthUserRegistrationRole.to_string(),
+        auth_config.user_registration_role.to_string(),
+    );
+    config.insert(
+        AirflowConfigOptions::AuthRolesSyncAtLogin.to_string(),
+        (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+    );
+
     Ok(())
 }
 
@@ -235,14 +257,21 @@ fn append_oidc_config(
 mod tests {
     use crate::config::add_airflow_config;
     use stackable_airflow_crd::authentication::{
-        default_sync_roles_at, default_user_registration, AirflowAuthenticationConfigResolved,
+        default_sync_roles_at, default_user_registration,
+        AirflowClientAuthenticationDetailsResolved,
     };
     use stackable_airflow_crd::AirflowConfigOptions;
     use stackable_operator::commons::authentication::AuthenticationClass;
     use std::collections::BTreeMap;
 
     #[test]
-    fn test_no_ldap() {
+    // pub struct AirflowClientAuthenticationDetailsResolved {
+    // pub authentication_classes_resolved: Vec<AirflowAuthenticationClassResolved>,
+    // pub user_registration: bool,
+    // pub user_registration_role: String,
+    // pub sync_roles_at: FlaskRolesSyncMoment,
+    // }
+    fn test_no_external_auth() {
         let mut result = BTreeMap::new();
         add_airflow_config(&mut result, &vec![]).expect("Ok");
         assert_eq!(
@@ -278,8 +307,8 @@ mod tests {
         let authentication_class: AuthenticationClass =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let resolved_config = AirflowAuthenticationConfigResolved {
-            authentication_class: Some(authentication_class),
+        let resolved_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: authentication_class,
             user_registration: default_user_registration(),
             user_registration_role: "Admin".to_string(),
             sync_roles_at: default_sync_roles_at(),

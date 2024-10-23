@@ -15,6 +15,7 @@ built = { version = "0.7", features = ["chrono", "git2"] }
 clap = "4.5"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
+indoc = "2.0"
 product-config = { git = "https://github.com/stackabletech/product-config.git", tag = "0.7.0" }
 rstest = "0.22"
 semver = "1.0"

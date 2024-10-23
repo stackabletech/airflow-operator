@@ -9,7 +9,6 @@ use stackable_operator::{
         oidc::{self, IdentityProviderHint},
         AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
-    kube::runtime::reflector::ObjectRef,
     schemars::{self, JsonSchema},
 };
 use std::collections::BTreeSet;
@@ -36,7 +35,7 @@ pub enum Error {
     #[snafu(display("Only one authentication class is currently supported at a time"))]
     MultipleAuthenticationClassesProvided,
     #[snafu(display(
-        "Failed to use authentication provider [{provider}] for authentication class [{authentication_class}] - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
+        "Failed to use authentication provider [{provider}] for authentication class [{auth_class_name}] - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
         auth_class_name: String,
@@ -55,6 +54,18 @@ pub enum Error {
         "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})."
     ))]
     TlsVerificationCannotBeDisabled { auth_class_name: String },
+    #[snafu(display(
+        "The userRegistrationRole settings must not differ between the authentication entries.",
+    ))]
+    DifferentUserRegistrationRoleSettingsNotAllowed,
+    #[snafu(display(
+        "The userRegistration settings must not differ between the authentication entries.",
+    ))]
+    DifferentUserRegistrationSettingsNotAllowed,
+    #[snafu(display(
+        "The syncRolesAt settings must not differ between the authentication entries.",
+    ))]
+    DifferentSyncRolesAtSettingsNotAllowed,
     #[snafu(display("Invalid OIDC configuration"))]
     OidcConfigurationInvalid {
         source: stackable_operator::commons::authentication::Error,
@@ -212,8 +223,42 @@ impl AirflowClientAuthenticationDetailsResolved {
                     });
                 }
             }
+
+            match user_registration {
+                Some(user_registration) => {
+                    ensure!(
+                        user_registration == entry.user_registration,
+                        DifferentUserRegistrationSettingsNotAllowedSnafu
+                    );
+                }
+                None => user_registration = Some(entry.user_registration),
+            }
+            match &user_registration_role {
+                Some(user_registration_role) => {
+                    ensure!(
+                        user_registration_role == &entry.user_registration_role,
+                        DifferentUserRegistrationRoleSettingsNotAllowedSnafu
+                    );
+                }
+                None => user_registration_role = Some(entry.user_registration_role.to_owned()),
+            }
+            match &sync_roles_at {
+                Some(sync_roles_at) => {
+                    ensure!(
+                        sync_roles_at == &entry.sync_roles_at,
+                        DifferentSyncRolesAtSettingsNotAllowedSnafu
+                    );
+                }
+                None => sync_roles_at = Some(entry.sync_roles_at.to_owned()),
+            }
         }
-        Ok(())
+        Ok(AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: resolved_auth_classes,
+            user_registration: user_registration.unwrap_or_else(default_user_registration),
+            user_registration_role: user_registration_role
+                .unwrap_or_else(default_user_registration_role),
+            sync_roles_at: sync_roles_at.unwrap_or_else(FlaskRolesSyncMoment::default),
+        })
     }
 
     fn from_oidc(
