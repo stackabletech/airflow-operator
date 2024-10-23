@@ -5,7 +5,7 @@
 ### Added
 
 - Allowing arbitrary python code as `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` ([#493]).
-- - The operator can now run on Kubernetes clusters using a non-default cluster domain.
+- The operator can now run on Kubernetes clusters using a non-default cluster domain.
   Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#518]).
 - Support for `2.9.3` ([#494]).
 - Experimental Support for `2.10.2` ([#512]).
