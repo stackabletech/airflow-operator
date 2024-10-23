@@ -256,72 +256,184 @@ fn append_oidc_config(
 #[cfg(test)]
 mod tests {
     use crate::config::add_airflow_config;
+    use indoc::indoc;
     use stackable_airflow_crd::authentication::{
-        default_sync_roles_at, default_user_registration,
-        AirflowClientAuthenticationDetailsResolved,
+        default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
+        AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
     };
-    use stackable_airflow_crd::AirflowConfigOptions;
-    use stackable_operator::commons::authentication::AuthenticationClass;
+    use stackable_operator::commons::authentication::{ldap, oidc};
     use std::collections::BTreeMap;
 
     #[test]
-    // pub struct AirflowClientAuthenticationDetailsResolved {
-    // pub authentication_classes_resolved: Vec<AirflowAuthenticationClassResolved>,
-    // pub user_registration: bool,
-    // pub user_registration_role: String,
-    // pub sync_roles_at: FlaskRolesSyncMoment,
-    // }
-    fn test_no_external_auth() {
+    fn test_auth_db_config() {
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![],
+            user_registration: true,
+            user_registration_role: "User".to_string(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
+        };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &vec![]).expect("Ok");
+        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+
         assert_eq!(
-            BTreeMap::from([("AUTH_TYPE".into(), "AUTH_DB".into())]),
+            BTreeMap::from([
+                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+                ("AUTH_TYPE".into(), "AUTH_DB".into()),
+                ("AUTH_USER_REGISTRATION".into(), "true".into()),
+                ("AUTH_USER_REGISTRATION_ROLE".into(), "User".into())
+            ]),
             result
         );
     }
 
     #[test]
-    fn test_ldap() {
-        let authentication_class = "
-            apiVersion: authentication.stackable.tech/v1alpha1
-            kind: AuthenticationClass
-            metadata:
-              name: airflow-with-ldap-server-veri-tls-ldap
-            spec:
-              provider:
-                ldap:
-                  hostname: openldap.default.svc.cluster.local
-                  port: 636
-                  searchBase: ou=users,dc=example,dc=org
-                  ldapFieldNames:
-                    uid: uid
-                  bindCredentials:
-                    secretClass: airflow-with-ldap-server-veri-tls-ldap-bind
-                  tls:
-                    verification:
-                      server:
-                        caCert:
-                          secretClass: openldap-tls
-          ";
-        let deserializer = serde_yaml::Deserializer::from_str(authentication_class);
-        let authentication_class: AuthenticationClass =
+    fn test_ldap_config() {
+        let ldap_provider_yaml = r#"
+            hostname: openldap.default.svc.cluster.local
+            port: 636
+            searchBase: ou=users,dc=example,dc=org
+            ldapFieldNames:
+              uid: uid
+            bindCredentials:
+              secretClass: airflow-with-ldap-server-veri-tls-ldap-bind
+            tls:
+              verification:
+                server:
+                  caCert:
+                    secretClass: openldap-tls
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(ldap_provider_yaml);
+        let ldap_provider: ldap::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let resolved_config = AirflowClientAuthenticationDetailsResolved {
-            authentication_classes_resolved: authentication_class,
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
+                provider: ldap_provider,
+            }],
+            user_registration: true,
+            user_registration_role: "Admin".to_string(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
+        };
+
+        let mut result = BTreeMap::new();
+        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+
+        assert_eq!(BTreeMap::from([
+            ("AUTH_LDAP_ALLOW_SELF_SIGNED".into(), "false".into()),
+            ("AUTH_LDAP_BIND_PASSWORD".into(), "open('/stackable/secrets/airflow-with-ldap-server-veri-tls-ldap-bind/password').read()".into()),
+            ("AUTH_LDAP_BIND_USER".into(), "open('/stackable/secrets/airflow-with-ldap-server-veri-tls-ldap-bind/user').read()".into()),
+            ("AUTH_LDAP_FIRSTNAME_FIELD".into(), "givenName".into()),
+            ("AUTH_LDAP_GROUP_FIELD".into(), "memberof".into()),
+            ("AUTH_LDAP_LASTNAME_FIELD".into(), "sn".into()),
+            ("AUTH_LDAP_SEARCH".into(), "ou=users,dc=example,dc=org".into()),
+            ("AUTH_LDAP_SEARCH_FILTER".into(), "".into()),
+            ("AUTH_LDAP_SERVER".into(), "ldaps://openldap.default.svc.cluster.local:636".into()),
+            ("AUTH_LDAP_TLS_CACERTFILE".into(), "/stackable/secrets/openldap-tls/ca.crt".into()),
+            ("AUTH_LDAP_TLS_DEMAND".into(), "true".into()),
+            ("AUTH_LDAP_UID_FIELD".into(), "uid".into()),
+            ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+            ("AUTH_TYPE".into(), "AUTH_LDAP".into()),
+            ("AUTH_USER_REGISTRATION".into(), "true".into()),
+            ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into())
+        ]), result);
+    }
+
+    #[test]
+    fn test_oidc_config() {
+        let oidc_provider_yaml1 = r#"
+            hostname: my.keycloak1.server
+            port: 12345
+            rootPath: my-root-path
+            tls:
+              verification:
+                server:
+                  caCert:
+                    secretClass: keycloak-ca-cert
+            principalClaim: preferred_username
+            scopes:
+              - openid
+              - email
+              - profile
+            provider_hint: Keycloak
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml1);
+        let oidc_provider1: oidc::AuthenticationProvider =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let oidc_provider_yaml2 = r#"
+            hostname: my.keycloak2.server
+            principalClaim: preferred_username
+            scopes:
+              - openid
+            provider_hint: Keycloak
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml2);
+        let oidc_provider2: oidc::AuthenticationProvider =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![
+                AirflowAuthenticationClassResolved::Oidc {
+                    provider: oidc_provider1,
+                    oidc: oidc::ClientAuthenticationOptions {
+                        client_credentials_secret_ref: "test-client-secret1".to_string(),
+                        extra_scopes: vec!["roles".to_string()],
+                        product_specific_fields: (),
+                    },
+                },
+                AirflowAuthenticationClassResolved::Oidc {
+                    provider: oidc_provider2,
+                    oidc: oidc::ClientAuthenticationOptions {
+                        client_credentials_secret_ref: "test-client-secret2".to_string(),
+                        extra_scopes: vec![],
+                        product_specific_fields: (),
+                    },
+                },
+            ],
             user_registration: default_user_registration(),
             user_registration_role: "Admin".to_string(),
             sync_roles_at: default_sync_roles_at(),
         };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &vec![resolved_config]).expect("Ok");
+        add_airflow_config(&mut result, &authentication_config).expect("Ok");
 
-        assert_eq!(
-            "AUTH_LDAP",
-            result
-                .get(&AirflowConfigOptions::AuthType.to_string())
-                .unwrap()
-        );
+        assert_eq!(BTreeMap::from([
+            ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+            ("AUTH_TYPE".into(), "AUTH_OAUTH".into()),
+            ("AUTH_USER_REGISTRATION".into(), "true".into()),
+            ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into()),
+            ("OAUTH_PROVIDERS".into(), indoc!("
+              [
+              { 'name': 'keycloak',
+                'icon': 'fa-key',
+                'token_key': 'access_token',
+                'remote_app': {
+                  'client_id': os.environ.get('OIDC_A96BCC4FA49835D2_CLIENT_ID'),
+                  'client_secret': os.environ.get('OIDC_A96BCC4FA49835D2_CLIENT_SECRET'),
+                  'client_kwargs': {
+                    'scope': 'openid email profile roles'
+                  },
+                  'api_base_url': 'https://my.keycloak1.server:12345/my-root-path/protocol/',
+                  'server_metadata_url': 'https://my.keycloak1.server:12345/my-root-path/.well-known/openid-configuration',
+                },
+              },
+              { 'name': 'keycloak',
+                'icon': 'fa-key',
+                'token_key': 'access_token',
+                'remote_app': {
+                  'client_id': os.environ.get('OIDC_3A305E38C3B561F3_CLIENT_ID'),
+                  'client_secret': os.environ.get('OIDC_3A305E38C3B561F3_CLIENT_SECRET'),
+                  'client_kwargs': {
+                    'scope': 'openid'
+                  },
+                  'api_base_url': 'http://my.keycloak2.server//protocol/',
+                  'server_metadata_url': 'http://my.keycloak2.server//.well-known/openid-configuration',
+                },
+              }
+              ]
+              ").into())
+        ]), result);
     }
 }
