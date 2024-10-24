@@ -51,7 +51,7 @@ pub enum Error {
         oidc_provider: String,
     },
     #[snafu(display(
-        "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})."
+        "TLS verification cannot be disabled in Airflow (AuthenticationClass {auth_class_name:?})."
     ))]
     TlsVerificationCannotBeDisabled { auth_class_name: String },
     #[snafu(display(
@@ -309,5 +309,636 @@ impl AirflowClientAuthenticationDetailsResolved {
                 .context(OidcConfigurationInvalidSnafu)?
                 .clone(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+
+    use indoc::indoc;
+    use stackable_operator::commons::networking::HostName;
+    use stackable_operator::commons::tls_verification::{
+        CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
+    };
+    use stackable_operator::{commons::authentication::oidc, kube};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn resolve_without_authentication_details() {
+        let auth_details_resolved = test_resolve_and_expect_success("[]", "").await;
+
+        assert_eq!(
+            AirflowClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: Vec::default(),
+                user_registration: default_user_registration(),
+                user_registration_role: default_user_registration_role(),
+                sync_roles_at: FlaskRolesSyncMoment::default()
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_ldap_with_all_authentication_details() {
+        // Avoid using defaults here
+        let auth_details_resolved = test_resolve_and_expect_success(
+            indoc! {"
+                - authenticationClass: ldap
+                    userRegistration: false
+                    userRegistrationRole: Gamma
+                    syncRolesAt: Login
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                    name: ldap
+                spec:
+                    provider:
+                    ldap:
+                        hostname: my.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            AirflowClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
+                    provider: serde_yaml::from_str("hostname: my.ldap.server").unwrap()
+                }],
+                user_registration: false,
+                user_registration_role: "Gamma".into(),
+                sync_roles_at: FlaskRolesSyncMoment::Login
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_oidc_with_all_authentication_details() {
+        // Avoid using defaults here
+        let auth_details_resolved = test_resolve_and_expect_success(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client1
+                    extraScopes:
+                      - groups
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client2
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      port: 443
+                      rootPath: /realms/main
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+                      providerHint: Keycloak
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      rootPath: /realms/test
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            AirflowClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![
+                    AirflowAuthenticationClassResolved::Oidc {
+                        provider: oidc::AuthenticationProvider::new(
+                            HostName::try_from("first.oidc.server".to_string()).unwrap(),
+                            Some(443),
+                            "/realms/main".into(),
+                            TlsClientDetails {
+                                tls: Some(Tls {
+                                    verification: TlsVerification::Server(TlsServerVerification {
+                                        ca_cert: CaCert::SecretClass("tls".into())
+                                    })
+                                })
+                            },
+                            "preferred_username".into(),
+                            vec!["openid".into(), "email".into(), "profile".into()],
+                            Some(IdentityProviderHint::Keycloak)
+                        ),
+                        oidc: oidc::ClientAuthenticationOptions {
+                            client_credentials_secret_ref: "airflow-oidc-client1".into(),
+                            extra_scopes: vec!["groups".into()],
+                            product_specific_fields: ()
+                        }
+                    },
+                    AirflowAuthenticationClassResolved::Oidc {
+                        provider: oidc::AuthenticationProvider::new(
+                            HostName::try_from("second.oidc.server".to_string()).unwrap(),
+                            None,
+                            "/realms/test".into(),
+                            TlsClientDetails { tls: None },
+                            "preferred_username".into(),
+                            vec!["openid".into(), "email".into(), "profile".into()],
+                            None
+                        ),
+                        oidc: oidc::ClientAuthenticationOptions {
+                            client_credentials_secret_ref: "airflow-oidc-client2".into(),
+                            extra_scopes: Vec::new(),
+                            product_specific_fields: ()
+                        }
+                    }
+                ],
+                user_registration: false,
+                user_registration_role: "Gamma".into(),
+                sync_roles_at: FlaskRolesSyncMoment::Login
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_duplicate_authentication_class_references() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client1
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client2
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#"The AuthenticationClass "oidc" is referenced several times which is not allowed."#,
+            error_message
+        );
+    }
+    #[tokio::test]
+    async fn reject_different_authentication_types() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client
+                - authenticationClass: ldap
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap
+                spec:
+                  provider:
+                    ldap:
+                      hostname: my.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Only one authentication type at a time is supported by Airflow, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_multiple_ldap_providers() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: ldap1
+                - authenticationClass: ldap2
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap1
+                spec:
+                  provider:
+                    ldap:
+                      hostname: first.ldap.server
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap2
+                spec:
+                  provider:
+                    ldap:
+                      hostname: second.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Only one LDAP provider at a time is supported by Airflow.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_user_registration_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+                  userRegistration: false
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The userRegistration settings must not differ between the authentication entries.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_user_registration_role_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client2
+                  userRegistrationRole: Gamma
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The userRegistrationRole settings must not differ between the authentication entries.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_sync_roles_at_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client2
+                  syncRolesAt: Login
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The syncRolesAt settings must not differ between the authentication entries.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_if_oidc_details_are_missing() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            indoc! { r#"
+                Invalid OIDC configuration
+                Caused by this error:
+                  1: OIDC authentication details not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
+            },
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_wrong_principal_claim() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: sub
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#""sub" is not a supported principalClaim in Airflow for the Keycloak OIDC provider. Please use "preferred_username" in the AuthenticationClass "oidc""#,
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_disabled_tls_verification() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                      tls:
+                        verification:
+                          none: {}
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#"TLS verification cannot be disabled in Airflow (AuthenticationClass "oidc")."#,
+            error_message
+        );
+    }
+
+    /// Call `AirflowClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `AirflowClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the
+    /// `AirflowClientAuthenticationDetailsResolved`.
+    ///
+    /// The parameters are meant to be valid and resolvable. Just fail
+    /// if there is an error.
+    async fn test_resolve_and_expect_success(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> AirflowClientAuthenticationDetailsResolved {
+        test_resolve(auth_details_yaml, auth_classes_yaml)
+            .await
+            .expect("The AirflowClientAuthenticationDetails should be resolvable.")
+    }
+
+    /// Call `AirflowClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `AirflowClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the error message.
+    ///
+    /// The parameters are meant to be invalid or not resolvable. Just
+    /// fail if there is no error.
+    async fn test_resolve_and_expect_error(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> String {
+        let error = test_resolve(auth_details_yaml, auth_classes_yaml)
+            .await
+            .expect_err(
+                "The AirflowClientAuthenticationDetails are invalid and should not be resolvable.",
+            );
+        snafu::Report::from_error(error)
+            .to_string()
+            .trim_end()
+            .to_owned()
+    }
+
+    /// Call `AirflowClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `AirflowClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the result.
+    async fn test_resolve(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> Result<AirflowClientAuthenticationDetailsResolved> {
+        let auth_details = deserialize_airflow_client_authentication_details(auth_details_yaml);
+
+        let auth_classes = deserialize_auth_classes(auth_classes_yaml);
+
+        let resolve_auth_class = create_auth_class_resolver(auth_classes);
+
+        AirflowClientAuthenticationDetailsResolved::resolve(&auth_details, resolve_auth_class).await
+    }
+
+    /// Deserialize the given list of
+    /// `AirflowClientAuthenticationDetails`.
+    ///
+    /// Fail if the given string cannot be deserialized.
+    fn deserialize_airflow_client_authentication_details(
+        input: &str,
+    ) -> Vec<AirflowClientAuthenticationDetails> {
+        serde_yaml::from_str(input)
+            .expect("The definition of the authentication configuration should be valid.")
+    }
+
+    /// Deserialize the given `AuthenticationClass` YAML documents.
+    ///
+    /// Fail if the given string cannot be deserialized.
+    fn deserialize_auth_classes(input: &str) -> Vec<AuthenticationClass> {
+        if input.is_empty() {
+            Vec::new()
+        } else {
+            let deserializer = serde_yaml::Deserializer::from_str(input);
+            deserializer
+                .map(|d| {
+                    serde_yaml::with::singleton_map_recursive::deserialize(d)
+                        .expect("The definition of the AuthenticationClass should be valid.")
+                })
+                .collect()
+        }
+    }
+    /// Returns a function which resolves `AuthenticationClass` names to
+    /// the given list of `AuthenticationClass`es.
+    ///
+    /// Use this function in the tests to replace
+    /// `stackable_operator::commons::authentication::ClientAuthenticationDetails`
+    /// which requires a Kubernetes client.
+    fn create_auth_class_resolver(
+        auth_classes: Vec<AuthenticationClass>,
+    ) -> impl Fn(
+        ClientAuthenticationDetails,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>>,
+    > {
+        move |auth_details: ClientAuthenticationDetails| {
+            let auth_classes = auth_classes.clone();
+            Box::pin(async move {
+                auth_classes
+                    .iter()
+                    .find(|auth_class| {
+                        auth_class.metadata.name.as_ref()
+                            == Some(auth_details.authentication_class_name())
+                    })
+                    .cloned()
+                    .ok_or_else(|| stackable_operator::client::Error::ListResources {
+                        source: kube::Error::Api(kube::error::ErrorResponse {
+                            code: 404,
+                            message: "AuthenticationClass not found".into(),
+                            reason: "NotFound".into(),
+                            status: "Failure".into(),
+                        }),
+                    })
+            })
+        }
     }
 }

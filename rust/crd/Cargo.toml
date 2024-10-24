@@ -16,6 +16,8 @@ stackable-operator.workspace = true
 product-config.workspace = true
 strum.workspace = true
 tracing.workspace = true
+indoc.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true
