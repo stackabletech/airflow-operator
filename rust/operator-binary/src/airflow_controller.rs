@@ -5,14 +5,16 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
-    authentication::AirflowAuthenticationConfigResolved, build_recommended_labels, AirflowCluster,
-    AirflowClusterStatus, AirflowConfig, AirflowConfigFragment, AirflowConfigOptions,
-    AirflowExecutor, AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment,
-    AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT,
-    GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
-    TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    authentication::AirflowAuthenticationClassResolved, git_sync::GitSync,
+};
+use stackable_airflow_crd::{
+    authentication::AirflowClientAuthenticationDetailsResolved, build_recommended_labels,
+    AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigFragment,
+    AirflowConfigOptions, AirflowExecutor, AirflowRole, Container, ExecutorConfig,
+    ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH,
+    GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, PodTemplateSpec, VolumeMount};
 use stackable_operator::kube::api::ObjectMeta;
@@ -27,7 +29,7 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{ldap, AuthenticationClass, AuthenticationClassProvider},
+        authentication::{ldap, oidc, AuthenticationClass},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -67,7 +69,7 @@ use stackable_operator::{
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
     str::FromStr,
     sync::Arc,
@@ -88,6 +90,7 @@ use crate::{
         pdb::add_pdbs,
     },
     product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
+    util::add_cert_to_python_certifi_command,
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -289,6 +292,16 @@ pub enum Error {
         "failed to write to String (Vec<u8> to be precise) containing Airflow config"
     ))]
     WriteToConfigFileString { source: std::io::Error },
+
+    #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
+    AddTlsVolumesAndVolumeMounts {
+        source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
+    },
+
+    #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
+    AddLdapVolumesAndVolumeMounts {
+        source: stackable_operator::commons::authentication::ldap::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -311,13 +324,12 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
 
-    let authentication_config = airflow
-        .spec
-        .cluster_config
-        .authentication
-        .resolve(client)
-        .await
-        .context(InvalidAuthenticationConfigSnafu)?;
+    let authentication_config = AirflowClientAuthenticationDetailsResolved::from(
+        &airflow.spec.cluster_config.authentication,
+        client,
+    )
+    .await
+    .context(InvalidAuthenticationConfigSnafu)?;
 
     let mut roles = HashMap::new();
 
@@ -450,7 +462,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &airflow_role,
                 &rolegroup,
                 rolegroup_config,
-                authentication_config.as_ref(),
+                &authentication_config,
                 &rbac_sa.name_unchecked(),
                 &merged_airflow_config,
                 airflow_executor,
@@ -470,7 +482,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 &resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
-                authentication_config.as_ref(),
+                &authentication_config,
                 &merged_airflow_config.logging,
                 vector_aggregator_address.as_deref(),
                 &Container::Airflow,
@@ -519,7 +531,7 @@ async fn build_executor_template(
     airflow: &Arc<AirflowCluster>,
     common_config: &CommonConfiguration<ExecutorConfigFragment>,
     resolved_product_image: &ResolvedProductImage,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
     vector_aggregator_address: &Option<String>,
     cluster_resources: &mut ClusterResources,
     client: &stackable_operator::client::Client,
@@ -538,7 +550,7 @@ async fn build_executor_template(
         resolved_product_image,
         &rolegroup,
         &HashMap::new(),
-        authentication_config,
+        &authentication_config,
         &merged_executor_config.logging,
         vector_aggregator_address.as_deref(),
         &Container::Base,
@@ -635,7 +647,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
     container: &Container,
@@ -797,7 +809,7 @@ fn build_server_rolegroup_statefulset(
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
@@ -1059,7 +1071,7 @@ fn build_logging_container(
 fn build_executor_template_config_map(
     airflow: &AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
@@ -1104,7 +1116,7 @@ fn build_executor_template_config_map(
         &mut airflow_container,
         &mut pb,
     )?;
-
+    // TODO: Propagate error rather then ignore it with unwrap()
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(merged_executor_config.resources.clone().into())
@@ -1114,8 +1126,11 @@ fn build_executor_template_config_map(
             merged_executor_config,
         ))
         .add_volume_mounts(airflow.volume_mounts())
+        .unwrap()
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .unwrap()
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .unwrap()
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
 
     pb.add_container(airflow_container.build());
@@ -1210,7 +1225,9 @@ fn build_gitsync_container(
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
         .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .unwrap()
         .add_volume_mounts(volume_mounts)
+        .unwrap()
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
@@ -1226,27 +1243,98 @@ fn build_gitsync_container(
 pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(*Duration::from_secs(5))
 }
+// I want to add secret volumes right here
 
 fn add_authentication_volumes_and_volume_mounts(
-    authentication_config: &Vec<AirflowAuthenticationConfigResolved>,
+    authentication_config: &AirflowClientAuthenticationDetailsResolved,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) -> Result<()> {
-    // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
-    //    Needs adaptation once FAB and airflow support multiple auth methods.
-    // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
-    for config in authentication_config {
-        if let Some(auth_class) = &config.authentication_class {
-            match &auth_class.spec.provider {
-                AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb])
-                        .context(VolumeAndMountsSnafu)?;
-                }
-                AuthenticationClassProvider::Tls(_)
-                | AuthenticationClassProvider::Oidc(_)
-                | AuthenticationClassProvider::Static(_) => {}
+    // Different authentication entries can reference the same secret
+    // class or TLS certificate. It must be ensured that the volumes
+    // and volume mounts are only added once in such a case.
+
+    let mut ldap_authentication_providers = BTreeSet::new();
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &authentication_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            AirflowAuthenticationClassResolved::Ldap { provider } => {
+                ldap_authentication_providers.insert(provider);
+            }
+            AirflowAuthenticationClassResolved::Oidc { provider, oidc } => {
+                tls_client_credentials.insert(&provider.tls);
             }
         }
     }
+
+    for provider in ldap_authentication_providers {
+        provider
+            .add_volumes_and_mounts(pb, vec![cb])
+            .context(AddLdapVolumesAndVolumeMountsSnafu)?;
+    }
+
+    for tls in tls_client_credentials {
+        tls.add_volumes_and_mounts(pb, vec![cb])
+            .context(AddTlsVolumesAndVolumeMountsSnafu)?;
+    }
     Ok(())
+}
+
+fn authentication_env_vars(
+    auth_config: &AirflowClientAuthenticationDetailsResolved,
+) -> Vec<EnvVar> {
+    // Different OIDC authentication entries can reference the same
+    // client secret. It must be ensured that the env variables are only
+    // added once in such a case.
+
+    let mut oidc_client_credentials_secrets = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            AirflowAuthenticationClassResolved::Ldap { .. } => {}
+            AirflowAuthenticationClassResolved::Oidc { oidc, .. } => {
+                oidc_client_credentials_secrets
+                    .insert(oidc.client_credentials_secret_ref.to_owned());
+            }
+        }
+    }
+
+    oidc_client_credentials_secrets
+        .iter()
+        .cloned()
+        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .collect()
+}
+
+fn authentication_start_commands(
+    auth_config: &AirflowClientAuthenticationDetailsResolved,
+) -> String {
+    let mut commands = Vec::new();
+
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            AirflowAuthenticationClassResolved::Oidc { provider, .. } => {
+                tls_client_credentials.insert(&provider.tls);
+
+                // WebPKI will be handled implicitly
+            }
+            AirflowAuthenticationClassResolved::Ldap { .. } => {}
+        }
+    }
+
+    for tls in tls_client_credentials {
+        commands.push(tls.tls_ca_cert_mount_path().map(|tls_ca_cert_mount_path| {
+            add_cert_to_python_certifi_command(&tls_ca_cert_mount_path)
+        }));
+    }
+
+    commands
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
