@@ -5,6 +5,8 @@
 ### Added
 
 - Allowing arbitrary python code as `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` ([#493]).
+- The operator can now run on Kubernetes clusters using a non-default cluster domain.
+  Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#518]).
 - Support for `2.9.3` ([#494]).
 - Experimental Support for `2.10.2` ([#512]).
 
@@ -20,11 +22,14 @@
 ### Fixed
 
 - Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
+- Failing to parse one `AirflowCluster`/`AuthenticationClass` should no longer cause the whole operator to stop functioning ([#520]).
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
 [#493]: https://github.com/stackabletech/airflow-operator/pull/493
 [#494]: https://github.com/stackabletech/airflow-operator/pull/494
+[#518]: https://github.com/stackabletech/airflow-operator/pull/518
+[#520]: https://github.com/stackabletech/airflow-operator/pull/520
 
 ## [24.7.0] - 2024-07-24
 

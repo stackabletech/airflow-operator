@@ -10,16 +10,17 @@ use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
-use stackable_airflow_crd::{
-    authentication::AirflowAuthentication, AirflowCluster, APP_NAME, OPERATOR_NAME,
-};
+use stackable_airflow_crd::{AirflowCluster, APP_NAME, OPERATOR_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
-        runtime::{reflector::ObjectRef, watcher, Controller},
-        ResourceExt,
+        core::DeserializeGuard,
+        runtime::{
+            reflector::{Lookup, ObjectRef},
+            watcher, Controller,
+        },
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -49,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
             product_config,
             watch_namespace,
             tracing_target,
+            cluster_info_opts,
         }) => {
             stackable_operator::logging::initialize_logging(
                 "AIRFLOW_OPERATOR_LOG",
@@ -68,11 +70,14 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/airflow-operator/config-spec/properties.yaml",
             ])?;
 
-            let client =
-                stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
+            let client = stackable_operator::client::initialize_operator(
+                Some(OPERATOR_NAME.to_string()),
+                &cluster_info_opts,
+            )
+            .await?;
 
             let airflow_controller_builder = Controller::new(
-                watch_namespace.get_api::<AirflowCluster>(&client),
+                watch_namespace.get_api::<DeserializeGuard<AirflowCluster>>(&client),
                 watcher::Config::default(),
             );
 
@@ -88,17 +93,14 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .shutdown_on_signal()
                 .watches(
-                    client.get_api::<AuthenticationClass>(&()),
+                    client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
                         airflow_store_1
                             .state()
                             .into_iter()
-                            .filter(move |airflow: &Arc<AirflowCluster>| {
-                                references_authentication_class(
-                                    &airflow.spec.cluster_config.authentication,
-                                    &authentication_class,
-                                )
+                            .filter(move |airflow: &Arc<DeserializeGuard<AirflowCluster>>| {
+                                references_authentication_class(airflow, &authentication_class)
                             })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
@@ -127,15 +129,19 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    authentication_config: &AirflowAuthentication,
-    authentication_class: &AuthenticationClass,
+    airflow: &DeserializeGuard<AirflowCluster>,
+    authentication_class: &DeserializeGuard<AuthenticationClass>,
 ) -> bool {
-    assert!(authentication_class.metadata.name.is_some());
-
-    authentication_config
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+    let Some(authn_class_name) = authentication_class.name() else {
+        return false;
+    };
+    airflow
+        .spec
+        .cluster_config
+        .authentication
         .authentication_class_names()
-        .into_iter()
-        .filter(|c| *c == authentication_class.name_any())
-        .count()
-        > 0
+        .contains(&&*authn_class_name)
 }

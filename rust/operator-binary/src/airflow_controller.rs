@@ -1,4 +1,11 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Write,
+    str::FromStr,
+    sync::Arc,
+};
+
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
     types::PropertyNameKind,
@@ -16,10 +23,9 @@ use stackable_airflow_crd::{
     GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
     TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
 };
-use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, PodTemplateSpec, VolumeMount};
-use stackable_operator::kube::api::ObjectMeta;
 use stackable_operator::{
     builder::{
+        self,
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
@@ -34,19 +40,21 @@ use stackable_operator::{
         rbac::build_rbac_resources,
     },
     config::fragment::ValidationError,
-    k8s_openapi,
     k8s_openapi::{
+        self,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EmptyDirVolumeSource, Probe, Service, ServicePort, ServiceSpec,
-                TCPSocketAction,
+                ConfigMap, EmptyDirVolumeSource, EnvVar, PodTemplateSpec, Probe, Service,
+                ServicePort, ServiceSpec, TCPSocketAction, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
     },
     kube::{
+        api::ObjectMeta,
+        core::{error_boundary, DeserializeGuard},
         runtime::{controller::Action, reflector::ObjectRef},
         Resource, ResourceExt,
     },
@@ -58,6 +66,7 @@ use stackable_operator::{
     },
     product_logging::{
         self,
+        framework::LoggingError,
         spec::{ContainerLogConfig, Logging},
     },
     role_utils::{CommonConfiguration, GenericRoleConfig, RoleGroupRef},
@@ -76,13 +85,12 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
-use crate::env_vars::{
-    build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
-};
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    env_vars,
+    env_vars::{
+        self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
+    },
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -293,14 +301,20 @@ pub enum Error {
     ))]
     WriteToConfigFileString { source: std::io::Error },
 
-    #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
-    AddTlsVolumesAndVolumeMounts {
-        source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
+    #[snafu(display("failed to configure logging"))]
+    ConfigureLogging { source: LoggingError },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume { source: builder::pod::Error },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
-    AddLdapVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::ldap::Error,
+    #[snafu(display("AirflowCluster object is invalid"))]
+    InvalidAirflowCluster {
+        source: error_boundary::InvalidObject,
     },
 }
 
@@ -312,8 +326,17 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> Result<Action> {
+pub async fn reconcile_airflow(
+    airflow: Arc<DeserializeGuard<AirflowCluster>>,
+    ctx: Arc<Ctx>,
+) -> Result<Action> {
     tracing::info!("Starting reconcile");
+
+    let airflow = airflow
+        .0
+        .as_ref()
+        .map_err(error_boundary::InvalidObject::clone)
+        .context(InvalidAirflowClusterSnafu)?;
 
     let client = &ctx.client;
     let resolved_product_image: ResolvedProductImage = airflow
@@ -350,7 +373,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         }
     }
 
-    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(&airflow, roles);
+    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -362,7 +385,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
-        airflow.as_ref(),
+        airflow,
         airflow
             .spec
             .cluster_config
@@ -386,8 +409,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         .context(BuildLabelSnafu)?;
 
     let (rbac_sa, rbac_rolebinding) =
-        build_rbac_resources(airflow.as_ref(), APP_NAME, required_labels)
-            .context(BuildRBACObjectsSnafu)?;
+        build_rbac_resources(airflow, APP_NAME, required_labels).context(BuildRBACObjectsSnafu)?;
 
     let rbac_sa = cluster_resources
         .add(client, rbac_sa)
@@ -409,7 +431,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
     } = &airflow_executor
     {
         build_executor_template(
-            &airflow,
+            airflow,
             common_configuration,
             &resolved_product_image,
             &authentication_config,
@@ -430,7 +452,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
         // some roles will only run "internally" and do not need to be created as services
         if let Some(resolved_port) = role_port(role_name) {
             let role_service =
-                build_role_service(&airflow, &resolved_product_image, role_name, resolved_port)?;
+                build_role_service(airflow, &resolved_product_image, role_name, resolved_port)?;
             cluster_resources
                 .add(client, role_service)
                 .await
@@ -439,7 +461,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
-                cluster: ObjectRef::from_obj(&*airflow),
+                cluster: ObjectRef::from_obj(airflow),
                 role: role_name.into(),
                 role_group: rolegroup_name.into(),
             };
@@ -448,8 +470,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let rg_service =
-                build_rolegroup_service(&airflow, &resolved_product_image, &rolegroup)?;
+            let rg_service = build_rolegroup_service(airflow, &resolved_product_image, &rolegroup)?;
             cluster_resources.add(client, rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -457,7 +478,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             )?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
-                &airflow,
+                airflow,
                 &resolved_product_image,
                 &airflow_role,
                 &rolegroup,
@@ -478,7 +499,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             );
 
             let rg_configmap = build_rolegroup_config_map(
-                &airflow,
+                airflow,
                 &resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
@@ -500,7 +521,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
             pod_disruption_budget: pdb,
         }) = role_config
         {
-            add_pdbs(pdb, &airflow, &airflow_role, client, &mut cluster_resources)
+            add_pdbs(pdb, airflow, &airflow_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
@@ -513,13 +534,13 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
     let status = AirflowClusterStatus {
         conditions: compute_conditions(
-            airflow.as_ref(),
+            airflow,
             &[&ss_cond_builder, &cluster_operation_cond_builder],
         ),
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, &*airflow, &status)
+        .apply_patch_status(OPERATOR_NAME, airflow, &status)
         .await
         .context(ApplyStatusSnafu)?;
 
@@ -528,7 +549,7 @@ pub async fn reconcile_airflow(airflow: Arc<AirflowCluster>, ctx: Arc<Ctx>) -> R
 
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
-    airflow: &Arc<AirflowCluster>,
+    airflow: &AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
@@ -541,7 +562,7 @@ async fn build_executor_template(
         .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
     let rolegroup = RoleGroupRef {
-        cluster: ObjectRef::from_obj(&**airflow),
+        cluster: ObjectRef::from_obj(airflow),
         role: "executor".into(),
         role_group: "kubernetes".into(),
     };
@@ -879,13 +900,23 @@ fn build_server_rolegroup_statefulset(
     ));
 
     let volume_mounts = airflow.volume_mounts();
-    airflow_container.add_volume_mounts(volume_mounts);
-    airflow_container.add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH);
-    airflow_container.add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR);
-    airflow_container.add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+    airflow_container
+        .add_volume_mounts(volume_mounts)
+        .context(AddVolumeMountSnafu)?;
+    airflow_container
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .context(AddVolumeMountSnafu)?;
+    airflow_container
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .context(AddVolumeMountSnafu)?;
+    airflow_container
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .context(AddVolumeMountSnafu)?;
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
-        airflow_container.add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION);
+        airflow_container
+            .add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
+            .context(AddVolumeMountSnafu)?;
     }
 
     if let Some(resolved_port) = airflow_role.get_http_port() {
@@ -935,21 +966,24 @@ fn build_server_rolegroup_statefulset(
         .build();
     pb.add_container(metrics_container);
 
-    pb.add_volumes(airflow.volumes().clone());
+    pb.add_volumes(airflow.volumes().clone())
+        .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_airflow_config
             .logging
             .containers
             .get(&Container::Airflow),
-    ));
+    ))
+    .context(AddVolumeSnafu)?;
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
                 .with_config_map(TEMPLATE_CONFIGMAP_NAME)
                 .build(),
-        );
+        )
+        .context(AddVolumeSnafu)?;
     }
 
     if let Some(gitsync) = airflow.git_sync() {
@@ -966,7 +1000,8 @@ fn build_server_rolegroup_statefulset(
             VolumeBuilder::new(GIT_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
-        );
+        )
+        .context(AddVolumeSnafu)?;
 
         pb.add_container(gitsync_container);
 
@@ -995,7 +1030,7 @@ fn build_server_rolegroup_statefulset(
                 .logging
                 .containers
                 .get(&Container::Vector),
-        ));
+        )?);
     }
 
     let mut pod_template = pb.build_template();
@@ -1052,7 +1087,7 @@ fn build_server_rolegroup_statefulset(
 fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
     log_config: Option<&ContainerLogConfig>,
-) -> k8s_openapi::api::core::v1::Container {
+) -> Result<k8s_openapi::api::core::v1::Container> {
     product_logging::framework::vector_container(
         resolved_product_image,
         CONFIG_VOLUME_NAME,
@@ -1065,6 +1100,7 @@ fn build_logging_container(
             .with_memory_limit("128Mi")
             .build(),
     )
+    .context(ConfigureLoggingSnafu)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1126,22 +1162,25 @@ fn build_executor_template_config_map(
             merged_executor_config,
         ))
         .add_volume_mounts(airflow.volume_mounts())
-        .unwrap()
+        .context(AddVolumeMountSnafu)?
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
-        .unwrap()
+        .context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .unwrap()
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR);
+        .context(AddVolumeMountSnafu)?
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .context(AddVolumeMountSnafu)?;
 
     pb.add_container(airflow_container.build());
-    pb.add_volumes(airflow.volumes().clone());
+    pb.add_volumes(airflow.volumes().clone())
+        .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_executor_config
             .logging
             .containers
             .get(&Container::Airflow),
-    ));
+    ))
+    .context(AddVolumeSnafu)?;
 
     if let Some(gitsync) = airflow.git_sync() {
         let gitsync_container = build_gitsync_container(
@@ -1156,7 +1195,8 @@ fn build_executor_template_config_map(
             VolumeBuilder::new(GIT_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
-        );
+        )
+        .context(AddVolumeSnafu)?;
         pb.add_init_container(gitsync_container);
     }
 
@@ -1167,7 +1207,7 @@ fn build_executor_template_config_map(
                 .logging
                 .containers
                 .get(&Container::Vector),
-        ));
+        )?);
     }
 
     let mut pod_template = pb.build_template();
@@ -1225,9 +1265,9 @@ fn build_gitsync_container(
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
         .add_volume_mount(GIT_CONTENT, GIT_ROOT)
-        .unwrap()
+        .context(AddVolumeMountSnafu)?
         .add_volume_mounts(volume_mounts)
-        .unwrap()
+        .context(AddVolumeMountSnafu)?
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
@@ -1240,8 +1280,17 @@ fn build_gitsync_container(
     Ok(gitsync_container)
 }
 
-pub fn error_policy(_obj: Arc<AirflowCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(*Duration::from_secs(5))
+pub fn error_policy(
+    _obj: Arc<DeserializeGuard<AirflowCluster>>,
+    error: &Error,
+    _ctx: Arc<Ctx>,
+) -> Action {
+    match error {
+        // root object is invalid, will be requeued when modified anyway
+        Error::InvalidAirflowCluster { .. } => Action::await_change(),
+
+        _ => Action::requeue(*Duration::from_secs(10)),
+    }
 }
 // I want to add secret volumes right here
 
