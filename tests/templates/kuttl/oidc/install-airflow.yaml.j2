@@ -48,9 +48,11 @@ spec:
       - authenticationClass: keycloak1-$NAMESPACE
         oidc:
           clientCredentialsSecret: airflow-keycloak1-client
+        userRegistrationRole: Admin
       - authenticationClass: keycloak2-$NAMESPACE
         oidc:
           clientCredentialsSecret: airflow-keycloak2-client
+        userRegistrationRole: Admin
     credentialsSecret: airflow-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
@@ -59,6 +61,8 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    envOverrides:
+      REQUESTS_CA_BUNDLE: /stackable/secrets/tls/ca.crt
     roleGroups:
       default:
         replicas: 1

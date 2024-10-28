@@ -1,6 +1,5 @@
 # $NAMESPACE will be replaced with the namespace of the test case.
 
-import json
 import logging
 import requests
 import sys
@@ -23,33 +22,29 @@ assert login_page.url.startswith("https://keycloak1.$NAMESPACE.svc.cluster.local
 # Enter username and password into the Keycloak login page and click on "Sign In"
 login_page_html = BeautifulSoup(login_page.text, 'html.parser')
 authenticate_url = login_page_html.form['action']
-welcome_page = session.post(authenticate_url, data={
-    'username': "jane.doe",
-    'password': "T8mn72D9"
-})
+welcome_page = session.post(authenticate_url, data={ 'username': "jane.doe", 'password': "T8mn72D9" })
 
 assert welcome_page.ok, "Login failed"
-assert welcome_page.url == "http://airflow-webserver:8080/airflow/welcome/", \
-    "Redirection to the Airflow welcome page expected"
+assert welcome_page.url == "http://airflow-webserver:8080/home", \
+    "Redirection to the Airflow home page expected"
 
 # Open the user information page in Airflow
 userinfo_page = session.get("http://airflow-webserver:8080/users/userinfo/")
 
 assert userinfo_page.ok, "Retrieving user information failed"
-assert userinfo_page.url == "http://airflow-webserver:8080/airflow/welcome/", \
-    "Redirection to the Airflow welcome page expected"
+assert userinfo_page.url == "http://airflow-webserver:8080/users/userinfo/", \
+    "Redirection to the Airflow user info page expected"
 
 # Expect the user data provided by Keycloak in Airflow
 userinfo_page_html = BeautifulSoup(userinfo_page.text, 'html.parser')
-raw_data = userinfo_page_html.find(id='app')['data-bootstrap']
-data = json.loads(raw_data)
-user_data = data['user']
+table_rows = userinfo_page_html.find_all('tr')
+user_data = {tr.find('th').text:tr.find('td').text for tr in table_rows}
 
-assert user_data['firstName'] == "Jane", \
+assert user_data['First Name'] == "Jane", \
     "The first name of the user in Airflow should match the one provided by Keycloak"
-assert user_data['lastName'] == "Doe", \
+assert user_data['Last Name'] == "Doe", \
     "The last name of the user in Airflow should match the one provided by Keycloak"
-assert user_data['email'] == "jane.doe@stackable.tech", \
+assert user_data['Email'] == "jane.doe@stackable.tech", \
     "The email of the user in Airflow should match the one provided by Keycloak"
 
 # TODO Use different OIDC providers (currently only Keycloak is
