@@ -194,10 +194,10 @@ fn append_oidc_config(
     )],
 ) {
     // Debatable: AUTH_OAUTH or AUTH_OID
-    // Additionally can be set via config... dunno
+    // Additionally can be set via config
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
-        "AUTH_OID".into(),
+        "AUTH_OAUTH".into(),
     );
 
     let mut oauth_providers_config = Vec::new();

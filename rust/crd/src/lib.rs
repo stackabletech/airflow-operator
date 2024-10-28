@@ -189,7 +189,7 @@ pub struct AirflowClusterSpec {
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
-    #[serde(flatten)]
+    #[serde(default)]
     pub authentication: Vec<AirflowClientAuthenticationDetails>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.

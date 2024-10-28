@@ -902,6 +902,7 @@ fn build_server_rolegroup_statefulset(
         airflow_role,
         rolegroup_config,
         executor,
+        authentication_config,
     ));
 
     let volume_mounts = airflow.volume_mounts();
@@ -1152,12 +1153,12 @@ fn build_executor_template_config_map(
     let mut airflow_container =
         ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
 
+    // Works too, had been changed
     add_authentication_volumes_and_volume_mounts(
         authentication_config,
         &mut airflow_container,
         &mut pb,
     )?;
-    // TODO: Propagate error rather then ignore it with unwrap()
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(merged_executor_config.resources.clone().into())
@@ -1333,32 +1334,6 @@ fn add_authentication_volumes_and_volume_mounts(
             .context(AddTlsVolumesAndVolumeMountsSnafu)?;
     }
     Ok(())
-}
-
-fn authentication_env_vars(
-    auth_config: &AirflowClientAuthenticationDetailsResolved,
-) -> Vec<EnvVar> {
-    // Different OIDC authentication entries can reference the same
-    // client secret. It must be ensured that the env variables are only
-    // added once in such a case.
-
-    let mut oidc_client_credentials_secrets = BTreeSet::new();
-
-    for auth_class_resolved in &auth_config.authentication_classes_resolved {
-        match auth_class_resolved {
-            AirflowAuthenticationClassResolved::Ldap { .. } => {}
-            AirflowAuthenticationClassResolved::Oidc { oidc, .. } => {
-                oidc_client_credentials_secrets
-                    .insert(oidc.client_credentials_secret_ref.to_owned());
-            }
-        }
-    }
-
-    oidc_client_credentials_secrets
-        .iter()
-        .cloned()
-        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
-        .collect()
 }
 
 fn authentication_start_commands(
