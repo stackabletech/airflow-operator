@@ -21,6 +21,7 @@ use stackable_operator::{
             reflector::{Lookup, ObjectRef},
             watcher, Controller,
         },
+        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -135,13 +136,12 @@ fn references_authentication_class(
     let Ok(airflow) = &airflow.0 else {
         return false;
     };
-    let Some(authn_class_name) = authentication_class.name() else {
-        return false;
-    };
+    let authentication_class_name = authentication_class.name_any();
+
     airflow
         .spec
         .cluster_config
         .authentication
-        .authentication_class_names()
-        .contains(&&*authn_class_name)
+        .iter()
+        .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }

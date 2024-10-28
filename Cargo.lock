@@ -1038,6 +1038,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "2.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
+
+[[package]]
 name = "instant"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2168,6 +2174,7 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 name = "stackable-airflow-crd"
 version = "0.0.0-dev"
 dependencies = [
+ "indoc",
  "product-config",
  "rstest",
  "serde",
@@ -2176,6 +2183,7 @@ dependencies = [
  "snafu 0.8.5",
  "stackable-operator",
  "strum",
+ "tokio",
  "tracing",
 ]
 
@@ -2188,6 +2196,7 @@ dependencies = [
  "clap",
  "fnv",
  "futures 0.3.31",
+ "indoc",
  "product-config",
  "serde",
  "serde_yaml",

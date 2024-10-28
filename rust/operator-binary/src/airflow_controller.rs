@@ -1,6 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
     str::FromStr,
     sync::Arc,
@@ -77,12 +77,7 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    io::Write,
-    str::FromStr,
-    sync::Arc,
-};
+
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 use crate::{
@@ -310,6 +305,16 @@ pub enum Error {
     #[snafu(display("failed to add needed volumeMount"))]
     AddVolumeMount {
         source: builder::pod::container::Error,
+    },
+
+    #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
+    AddLdapVolumesAndVolumeMounts {
+        source: stackable_operator::commons::authentication::ldap::Error,
+    },
+
+    #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
+    AddTlsVolumesAndVolumeMounts {
+        source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
     },
 
     #[snafu(display("AirflowCluster object is invalid"))]
