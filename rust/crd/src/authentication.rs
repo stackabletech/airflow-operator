@@ -346,20 +346,20 @@ mod tests {
         let auth_details_resolved = test_resolve_and_expect_success(
             indoc! {"
                 - authenticationClass: ldap
-                    userRegistration: false
-                    userRegistrationRole: Gamma
-                    syncRolesAt: Login
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
             "},
             indoc! {"
                 ---
                 apiVersion: authentication.stackable.tech/v1alpha1
                 kind: AuthenticationClass
                 metadata:
-                    name: ldap
+                  name: ldap
                 spec:
-                    provider:
+                  provider:
                     ldap:
-                        hostname: my.ldap.server
+                      hostname: my.ldap.server
             "},
         )
         .await;
@@ -757,9 +757,9 @@ mod tests {
         assert_eq!(
             indoc! { r#"
                 Invalid OIDC configuration
+
                 Caused by this error:
-                  1: OIDC authentication details not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
-            },
+                  1: authentication details for OIDC were not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#            },
             error_message
         );
     }
