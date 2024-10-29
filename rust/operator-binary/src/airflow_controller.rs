@@ -576,7 +576,7 @@ async fn build_executor_template(
         resolved_product_image,
         &rolegroup,
         &HashMap::new(),
-        &authentication_config,
+        authentication_config,
         &merged_executor_config.logging,
         vector_aggregator_address.as_deref(),
         &Container::Base,
