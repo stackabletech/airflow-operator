@@ -23,7 +23,7 @@ assert login_page.url.startswith(
 login_page_html = BeautifulSoup(login_page.text, "html.parser")
 authenticate_url = login_page_html.form["action"]
 welcome_page = session.post(
-    authenticate_url, data={"username": "jane.doe", 'password': "T8mn72D9" }
+    authenticate_url, data={"username": "jane.doe", "password": "T8mn72D9" }
 )
 
 assert welcome_page.ok, "Login failed"
