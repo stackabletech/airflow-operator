@@ -26,7 +26,7 @@ image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:concepts:authentication.adoc[user authentication] againts a single LDAP server.
+Airflow supports xref:concepts:authentication.adoc[user authentication] against a single LDAP server.
 Set up an AuthenticationClass for the LDAP server and reference it in the Airflow Stacklet resource as shown:
 
 [source,yaml]
