@@ -20,10 +20,10 @@ assert login_page.url.startswith(
 ), "Redirection to the Keycloak login page expected"
 
 # Enter username and password into the Keycloak login page and click on "Sign In"
-login_page_html = BeautifulSoup(login_page.text, 'html.parser')
-authenticate_url = login_page_html.form['action']
+login_page_html = BeautifulSoup(login_page.text, "html.parser")
+authenticate_url = login_page_html.form["action"]
 welcome_page = session.post(
-    authenticate_url, data={ "username": "jane.doe", 'password': "T8mn72D9" }
+    authenticate_url, data={"username": "jane.doe", 'password': "T8mn72D9" }
 )
 
 assert welcome_page.ok, "Login failed"
@@ -42,7 +42,7 @@ assert (
 # Expect the user data provided by Keycloak in Airflow
 userinfo_page_html = BeautifulSoup(userinfo_page.text, "html.parser")
 table_rows = userinfo_page_html.find_all("tr")
-user_data = {tr.find("th").text:tr.find("td").text for tr in table_rows}
+user_data = {tr.find("th").text: tr.find("td").text for tr in table_rows}
 
 assert (
     user_data["First Name"] == "Jane"
