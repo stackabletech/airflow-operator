@@ -17,10 +17,7 @@ use stackable_operator::{
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
-        runtime::{
-            reflector::{Lookup, ObjectRef},
-            watcher, Controller,
-        },
+        runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,

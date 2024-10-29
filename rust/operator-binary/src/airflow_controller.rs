@@ -35,7 +35,7 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{ldap, oidc, AuthenticationClass},
+        authentication::{ldap, AuthenticationClass},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -93,7 +93,6 @@ use crate::{
         pdb::add_pdbs,
     },
     product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
-    util::add_cert_to_python_certifi_command,
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -571,6 +570,7 @@ async fn build_executor_template(
         role: "executor".into(),
         role_group: "kubernetes".into(),
     };
+
     let rg_configmap = build_rolegroup_config_map(
         airflow,
         resolved_product_image,
@@ -1317,7 +1317,7 @@ fn add_authentication_volumes_and_volume_mounts(
             AirflowAuthenticationClassResolved::Ldap { provider } => {
                 ldap_authentication_providers.insert(provider);
             }
-            AirflowAuthenticationClassResolved::Oidc { provider, oidc } => {
+            AirflowAuthenticationClassResolved::Oidc { provider, .. } => {
                 tls_client_credentials.insert(&provider.tls);
             }
         }
@@ -1334,36 +1334,4 @@ fn add_authentication_volumes_and_volume_mounts(
             .context(AddTlsVolumesAndVolumeMountsSnafu)?;
     }
     Ok(())
-}
-
-fn authentication_start_commands(
-    auth_config: &AirflowClientAuthenticationDetailsResolved,
-) -> String {
-    let mut commands = Vec::new();
-
-    let mut tls_client_credentials = BTreeSet::new();
-
-    for auth_class_resolved in &auth_config.authentication_classes_resolved {
-        match auth_class_resolved {
-            AirflowAuthenticationClassResolved::Oidc { provider, .. } => {
-                tls_client_credentials.insert(&provider.tls);
-
-                // WebPKI will be handled implicitly
-            }
-            AirflowAuthenticationClassResolved::Ldap { .. } => {}
-        }
-    }
-
-    for tls in tls_client_credentials {
-        commands.push(tls.tls_ca_cert_mount_path().map(|tls_ca_cert_mount_path| {
-            add_cert_to_python_certifi_command(&tls_ca_cert_mount_path)
-        }));
-    }
-
-    commands
-        .iter()
-        .flatten()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n")
 }
