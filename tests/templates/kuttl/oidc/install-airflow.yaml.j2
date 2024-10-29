@@ -61,8 +61,6 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    envOverrides:
-      REQUESTS_CA_BUNDLE: /stackable/secrets/tls/ca.crt
     roleGroups:
       default:
         replicas: 1
