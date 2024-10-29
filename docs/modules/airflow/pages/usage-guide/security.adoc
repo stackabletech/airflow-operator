@@ -13,7 +13,7 @@ Users need to authenticate themselves before using Airflow, and there are severa
 [IMPORTANT]
 .Multiple authentication methods
 ====
-Only one authentication method is supported at a time, and in case of LDAP, only one authentication class is allowed. 
+Only one authentication method is supported at a time, and in case of LDAP, only one authentication class is allowed.
 This means, it is not possible to configure both LDAP and OIDC authentication methods at the same time, but *it is* possible to configure multiple OIDC classes *or* one LDAP authentication class.
 ====
 
