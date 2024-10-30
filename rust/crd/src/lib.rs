@@ -86,7 +86,6 @@ pub enum Error {
     NoRoleForExecutorFailure,
 }
 
-// TODO: Doku! airflow
 #[derive(Display, EnumIter, EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum AirflowConfigOptions {
@@ -111,7 +110,7 @@ pub enum AirflowConfigOptions {
     AuthLdapTlsCacertfile,
     AuthLdapAllowSelfSigned,
 }
-// TODO: Doku! airflow
+
 impl FlaskAppConfigOptions for AirflowConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
