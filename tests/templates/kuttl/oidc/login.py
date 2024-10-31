@@ -54,7 +54,7 @@ assert (
     user_data["Email"] == "jane.doe@stackable.tech"
 ), "The email of the user in Airflow should match the one provided by Keycloak"
 
-# TODO Use different OIDC providers (currently only Keycloak is
+# Later this can be extended to use different OIDC providers (currently only Keycloak is
 # supported)
 #
 # It would be beneficial if the second OAuth provider keycloak2 could
