@@ -3077,6 +3077,17 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "indoc" = rec {
+        crateName = "indoc";
+        version = "2.0.5";
+        edition = "2021";
+        sha256 = "1dgjk49rkmx4kjy07k4b90qb5vl89smgb5rcw02n0q0x9ligaj5j";
+        procMacro = true;
+        authors = [
+          "David Tolnay <dtolnay@gmail.com>"
+        ];
+
+      };
       "instant" = rec {
         crateName = "instant";
         version = "0.1.13";
@@ -6676,6 +6687,10 @@ rec {
         ];
         dependencies = [
           {
+            name = "indoc";
+            packageId = "indoc";
+          }
+          {
             name = "product-config";
             packageId = "product-config";
           }
@@ -6700,6 +6715,11 @@ rec {
             name = "strum";
             packageId = "strum";
             features = [ "derive" ];
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "full" ];
           }
           {
             name = "tracing";
@@ -6750,6 +6770,10 @@ rec {
             name = "futures";
             packageId = "futures 0.3.31";
             features = [ "compat" ];
+          }
+          {
+            name = "indoc";
+            packageId = "indoc";
           }
           {
             name = "product-config";

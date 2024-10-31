@@ -38,7 +38,7 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
     affinity::{get_affinity, get_executor_affinity},
-    authentication::AirflowAuthentication,
+    authentication::AirflowClientAuthenticationDetails,
 };
 
 pub mod affinity;
@@ -90,6 +90,7 @@ pub enum Error {
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum AirflowConfigOptions {
     AuthType,
+    OauthProviders,
     AuthLdapSearch,
     AuthLdapSearchFilter,
     AuthLdapServer,
@@ -114,6 +115,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
             AirflowConfigOptions::AuthType => PythonType::Expression,
+            AirflowConfigOptions::OauthProviders => PythonType::Expression,
             AirflowConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
             AirflowConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
             AirflowConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
@@ -186,8 +188,8 @@ pub struct AirflowClusterSpec {
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
-    #[serde(flatten)]
-    pub authentication: AirflowAuthentication,
+    #[serde(default)]
+    pub authentication: Vec<AirflowClientAuthenticationDetails>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the

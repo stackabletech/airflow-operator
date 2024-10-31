@@ -51,6 +51,10 @@ tests:
       - openshift
       - ldap-authentication
       - executor
+  - name: oidc
+    dimensions:
+      - airflow
+      - openshift
   - name: resources
     dimensions:
       - airflow-latest

@@ -17,10 +17,8 @@ use stackable_operator::{
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
-        runtime::{
-            reflector::{Lookup, ObjectRef},
-            watcher, Controller,
-        },
+        runtime::{reflector::ObjectRef, watcher, Controller},
+        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -135,13 +133,12 @@ fn references_authentication_class(
     let Ok(airflow) = &airflow.0 else {
         return false;
     };
-    let Some(authn_class_name) = authentication_class.name() else {
-        return false;
-    };
+    let authentication_class_name = authentication_class.name_any();
+
     airflow
         .spec
         .cluster_config
         .authentication
-        .authentication_class_names()
-        .contains(&&*authn_class_name)
+        .iter()
+        .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }

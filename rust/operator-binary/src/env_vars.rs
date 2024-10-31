@@ -1,15 +1,19 @@
 use crate::util::env_var_from_secret;
 use product_config::types::PropertyNameKind;
+use stackable_airflow_crd::authentication::{
+    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+};
 use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
     AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
     STACKABLE_LOG_DIR,
 };
 use stackable_airflow_crd::{GIT_LINK, GIT_SYNC_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME};
+use stackable_operator::commons::authentication::oidc;
 use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::product_logging::framework::create_vector_shutdown_file_command;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 const AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW__METRICS__STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
@@ -44,6 +48,7 @@ pub fn build_airflow_statefulset_envs(
     airflow_role: &AirflowRole,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
+    auth_config: &AirflowClientAuthenticationDetailsResolved,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -166,32 +171,46 @@ pub fn build_airflow_statefulset_envs(
         );
     }
 
-    // Database initialization is limited to the scheduler.
-    // See https://github.com/stackabletech/airflow-operator/issues/259
-    if airflow_role == &AirflowRole::Scheduler {
-        let secret = &airflow.spec.cluster_config.credentials_secret;
-        env.insert(
-            ADMIN_USERNAME.into(),
-            env_var_from_secret(ADMIN_USERNAME, secret, "adminUser.username"),
-        );
-        env.insert(
-            ADMIN_FIRSTNAME.into(),
-            env_var_from_secret(ADMIN_FIRSTNAME, secret, "adminUser.firstname"),
-        );
-        env.insert(
-            ADMIN_LASTNAME.into(),
-            env_var_from_secret(ADMIN_LASTNAME, secret, "adminUser.lastname"),
-        );
-        env.insert(
-            ADMIN_EMAIL.into(),
-            env_var_from_secret(ADMIN_EMAIL, secret, "adminUser.email"),
-        );
-        env.insert(
-            ADMIN_PASSWORD.into(),
-            env_var_from_secret(ADMIN_PASSWORD, secret, "adminUser.password"),
-        );
+    match airflow_role {
+        // Database initialization is limited to the scheduler.
+        // See https://github.com/stackabletech/airflow-operator/issues/259
+        AirflowRole::Scheduler => {
+            let secret = &airflow.spec.cluster_config.credentials_secret;
+            env.insert(
+                ADMIN_USERNAME.into(),
+                env_var_from_secret(ADMIN_USERNAME, secret, "adminUser.username"),
+            );
+            env.insert(
+                ADMIN_FIRSTNAME.into(),
+                env_var_from_secret(ADMIN_FIRSTNAME, secret, "adminUser.firstname"),
+            );
+            env.insert(
+                ADMIN_LASTNAME.into(),
+                env_var_from_secret(ADMIN_LASTNAME, secret, "adminUser.lastname"),
+            );
+            env.insert(
+                ADMIN_EMAIL.into(),
+                env_var_from_secret(ADMIN_EMAIL, secret, "adminUser.email"),
+            );
+            env.insert(
+                ADMIN_PASSWORD.into(),
+                env_var_from_secret(ADMIN_PASSWORD, secret, "adminUser.password"),
+            );
+        }
+        AirflowRole::Webserver => {
+            let auth_vars = authentication_env_vars(auth_config);
+            env.extend(auth_vars.into_iter().map(|var| (var.name.to_owned(), var)));
+            env.insert(
+                "REQUESTS_CA_BUNDLE".into(),
+                EnvVar {
+                    name: "REQUESTS_CA_BUNDLE".to_string(),
+                    value: Some("/stackable/secrets/tls/ca.crt".to_string()),
+                    ..Default::default()
+                },
+            );
+        }
+        _ => {}
     }
-
     // apply overrides last of all with a fixed ordering
     if let Some(env_vars) = env_vars {
         for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
@@ -453,4 +472,30 @@ fn gitsync_vars_map(k: &String, env: &mut BTreeMap<String, EnvVar>, v: &String) 
 // override existing keys. The returned collection will be a vector.
 fn transform_map_to_vec(env_map: BTreeMap<String, EnvVar>) -> Vec<EnvVar> {
     env_map.into_values().collect::<Vec<EnvVar>>()
+}
+
+fn authentication_env_vars(
+    auth_config: &AirflowClientAuthenticationDetailsResolved,
+) -> Vec<EnvVar> {
+    // Different OIDC authentication entries can reference the same
+    // client secret. It must be ensured that the env variables are only
+    // added once in such a case.
+
+    let mut oidc_client_credentials_secrets = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            AirflowAuthenticationClassResolved::Ldap { .. } => {}
+            AirflowAuthenticationClassResolved::Oidc { oidc, .. } => {
+                oidc_client_credentials_secrets
+                    .insert(oidc.client_credentials_secret_ref.to_owned());
+            }
+        }
+    }
+
+    oidc_client_credentials_secrets
+        .iter()
+        .cloned()
+        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .collect()
 }

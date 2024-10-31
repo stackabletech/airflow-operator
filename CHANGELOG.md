@@ -9,6 +9,7 @@
   Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#518]).
 - Support for `2.9.3` ([#494]).
 - Experimental Support for `2.10.2` ([#512]).
+- Add support for OpenID Connect ([#524])
 
 ### Changed
 
@@ -30,6 +31,7 @@
 [#494]: https://github.com/stackabletech/airflow-operator/pull/494
 [#518]: https://github.com/stackabletech/airflow-operator/pull/518
 [#520]: https://github.com/stackabletech/airflow-operator/pull/520
+[#524]: https://github.com/stackabletech/airflow-operator/pull/524
 
 ## [24.7.0] - 2024-07-24
 

@@ -1,14 +1,21 @@
 = Security
-:description: Secure Apache Airflow by configuring user authentication and authorization, either with built-in methods or LDAP.
+:description: Secure Apache Airflow by configuring user authentication and authorization.
 :airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html
+:keycloak: https://www.keycloak.org/
 
 Secure Apache Airflow by configuring user authentication and authorization.
-Airflow provides built-in user and role management, but can also connect to a LDAP server to manage users centrally instead.
+Airflow provides built-in user and role management, but can also connect to an LDAP server or an OIDC provider to manage users centrally instead.
 
 == Authentication
 
-Users need to authenticate themselves before using Airflow, and there are two ways to configure users:
-The built-in user management or LDAP.
+Users need to authenticate themselves before using Airflow, and there are several ways in which this can be set up.
+￼
+[IMPORTANT]
+.Multiple authentication methods
+====
+Only one authentication method is supported at a time, and in case of LDAP, only one authentication class is allowed.
+This means, it is not possible to configure both LDAP and OIDC authentication methods at the same time, but *it is* possible to configure multiple OIDC classes *or* one LDAP authentication class.
+====
 
 === Built-in user management
 
@@ -19,7 +26,7 @@ image::airflow_security.png[Airflow Security menu]
 
 === LDAP
 
-Airflow supports xref:concepts:authentication.adoc[user authentication] via LDAP.
+Airflow supports xref:concepts:authentication.adoc[user authentication] against a single LDAP server.
 Set up an AuthenticationClass for the LDAP server and reference it in the Airflow Stacklet resource as shown:
 
 [source,yaml]
@@ -30,7 +37,7 @@ metadata:
   name: airflow-with-ldap
 spec:
   image:
-    productVersion: 2.9.3
+    productVersion: 2.10.2
   clusterConfig:
     authentication:
       - authenticationClass: ldap    # <1>
@@ -47,6 +54,79 @@ You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial t
 The users and roles can be viewed as before in the Webserver UI, but the blue "+" button is not available when authenticating via LDAP:
 
 image::airflow_security_ldap.png[Airflow Security menu]
+
+=== [[oidc]]OpenID Connect
+
+An OpenID Connect provider can be used for authentication.
+Unfortunately, there is no generic support for OpenID Connect built into Airflow.
+This means that only specific OpenID Connect providers can be configured.
+
+IMPORTANT: Airflow deployments on the Stackable Data Platform only support {keycloak}[Keycloak].
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-with-oidc
+spec:
+  image:
+    productVersion: 2.10.2
+  clusterConfig:
+    authentication:
+    - authenticationClass: keycloak                       # <1>
+      oidc:
+        clientCredentialsSecret: airflow-keycloak-client  # <2>
+      userRegistrationRole: User                          # <3>
+----
+
+<1> The reference to an AuthenticationClass called `keycloak`
+<2> The reference to the Secret containing the Airflow client credentials
+<3> The default role to which all users are assigned
+
+Users that log in with OpenID Connect are assigned to a default {airflow-access-control-docs}[role] which is specified with the `userRegistrationRole` property.
+
+The Secret containing the Airflow client credentials:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-keycloak-client
+stringData:
+  clientId: airflow                    # <1>
+  clientSecret: airflow_client_secret  # <2>
+----
+
+<1> The client ID of Airflow as defined in Keycloak
+<2> The client secret as defined in Keycloak
+
+A minimum client configuration in Keycloak for this example looks like this:
+
+[source,json]
+----
+{
+  "clientId": "airflow",
+  "enabled": true,
+  "clientAuthenticatorType": "client-secret", # <1>
+  "secret": "airflow_client_secret",
+  "redirectUris": [
+    "*"
+  ],
+  "webOrigins": [
+    "*"
+  ],
+  "standardFlowEnabled": true, # <2>
+  "protocol": "openid-connect" # <3>
+}
+----
+
+<1> Sets the OIDC type to confidential access type.
+<2> Enables the OAuth2 "Authorization Code Flow".
+<3> Enables OpenID Connect and OAuth2 support.
+
+Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:concepts:authentication.adoc#_oidc[concepts page].
 
 == Authorization
 The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
@@ -74,3 +154,26 @@ spec:
 
 <1> The reference to an AuthenticationClass called `ldap`
 <2> All users are assigned to the `Admin` role
+
+=== OpenID Connect
+
+The mechanism for assigning roles to users described in the LDAP section also applies to OpenID Connect.
+Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
+All the users logging in via OpenID Connect get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `AirflowCluster` object:
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-with-oidc
+spec:
+  clusterConfig:
+    authentication:
+    - authenticationClass: keycloak
+      oidc:
+        clientCredentialsSecret: airflow-keycloak-client
+      userRegistrationRole: Admin  # <1>
+----
+
+<1> All users are assigned to the `Admin` role
