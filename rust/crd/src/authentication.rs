@@ -214,9 +214,11 @@ impl AirflowClientAuthenticationDetailsResolved {
                         );
                     }
                     resolved_auth_classes.push(resolved_auth_class);
+                    //`&Static(_)`, `&Tls(_)` and `&Kerberos(_)` not covered
                 }
-
-                _ => {
+                AuthenticationClassProvider::Kerberos(_)
+                | AuthenticationClassProvider::Static(_)
+                | AuthenticationClassProvider::Tls(_) => {
                     return Err(Error::AuthenticationProviderNotSupported {
                         auth_class_name: auth_class_name.to_owned(),
                         provider: auth_class.spec.provider.to_string(),
