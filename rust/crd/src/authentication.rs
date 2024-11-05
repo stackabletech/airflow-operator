@@ -4,10 +4,13 @@ use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
-    commons::authentication::{
-        ldap,
-        oidc::{self, IdentityProviderHint},
-        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
+    commons::{
+        authentication::{
+            ldap,
+            oidc::{self, IdentityProviderHint},
+            AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
+        },
+        tls_verification::TlsClientDetails,
     },
     schemars::{self, JsonSchema},
 };
@@ -78,6 +81,8 @@ pub enum Error {
         supported: String,
         auth_class_name: String,
     },
+    #[snafu(display("Currently only one CA certificate is supported."))]
+    MultipleCaCertsNotSupported,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -130,6 +135,7 @@ pub struct AirflowClientAuthenticationDetailsResolved {
     pub user_registration: bool,
     pub user_registration_role: String,
     pub sync_roles_at: FlaskRolesSyncMoment,
+    pub tls_ca_cert_mount_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,6 +147,24 @@ pub enum AirflowAuthenticationClassResolved {
         provider: oidc::AuthenticationProvider,
         oidc: oidc::ClientAuthenticationOptions<()>,
     },
+}
+
+impl AirflowAuthenticationClassResolved {
+    pub fn tls_ca_cert_mount_path(&self) -> Option<String> {
+        self.tls_client_details().tls_ca_cert_mount_path()
+    }
+
+    pub fn tls_client_details(&self) -> &TlsClientDetails {
+        match self {
+            AirflowAuthenticationClassResolved::Ldap {
+                provider: ldap::AuthenticationProvider { tls, .. },
+            } => tls,
+            AirflowAuthenticationClassResolved::Oidc {
+                provider: oidc::AuthenticationProvider { tls, .. },
+                ..
+            } => tls,
+        }
+    }
 }
 
 impl AirflowClientAuthenticationDetailsResolved {
@@ -254,12 +278,24 @@ impl AirflowClientAuthenticationDetailsResolved {
                 None => sync_roles_at = Some(entry.sync_roles_at.to_owned()),
             }
         }
+
+        let mut tls_ca_cert_mount_paths = resolved_auth_classes
+            .iter()
+            .filter_map(AirflowAuthenticationClassResolved::tls_ca_cert_mount_path)
+            .collect::<BTreeSet<_>>();
+        let tls_ca_cert_mount_path = tls_ca_cert_mount_paths.pop_first();
+        ensure!(
+            tls_ca_cert_mount_paths.is_empty(),
+            MultipleCaCertsNotSupportedSnafu
+        );
+
         Ok(AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: resolved_auth_classes,
             user_registration: user_registration.unwrap_or_else(default_user_registration),
             user_registration_role: user_registration_role
                 .unwrap_or_else(default_user_registration_role),
             sync_roles_at: sync_roles_at.unwrap_or_else(FlaskRolesSyncMoment::default),
+            tls_ca_cert_mount_path,
         })
     }
 
@@ -336,7 +372,8 @@ mod tests {
                 authentication_classes_resolved: Vec::default(),
                 user_registration: default_user_registration(),
                 user_registration_role: default_user_registration_role(),
-                sync_roles_at: FlaskRolesSyncMoment::default()
+                sync_roles_at: FlaskRolesSyncMoment::default(),
+                tls_ca_cert_mount_path: None
             },
             auth_details_resolved
         );
@@ -362,6 +399,11 @@ mod tests {
                   provider:
                     ldap:
                       hostname: my.ldap.server
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls-keycloak
             "},
         )
         .await;
@@ -369,11 +411,20 @@ mod tests {
         assert_eq!(
             AirflowClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
-                    provider: serde_yaml::from_str("hostname: my.ldap.server").unwrap()
+                    provider: serde_yaml::from_str(indoc! {"
+                    hostname: my.ldap.server
+                    tls:
+                      verification:
+                        server:
+                          caCert:
+                            secretClass: tls
+                "})
+                    .unwrap()
                 }],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login
+                sync_roles_at: FlaskRolesSyncMoment::Login,
+                tls_ca_cert_mount_path: Some("/stackable/secrets/tls-keycloak/ca.crt".into()),
             },
             auth_details_resolved
         );
@@ -437,6 +488,11 @@ mod tests {
                         - openid
                         - email
                         - profile
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls-keycloak
             "},
         )
         .await;
@@ -471,7 +527,13 @@ mod tests {
                             HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
                             "/realms/test".into(),
-                            TlsClientDetails { tls: None },
+                            TlsClientDetails {
+                                tls: Some(Tls {
+                                    verification: TlsVerification::Server(TlsServerVerification {
+                                        ca_cert: CaCert::SecretClass("tls".into())
+                                    })
+                                })
+                            },
                             "preferred_username".into(),
                             vec!["openid".into(), "email".into(), "profile".into()],
                             None
@@ -485,7 +547,8 @@ mod tests {
                 ],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login
+                sync_roles_at: FlaskRolesSyncMoment::Login,
+                tls_ca_cert_mount_path: Some("/stackable/secrets/tls/ca.crt".into()),
             },
             auth_details_resolved
         );
@@ -762,6 +825,59 @@ mod tests {
 
                 Caused by this error:
                   1: authentication details for OIDC were not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#            },
+            error_message
+        );
+    }
+    #[tokio::test]
+    async fn reject_different_tls_ca_certs() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: airflow-oidc-client2
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls1
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls2
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Currently only one CA certificate is supported.",
             error_message
         );
     }

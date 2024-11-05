@@ -4,7 +4,7 @@ use authentication::AirflowClientAuthenticationDetailsResolved;
 use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ensure, OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -343,6 +343,7 @@ impl AirflowRole {
                 ]);
                 command.extend(auth_commands);
             }
+
             AirflowRole::Scheduler => command.extend(vec![
                 // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                 "airflow db init".to_string(),
@@ -406,6 +407,7 @@ impl AirflowRole {
     fn add_cert_to_python_certifi_command(cert_file: &str) -> String {
         format!("cat {cert_file} >> \"$(python -c 'import certifi; print(certifi.where())')\"")
     }
+
     /// Will be used to expose service ports and - by extension - which roles should be
     /// created as services.
     pub fn get_http_port(&self) -> Option<u16> {
