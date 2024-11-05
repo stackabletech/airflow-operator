@@ -417,7 +417,7 @@ mod tests {
                       verification:
                         server:
                           caCert:
-                            secretClass: tls
+                            secretClass: tls-keycloak
                 "})
                     .unwrap()
                 }],
@@ -492,7 +492,7 @@ mod tests {
                         verification:
                           server:
                             caCert:
-                              secretClass: tls-keycloak
+                              secretClass: tls
             "},
         )
         .await;
