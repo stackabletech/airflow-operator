@@ -336,6 +336,7 @@ impl AirflowRole {
 
         match &self {
             AirflowRole::Webserver => {
+                // Getting auth commands for AuthClass
                 let auth_commands = vec![Self::authentication_start_commands(auth_config)];
                 command.extend(vec![
                     "prepare_signal_handlers".to_string(),

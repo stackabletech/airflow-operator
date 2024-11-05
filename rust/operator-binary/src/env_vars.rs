@@ -200,7 +200,6 @@ pub fn build_airflow_statefulset_envs(
         AirflowRole::Webserver => {
             let auth_vars = authentication_env_vars(auth_config);
             env.extend(auth_vars.into_iter().map(|var| (var.name.to_owned(), var)));
-            // TODO: Add TLS certificate to env.
 
             if let Some(tls_ca_cert_mount_path) = &auth_config.tls_ca_cert_mount_path {
                 env.insert(
@@ -213,7 +212,6 @@ pub fn build_airflow_statefulset_envs(
                 );
             }
         }
-
         _ => {}
     }
     // apply overrides last of all with a fixed ordering
