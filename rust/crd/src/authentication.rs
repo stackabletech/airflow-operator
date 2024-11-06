@@ -4,13 +4,10 @@ use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
-    commons::{
-        authentication::{
-            ldap,
-            oidc::{self, IdentityProviderHint},
-            AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
-        },
-        tls_verification::TlsClientDetails,
+    commons::authentication::{
+        ldap,
+        oidc::{self, IdentityProviderHint},
+        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
     schemars::{self, JsonSchema},
 };
@@ -769,8 +766,8 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn reject_different_tls_ca_certs() {
-        let error_message = test_resolve_and_expect_error(
+    async fn accept_different_tls_ca_certs() {
+        let error_message = test_resolve_and_expect_success(
             indoc! {"
                 - authenticationClass: oidc1
                   oidc:
@@ -815,11 +812,6 @@ mod tests {
             "},
         )
         .await;
-
-        assert_eq!(
-            "Currently only one CA certificate is supported.",
-            error_message
-        );
     }
 
     #[tokio::test]

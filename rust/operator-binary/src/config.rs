@@ -271,7 +271,6 @@ mod tests {
             user_registration: true,
             user_registration_role: "User".to_string(),
             sync_roles_at: FlaskRolesSyncMoment::Registration,
-            tls_ca_cert_mount_path: None,
         };
 
         let mut result = BTreeMap::new();
@@ -315,7 +314,6 @@ mod tests {
             user_registration: true,
             user_registration_role: "Admin".to_string(),
             sync_roles_at: FlaskRolesSyncMoment::Registration,
-            tls_ca_cert_mount_path: Some("stackable/secrets/openldap-tls".to_string()),
         };
 
         let mut result = BTreeMap::new();
@@ -396,7 +394,6 @@ mod tests {
             user_registration: default_user_registration(),
             user_registration_role: "Admin".to_string(),
             sync_roles_at: default_sync_roles_at(),
-            tls_ca_cert_mount_path: None,
         };
 
         let mut result = BTreeMap::new();
