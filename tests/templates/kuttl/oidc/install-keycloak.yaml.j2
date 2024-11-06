@@ -104,7 +104,7 @@ spec:
           csi:
             driver: secrets.stackable.tech
             volumeAttributes:
-              secrets.stackable.tech/class: tls-keycloak
+              secrets.stackable.tech/class: tls
               secrets.stackable.tech/scope: service=$INSTANCE_NAME
 ---
 apiVersion: v1
@@ -138,7 +138,7 @@ spec:
         verification:
           server:
             caCert:
-              secretClass: tls-keycloak
+              secretClass: tls
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -168,17 +168,3 @@ roleRef:
   kind: Role
   name: keycloak
   apiGroup: rbac.authorization.k8s.io
-
----
-apiVersion: secrets.stackable.tech/v1alpha1
-kind: SecretClass
-metadata:
-  name: tls-keycloak
-spec:
-  backend:
-    autoTls:
-      ca:
-        secret:
-          name: secret-provisioner-tls-keycloak-ca
-          namespace: ${NAMESPACE}
-        autoGenerate: true

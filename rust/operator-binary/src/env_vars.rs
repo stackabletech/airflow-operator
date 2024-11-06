@@ -200,17 +200,14 @@ pub fn build_airflow_statefulset_envs(
         AirflowRole::Webserver => {
             let auth_vars = authentication_env_vars(auth_config);
             env.extend(auth_vars.into_iter().map(|var| (var.name.to_owned(), var)));
-
-            if let Some(tls_ca_cert_mount_path) = &auth_config.tls_ca_cert_mount_path {
-                env.insert(
-                    "REQUESTS_CA_BUNDLE".into(),
-                    EnvVar {
-                        name: "REQUESTS_CA_BUNDLE".to_string(),
-                        value: Some(tls_ca_cert_mount_path.to_owned()),
-                        ..Default::default()
-                    },
-                );
-            }
+            env.insert(
+                "REQUESTS_CA_BUNDLE".into(),
+                EnvVar {
+                    name: "REQUESTS_CA_BUNDLE".to_string(),
+                    value: Some("/stackable/secrets/tls/ca.crt".to_string()),
+                    ..Default::default()
+                },
+            );
         }
         _ => {}
     }
