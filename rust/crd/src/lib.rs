@@ -1,5 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use authentication::{
+    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+};
 use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -322,7 +325,10 @@ impl AirflowRole {
     /// components to have the same image/configuration (e.g. DAG folder location), even if not all
     /// configuration settings are used everywhere. For this reason we ensure that the webserver
     /// config file is in the Airflow home directory on all pods.
-    pub fn get_commands(&self) -> Vec<String> {
+    pub fn get_commands(
+        &self,
+        auth_config: &AirflowClientAuthenticationDetailsResolved,
+    ) -> Vec<String> {
         let mut command = vec![
             format!("cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"),
             // graceful shutdown part
