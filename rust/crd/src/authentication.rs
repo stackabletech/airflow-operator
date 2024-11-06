@@ -81,8 +81,6 @@ pub enum Error {
         supported: String,
         auth_class_name: String,
     },
-    #[snafu(display("Currently only one CA certificate is supported."))]
-    MultipleCaCertsNotSupported,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -135,7 +133,6 @@ pub struct AirflowClientAuthenticationDetailsResolved {
     pub user_registration: bool,
     pub user_registration_role: String,
     pub sync_roles_at: FlaskRolesSyncMoment,
-    pub tls_ca_cert_mount_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -147,24 +144,6 @@ pub enum AirflowAuthenticationClassResolved {
         provider: oidc::AuthenticationProvider,
         oidc: oidc::ClientAuthenticationOptions<()>,
     },
-}
-
-impl AirflowAuthenticationClassResolved {
-    pub fn tls_ca_cert_mount_path(&self) -> Option<String> {
-        self.tls_client_details().tls_ca_cert_mount_path()
-    }
-
-    pub fn tls_client_details(&self) -> &TlsClientDetails {
-        match self {
-            AirflowAuthenticationClassResolved::Ldap {
-                provider: ldap::AuthenticationProvider { tls, .. },
-            } => tls,
-            AirflowAuthenticationClassResolved::Oidc {
-                provider: oidc::AuthenticationProvider { tls, .. },
-                ..
-            } => tls,
-        }
-    }
 }
 
 impl AirflowClientAuthenticationDetailsResolved {
@@ -278,24 +257,12 @@ impl AirflowClientAuthenticationDetailsResolved {
                 None => sync_roles_at = Some(entry.sync_roles_at.to_owned()),
             }
         }
-
-        let mut tls_ca_cert_mount_paths = resolved_auth_classes
-            .iter()
-            .filter_map(AirflowAuthenticationClassResolved::tls_ca_cert_mount_path)
-            .collect::<BTreeSet<_>>();
-        let tls_ca_cert_mount_path = tls_ca_cert_mount_paths.pop_first();
-        ensure!(
-            tls_ca_cert_mount_paths.is_empty(),
-            MultipleCaCertsNotSupportedSnafu
-        );
-
         Ok(AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: resolved_auth_classes,
             user_registration: user_registration.unwrap_or_else(default_user_registration),
             user_registration_role: user_registration_role
                 .unwrap_or_else(default_user_registration_role),
             sync_roles_at: sync_roles_at.unwrap_or_else(FlaskRolesSyncMoment::default),
-            tls_ca_cert_mount_path,
         })
     }
 
@@ -372,8 +339,7 @@ mod tests {
                 authentication_classes_resolved: Vec::default(),
                 user_registration: default_user_registration(),
                 user_registration_role: default_user_registration_role(),
-                sync_roles_at: FlaskRolesSyncMoment::default(),
-                tls_ca_cert_mount_path: None
+                sync_roles_at: FlaskRolesSyncMoment::default()
             },
             auth_details_resolved
         );
@@ -399,11 +365,6 @@ mod tests {
                   provider:
                     ldap:
                       hostname: my.ldap.server
-                      tls:
-                        verification:
-                          server:
-                            caCert:
-                              secretClass: tls-keycloak
             "},
         )
         .await;
@@ -411,20 +372,11 @@ mod tests {
         assert_eq!(
             AirflowClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
-                    provider: serde_yaml::from_str(indoc! {"
-                    hostname: my.ldap.server
-                    tls:
-                      verification:
-                        server:
-                          caCert:
-                            secretClass: tls-keycloak
-                "})
-                    .unwrap()
+                    provider: serde_yaml::from_str("hostname: my.ldap.server").unwrap()
                 }],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login,
-                tls_ca_cert_mount_path: Some("/stackable/secrets/tls-keycloak/ca.crt".into()),
+                sync_roles_at: FlaskRolesSyncMoment::Login
             },
             auth_details_resolved
         );
@@ -488,11 +440,6 @@ mod tests {
                         - openid
                         - email
                         - profile
-                      tls:
-                        verification:
-                          server:
-                            caCert:
-                              secretClass: tls
             "},
         )
         .await;
@@ -527,13 +474,7 @@ mod tests {
                             HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
                             "/realms/test".into(),
-                            TlsClientDetails {
-                                tls: Some(Tls {
-                                    verification: TlsVerification::Server(TlsServerVerification {
-                                        ca_cert: CaCert::SecretClass("tls".into())
-                                    })
-                                })
-                            },
+                            TlsClientDetails { tls: None },
                             "preferred_username".into(),
                             vec!["openid".into(), "email".into(), "profile".into()],
                             None
@@ -547,8 +488,7 @@ mod tests {
                 ],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login,
-                tls_ca_cert_mount_path: Some("/stackable/secrets/tls/ca.crt".into()),
+                sync_roles_at: FlaskRolesSyncMoment::Login
             },
             auth_details_resolved
         );
