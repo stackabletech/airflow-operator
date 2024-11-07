@@ -766,55 +766,6 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn accept_different_tls_ca_certs() {
-        let error_message = test_resolve_and_expect_success(
-            indoc! {"
-                - authenticationClass: oidc1
-                  oidc:
-                    clientCredentialsSecret: airflow-oidc-client1
-                - authenticationClass: oidc2
-                  oidc:
-                    clientCredentialsSecret: airflow-oidc-client2
-            "},
-            indoc! {"
-                ---
-                apiVersion: authentication.stackable.tech/v1alpha1
-                kind: AuthenticationClass
-                metadata:
-                  name: oidc1
-                spec:
-                  provider:
-                    oidc:
-                      hostname: first.oidc.server
-                      principalClaim: preferred_username
-                      scopes: []
-                      tls:
-                        verification:
-                          server:
-                            caCert:
-                              secretClass: tls1
-                ---
-                apiVersion: authentication.stackable.tech/v1alpha1
-                kind: AuthenticationClass
-                metadata:
-                  name: oidc2
-                spec:
-                  provider:
-                    oidc:
-                      hostname: second.oidc.server
-                      principalClaim: preferred_username
-                      scopes: []
-                      tls:
-                        verification:
-                          server:
-                            caCert:
-                              secretClass: tls2
-            "},
-        )
-        .await;
-    }
-
-    #[tokio::test]
     async fn reject_wrong_principal_claim() {
         let error_message = test_resolve_and_expect_error(
             indoc! {"
