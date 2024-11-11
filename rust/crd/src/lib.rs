@@ -341,12 +341,11 @@ impl AirflowRole {
         match &self {
             AirflowRole::Webserver => {
                 // Getting auth commands for AuthClass
-                let auth_commands = vec![Self::authentication_start_commands(auth_config)];
+                command.extend(Self::authentication_start_commands(auth_config));
                 command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     "airflow webserver &".to_string(),
                 ]);
-                command.extend(auth_commands);
             }
 
             AirflowRole::Scheduler => command.extend(vec![
@@ -377,9 +376,10 @@ impl AirflowRole {
 
         command
     }
+
     fn authentication_start_commands(
         auth_config: &AirflowClientAuthenticationDetailsResolved,
-    ) -> String {
+    ) -> Vec<String> {
         let mut commands = Vec::new();
 
         let mut tls_client_credentials = BTreeSet::new();
@@ -401,13 +401,9 @@ impl AirflowRole {
             }));
         }
 
-        commands
-            .iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n")
+        commands.iter().flatten().cloned().collect::<Vec<_>>()
     }
+
     // Adding certificate to the mount path for airflow startup commands
     fn add_cert_to_python_certifi_command(cert_file: &str) -> String {
         format!("cat {cert_file} >> \"$(python -c 'import certifi; print(certifi.where())')\"")

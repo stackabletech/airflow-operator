@@ -765,6 +765,7 @@ mod tests {
             error_message
         );
     }
+
     #[tokio::test]
     async fn reject_wrong_principal_claim() {
         let error_message = test_resolve_and_expect_error(
