@@ -25,7 +25,9 @@ from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 
 class SparkKubernetesSensor(BaseSensorOperator):  # <3>
     template_fields = ("application_name", "namespace")
-    FAILURE_STATES = ("Failed", "Unknown")
+    # See https://github.com/stackabletech/spark-k8s-operator/pull/460/files#diff-d737837121132af6b60f50279a78464b05dcfd06c05d1d090f4198a5e962b5f6R371
+    # Unknown is set immediately so it must be excluded from the failed states.
+    FAILURE_STATES = "Failed"
     SUCCESS_STATES = "Succeeded"
 
     def __init__(
