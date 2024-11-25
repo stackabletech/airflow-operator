@@ -6823,6 +6823,10 @@ rec {
         ];
         devDependencies = [
           {
+            name = "rstest";
+            packageId = "rstest";
+          }
+          {
             name = "serde_yaml";
             packageId = "serde_yaml";
           }
@@ -6831,13 +6835,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.80.0";
+        version = "0.82.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "6fbe32300b60f95e0baa2ab0ff2daf961b06531c";
-          sha256 = "16jrq3wdwz63210jgmqbx3snrr15wxw6l1smqhzv7b7jpq8qvya3";
+          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
+          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
         };
         libName = "stackable_operator";
         authors = [
@@ -6994,8 +6998,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "6fbe32300b60f95e0baa2ab0ff2daf961b06531c";
-          sha256 = "16jrq3wdwz63210jgmqbx3snrr15wxw6l1smqhzv7b7jpq8qvya3";
+          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
+          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -7029,8 +7033,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "6fbe32300b60f95e0baa2ab0ff2daf961b06531c";
-          sha256 = "16jrq3wdwz63210jgmqbx3snrr15wxw6l1smqhzv7b7jpq8qvya3";
+          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
+          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
         };
         libName = "stackable_shared";
         authors = [
