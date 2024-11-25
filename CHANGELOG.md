@@ -26,6 +26,7 @@
 
 - Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
 - Failing to parse one `AirflowCluster`/`AuthenticationClass` should no longer cause the whole operator to stop functioning ([#520]).
+- Fix OIDC endpoint construction in case the `rootPath` does not have a trailing slash ([#547]).
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
@@ -35,6 +36,7 @@
 [#520]: https://github.com/stackabletech/airflow-operator/pull/520
 [#524]: https://github.com/stackabletech/airflow-operator/pull/524
 [#530]: https://github.com/stackabletech/airflow-operator/pull/530
+[#547]: https://github.com/stackabletech/airflow-operator/pull/547
 
 ## [24.7.0] - 2024-07-24
 
