@@ -46,7 +46,7 @@ use stackable_operator::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 ConfigMap, EmptyDirVolumeSource, EnvVar, PodTemplateSpec, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction, VolumeMount,
+                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -416,7 +416,7 @@ pub async fn reconcile_airflow(
         build_rbac_resources(airflow, APP_NAME, required_labels).context(BuildRBACObjectsSnafu)?;
 
     let rbac_sa = cluster_resources
-        .add(client, rbac_sa)
+        .add(client, rbac_sa.clone())
         .await
         .context(ApplyServiceAccountSnafu)?;
     cluster_resources
@@ -488,7 +488,7 @@ pub async fn reconcile_airflow(
                 &rolegroup,
                 rolegroup_config,
                 &authentication_config,
-                &rbac_sa.name_unchecked(),
+                &rbac_sa,
                 &merged_airflow_config,
                 airflow_executor,
             )?;
@@ -836,7 +836,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    sa_name: &str,
+    service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
 ) -> Result<StatefulSet> {
@@ -861,7 +861,7 @@ fn build_server_rolegroup_statefulset(
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&merged_airflow_config.affinity)
-        .service_account_name(sa_name)
+        .service_account_name(service_account.name_any())
         .security_context(
             PodSecurityContextBuilder::new()
                 .run_as_user(AIRFLOW_UID)
