@@ -2198,6 +2198,7 @@ dependencies = [
  "futures 0.3.31",
  "indoc",
  "product-config",
+ "rstest",
  "serde",
  "serde_yaml",
  "snafu 0.8.5",
