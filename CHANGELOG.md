@@ -28,7 +28,6 @@
 - Failing to parse one `AirflowCluster`/`AuthenticationClass` should no longer cause the whole operator to stop functioning ([#520]).
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after restart ([#545]).
 - Fix OIDC endpoint construction in case the `rootPath` does not have a trailing slash ([#547]).
-=======
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
