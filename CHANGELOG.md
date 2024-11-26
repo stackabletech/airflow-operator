@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
+  deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
+  restart ([#545]).
+- Fix OIDC endpoint construction in case the `rootPath` does not have a trailing slash ([#547]).
+
+[#545]: https://github.com/stackabletech/airflow-operator/pull/545
+[#547]: https://github.com/stackabletech/airflow-operator/pull/547
+
 ## [24.11.0] - 2024-11-18
 
 ### Added
@@ -26,8 +36,6 @@
 
 - Pass gitsync credentials through properly and use a fine-grained access token ([#489]).
 - Failing to parse one `AirflowCluster`/`AuthenticationClass` should no longer cause the whole operator to stop functioning ([#520]).
-- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after restart ([#545]).
-- Fix OIDC endpoint construction in case the `rootPath` does not have a trailing slash ([#547]).
 
 [#488]: https://github.com/stackabletech/airflow-operator/pull/488
 [#489]: https://github.com/stackabletech/airflow-operator/pull/489
@@ -37,8 +45,6 @@
 [#520]: https://github.com/stackabletech/airflow-operator/pull/520
 [#524]: https://github.com/stackabletech/airflow-operator/pull/524
 [#530]: https://github.com/stackabletech/airflow-operator/pull/530
-[#545]: https://github.com/stackabletech/airflow-operator/pull/545
-[#547]: https://github.com/stackabletech/airflow-operator/pull/547
 
 ## [24.7.0] - 2024-07-24
 
