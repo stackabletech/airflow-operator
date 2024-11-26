@@ -7,8 +7,10 @@
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
   deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
   restart ([#545]).
+- Fix OIDC endpoint construction in case the `rootPath` does not have a trailing slash ([#547]).
 
 [#545]: https://github.com/stackabletech/airflow-operator/pull/545
+[#547]: https://github.com/stackabletech/airflow-operator/pull/547
 
 ## [24.11.0] - 2024-11-18
 
