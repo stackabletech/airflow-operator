@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-rules
+  labels:
+    opa.stackable.tech/bundle: "trino"
+data:
+  airflow.rego: |
+    package airflow
+
+    import rego.v1
+
+    # is_authorized_configuration = input
+    default is_authorized_configuration := false
+
+    is_authorized_configuration if {
+        input.user.name == "jane.doe"
+    }
