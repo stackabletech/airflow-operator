@@ -1,0 +1,208 @@
+# The environment variables must be replaced.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realms
+data:
+  test-realm.json: |
+    {
+      "realm": "test",
+      "enabled": true,
+      "users": [
+        {
+          "enabled": true,
+          "username": "jane.doe",
+          "firstName" : "Jane",
+          "lastName" : "Doe",
+          "email" : "jane.doe@stackable.tech",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "T8mn72D9"
+            }
+          ],
+          "realmRoles": [
+            "admin"
+          ]
+        },
+        {
+          "enabled": true,
+          "username": "richard.roe",
+          "firstName" : "Richard",
+          "lastName" : "Roe",
+          "email" : "richard.roe@stackable.tech",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "NvfpU518"
+            }
+          ],
+          "realmRoles": [
+            "user"
+          ]
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "admin",
+            "description": "Admin privileges"
+          },
+          {
+            "name": "user",
+            "description": "User privileges"
+          }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "airflow",
+          "enabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "R1bxHUD569vHeQdw",
+          "redirectUris": [
+            "*"
+          ],
+          "webOrigins": [
+            "*"
+          ],
+          "standardFlowEnabled": true,
+          "protocol": "openid-connect"
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-info-fetcher-client-credentials
+stringData:
+  clientId: user-info-fetcher
+  clientSecret: user-info-fetcher-client-secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      serviceAccountName: keycloak
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0.4
+          args:
+            - start-dev
+            - --import-realm
+            - --https-certificate-file=/tls/tls.crt
+            - --https-certificate-key-file=/tls/tls.key
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: admin
+            - name: USER_INFO_FETCHER_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: user-info-fetcher-client-credentials
+                  key: clientId
+            - name: USER_INFO_FETCHER_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: user-info-fetcher-client-credentials
+                  key: clientSecret
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: realms
+              mountPath: /opt/keycloak/data/import
+            - name: tls
+              mountPath: /tls
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /realms/test
+              port: 8443
+      volumes:
+        - name: realms
+          configMap:
+            name: keycloak-realms
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: tls
+              secrets.stackable.tech/scope: service=keycloak
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 8443
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: keycloak-$NAMESPACE
+spec:
+  provider:
+    oidc:
+      hostname: keycloak.$NAMESPACE.svc.cluster.local
+      port: 8443
+      rootPath: /realms/test
+      scopes:
+        - email
+        - openid
+        - profile
+      principalClaim: preferred_username
+      providerHint: Keycloak
+      tls:
+        verification:
+          server:
+            caCert:
+              secretClass: tls
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keycloak
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: keycloak
+{% if test_scenario['values']['openshift'] == 'true' %}
+rules:
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames: ["privileged"]
+  verbs: ["use"]
+{% endif %}
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: keycloak
+subjects:
+  - kind: ServiceAccount
+    name: keycloak
+roleRef:
+  kind: Role
+  name: keycloak
+  apiGroup: rbac.authorization.k8s.io
