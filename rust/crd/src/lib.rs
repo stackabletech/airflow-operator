@@ -1,5 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use authentication::{
+    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+};
 use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -322,7 +325,12 @@ impl AirflowRole {
     /// components to have the same image/configuration (e.g. DAG folder location), even if not all
     /// configuration settings are used everywhere. For this reason we ensure that the webserver
     /// config file is in the Airflow home directory on all pods.
-    pub fn get_commands(&self) -> Vec<String> {
+    /// Only the webserver needs to know about authentication CA's which is added via python's certify
+    /// if authentication is enabled.
+    pub fn get_commands(
+        &self,
+        auth_config: &AirflowClientAuthenticationDetailsResolved,
+    ) -> Vec<String> {
         let mut command = vec![
             format!("cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"),
             // graceful shutdown part
@@ -331,10 +339,15 @@ impl AirflowRole {
         ];
 
         match &self {
-            AirflowRole::Webserver => command.extend(vec![
-                "prepare_signal_handlers".to_string(),
-                "airflow webserver &".to_string(),
-            ]),
+            AirflowRole::Webserver => {
+                // Getting auth commands for AuthClass
+                command.extend(Self::authentication_start_commands(auth_config));
+                command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    "airflow webserver &".to_string(),
+                ]);
+            }
+
             AirflowRole::Scheduler => command.extend(vec![
                 // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                 "airflow db init".to_string(),
@@ -362,6 +375,38 @@ impl AirflowRole {
         ]);
 
         command
+    }
+
+    fn authentication_start_commands(
+        auth_config: &AirflowClientAuthenticationDetailsResolved,
+    ) -> Vec<String> {
+        let mut commands = Vec::new();
+
+        let mut tls_client_credentials = BTreeSet::new();
+
+        for auth_class_resolved in &auth_config.authentication_classes_resolved {
+            match auth_class_resolved {
+                AirflowAuthenticationClassResolved::Oidc { provider, .. } => {
+                    tls_client_credentials.insert(&provider.tls);
+
+                    // WebPKI will be handled implicitly
+                }
+                AirflowAuthenticationClassResolved::Ldap { .. } => {}
+            }
+        }
+
+        for tls in tls_client_credentials {
+            commands.push(tls.tls_ca_cert_mount_path().map(|tls_ca_cert_mount_path| {
+                Self::add_cert_to_python_certifi_command(&tls_ca_cert_mount_path)
+            }));
+        }
+
+        commands.iter().flatten().cloned().collect::<Vec<_>>()
+    }
+
+    // Adding certificate to the mount path for airflow startup commands
+    fn add_cert_to_python_certifi_command(cert_file: &str) -> String {
+        format!("cat {cert_file} >> \"$(python -c 'import certifi; print(certifi.where())')\"")
     }
 
     /// Will be used to expose service ports and - by extension - which roles should be

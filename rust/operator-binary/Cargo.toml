@@ -26,8 +26,8 @@ tracing.workspace = true
 indoc.workspace = true
 
 [build-dependencies]
-
 built.workspace = true
 
 [dev-dependencies]
+rstest.workspace = true
 serde_yaml.workspace = true

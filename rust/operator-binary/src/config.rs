@@ -26,6 +26,16 @@ pub enum Error {
     FailedToCreateLdapEndpointUrl {
         source: stackable_operator::commons::authentication::ldap::Error,
     },
+
+    #[snafu(display("invalid OIDC endpoint"))]
+    InvalidOidcEndpoint {
+        source: stackable_operator::commons::authentication::oidc::Error,
+    },
+
+    #[snafu(display("invalid well-known OIDC configuration URL"))]
+    InvalidWellKnownConfigUrl {
+        source: stackable_operator::commons::authentication::oidc::Error,
+    },
 }
 
 pub fn add_airflow_config(
@@ -78,7 +88,7 @@ fn append_authentication_config(
     }
 
     if !oidc_providers.is_empty() {
-        append_oidc_config(config, &oidc_providers);
+        append_oidc_config(config, &oidc_providers)?;
     }
 
     config.insert(
@@ -192,7 +202,7 @@ fn append_oidc_config(
         &oidc::AuthenticationProvider,
         &oidc::ClientAuthenticationOptions<()>,
     )],
-) {
+) -> Result<(), Error> {
     // Debatable: AUTH_OAUTH or AUTH_OID
     // Additionally can be set via config
     config.insert(
@@ -217,6 +227,13 @@ fn append_oidc_config(
 
         let oauth_providers_config_entry = match oidc_provider {
             oidc::IdentityProviderHint::Keycloak => {
+                let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
+                let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
+                api_base_url.push_str("/protocol/");
+                let well_known_config_url = oidc
+                    .well_known_config_url()
+                    .context(InvalidWellKnownConfigUrlSnafu)?;
+
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -228,11 +245,10 @@ fn append_oidc_config(
                           'client_kwargs': {{
                             'scope': '{scopes}'
                           }},
-                          'api_base_url': '{url}/protocol/',
-                          'server_metadata_url': '{url}/.well-known/openid-configuration',
+                          'api_base_url': '{api_base_url}',
+                          'server_metadata_url': '{well_known_config_url}',
                         }},
                       }}",
-                    url = oidc.endpoint_url().unwrap(),
                     scopes = scopes.join(" "),
                 )
             }
@@ -251,12 +267,15 @@ fn append_oidc_config(
             joined_oauth_providers_config = oauth_providers_config.join(",\n")
         ),
     );
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::add_airflow_config;
-    use indoc::indoc;
+    use indoc::formatdoc;
+    use rstest::rstest;
     use stackable_airflow_crd::authentication::{
         default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
         AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
@@ -339,12 +358,15 @@ mod tests {
         ]), result);
     }
 
-    #[test]
-    fn test_oidc_config() {
-        let oidc_provider_yaml1 = r#"
-            hostname: my.keycloak1.server
+    #[rstest]
+    #[case("/realms/sdp")]
+    #[case("/realms/sdp/")]
+    #[case("/realms/sdp/////")]
+    fn test_oidc_config(#[case] root_path: &str) {
+        let oidc_provider_yaml1 = formatdoc!(
+            "hostname: my.keycloak1.server
             port: 12345
-            rootPath: my-root-path
+            rootPath: {root_path}
             tls:
               verification:
                 server:
@@ -356,8 +378,9 @@ mod tests {
               - email
               - profile
             provider_hint: Keycloak
-        "#;
-        let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml1);
+        "
+        );
+        let deserializer = serde_yaml::Deserializer::from_str(&oidc_provider_yaml1);
         let oidc_provider1: oidc::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
@@ -399,41 +422,47 @@ mod tests {
         let mut result = BTreeMap::new();
         add_airflow_config(&mut result, &authentication_config).expect("Ok");
 
-        assert_eq!(BTreeMap::from([
-            ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
-            ("AUTH_TYPE".into(), "AUTH_OAUTH".into()),
-            ("AUTH_USER_REGISTRATION".into(), "true".into()),
-            ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into()),
-            ("OAUTH_PROVIDERS".into(), indoc!("
+        assert_eq!(
+            BTreeMap::from([
+                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+                ("AUTH_TYPE".into(), "AUTH_OAUTH".into()),
+                ("AUTH_USER_REGISTRATION".into(), "true".into()),
+                ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into()),
+                (
+                    "OAUTH_PROVIDERS".into(),
+                    formatdoc! {"
               [
-              { 'name': 'keycloak',
+              {{ 'name': 'keycloak',
                 'icon': 'fa-key',
                 'token_key': 'access_token',
-                'remote_app': {
+                'remote_app': {{
                   'client_id': os.environ.get('OIDC_A96BCC4FA49835D2_CLIENT_ID'),
                   'client_secret': os.environ.get('OIDC_A96BCC4FA49835D2_CLIENT_SECRET'),
-                  'client_kwargs': {
+                  'client_kwargs': {{
                     'scope': 'openid email profile roles'
-                  },
-                  'api_base_url': 'https://my.keycloak1.server:12345/my-root-path/protocol/',
-                  'server_metadata_url': 'https://my.keycloak1.server:12345/my-root-path/.well-known/openid-configuration',
-                },
-              },
-              { 'name': 'keycloak',
+                  }},
+                  'api_base_url': 'https://my.keycloak1.server:12345/realms/sdp/protocol/',
+                  'server_metadata_url': 'https://my.keycloak1.server:12345/realms/sdp/.well-known/openid-configuration',
+                }},
+              }},
+              {{ 'name': 'keycloak',
                 'icon': 'fa-key',
                 'token_key': 'access_token',
-                'remote_app': {
+                'remote_app': {{
                   'client_id': os.environ.get('OIDC_3A305E38C3B561F3_CLIENT_ID'),
                   'client_secret': os.environ.get('OIDC_3A305E38C3B561F3_CLIENT_SECRET'),
-                  'client_kwargs': {
+                  'client_kwargs': {{
                     'scope': 'openid'
-                  },
-                  'api_base_url': 'http://my.keycloak2.server//protocol/',
-                  'server_metadata_url': 'http://my.keycloak2.server//.well-known/openid-configuration',
-                },
-              }
+                  }},
+                  'api_base_url': 'http://my.keycloak2.server/protocol/',
+                  'server_metadata_url': 'http://my.keycloak2.server/.well-known/openid-configuration',
+                }},
+              }}
               ]
-              ").into())
-        ]), result);
+              "}
+                )
+            ]),
+            result
+        );
     }
 }
