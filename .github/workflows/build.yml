@@ -351,7 +351,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' }}
         run: |
           MANIFEST_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
-          PR_VERSION="${MANIFEST_VERSION}+pr${{ github.event.pull_request.number }}"
+          PR_VERSION="${MANIFEST_VERSION}-pr${{ github.event.pull_request.number }}"
           cargo set-version --offline --workspace "$PR_VERSION"
 
       # Recreate charts and publish charts and docker image. The "-e" is needed as we want to override the
@@ -423,7 +423,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' }}
         run: |
           MANIFEST_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
-          PR_VERSION="${MANIFEST_VERSION}+pr${{ github.event.pull_request.number }}"
+          PR_VERSION="${MANIFEST_VERSION}-pr${{ github.event.pull_request.number }}"
           cargo set-version --offline --workspace "$PR_VERSION"
       - name: Build manifest list
         run: |
