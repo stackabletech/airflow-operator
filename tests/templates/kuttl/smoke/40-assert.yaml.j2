@@ -85,5 +85,5 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 commands:
-  - script: kubectl exec -n $NAMESPACE airflow-scheduler-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status
-  - script: kubectl exec -n $NAMESPACE airflow-webserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status
+  - script: kubectl exec -n $NAMESPACE --container airflow airflow-scheduler-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status
+  - script: kubectl exec -n $NAMESPACE --container airflow airflow-webserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status
