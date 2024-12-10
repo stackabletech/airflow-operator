@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -11,6 +15,7 @@
 
 [#545]: https://github.com/stackabletech/airflow-operator/pull/545
 [#547]: https://github.com/stackabletech/airflow-operator/pull/547
+[#557]: https://github.com/stackabletech/airflow-operator/pull/557
 
 ## [24.11.0] - 2024-11-18
 
