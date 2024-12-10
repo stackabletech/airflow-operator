@@ -1,1 +1,3 @@
-instance-size: medium
+instance-size: large
+disk: 100
+nodes: 3
