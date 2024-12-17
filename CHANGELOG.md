@@ -6,6 +6,10 @@
 
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 
+### Changed
+
+- Bump `stackable-operator` from `0.82.0` to `0.83.0` ([#565]).
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -16,6 +20,7 @@
 [#545]: https://github.com/stackabletech/airflow-operator/pull/545
 [#547]: https://github.com/stackabletech/airflow-operator/pull/547
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
+[#565]: https://github.com/stackabletech/airflow-operator/pull/565
 
 ## [24.11.0] - 2024-11-18
 
