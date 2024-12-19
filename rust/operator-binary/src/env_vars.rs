@@ -217,6 +217,16 @@ pub fn build_airflow_statefulset_envs(
         }
     }
 
+    // Needed for the `containerdebug` process to log it's tracing information to.
+    env.insert(
+        "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+        EnvVar {
+            name: "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+            value: Some(format!("{STACKABLE_LOG_DIR}/containerdebug")),
+            value_from: None,
+        },
+    );
+
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
 }
