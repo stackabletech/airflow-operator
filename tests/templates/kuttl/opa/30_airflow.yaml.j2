@@ -14,14 +14,6 @@ stringData:
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: airflow-keycloak-client
-stringData:
-  clientId: airflow
-  clientSecret: R1bxHUD569vHeQdw
----
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
@@ -36,12 +28,9 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
-    authentication:
-      - authenticationClass: keycloak-$NAMESPACE
-        oidc:
-          clientCredentialsSecret: airflow-keycloak-client
-        userRegistrationRole: Admin
     credentialsSecret: airflow-credentials
+    exposeConfig: true
+    loadExamples: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -49,6 +38,9 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    configOverrides:
+      webserver_config.py:
+        WTF_CSRF_ENABLED: "False" # Allow "POST /login/" without CSRF token
     envOverrides:
       AIRFLOW__CORE__AUTH_MANAGER: opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager
     roleGroups:

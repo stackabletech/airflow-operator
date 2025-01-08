@@ -11,9 +11,158 @@ data:
 
     import rego.v1
 
-    # is_authorized_configuration = input
     default is_authorized_configuration := false
+    default is_authorized_connection := false
+    default is_authorized_dag := false
+    default is_authorized_dataset := false
+    default is_authorized_pool := false
+    default is_authorized_variable := false
+    default is_authorized_view := false
+    default is_authorized_custom_view := false
 
+    # Allow the user "airflow" to create test users
+    # POST /auth/fab/v1/users
+    is_authorized_custom_view if {
+        input.method == "POST"
+        input.resource_name == "Users"
+
+        input.user.id == 1
+        input.user.name == "airflow"
+    }
+
+    # GET /api/v1/config
     is_authorized_configuration if {
+        input.method == "GET"
+        input.details.section == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/config?section=core
+    is_authorized_configuration if {
+        input.method == "GET"
+        input.details.section == "core"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/connections
+    is_authorized_connection if {
+        input.method == "GET"
+        input.details.conn_id == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/connections/postgres_default
+    is_authorized_connection if {
+        input.method == "GET"
+        input.details.conn_id == "postgres_default"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/dags/example_trigger_target_dag
+    is_authorized_dag if {
+        input.method == "GET"
+        input.access_entity == null
+        input.details.id == "example_trigger_target_dag"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/dags/~/dagRuns
+    is_authorized_dag if {
+        input.method == "GET"
+        input.access_entity == "RUN"
+        input.details.id == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/dags/example_trigger_target_dag/dagRuns
+    is_authorized_dag if {
+        input.method == "GET"
+        input.access_entity == "RUN"
+        input.details.id == "example_trigger_target_dag"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/datasets
+    is_authorized_dataset if {
+        input.method == "GET"
+        input.details.uri == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/datasets/s3%3A%2F%2Fbucket%2Fmy-task
+    is_authorized_dataset if {
+        input.method == "GET"
+        input.details.uri == "s3://bucket/my-task"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/pools
+    is_authorized_pool if {
+        input.method == "GET"
+        input.details.name == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/pools/default_pool
+    is_authorized_pool if {
+        input.method == "GET"
+        input.details.name == "default_pool"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # POST /api/v1/variables
+    is_authorized_variable if {
+        input.method == "POST"
+        input.details.key == null
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v1/variables/myVar
+    is_authorized_variable if {
+        input.method == "GET"
+        input.details.key == "myVar"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # GET /home
+    is_authorized_view if {
+        input.access_view == "WEBSITE"
+
+        input.user.id == 2
+        input.user.name == "jane.doe"
+    }
+
+    # PATCH /auth/fab/v1/users/jane.doe
+    is_authorized_custom_view if {
+        input.method == "PUT"
+        input.resource_name == "Users"
+
+        input.user.id == 2
         input.user.name == "jane.doe"
     }

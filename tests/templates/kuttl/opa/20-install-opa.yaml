@@ -4,5 +4,5 @@ kind: TestStep
 timeout: 300
 commands:
   - script: >
-      envsubst '$NAMESPACE' < 21_opa.yaml |
+      envsubst '$NAMESPACE' < 20_opa.yaml |
       kubectl apply --namespace=$NAMESPACE --filename=-

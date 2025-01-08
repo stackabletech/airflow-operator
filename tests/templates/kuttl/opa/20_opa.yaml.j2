@@ -8,14 +8,6 @@ spec:
     productVersion: "{{ test_scenario['values']['opa-latest'] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
-    userInfo:
-      backend:
-        keycloak:
-          hostname: keycloak.$NAMESPACE.svc.cluster.local
-          port: 8443
-          clientCredentialsSecret: user-info-fetcher-client-credentials
-          adminRealm: test
-          userRealm: test
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
