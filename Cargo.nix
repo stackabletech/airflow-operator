@@ -6677,7 +6677,7 @@ rec {
       };
       "stackable-airflow-crd" = rec {
         crateName = "stackable-airflow-crd";
-        version = "24.11.1-rc2";
+        version = "24.11.1-rc3";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd; };
         libName = "stackable_airflow_crd";
@@ -6739,7 +6739,7 @@ rec {
       };
       "stackable-airflow-operator" = rec {
         crateName = "stackable-airflow-operator";
-        version = "24.11.1-rc2";
+        version = "24.11.1-rc3";
         edition = "2021";
         crateBin = [
           {

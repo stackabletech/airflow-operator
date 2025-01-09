@@ -1,8 +1,8 @@
 ---
 apiVersion: v2
 name: airflow-operator
-version: "24.11.1-rc2"
-appVersion: "24.11.1-rc2"
+version: "24.11.1-rc3"
+appVersion: "24.11.1-rc3"
 description: The Stackable Operator for Apache Airflow
 home: https://github.com/stackabletech/airflow-operator
 maintainers:

@@ -7,12 +7,12 @@ releases:
     description: Integration test
     products:
       commons:
-        operatorVersion: 24.11.1-rc2
+        operatorVersion: 24.11.1-rc3
       secret:
-        operatorVersion: 24.11.1-rc2
+        operatorVersion: 24.11.1-rc3
       listener:
-        operatorVersion: 24.11.1-rc2
+        operatorVersion: 24.11.1-rc3
       airflow:
-        operatorVersion: 24.11.1-rc2
+        operatorVersion: 24.11.1-rc3
       spark-k8s:
-        operatorVersion: 24.11.1-rc2
+        operatorVersion: 24.11.1-rc3
