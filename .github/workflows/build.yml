@@ -363,7 +363,7 @@ jobs:
             sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           fi
       - name: Build Docker image and Helm chart - main-PR
-        if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' }}
+        if: ${{ github.event_name == 'pull_request' && github.ref == 'refs/heads/main' }}
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
