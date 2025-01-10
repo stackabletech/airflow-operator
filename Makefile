@@ -142,7 +142,7 @@ helm-publish:
 	cosign sign -y "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}@$$REPO_DIGEST_OF_ARTIFACT"
 
 helm-package:
-	mkdir -p target/helm && helm package --destination target/helm deploy/helm/${OPERATOR_NAME}
+	mkdir -p target/helm && helm package --version ${PR_VERSION} --destination target/helm deploy/helm/${OPERATOR_NAME}
 
 ## Chart related targets
 compile-chart: version crds config
