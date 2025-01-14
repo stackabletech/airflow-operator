@@ -138,7 +138,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
             AirflowConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
-            AirflowConfigOptions::AuthRolesMapping => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthRolesMapping => PythonType::Expression,
         }
     }
 }
