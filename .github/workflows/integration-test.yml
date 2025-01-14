@@ -86,12 +86,10 @@ jobs:
 
       - name: Run Integration Test
         id: test
-        uses: stackabletech/actions/run-integration-test@95626907fd8cae2f17c862ae40bcab1aa5a2c854 # v0.5.0
+        uses: stackabletech/actions/run-integration-test@05cb2081c8ffd34bbaaee36846f4e1892686cf55 # TODO: Use releases version
         with:
-          test-platform: ${{ env.TEST_PLATFORM }}-${{ env.TEST_ARCHITECTURE }}
-          test-run: ${{ env.TEST_RUN }}
-          test-parameter: ${{ env.TEST_PARAMETER }}
           replicated-api-token: ${{ secrets.REPLICATED_API_TOKEN }}
+          test-profile: schedule
 
       - name: Send Notification
         if: ${{ failure() }}
