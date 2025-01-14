@@ -1,12 +1,12 @@
 runners:
   amd64:
     platform: aks-1.31
-    ttl: 4h
+    ttl: 6h
     node-groups:
       - name: default
         arch: amd64
         size: large
-        disk-gb: 50
+        disk-gb: 100
         nodes: 3
 
 profiles:
@@ -14,4 +14,4 @@ profiles:
     strategy: use-runner
     runner: amd64
     options:
-      parallelism: 1
+      parallelism: 2
