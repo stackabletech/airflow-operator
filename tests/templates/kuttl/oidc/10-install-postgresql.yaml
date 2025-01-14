@@ -7,6 +7,6 @@ commands:
       --namespace $NAMESPACE
       --version 16.4.2
       --values helm-bitnami-postgresql-values.yaml
-      --repo https://charts.bitnami.com/bitnami postgresql
+      oci://registry-1.docker.io/bitnamicharts/postgresql
       --wait
     timeout: 600
