@@ -344,6 +344,7 @@ impl AirflowRole {
                 command.extend(Self::authentication_start_commands(auth_config));
                 command.extend(vec![
                     "prepare_signal_handlers".to_string(),
+                    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
                     "airflow webserver &".to_string(),
                 ]);
             }
@@ -361,10 +362,12 @@ impl AirflowRole {
                     --role \"Admin\""
                     .to_string(),
                 "prepare_signal_handlers".to_string(),
+                format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
                 "airflow scheduler &".to_string(),
             ]),
             AirflowRole::Worker => command.extend(vec![
                 "prepare_signal_handlers".to_string(),
+                format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
                 "airflow celery worker &".to_string(),
             ]),
         }
