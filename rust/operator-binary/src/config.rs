@@ -5,6 +5,7 @@ use stackable_airflow_crd::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         FlaskRolesSyncMoment, DEFAULT_OIDC_PROVIDER,
     },
+    authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
     AirflowConfigOptions,
 };
 use stackable_operator::commons::authentication::{ldap::AuthenticationProvider, oidc};
@@ -41,6 +42,7 @@ pub enum Error {
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
 ) -> Result<()> {
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
@@ -51,6 +53,7 @@ pub fn add_airflow_config(
     }
 
     append_authentication_config(config, authentication_config)?;
+    append_authorization_config(config, authorization_config)?;
 
     Ok(())
 }
@@ -271,16 +274,53 @@ fn append_oidc_config(
     Ok(())
 }
 
+fn append_authorization_config(
+    config: &mut BTreeMap<String, String>,
+    authorization_config: &AirflowAuthorizationResolved,
+) -> Result<(), Error> {
+    if let Some(opa_config) = &authorization_config.opa {
+        append_opa_config(config, opa_config)?;
+    }
+
+    Ok(())
+}
+
+fn append_opa_config(
+    config: &mut BTreeMap<String, String>,
+    opa_config: &OpaConfigResolved,
+) -> Result<(), Error> {
+    config.insert(
+        AirflowConfigOptions::AuthOpaRequestUrl.to_string(),
+        opa_config.connection_string.to_owned(),
+    );
+    config.insert(
+        AirflowConfigOptions::AuthOpaCacheTtlInSec.to_string(),
+        opa_config.cache_entry_time_to_live.as_secs().to_string(),
+    );
+    config.insert(
+        AirflowConfigOptions::AuthOpaCacheMaxsize.to_string(),
+        opa_config.cache_max_entries.to_string(),
+    );
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::add_airflow_config;
     use indoc::formatdoc;
     use rstest::rstest;
-    use stackable_airflow_crd::authentication::{
-        default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
-        AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
+    use stackable_airflow_crd::{
+        authentication::{
+            default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
+            AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
+        },
+        authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
     };
-    use stackable_operator::commons::authentication::{ldap, oidc};
+    use stackable_operator::{
+        commons::authentication::{ldap, oidc},
+        time::Duration,
+    };
     use std::collections::BTreeMap;
 
     #[test]
@@ -292,8 +332,10 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -335,8 +377,10 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
 
         assert_eq!(BTreeMap::from([
             ("AUTH_LDAP_ALLOW_SELF_SIGNED".into(), "false".into()),
@@ -419,8 +463,10 @@ mod tests {
             sync_roles_at: default_sync_roles_at(),
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -461,6 +507,43 @@ mod tests {
               ]
               "}
                 )
+            ]),
+            result
+        );
+    }
+
+    #[test]
+    fn test_opa_config() {
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![],
+            user_registration: true,
+            user_registration_role: "User".to_string(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
+        };
+
+        let authorization_config = AirflowAuthorizationResolved {
+            opa: Some(OpaConfigResolved {
+                connection_string: "http://opa:8081/v1/data/airflow".to_string(),
+                cache_entry_time_to_live: Duration::from_secs(30),
+                cache_max_entries: 1000,
+            }),
+        };
+
+        let mut result = BTreeMap::new();
+        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
+
+        assert_eq!(
+            BTreeMap::from([
+                ("AUTH_OPA_CACHE_MAXSIZE".into(), "1000".into()),
+                ("AUTH_OPA_CACHE_TTL_IN_SEC".into(), "30".into()),
+                (
+                    "AUTH_OPA_REQUEST_URL".into(),
+                    "http://opa:8081/v1/data/airflow".into()
+                ),
+                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+                ("AUTH_TYPE".into(), "AUTH_DB".into()),
+                ("AUTH_USER_REGISTRATION".into(), "true".into()),
+                ("AUTH_USER_REGISTRATION_ROLE".into(), "User".into())
             ]),
             result
         );

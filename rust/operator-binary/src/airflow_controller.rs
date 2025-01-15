@@ -14,10 +14,12 @@ use product_config::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
-    authentication::AirflowAuthenticationClassResolved, git_sync::GitSync,
-};
-use stackable_airflow_crd::{
-    authentication::AirflowClientAuthenticationDetailsResolved, build_recommended_labels,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    },
+    authorization::AirflowAuthorizationResolved,
+    build_recommended_labels,
+    git_sync::GitSync,
     AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
     AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
     AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR,
@@ -363,6 +365,14 @@ pub async fn reconcile_airflow(
     .await
     .context(InvalidAuthenticationConfigSnafu)?;
 
+    let authorization_config = AirflowAuthorizationResolved::from_authorization_config(
+        client,
+        airflow,
+        &airflow.spec.cluster_config.authorization,
+    )
+    .await
+    .unwrap();
+
     let mut roles = HashMap::new();
 
     // if the kubernetes executor is specified there will be no worker role as the pods
@@ -444,6 +454,7 @@ pub async fn reconcile_airflow(
             common_configuration,
             &resolved_product_image,
             &authentication_config,
+            &authorization_config,
             &vector_aggregator_address,
             &mut cluster_resources,
             client,
@@ -493,6 +504,7 @@ pub async fn reconcile_airflow(
                 &rolegroup,
                 rolegroup_config,
                 &authentication_config,
+                &authorization_config,
                 &rbac_sa,
                 &merged_airflow_config,
                 airflow_executor,
@@ -513,6 +525,7 @@ pub async fn reconcile_airflow(
                 &rolegroup,
                 rolegroup_config,
                 &authentication_config,
+                &authorization_config,
                 &merged_airflow_config.logging,
                 vector_aggregator_address.as_deref(),
                 &Container::Airflow,
@@ -562,6 +575,7 @@ async fn build_executor_template(
     common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
     vector_aggregator_address: &Option<String>,
     cluster_resources: &mut ClusterResources,
     client: &stackable_operator::client::Client,
@@ -582,6 +596,7 @@ async fn build_executor_template(
         &rolegroup,
         &HashMap::new(),
         authentication_config,
+        authorization_config,
         &merged_executor_config.logging,
         vector_aggregator_address.as_deref(),
         &Container::Base,
@@ -679,6 +694,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
     container: &Container,
@@ -688,7 +704,8 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_airflow_config(&mut config, authentication_config).context(ConstructConfigSnafu)?;
+    config::add_airflow_config(&mut config, authentication_config, authorization_config)
+        .context(ConstructConfigSnafu)?;
 
     let mut config_file = Vec::new();
 
@@ -841,6 +858,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
@@ -908,6 +926,7 @@ fn build_server_rolegroup_statefulset(
         rolegroup_config,
         executor,
         authentication_config,
+        authorization_config,
     ));
 
     let volume_mounts = airflow.volume_mounts();

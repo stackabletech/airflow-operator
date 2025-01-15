@@ -28,6 +28,13 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
+    authorization:
+      opa:
+        configMapName: opa
+        package: airflow
+        cache:
+          entryTimeToLive: 5s
+          maxEntries: 10
     credentialsSecret: airflow-credentials
     exposeConfig: true
     loadExamples: true
@@ -41,8 +48,6 @@ spec:
     configOverrides:
       webserver_config.py:
         WTF_CSRF_ENABLED: "False" # Allow "POST /login/" without CSRF token
-    envOverrides:
-      AIRFLOW__CORE__AUTH_MANAGER: opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager
     roleGroups:
       default:
         replicas: 1
