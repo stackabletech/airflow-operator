@@ -5,7 +5,7 @@ commands:
   - script: >-
       helm install airflow-postgresql
       --namespace $NAMESPACE
-      --version 12.5.6
+      --version 16.4.2
       -f helm-bitnami-postgresql-values.yaml
-      --repo https://charts.bitnami.com/bitnami postgresql
+      oci://registry-1.docker.io/bitnamicharts/postgresql
     timeout: 600
