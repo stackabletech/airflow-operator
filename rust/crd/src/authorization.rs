@@ -27,7 +27,7 @@ impl AirflowAuthorizationResolved {
 pub struct OpaConfigResolved {
     pub connection_string: String,
     pub cache_entry_time_to_live: Duration,
-    pub cache_max_entries: i32,
+    pub cache_max_entries: u32,
 }
 
 impl OpaConfigResolved {
