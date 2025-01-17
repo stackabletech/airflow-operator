@@ -6,6 +6,7 @@
 
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
+- Add OPA support ([#573]).
 
 ### Changed
 
@@ -22,6 +23,7 @@
 [#547]: https://github.com/stackabletech/airflow-operator/pull/547
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
+[#573]: https://github.com/stackabletech/airflow-operator/pull/573
 
 ## [24.11.0] - 2024-11-18
 
