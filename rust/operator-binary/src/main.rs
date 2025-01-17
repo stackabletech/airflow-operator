@@ -6,7 +6,7 @@ mod operations;
 mod product_logging;
 mod util;
 
-use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
+use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
@@ -17,13 +17,18 @@ use stackable_operator::{
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
-        runtime::{reflector::ObjectRef, watcher, Controller},
+        runtime::{
+            events::{Recorder, Reporter},
+            reflector::ObjectRef,
+            watcher, Controller,
+        },
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
-use std::sync::Arc;
+
+use crate::airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -74,13 +79,21 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let airflow_controller_builder = Controller::new(
+            let event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
+                    controller: AIRFLOW_FULL_CONTROLLER_NAME.to_string(),
+                    instance: None,
+                },
+            ));
+
+            let airflow_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<AirflowCluster>>(&client),
                 watcher::Config::default(),
             );
 
-            let airflow_store_1 = airflow_controller_builder.store();
-            let airflow_controller = airflow_controller_builder
+            let airflow_store_1 = airflow_controller.store();
+            airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
                     watcher::Config::default(),
@@ -111,15 +124,24 @@ async fn main() -> anyhow::Result<()> {
                         product_config,
                     }),
                 )
-                .map(|res| {
-                    report_controller_reconciled(
-                        &client,
-                        &format!("{AIRFLOW_CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                        &res,
-                    );
-                });
-
-            airflow_controller.collect::<()>().await;
+                // We can let the reporting happen in the background
+                .for_each_concurrent(
+                    16, // concurrency limit
+                    |result| {
+                        // The event_recorder needs to be shared across all invocations, so that
+                        // events are correctly aggregated
+                        let event_recorder = event_recorder.clone();
+                        async move {
+                            report_controller_reconciled(
+                                &event_recorder,
+                                AIRFLOW_FULL_CONTROLLER_NAME,
+                                &result,
+                            )
+                            .await;
+                        }
+                    },
+                )
+                .await;
         }
     }
 

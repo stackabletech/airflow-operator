@@ -17,7 +17,10 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
+    config::{
+        fragment::{self, Fragment, ValidationError},
+        merge::Merge,
+    },
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
@@ -31,7 +34,10 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{
+        CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, Role,
+        RoleGroupRef,
+    },
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
@@ -445,7 +451,8 @@ pub enum AirflowExecutor {
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
-        common_configuration: CommonConfiguration<ExecutorConfigFragment>,
+        common_configuration:
+            CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
     },
 }
 
