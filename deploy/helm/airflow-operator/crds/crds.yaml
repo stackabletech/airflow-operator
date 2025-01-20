@@ -503,15 +503,20 @@ spec:
                             cache:
                               default:
                                 entryTimeToLive: 30s
-                                maxEntries: 1000
-                              description: Least Recently Used (LRU) cache with per-entry time-to-live (TTL) value.
+                                maxEntries: 10000
+                              description: |-
+                                Least Recently Used (LRU) cache with per-entry time-to-live (TTL) value.
+
+                                This struct has two const generics, so that different use-cases can have different default values:
+
+                                * `D_TTL_SEC` is the default TTL (in seconds) the entries should have. * `D_MAX_ENTRIES` is the default for the maximum number of entries
                               properties:
                                 entryTimeToLive:
                                   default: 30s
                                   description: Time to live per entry; Entries which were not queried within the given duration, are removed.
                                   type: string
                                 maxEntries:
-                                  default: 1000
+                                  default: 10000
                                   description: Maximum number of entries in the cache; If this threshold is reached then the least recently used item is removed.
                                   format: uint32
                                   minimum: 0.0

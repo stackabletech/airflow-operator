@@ -10,7 +10,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
-        cache::TtlCache,
+        cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
         product_image_selection::ProductImage,
@@ -282,7 +282,7 @@ pub struct AirflowOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
     #[serde(default)]
-    pub cache: TtlCache,
+    pub cache: UserInformationCache,
 }
 
 // TODO: Temporary solution until listener-operator is finished
