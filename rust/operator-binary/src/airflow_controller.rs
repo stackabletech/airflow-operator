@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use const_format::concatcp;
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
     types::PropertyNameKind,
@@ -17,11 +18,11 @@ use stackable_airflow_crd::{
 };
 use stackable_airflow_crd::{
     authentication::AirflowClientAuthenticationDetailsResolved, build_recommended_labels,
-    AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigFragment,
-    AirflowConfigOptions, AirflowExecutor, AirflowRole, Container, ExecutorConfig,
-    ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, CONFIG_PATH,
-    GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
-    TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
+    AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
+    AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR,
+    OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
+    TEMPLATE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -69,7 +70,9 @@ use stackable_operator::{
         framework::LoggingError,
         spec::{ContainerLogConfig, Logging},
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, RoleGroupRef},
+    role_utils::{
+        CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroupRef,
+    },
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
@@ -97,6 +100,8 @@ use crate::{
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
+pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
+    concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
@@ -377,7 +382,7 @@ pub async fn reconcile_airflow(
         }
     }
 
-    let role_config = transform_all_roles_to_config::<AirflowConfigFragment, _>(airflow, roles);
+    let role_config = transform_all_roles_to_config(airflow, roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -554,7 +559,7 @@ pub async fn reconcile_airflow(
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &AirflowCluster,
-    common_config: &CommonConfiguration<ExecutorConfigFragment>,
+    common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     vector_aggregator_address: &Option<String>,
