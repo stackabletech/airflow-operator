@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-￼
+
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
 
