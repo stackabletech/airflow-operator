@@ -9,7 +9,7 @@ spec:
   webservers:
     roleGroups:
       default:
-        envOverrides:
+        envOverrides: &s3-logging-env-overrides
           AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
           AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
           # The name / connection ID created in the Airflow Web UI
@@ -18,15 +18,7 @@ spec:
   schedulers:
     roleGroups:
       default:
-        envOverrides:
-          AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
-          AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
-          # The name / connection ID created in the Airflow Web UI
-          AIRFLOW_LOGGING_REMOTE_LOG_CONN_ID: minio
+        envOverrides: *s3-logging-env-overrides
         replicas: 1
   kubernetesExecutors:
-    envOverrides:
-      AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
-      AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
-      # The name / connection ID created in the Airflow Web UI
-      AIRFLOW_LOGGING_REMOTE_LOG_CONN_ID: minio
+    envOverrides: *s3-logging-env-overrides
