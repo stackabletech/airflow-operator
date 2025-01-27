@@ -36,7 +36,7 @@ spec:
 Kubernetes Executors and their respective Pods only live as long as the task they are executing.
 Afterwards the Pod is immediately terminated and e.g. console output or logs are gone.
 
-In order to persist executor logs, Airflow can be configured to store its https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/kubernetes_executor.html[executor logs on disk (PV)] or as described in the following section on S3.
+In order to persist task logs, Airflow can be configured to store its https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/kubernetes_executor.html#managing-dags-and-logs[executor logs on disk (PV)] or as described in the following section on S3.
 
 === Airflow Web UI
 
