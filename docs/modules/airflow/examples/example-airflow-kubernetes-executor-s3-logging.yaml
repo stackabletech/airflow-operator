@@ -1,0 +1,32 @@
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: 2.9.3
+  clusterConfig: {}
+  webservers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
+          AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
+          # The name / connection ID created in the Airflow Web UI
+          AIRFLOW_LOGGING_REMOTE_LOG_CONN_ID: minio
+        replicas: 1
+  schedulers:
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
+          AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
+          # The name / connection ID created in the Airflow Web UI
+          AIRFLOW_LOGGING_REMOTE_LOG_CONN_ID: minio
+        replicas: 1
+  kubernetesExecutors:
+    envOverrides:
+      AIRFLOW_LOGGING_REMOTE_LOGGING: "True"
+      AIRFLOW_LOGGING_REMOTE_BASE_LOG_FOLDER: s3://<bucket-name>/airflow-task-logs/
+      # The name / connection ID created in the Airflow Web UI
+      AIRFLOW_LOGGING_REMOTE_LOG_CONN_ID: minio    
