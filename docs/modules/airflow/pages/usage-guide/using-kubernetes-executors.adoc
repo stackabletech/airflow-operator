@@ -40,7 +40,8 @@ In order to persist task logs, Airflow can be configured to store its https://ai
 
 === Airflow Web UI
 
-In the Airflow Web UI, click on `Admin` -> `Connections` -> `Add a new record` (the plus). Then enter your minio host and credentials as shown.
+In the Airflow Web UI, click on `Admin` -> `Connections` -> `Add a new record` (the plus).
+Then enter your MinIO host and credentials as shown.
 
 image::airflow_edit_s3_connection.png[Airflow connection menu]
 
@@ -50,19 +51,19 @@ The `Extra` field contains the endpoint URL like:
 [source,json]
 ----
 {
-  "endpoint_url": "http://minio.minio.svc.cluster.local:9000"
+  "endpoint_url": "http://minio.default.svc.cluster.local:9000"
 }
 ----
 
 === Executor configuration
 
-Now we can add ENV variables to the Airflow cluster definition and configure the S3 logging.
+Now you need to add the following ENV variables to the Airflow cluster definition to configure the S3 logging.
 
 [source,yaml]
 ----
 include::example$example-airflow-kubernetes-executor-s3-logging.yaml[]
 ----
 
-Now you should be able to fetch and inspect logs in the Airflow Web UI from S3 for each DAG.
+Now you should be able to fetch and inspect logs in the Airflow Web UI from S3 for each DAG run.
 
 image::airflow_dag_s3_logs.png[Airflow DAG S3 logs]
