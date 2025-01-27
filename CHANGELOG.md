@@ -4,10 +4,6 @@
 
 ## [24.11.1] - 2025-01-09
 
-## [24.11.1-rc2] - 2024-12-12
-
-## [24.11.1-rc1] - 2024-12-05
-
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
