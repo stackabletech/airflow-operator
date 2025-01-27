@@ -57,7 +57,7 @@ The `Extra` field contains the endpoint URL like:
 
 === Executor configuration
 
-Now you need to add the following ENV variables to the Airflow cluster definition to configure the S3 logging.
+Now you need to add the following environment variables to the Airflow cluster definition, in order to configure the S3 logging.
 
 [source,yaml]
 ----
