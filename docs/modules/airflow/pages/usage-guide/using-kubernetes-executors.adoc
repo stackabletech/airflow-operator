@@ -65,4 +65,3 @@ include::example$example-airflow-kubernetes-executor-s3-logging.yaml[]
 Now you should be able to fetch and inspect logs in the Airflow Web UI from S3 for each DAG.
 
 image::airflow_dag_s3_logs.png[Airflow DAG S3 logs]
-
