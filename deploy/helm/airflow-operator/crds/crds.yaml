@@ -504,12 +504,7 @@ spec:
                               default:
                                 entryTimeToLive: 30s
                                 maxEntries: 10000
-                              description: |-
-                                Least Recently Used (LRU) cache with per-entry time-to-live (TTL) value.
-
-                                This struct has two const generics, so that different use-cases can have different default values:
-
-                                * `D_TTL_SEC` is the default TTL (in seconds) the entries should have. * `D_MAX_ENTRIES` is the default for the maximum number of entries
+                              description: Least Recently Used (LRU) cache with per-entry time-to-live (TTL) value.
                               properties:
                                 entryTimeToLive:
                                   default: 30s
@@ -652,7 +647,7 @@ spec:
                     Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
                   properties:
                     custom:
-                      description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
+                      description: Overwrite the docker image. Specify the full docker image name, e.g. `oci.stackable.tech/sdp/superset:1.4.1-stackable2.1.0`
                       type: string
                     productVersion:
                       description: Version of the product, e.g. `1.4.1`.
@@ -679,7 +674,7 @@ spec:
                       nullable: true
                       type: array
                     repo:
-                      description: Name of the docker repo, e.g. `docker.stackable.tech/stackable`
+                      description: Name of the docker repo, e.g. `oci.stackable.tech/sdp`
                       nullable: true
                       type: string
                     stackableVersion:
