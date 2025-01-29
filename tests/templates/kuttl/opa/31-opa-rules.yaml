@@ -4,7 +4,7 @@ kind: ConfigMap
 metadata:
   name: airflow-rules
   labels:
-    opa.stackable.tech/bundle: "trino"
+    opa.stackable.tech/bundle: "true"
 data:
   airflow.rego: |
     package airflow
