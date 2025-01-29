@@ -188,6 +188,162 @@ pub mod versioned {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowClusterStatus {
+    #[serde(default)]
+    pub conditions: Vec<ClusterCondition>,
+}
+
+impl HasStatusCondition for v1alpha1::AirflowCluster {
+    fn conditions(&self) -> Vec<ClusterCondition> {
+        match &self.status {
+            Some(status) => status.conditions.clone(),
+            None => vec![],
+        }
+    }
+}
+
+impl v1alpha1::AirflowCluster {
+    /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
+    /// the kubernetes executor is specified)
+    pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
+        match role {
+            AirflowRole::Webserver => self.spec.webservers.as_ref(),
+            AirflowRole::Scheduler => self.spec.schedulers.as_ref(),
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                    Some(config)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn role_config(&self, role: &AirflowRole) -> Option<&GenericRoleConfig> {
+        self.get_role(role).map(|r| &r.role_config)
+    }
+
+    pub fn volumes(&self) -> &Vec<Volume> {
+        &self.spec.cluster_config.volumes
+    }
+
+    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
+        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
+        if self.git_sync().is_some() {
+            mounts.push(VolumeMount {
+                name: GIT_SYNC_CONTENT.into(),
+                mount_path: GIT_SYNC_DIR.into(),
+                ..VolumeMount::default()
+            });
+        }
+        mounts
+    }
+
+    pub fn git_sync(&self) -> Option<&GitSync> {
+        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
+        // dags_git_sync is a list but only the first element is considered
+        // (this avoids a later breaking change when all list elements are processed)
+        if dags_git_sync.len() > 1 {
+            tracing::warn!(
+                "{:?} git-sync elements: only first will be considered...",
+                dags_git_sync.len()
+            );
+        }
+        dags_git_sync.first()
+    }
+
+    /// The name of the role-level load-balanced Kubernetes `Service`
+    pub fn node_role_service_name(&self) -> Option<String> {
+        self.metadata.name.clone()
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn merged_config(
+        &self,
+        role: &AirflowRole,
+        rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    ) -> Result<AirflowConfig, Error> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
+
+        let role = match role {
+            AirflowRole::Webserver => {
+                self.spec
+                    .webservers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                    config
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
+            AirflowRole::Scheduler => {
+                self.spec
+                    .schedulers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+        };
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    /// Retrieve and merge resource configs for the executor template
+    pub fn merged_executor_config(
+        &self,
+        config: &ExecutorConfigFragment,
+    ) -> Result<ExecutorConfig, Error> {
+        // use the worker defaults for executor pods
+        let resources = default_resources(&AirflowRole::Worker);
+        let logging = product_logging::spec::default_logging();
+        let affinity = get_executor_affinity(&self.name_any());
+        let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
+
+        let executor_defaults = ExecutorConfigFragment {
+            resources,
+            logging,
+            affinity,
+            graceful_shutdown_timeout,
+        };
+
+        let mut conf_executor = config.to_owned();
+        conf_executor.merge(&executor_defaults);
+
+        tracing::debug!("Merged executor config: {:?}", conf_executor);
+        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
+}
+
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClusterConfig {
@@ -450,146 +606,6 @@ pub enum AirflowExecutor {
     },
 }
 
-impl v1alpha1::AirflowCluster {
-    /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
-    /// the kubernetes executor is specified)
-    pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
-        match role {
-            AirflowRole::Webserver => self.spec.webservers.as_ref(),
-            AirflowRole::Scheduler => self.spec.schedulers.as_ref(),
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    Some(config)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    pub fn role_config(&self, role: &AirflowRole) -> Option<&GenericRoleConfig> {
-        self.get_role(role).map(|r| &r.role_config)
-    }
-
-    pub fn volumes(&self) -> &Vec<Volume> {
-        &self.spec.cluster_config.volumes
-    }
-
-    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
-        if self.git_sync().is_some() {
-            mounts.push(VolumeMount {
-                name: GIT_SYNC_CONTENT.into(),
-                mount_path: GIT_SYNC_DIR.into(),
-                ..VolumeMount::default()
-            });
-        }
-        mounts
-    }
-
-    pub fn git_sync(&self) -> Option<&GitSync> {
-        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
-        // dags_git_sync is a list but only the first element is considered
-        // (this avoids a later breaking change when all list elements are processed)
-        if dags_git_sync.len() > 1 {
-            tracing::warn!(
-                "{:?} git-sync elements: only first will be considered...",
-                dags_git_sync.len()
-            );
-        }
-        dags_git_sync.first()
-    }
-
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    ) -> Result<AirflowConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
-
-        let role = match role {
-            AirflowRole::Webserver => {
-                self.spec
-                    .webservers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
-
-    /// Retrieve and merge resource configs for the executor template
-    pub fn merged_executor_config(
-        &self,
-        config: &ExecutorConfigFragment,
-    ) -> Result<ExecutorConfig, Error> {
-        // use the worker defaults for executor pods
-        let resources = default_resources(&AirflowRole::Worker);
-        let logging = product_logging::spec::default_logging();
-        let affinity = get_executor_affinity(&self.name_any());
-        let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
-
-        let executor_defaults = ExecutorConfigFragment {
-            resources,
-            logging,
-            affinity,
-            graceful_shutdown_timeout,
-        };
-
-        let mut conf_executor = config.to_owned();
-        conf_executor.merge(&executor_defaults);
-
-        tracing::debug!("Merged executor config: {:?}", conf_executor);
-        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
-    }
-}
-
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
 #[fragment_attrs(
@@ -643,7 +659,7 @@ pub enum Container {
     ),
     serde(rename_all = "camelCase")
 )]
-pub struct AirflowConfig {
+pub struct ExecutorConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
 
@@ -672,7 +688,7 @@ pub struct AirflowConfig {
     ),
     serde(rename_all = "camelCase")
 )]
-pub struct ExecutorConfig {
+pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
 
@@ -703,6 +719,40 @@ impl AirflowConfig {
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
+    }
+}
+
+impl Configuration for AirflowConfigFragment {
+    type Configurable = v1alpha1::AirflowCluster;
+
+    fn compute_env(
+        &self,
+        cluster: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
+        env.insert(
+            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            Some(cluster.spec.cluster_config.credentials_secret.clone()),
+        );
+        Ok(env)
+    }
+
+    fn compute_cli(
+        &self,
+        _cluster: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        Ok(BTreeMap::new())
+    }
+
+    fn compute_files(
+        &self,
+        _cluster: &Self::Configurable,
+        _role_name: &str,
+        _file: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        Ok(BTreeMap::new())
     }
 }
 
@@ -744,56 +794,6 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         cpu,
         memory,
         storage: AirflowStorageConfigFragment {},
-    }
-}
-
-impl Configuration for AirflowConfigFragment {
-    type Configurable = v1alpha1::AirflowCluster;
-
-    fn compute_env(
-        &self,
-        cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
-        env.insert(
-            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.cluster_config.credentials_secret.clone()),
-        );
-        Ok(env)
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        _file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterStatus {
-    #[serde(default)]
-    pub conditions: Vec<ClusterCondition>,
-}
-
-impl HasStatusCondition for v1alpha1::AirflowCluster {
-    fn conditions(&self) -> Vec<ClusterCondition> {
-        match &self.status {
-            Some(status) => status.conditions.clone(),
-            None => vec![],
-        }
     }
 }
 
