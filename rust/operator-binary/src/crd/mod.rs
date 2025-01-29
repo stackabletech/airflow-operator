@@ -39,6 +39,7 @@ use stackable_operator::{
     time::Duration,
     utils::{crds::raw_object_list_schema, COMMON_BASH_TRAP_FUNCTIONS},
 };
+use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::crd::{
@@ -138,51 +139,53 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
     }
 }
 
-/// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
-/// Find more information on how to use it and the resources that the operator generates in the
-/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
-///
-/// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
-/// You can use either the celeryExecutor or the kubernetesExecutor.
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[kube(
-    group = "airflow.stackable.tech",
-    version = "v1alpha1",
-    kind = "AirflowCluster",
-    plural = "airflowclusters",
-    shortname = "airflow",
-    status = "AirflowClusterStatus",
-    namespaced,
-    crates(
-        kube_core = "stackable_operator::kube::core",
-        k8s_openapi = "stackable_operator::k8s_openapi",
-        schemars = "stackable_operator::schemars"
-    )
-)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterSpec {
-    // no doc string - See ProductImage struct
-    pub image: ProductImage,
+#[versioned(version(name = "v1alpha1"))]
+pub mod versioned {
+    /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
+    /// Find more information on how to use it and the resources that the operator generates in the
+    /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
+    ///
+    /// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
+    /// You can use either the celeryExecutor or the kubernetesExecutor.
+    #[versioned(k8s(
+        group = "airflow.stackable.tech",
+        kind = "AirflowCluster",
+        plural = "airflowclusters",
+        shortname = "airflow",
+        status = "AirflowClusterStatus",
+        namespaced,
+        crates(
+            kube_core = "stackable_operator::kube::core",
+            k8s_openapi = "stackable_operator::k8s_openapi",
+            schemars = "stackable_operator::schemars"
+        )
+    ))]
+    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AirflowClusterSpec {
+        // no doc string - See ProductImage struct
+        pub image: ProductImage,
 
-    /// Configuration that applies to all roles and role groups.
-    /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
-    pub cluster_config: AirflowClusterConfig,
+        /// Configuration that applies to all roles and role groups.
+        /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
+        pub cluster_config: AirflowClusterConfig,
 
-    // no doc string - See ClusterOperation struct
-    #[serde(default)]
-    pub cluster_operation: ClusterOperation,
+        // no doc string - See ClusterOperation struct
+        #[serde(default)]
+        pub cluster_operation: ClusterOperation,
 
-    /// The `webserver` role provides the main UI for user interaction.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub webservers: Option<Role<AirflowConfigFragment>>,
+        /// The `webserver` role provides the main UI for user interaction.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub webservers: Option<Role<AirflowConfigFragment>>,
 
-    /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
-    /// Jobs are scheduled on the workers/executors.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedulers: Option<Role<AirflowConfigFragment>>,
+        /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+        /// Jobs are scheduled on the workers/executors.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub schedulers: Option<Role<AirflowConfigFragment>>,
 
-    #[serde(flatten)]
-    pub executor: AirflowExecutor,
+        #[serde(flatten)]
+        pub executor: AirflowExecutor,
+    }
 }
 
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
@@ -447,7 +450,7 @@ pub enum AirflowExecutor {
     },
 }
 
-impl AirflowCluster {
+impl v1alpha1::AirflowCluster {
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
     /// the kubernetes executor is specified)
     pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
@@ -506,7 +509,7 @@ impl AirflowCluster {
     pub fn merged_config(
         &self,
         role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+        rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
     ) -> Result<AirflowConfig, Error> {
         // Initialize the result with all default values as baseline
         let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
@@ -745,7 +748,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
 }
 
 impl Configuration for AirflowConfigFragment {
-    type Configurable = AirflowCluster;
+    type Configurable = v1alpha1::AirflowCluster;
 
     fn compute_env(
         &self,
@@ -785,7 +788,7 @@ pub struct AirflowClusterStatus {
     pub conditions: Vec<ClusterCondition>,
 }
 
-impl HasStatusCondition for AirflowCluster {
+impl HasStatusCondition for v1alpha1::AirflowCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
             Some(status) => status.conditions.clone(),
@@ -815,8 +818,9 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
-    use crate::AirflowCluster;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
+
+    use crate::v1alpha1::AirflowCluster;
 
     #[test]
     fn test_cluster_config() {

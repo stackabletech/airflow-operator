@@ -13,8 +13,8 @@ use crate::{
     crd::{
         authentication::AirflowClientAuthenticationDetailsResolved,
         git_sync::{GIT_SYNC_DIR, GIT_SYNC_LINK},
-        AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, LOG_CONFIG_DIR,
-        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        v1alpha1, AirflowConfig, AirflowExecutor, AirflowRole, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME,
     },
     util::env_var_from_secret,
 };
@@ -51,7 +51,7 @@ const PYTHONPATH: &str = "PYTHONPATH";
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
 pub fn build_airflow_statefulset_envs(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     airflow_role: &AirflowRole,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
@@ -238,7 +238,7 @@ pub fn build_airflow_statefulset_envs(
     transform_map_to_vec(env)
 }
 
-fn get_dags_folder(airflow: &AirflowCluster) -> String {
+fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
     return if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
@@ -256,7 +256,7 @@ fn get_dags_folder(airflow: &AirflowCluster) -> String {
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     let dags_folder = get_dags_folder(airflow);
@@ -363,7 +363,7 @@ fn add_gitsync_credentials(
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
 ) -> Vec<EnvVar> {

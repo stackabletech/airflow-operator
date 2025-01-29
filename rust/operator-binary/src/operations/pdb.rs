@@ -6,7 +6,7 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
-    crd::{AirflowCluster, AirflowExecutor, AirflowRole, APP_NAME, OPERATOR_NAME},
+    crd::{v1alpha1, AirflowExecutor, AirflowRole, APP_NAME, OPERATOR_NAME},
 };
 
 #[derive(Snafu, Debug)]
@@ -25,7 +25,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     role: &AirflowRole,
     client: &Client,
     cluster_resources: &mut ClusterResources,

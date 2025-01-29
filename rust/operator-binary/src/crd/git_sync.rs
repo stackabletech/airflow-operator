@@ -105,8 +105,9 @@ impl GitSync {
 
 #[cfg(test)]
 mod tests {
-    use crate::AirflowCluster;
     use rstest::rstest;
+
+    use crate::v1alpha1::AirflowCluster;
 
     #[test]
     fn test_git_sync() {

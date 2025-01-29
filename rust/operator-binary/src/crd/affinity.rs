@@ -40,10 +40,9 @@ fn get_affinity_for_role(cluster_name: &str, role: &str) -> StackableAffinityFra
 }
 #[cfg(test)]
 mod tests {
-
-    use rstest::rstest;
     use std::collections::BTreeMap;
 
+    use rstest::rstest;
     use stackable_operator::{
         commons::affinity::StackableAffinity,
         k8s_openapi::{
@@ -56,7 +55,7 @@ mod tests {
         role_utils::RoleGroupRef,
     };
 
-    use crate::crd::{AirflowCluster, AirflowExecutor, AirflowRole};
+    use crate::crd::{v1alpha1, AirflowExecutor, AirflowRole};
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -88,7 +87,7 @@ mod tests {
         ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: AirflowCluster =
+        let airflow: v1alpha1::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let rolegroup_ref = RoleGroupRef {
@@ -179,7 +178,7 @@ mod tests {
           ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: AirflowCluster =
+        let airflow: v1alpha1::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {
