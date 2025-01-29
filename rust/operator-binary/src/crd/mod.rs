@@ -168,7 +168,7 @@ pub mod versioned {
 
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
-        pub cluster_config: AirflowClusterConfig,
+        pub cluster_config: v1alpha1::AirflowClusterConfig,
 
         // no doc string - See ClusterOperation struct
         #[serde(default)]
@@ -185,6 +185,65 @@ pub mod versioned {
 
         #[serde(flatten)]
         pub executor: AirflowExecutor,
+    }
+
+    #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AirflowClusterConfig {
+        #[serde(default)]
+        pub authentication: Vec<AirflowClientAuthenticationDetails>,
+
+        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// Read the
+        /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
+        /// to find out more.
+        pub credentials_secret: String,
+
+        /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
+        /// Learn more in the
+        /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
+        #[serde(default)]
+        pub dags_git_sync: Vec<GitSync>,
+
+        /// for internal use only - not for production use.
+        #[serde(default)]
+        pub expose_config: bool,
+
+        /// Whether to load example DAGs or not; defaults to false. The examples are used in the
+        /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
+        #[serde(default)]
+        pub load_examples: bool,
+
+        /// This field controls which type of Service the Operator creates for this AirflowCluster:
+        ///
+        /// * cluster-internal: Use a ClusterIP service
+        ///
+        /// * external-unstable: Use a NodePort service
+        ///
+        /// * external-stable: Use a LoadBalancer service
+        ///
+        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
+        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
+        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+        #[serde(default)]
+        pub listener_class: CurrentlySupportedListenerClasses,
+
+        /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
+        /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+        /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+        /// to learn how to configure log aggregation with Vector.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub vector_aggregator_config_map_name: Option<String>,
+
+        /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
+        #[serde(default)]
+        #[schemars(schema_with = "raw_object_list_schema")]
+        pub volumes: Vec<Volume>,
+
+        /// Additional volumes to mount. Use together with `volumes` to define volumes.
+        #[serde(default)]
+        #[schemars(schema_with = "raw_object_list_schema")]
+        pub volume_mounts: Vec<VolumeMount>,
     }
 }
 
@@ -342,65 +401,6 @@ impl v1alpha1::AirflowCluster {
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
-}
-
-#[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterConfig {
-    #[serde(default)]
-    pub authentication: Vec<AirflowClientAuthenticationDetails>,
-
-    /// The name of the Secret object containing the admin user credentials and database connection details.
-    /// Read the
-    /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
-    /// to find out more.
-    pub credentials_secret: String,
-
-    /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-    /// Learn more in the
-    /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
-    #[serde(default)]
-    pub dags_git_sync: Vec<GitSync>,
-
-    /// for internal use only - not for production use.
-    #[serde(default)]
-    pub expose_config: bool,
-
-    /// Whether to load example DAGs or not; defaults to false. The examples are used in the
-    /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
-    #[serde(default)]
-    pub load_examples: bool,
-
-    /// This field controls which type of Service the Operator creates for this AirflowCluster:
-    ///
-    /// * cluster-internal: Use a ClusterIP service
-    ///
-    /// * external-unstable: Use a NodePort service
-    ///
-    /// * external-stable: Use a LoadBalancer service
-    ///
-    /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-    /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-    #[serde(default)]
-    pub listener_class: CurrentlySupportedListenerClasses,
-
-    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
-    /// to learn how to configure log aggregation with Vector.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-
-    /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
-    #[serde(default)]
-    #[schemars(schema_with = "raw_object_list_schema")]
-    pub volumes: Vec<Volume>,
-
-    /// Additional volumes to mount. Use together with `volumes` to define volumes.
-    #[serde(default)]
-    #[schemars(schema_with = "raw_object_list_schema")]
-    pub volume_mounts: Vec<VolumeMount>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
