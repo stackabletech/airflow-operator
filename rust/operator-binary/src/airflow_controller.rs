@@ -13,17 +13,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{
-    authentication::AirflowAuthenticationClassResolved, git_sync::GitSync,
-};
-use stackable_airflow_crd::{
-    authentication::AirflowClientAuthenticationDetailsResolved, build_recommended_labels,
-    AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
-    AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
-    AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR,
-    OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
-    TEMPLATE_VOLUME_NAME,
-};
 use stackable_operator::{
     builder::{
         self,
@@ -86,6 +75,18 @@ use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    crd::{
+        self,
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        },
+        build_recommended_labels,
+        git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT},
+        AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
+        AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
+        AIRFLOW_UID, APP_NAME, CONFIG_PATH, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    },
     env_vars::{
         self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
     },
@@ -113,7 +114,6 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
@@ -202,9 +202,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig {
-        source: stackable_airflow_crd::Error,
-    },
+    FailedToResolveConfig { source: crd::Error },
 
     #[snafu(display("could not parse Airflow role [{role}]"))]
     UnidentifiedAirflowRole {
@@ -249,9 +247,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to apply authentication configuration"))]
-    InvalidAuthenticationConfig {
-        source: stackable_airflow_crd::authentication::Error,
-    },
+    InvalidAuthenticationConfig { source: crd::authentication::Error },
 
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
@@ -1008,7 +1004,7 @@ fn build_server_rolegroup_statefulset(
         )?;
 
         pb.add_volume(
-            VolumeBuilder::new(GIT_CONTENT)
+            VolumeBuilder::new(GIT_SYNC_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         )
@@ -1203,7 +1199,7 @@ fn build_executor_template_config_map(
             airflow.volume_mounts(),
         )?;
         pb.add_volume(
-            VolumeBuilder::new(GIT_CONTENT)
+            VolumeBuilder::new(GIT_SYNC_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         )
@@ -1275,7 +1271,7 @@ fn build_gitsync_container(
             "-c".to_string(),
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
-        .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .add_volume_mount(GIT_SYNC_CONTENT, GIT_SYNC_ROOT)
         .context(AddVolumeMountSnafu)?
         .add_volume_mounts(volume_mounts)
         .context(AddVolumeMountSnafu)?

@@ -5,7 +5,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
 
-use crate::{AirflowRole, APP_NAME};
+use crate::crd::{AirflowRole, APP_NAME};
 
 /// Used for all [`AirflowRole`]s besides executors.
 pub fn get_affinity(cluster_name: &str, role: &AirflowRole) -> StackableAffinityFragment {
@@ -56,7 +56,7 @@ mod tests {
         role_utils::RoleGroupRef,
     };
 
-    use crate::{AirflowCluster, AirflowRole};
+    use crate::crd::{AirflowCluster, AirflowExecutor, AirflowRole};
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -236,8 +236,8 @@ mod tests {
         };
 
         let executor_config = match &airflow.spec.executor {
-            crate::AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
-            crate::AirflowExecutor::KubernetesExecutor {
+            AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
+            AirflowExecutor::KubernetesExecutor {
                 common_configuration,
             } => &common_configuration.config,
         };

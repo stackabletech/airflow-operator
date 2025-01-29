@@ -1,9 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use authentication::{
-    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-};
-use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -45,9 +41,13 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{
+use crate::crd::{
     affinity::{get_affinity, get_executor_affinity},
-    authentication::AirflowClientAuthenticationDetails,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
+        AirflowClientAuthenticationDetailsResolved,
+    },
+    git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_DIR},
 };
 
 pub mod affinity;
@@ -62,20 +62,11 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
-pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
-pub const GIT_CONTENT: &str = "content-from-git";
-pub const GIT_ROOT: &str = "/tmp/git";
-pub const GIT_LINK: &str = "current";
-pub const GIT_SYNC_NAME: &str = "gitsync";
-pub const GIT_SAFE_DIR: &str = "safe.directory";
 
 pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
-
-const GIT_SYNC_DEPTH: u8 = 1u8;
-const GIT_SYNC_PERIOD_SECONDS: u16 = 20u16;
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -485,7 +476,7 @@ impl AirflowCluster {
         let mut mounts = self.spec.cluster_config.volume_mounts.clone();
         if self.git_sync().is_some() {
             mounts.push(VolumeMount {
-                name: GIT_CONTENT.into(),
+                name: GIT_SYNC_CONTENT.into(),
                 mount_path: GIT_SYNC_DIR.into(),
                 ..VolumeMount::default()
             });

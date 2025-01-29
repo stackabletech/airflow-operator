@@ -1,16 +1,7 @@
-mod airflow_controller;
-mod config;
-mod controller_commons;
-mod env_vars;
-mod operations;
-mod product_logging;
-mod util;
-
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
-use stackable_airflow_crd::{AirflowCluster, APP_NAME, OPERATOR_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
@@ -28,7 +19,19 @@ use stackable_operator::{
     CustomResourceExt,
 };
 
-use crate::airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME;
+use crate::{
+    airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
+    crd::{AirflowCluster, APP_NAME, OPERATOR_NAME},
+};
+
+mod airflow_controller;
+mod config;
+mod controller_commons;
+mod crd;
+mod env_vars;
+mod operations;
+mod product_logging;
+mod util;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
