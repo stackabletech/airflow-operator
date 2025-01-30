@@ -7,8 +7,13 @@
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
 
+### Changed
+
+- Default to OCI for image metadata and product image selection ([#572]).
+
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
+[#572]: https://github.com/stackabletech/airflow-operator/pull/572
 
 ## [24.11.1] - 2025-01-09
 
