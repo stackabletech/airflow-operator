@@ -1,4 +1,6 @@
-//! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
+//! Ensures that `Pod`s are configured and running for each [`AirflowCluster`][v1alpha1]
+//!
+//! [v1alpha1]: crate::crd::v1alpha1::AirflowCluster
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
