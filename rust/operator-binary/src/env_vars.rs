@@ -1,20 +1,21 @@
 use crate::util::env_var_from_secret;
 use product_config::types::PropertyNameKind;
-use stackable_airflow_crd::authentication::{
-    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-};
-use stackable_airflow_crd::git_sync::GitSync;
 use stackable_airflow_crd::{
-    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
-    STACKABLE_LOG_DIR,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    },
+    authorization::AirflowAuthorizationResolved,
+    git_sync::GitSync,
+    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, GIT_LINK,
+    GIT_SYNC_DIR, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
 };
-use stackable_airflow_crd::{GIT_LINK, GIT_SYNC_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME};
-use stackable_operator::commons::authentication::oidc;
-use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::product_logging::framework::create_vector_shutdown_file_command;
+use stackable_operator::{
+    commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
+    product_logging::framework::create_vector_shutdown_file_command,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+const AIRFLOW__CORE__AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
 const AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW__METRICS__STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW__METRICS__STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
@@ -49,6 +50,7 @@ pub fn build_airflow_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -198,8 +200,9 @@ pub fn build_airflow_statefulset_envs(
             );
         }
         AirflowRole::Webserver => {
-            let auth_vars = authentication_env_vars(auth_config);
-            env.extend(auth_vars.into_iter().map(|var| (var.name.to_owned(), var)));
+            let mut vars = authentication_env_vars(auth_config);
+            vars.extend(authorization_env_vars(authorization_config));
+            env.extend(vars.into_iter().map(|var| (var.name.to_owned(), var)));
         }
         _ => {}
     }
@@ -232,7 +235,7 @@ pub fn build_airflow_statefulset_envs(
 }
 
 fn get_dags_folder(airflow: &AirflowCluster) -> String {
-    return if let Some(GitSync {
+    if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
@@ -244,7 +247,7 @@ fn get_dags_folder(airflow: &AirflowCluster) -> String {
         // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
         "/stackable/airflow/dags".to_string()
-    };
+    }
 }
 
 // This set of environment variables is a standard set that is not dependent on any
@@ -500,4 +503,18 @@ fn authentication_env_vars(
         .cloned()
         .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
+}
+
+fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -> Vec<EnvVar> {
+    let mut env = vec![];
+
+    if authorization_config.opa.is_some() {
+        env.push(EnvVar {
+            name: AIRFLOW__CORE__AUTH_MANAGER.into(),
+            value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
+            ..Default::default()
+        });
+    }
+
+    env
 }

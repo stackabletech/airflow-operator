@@ -53,7 +53,11 @@ while True:
     # (disable line-break flake checks)
     if (
         (assert_metric("scheduler", role_group, "airflow_scheduler_heartbeat"))
-        and (assert_metric("webserver", role_group, "airflow_task_instance_created_BashOperator"))  # noqa: W503, W504
+        and (
+            assert_metric(
+                "webserver", role_group, "airflow_task_instance_created_BashOperator"
+            )
+        )  # noqa: W503, W504
         and (
             assert_metric(
                 "scheduler",
