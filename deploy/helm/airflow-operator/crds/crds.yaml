@@ -508,7 +508,7 @@ spec:
                               properties:
                                 entryTimeToLive:
                                   default: 30s
-                                  description: Time to live per entry; Entries which were not queried within the given duration, are removed.
+                                  description: Time to live per entry
                                   type: string
                                 maxEntries:
                                   default: 10000
