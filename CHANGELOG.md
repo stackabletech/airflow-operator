@@ -7,6 +7,11 @@
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
 
+[#557]: https://github.com/stackabletech/airflow-operator/pull/557
+[#571]: https://github.com/stackabletech/airflow-operator/pull/571
+
+## [24.11.1] - 2025-01-09
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -16,7 +21,6 @@
 
 [#545]: https://github.com/stackabletech/airflow-operator/pull/545
 [#547]: https://github.com/stackabletech/airflow-operator/pull/547
-[#557]: https://github.com/stackabletech/airflow-operator/pull/557
 
 ## [24.11.0] - 2024-11-18
 
