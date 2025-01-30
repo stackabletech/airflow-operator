@@ -376,6 +376,9 @@ It can also be a view defined as part of a plugin defined by a user.
 <1> Usually one of "GET", "POST", "PUT", "DELETE" or "MENU", but the method can also be a string if the action has been defined in a plugin.
 In that case, the action can be anything.
 
+The roles defined in Airflow are not used when the authorization is performed by OPA.
+Therefore, it makes sense to hide the menu entry "List Roles" simply by not allowing access to the custom view "List Roles".
+
 A ConfigMap with the Rego rules could look as follows:
 
 [source,yaml]
@@ -412,10 +415,12 @@ data:
         input.details.id == "example_trigger_target_dag"
     }
 
-    # Allow the administrator to create users
+    # Allow the administrator to access all custom views but hide the
+    # menu "List Roles" and disallow the access to the Roles resource.
     is_authorized_custom_view if {
-        input.method == "POST"
-        input.resource_name == "Users"
+        input.resource_name != "List Roles"
+        input.resource_name != "Roles"
+
         input.user.name == "admin"
     }
 ----
