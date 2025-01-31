@@ -9,7 +9,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-stackable-airflow-crd = { path = "../crd" }
+stackable-versioned.workspace = true
+stackable-operator.workspace = true
+product-config.workspace = true
 
 anyhow.workspace = true
 clap.workspace = true
@@ -17,10 +19,9 @@ const_format.workspace = true
 fnv.workspace = true
 futures.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
 snafu.workspace = true
-stackable-operator.workspace = true
-product-config.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true

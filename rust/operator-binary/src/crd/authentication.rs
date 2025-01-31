@@ -1,4 +1,4 @@
-use std::{future::Future, mem};
+use std::{collections::BTreeSet, future::Future, mem};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt, Snafu};
@@ -11,7 +11,7 @@ use stackable_operator::{
     },
     schemars::{self, JsonSchema},
 };
-use std::collections::BTreeSet;
+
 use tracing::info;
 
 const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 2] = ["LDAP", "OIDC"];
@@ -109,11 +109,6 @@ pub fn default_user_registration() -> bool {
 
 pub fn default_user_registration_role() -> String {
     "Public".to_string()
-}
-
-/// Matches Flask's default mode of syncing at registration
-pub fn default_sync_roles_at() -> FlaskRolesSyncMoment {
-    FlaskRolesSyncMoment::Registration
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, Default)]

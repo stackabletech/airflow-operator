@@ -1,4 +1,3 @@
-use stackable_airflow_crd::MAX_LOG_FILES_SIZE;
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
@@ -10,6 +9,8 @@ use stackable_operator::{
         },
     },
 };
+
+use crate::crd::MAX_LOG_FILES_SIZE;
 
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";

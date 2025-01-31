@@ -1,7 +1,6 @@
 use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::STACKABLE_LOG_DIR;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     client::Client,
@@ -15,6 +14,8 @@ use stackable_operator::{
     },
     role_utils::RoleGroupRef,
 };
+
+use crate::crd::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
