@@ -493,7 +493,7 @@ spec:
                         type: object
                       type: array
                     authorization:
-                      description: Authorization options. Learn more in the [Airflow authorization usage guide](https://docs.stackable.tech/home/nightly/airflow/usage-guide/security#authorization).
+                      description: Authorization options. Learn more in the [Airflow authorization usage guide](https://docs.stackable.tech/home/nightly/airflow/usage-guide/security#_authorization).
                       nullable: true
                       properties:
                         opa:

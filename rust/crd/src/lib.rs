@@ -212,7 +212,7 @@ pub struct AirflowClusterConfig {
     pub authentication: Vec<AirflowClientAuthenticationDetails>,
 
     /// Authorization options.
-    /// Learn more in the [Airflow authorization usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security#authorization).
+    /// Learn more in the [Airflow authorization usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security#_authorization).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<AirflowAuthorization>,
 
