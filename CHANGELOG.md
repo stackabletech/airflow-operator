@@ -8,8 +8,13 @@
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
 - Add OPA support ([#573]).
 
+### Changed
+
+- Default to OCI for image metadata and product image selection ([#572]).
+
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
+[#572]: https://github.com/stackabletech/airflow-operator/pull/572
 [#573]: https://github.com/stackabletech/airflow-operator/pull/573
 
 ## [24.11.1] - 2025-01-09

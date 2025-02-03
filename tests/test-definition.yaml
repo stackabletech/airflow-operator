@@ -11,12 +11,12 @@ dimensions:
       - 2.9.3
       - 2.10.2,localhost:5000/stackable/airflow:2.10.2-stackable0.0.0-dev
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.8.1,docker.stackable.tech/sandbox/airflow:2.8.1-stackable0.0.0-dev
+      # - 2.8.1,oci.stackable.tech/sandbox/airflow:2.8.1-stackable0.0.0-dev
   - name: airflow-latest
     values:
       - 2.10.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.8.1,docker.stackable.tech/sandbox/airflow:2.8.1-stackable0.0.0-dev
+      # - 2.8.1,oci.stackable.tech/sandbox/airflow:2.8.1-stackable0.0.0-dev
   - name: opa-latest
     values:
       - 0.67.1
