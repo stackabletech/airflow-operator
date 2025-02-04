@@ -14,10 +14,11 @@ use product_config::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_airflow_crd::{
-    authentication::AirflowAuthenticationClassResolved, git_sync::GitSync,
-};
-use stackable_airflow_crd::{
-    authentication::AirflowClientAuthenticationDetailsResolved, build_recommended_labels,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    },
+    build_recommended_labels,
+    git_sync::GitSync,
     AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
     AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
     AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR,
@@ -80,7 +81,6 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 use crate::{

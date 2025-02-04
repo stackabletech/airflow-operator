@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     schemars::{self, JsonSchema},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::collections::BTreeMap;
 
 use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_PERIOD_SECONDS};
 
@@ -96,8 +97,9 @@ impl GitSync {
 
 #[cfg(test)]
 mod tests {
-    use crate::AirflowCluster;
     use rstest::rstest;
+
+    use crate::AirflowCluster;
 
     #[test]
     fn test_git_sync() {

@@ -1,19 +1,20 @@
-use crate::util::env_var_from_secret;
-use product_config::types::PropertyNameKind;
-use stackable_airflow_crd::authentication::{
-    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-};
-use stackable_airflow_crd::git_sync::GitSync;
-use stackable_airflow_crd::{
-    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
-    STACKABLE_LOG_DIR,
-};
-use stackable_airflow_crd::{GIT_LINK, GIT_SYNC_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME};
-use stackable_operator::commons::authentication::oidc;
-use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::product_logging::framework::create_vector_shutdown_file_command;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+use product_config::types::PropertyNameKind;
+use stackable_airflow_crd::{
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    },
+    git_sync::GitSync,
+    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, GIT_LINK,
+    GIT_SYNC_DIR, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+};
+use stackable_operator::{
+    commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
+    product_logging::framework::create_vector_shutdown_file_command,
+};
+
+use crate::util::env_var_from_secret;
 
 const AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW__METRICS__STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
