@@ -11,7 +11,6 @@ use stackable_operator::{
     },
     schemars::{self, JsonSchema},
 };
-
 use tracing::info;
 
 const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 2] = ["LDAP", "OIDC"];
@@ -314,11 +313,16 @@ mod tests {
     use std::pin::Pin;
 
     use indoc::indoc;
-    use stackable_operator::commons::networking::HostName;
-    use stackable_operator::commons::tls_verification::{
-        CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
+    use stackable_operator::{
+        commons::{
+            authentication::oidc,
+            networking::HostName,
+            tls_verification::{
+                CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
+            },
+        },
+        kube,
     };
-    use stackable_operator::{commons::authentication::oidc, kube};
 
     use super::*;
 

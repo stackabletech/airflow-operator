@@ -6,15 +6,14 @@ use stackable_operator::{
     product_logging::framework::create_vector_shutdown_file_command,
 };
 
-use crate::crd::authentication::AirflowAuthenticationClassResolved;
-use crate::crd::git_sync::GitSync;
-use crate::crd::ExecutorConfig;
 use crate::{
     crd::{
-        authentication::AirflowClientAuthenticationDetailsResolved,
-        git_sync::{GIT_SYNC_DIR, GIT_SYNC_LINK},
-        v1alpha1, AirflowConfig, AirflowExecutor, AirflowRole, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        },
+        git_sync::{GitSync, GIT_SYNC_DIR, GIT_SYNC_LINK},
+        v1alpha1, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
     },
     util::env_var_from_secret,
 };
