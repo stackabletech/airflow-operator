@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_airflow_crd::{
@@ -7,9 +9,10 @@ use stackable_airflow_crd::{
     },
     AirflowConfigOptions,
 };
-use stackable_operator::commons::authentication::{ldap::AuthenticationProvider, oidc};
-use stackable_operator::commons::tls_verification::TlsVerification;
-use std::collections::BTreeMap;
+use stackable_operator::commons::{
+    authentication::{ldap::AuthenticationProvider, oidc},
+    tls_verification::TlsVerification,
+};
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
@@ -273,7 +276,8 @@ fn append_oidc_config(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::add_airflow_config;
+    use std::collections::BTreeMap;
+
     use indoc::formatdoc;
     use rstest::rstest;
     use stackable_airflow_crd::authentication::{
@@ -281,7 +285,8 @@ mod tests {
         AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
     };
     use stackable_operator::commons::authentication::{ldap, oidc};
-    use std::collections::BTreeMap;
+
+    use crate::config::add_airflow_config;
 
     #[test]
     fn test_auth_db_config() {

@@ -824,8 +824,9 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
-    use crate::AirflowCluster;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
+
+    use crate::AirflowCluster;
 
     #[test]
     fn test_cluster_config() {

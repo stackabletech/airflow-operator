@@ -41,9 +41,9 @@ fn get_affinity_for_role(cluster_name: &str, role: &str) -> StackableAffinityFra
 #[cfg(test)]
 mod tests {
 
-    use rstest::rstest;
     use std::collections::BTreeMap;
 
+    use rstest::rstest;
     use stackable_operator::{
         commons::affinity::StackableAffinity,
         k8s_openapi::{
