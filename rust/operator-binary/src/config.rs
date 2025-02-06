@@ -2,16 +2,17 @@ use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_airflow_crd::{
+use stackable_operator::commons::{
+    authentication::{ldap::AuthenticationProvider, oidc},
+    tls_verification::TlsVerification,
+};
+
+use crate::crd::{
     authentication::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         FlaskRolesSyncMoment, DEFAULT_OIDC_PROVIDER,
     },
     AirflowConfigOptions,
-};
-use stackable_operator::commons::{
-    authentication::{ldap::AuthenticationProvider, oidc},
-    tls_verification::TlsVerification,
 };
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -280,13 +281,15 @@ mod tests {
 
     use indoc::formatdoc;
     use rstest::rstest;
-    use stackable_airflow_crd::authentication::{
-        default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
-        AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
-    };
     use stackable_operator::commons::authentication::{ldap, oidc};
 
-    use crate::config::add_airflow_config;
+    use crate::{
+        config::add_airflow_config,
+        crd::authentication::{
+            default_user_registration, AirflowAuthenticationClassResolved,
+            AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
+        },
+    };
 
     #[test]
     fn test_auth_db_config() {
@@ -421,7 +424,7 @@ mod tests {
             ],
             user_registration: default_user_registration(),
             user_registration_role: "Admin".to_string(),
-            sync_roles_at: default_sync_roles_at(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
         let mut result = BTreeMap::new();

@@ -1,16 +1,7 @@
-mod airflow_controller;
-mod config;
-mod controller_commons;
-mod env_vars;
-mod operations;
-mod product_logging;
-mod util;
-
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
-use stackable_airflow_crd::{AirflowCluster, APP_NAME, OPERATOR_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
@@ -25,10 +16,23 @@ use stackable_operator::{
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
-    CustomResourceExt,
+    shared::yaml::SerializeOptions,
+    YamlSchema,
 };
 
-use crate::airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME;
+use crate::{
+    airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
+    crd::{v1alpha1, AirflowCluster, APP_NAME, OPERATOR_NAME},
+};
+
+mod airflow_controller;
+mod config;
+mod controller_commons;
+mod crd;
+mod env_vars;
+mod operations;
+mod product_logging;
+mod util;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -47,7 +51,8 @@ async fn main() -> anyhow::Result<()> {
 
     match opts.cmd {
         Command::Crd => {
-            AirflowCluster::print_yaml_schema(built_info::PKG_VERSION)?;
+            AirflowCluster::merged_crd(AirflowCluster::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {
             product_config,
@@ -88,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
             ));
 
             let airflow_controller = Controller::new(
-                watch_namespace.get_api::<DeserializeGuard<AirflowCluster>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<v1alpha1::AirflowCluster>>(&client),
                 watcher::Config::default(),
             );
 
@@ -110,9 +115,11 @@ async fn main() -> anyhow::Result<()> {
                         airflow_store_1
                             .state()
                             .into_iter()
-                            .filter(move |airflow: &Arc<DeserializeGuard<AirflowCluster>>| {
-                                references_authentication_class(airflow, &authentication_class)
-                            })
+                            .filter(
+                                move |airflow: &Arc<DeserializeGuard<v1alpha1::AirflowCluster>>| {
+                                    references_authentication_class(airflow, &authentication_class)
+                                },
+                            )
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -149,7 +156,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    airflow: &DeserializeGuard<AirflowCluster>,
+    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
     authentication_class: &DeserializeGuard<AuthenticationClass>,
 ) -> bool {
     let Ok(airflow) = &airflow.0 else {

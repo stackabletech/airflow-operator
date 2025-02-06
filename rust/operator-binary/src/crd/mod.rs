@@ -1,9 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use authentication::{
-    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-};
-use git_sync::GitSync;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -43,11 +39,16 @@ use stackable_operator::{
     time::Duration,
     utils::{crds::raw_object_list_schema, COMMON_BASH_TRAP_FUNCTIONS},
 };
+use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{
+use crate::crd::{
     affinity::{get_affinity, get_executor_affinity},
-    authentication::AirflowClientAuthenticationDetails,
+    authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
+        AirflowClientAuthenticationDetailsResolved,
+    },
+    git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_DIR},
 };
 
 pub mod affinity;
@@ -62,20 +63,11 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
-pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
-pub const GIT_CONTENT: &str = "content-from-git";
-pub const GIT_ROOT: &str = "/tmp/git";
-pub const GIT_LINK: &str = "current";
-pub const GIT_SYNC_NAME: &str = "gitsync";
-pub const GIT_SAFE_DIR: &str = "safe.directory";
 
 pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
-
-const GIT_SYNC_DEPTH: u8 = 1u8;
-const GIT_SYNC_PERIOD_SECONDS: u16 = 20u16;
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -147,110 +139,268 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
     }
 }
 
-/// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
-/// Find more information on how to use it and the resources that the operator generates in the
-/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
-///
-/// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
-/// You can use either the celeryExecutor or the kubernetesExecutor.
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[kube(
-    group = "airflow.stackable.tech",
-    version = "v1alpha1",
-    kind = "AirflowCluster",
-    plural = "airflowclusters",
-    shortname = "airflow",
-    status = "AirflowClusterStatus",
-    namespaced,
-    crates(
-        kube_core = "stackable_operator::kube::core",
-        k8s_openapi = "stackable_operator::k8s_openapi",
-        schemars = "stackable_operator::schemars"
-    )
-)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterSpec {
-    // no doc string - See ProductImage struct
-    pub image: ProductImage,
+#[versioned(version(name = "v1alpha1"))]
+pub mod versioned {
+    /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
+    /// Find more information on how to use it and the resources that the operator generates in the
+    /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
+    ///
+    /// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
+    /// You can use either the celeryExecutor or the kubernetesExecutor.
+    #[versioned(k8s(
+        group = "airflow.stackable.tech",
+        kind = "AirflowCluster",
+        plural = "airflowclusters",
+        shortname = "airflow",
+        status = "AirflowClusterStatus",
+        namespaced,
+        crates(
+            kube_core = "stackable_operator::kube::core",
+            k8s_openapi = "stackable_operator::k8s_openapi",
+            schemars = "stackable_operator::schemars"
+        )
+    ))]
+    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AirflowClusterSpec {
+        // no doc string - See ProductImage struct
+        pub image: ProductImage,
 
-    /// Configuration that applies to all roles and role groups.
-    /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
-    pub cluster_config: AirflowClusterConfig,
+        /// Configuration that applies to all roles and role groups.
+        /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
+        pub cluster_config: v1alpha1::AirflowClusterConfig,
 
-    // no doc string - See ClusterOperation struct
-    #[serde(default)]
-    pub cluster_operation: ClusterOperation,
+        // no doc string - See ClusterOperation struct
+        #[serde(default)]
+        pub cluster_operation: ClusterOperation,
 
-    /// The `webserver` role provides the main UI for user interaction.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub webservers: Option<Role<AirflowConfigFragment>>,
+        /// The `webserver` role provides the main UI for user interaction.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub webservers: Option<Role<AirflowConfigFragment>>,
 
-    /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
-    /// Jobs are scheduled on the workers/executors.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedulers: Option<Role<AirflowConfigFragment>>,
+        /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+        /// Jobs are scheduled on the workers/executors.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub schedulers: Option<Role<AirflowConfigFragment>>,
 
-    #[serde(flatten)]
-    pub executor: AirflowExecutor,
+        #[serde(flatten)]
+        pub executor: AirflowExecutor,
+    }
+
+    #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AirflowClusterConfig {
+        #[serde(default)]
+        pub authentication: Vec<AirflowClientAuthenticationDetails>,
+
+        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// Read the
+        /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
+        /// to find out more.
+        pub credentials_secret: String,
+
+        /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
+        /// Learn more in the
+        /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
+        #[serde(default)]
+        pub dags_git_sync: Vec<GitSync>,
+
+        /// for internal use only - not for production use.
+        #[serde(default)]
+        pub expose_config: bool,
+
+        /// Whether to load example DAGs or not; defaults to false. The examples are used in the
+        /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
+        #[serde(default)]
+        pub load_examples: bool,
+
+        /// This field controls which type of Service the Operator creates for this AirflowCluster:
+        ///
+        /// * cluster-internal: Use a ClusterIP service
+        ///
+        /// * external-unstable: Use a NodePort service
+        ///
+        /// * external-stable: Use a LoadBalancer service
+        ///
+        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
+        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
+        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+        #[serde(default)]
+        pub listener_class: CurrentlySupportedListenerClasses,
+
+        /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
+        /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+        /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+        /// to learn how to configure log aggregation with Vector.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub vector_aggregator_config_map_name: Option<String>,
+
+        /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
+        #[serde(default)]
+        #[schemars(schema_with = "raw_object_list_schema")]
+        pub volumes: Vec<Volume>,
+
+        /// Additional volumes to mount. Use together with `volumes` to define volumes.
+        #[serde(default)]
+        #[schemars(schema_with = "raw_object_list_schema")]
+        pub volume_mounts: Vec<VolumeMount>,
+    }
 }
 
-#[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AirflowClusterConfig {
+pub struct AirflowClusterStatus {
     #[serde(default)]
-    pub authentication: Vec<AirflowClientAuthenticationDetails>,
+    pub conditions: Vec<ClusterCondition>,
+}
 
-    /// The name of the Secret object containing the admin user credentials and database connection details.
-    /// Read the
-    /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
-    /// to find out more.
-    pub credentials_secret: String,
+impl HasStatusCondition for v1alpha1::AirflowCluster {
+    fn conditions(&self) -> Vec<ClusterCondition> {
+        match &self.status {
+            Some(status) => status.conditions.clone(),
+            None => vec![],
+        }
+    }
+}
 
-    /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-    /// Learn more in the
-    /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
-    #[serde(default)]
-    pub dags_git_sync: Vec<GitSync>,
+impl v1alpha1::AirflowCluster {
+    /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
+    /// the kubernetes executor is specified)
+    pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
+        match role {
+            AirflowRole::Webserver => self.spec.webservers.as_ref(),
+            AirflowRole::Scheduler => self.spec.schedulers.as_ref(),
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                    Some(config)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 
-    /// for internal use only - not for production use.
-    #[serde(default)]
-    pub expose_config: bool,
+    pub fn role_config(&self, role: &AirflowRole) -> Option<&GenericRoleConfig> {
+        self.get_role(role).map(|r| &r.role_config)
+    }
 
-    /// Whether to load example DAGs or not; defaults to false. The examples are used in the
-    /// [getting started guide](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/).
-    #[serde(default)]
-    pub load_examples: bool,
+    pub fn volumes(&self) -> &Vec<Volume> {
+        &self.spec.cluster_config.volumes
+    }
 
-    /// This field controls which type of Service the Operator creates for this AirflowCluster:
-    ///
-    /// * cluster-internal: Use a ClusterIP service
-    ///
-    /// * external-unstable: Use a NodePort service
-    ///
-    /// * external-stable: Use a LoadBalancer service
-    ///
-    /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-    /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-    #[serde(default)]
-    pub listener_class: CurrentlySupportedListenerClasses,
+    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
+        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
+        if self.git_sync().is_some() {
+            mounts.push(VolumeMount {
+                name: GIT_SYNC_CONTENT.into(),
+                mount_path: GIT_SYNC_DIR.into(),
+                ..VolumeMount::default()
+            });
+        }
+        mounts
+    }
 
-    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
-    /// to learn how to configure log aggregation with Vector.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
+    pub fn git_sync(&self) -> Option<&GitSync> {
+        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
+        // dags_git_sync is a list but only the first element is considered
+        // (this avoids a later breaking change when all list elements are processed)
+        if dags_git_sync.len() > 1 {
+            tracing::warn!(
+                "{:?} git-sync elements: only first will be considered...",
+                dags_git_sync.len()
+            );
+        }
+        dags_git_sync.first()
+    }
 
-    /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
-    #[serde(default)]
-    #[schemars(schema_with = "raw_object_list_schema")]
-    pub volumes: Vec<Volume>,
+    /// The name of the role-level load-balanced Kubernetes `Service`
+    pub fn node_role_service_name(&self) -> Option<String> {
+        self.metadata.name.clone()
+    }
 
-    /// Additional volumes to mount. Use together with `volumes` to define volumes.
-    #[serde(default)]
-    #[schemars(schema_with = "raw_object_list_schema")]
-    pub volume_mounts: Vec<VolumeMount>,
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn merged_config(
+        &self,
+        role: &AirflowRole,
+        rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    ) -> Result<AirflowConfig, Error> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
+
+        let role = match role {
+            AirflowRole::Webserver => {
+                self.spec
+                    .webservers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                    config
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
+            AirflowRole::Scheduler => {
+                self.spec
+                    .schedulers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+        };
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    /// Retrieve and merge resource configs for the executor template
+    pub fn merged_executor_config(
+        &self,
+        config: &ExecutorConfigFragment,
+    ) -> Result<ExecutorConfig, Error> {
+        // use the worker defaults for executor pods
+        let resources = default_resources(&AirflowRole::Worker);
+        let logging = product_logging::spec::default_logging();
+        let affinity = get_executor_affinity(&self.name_any());
+        let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
+
+        let executor_defaults = ExecutorConfigFragment {
+            resources,
+            logging,
+            affinity,
+            graceful_shutdown_timeout,
+        };
+
+        let mut conf_executor = config.to_owned();
+        conf_executor.merge(&executor_defaults);
+
+        tracing::debug!("Merged executor config: {:?}", conf_executor);
+        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -456,146 +606,6 @@ pub enum AirflowExecutor {
     },
 }
 
-impl AirflowCluster {
-    /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
-    /// the kubernetes executor is specified)
-    pub fn get_role(&self, role: &AirflowRole) -> Option<&Role<AirflowConfigFragment>> {
-        match role {
-            AirflowRole::Webserver => self.spec.webservers.as_ref(),
-            AirflowRole::Scheduler => self.spec.schedulers.as_ref(),
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    Some(config)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    pub fn role_config(&self, role: &AirflowRole) -> Option<&GenericRoleConfig> {
-        self.get_role(role).map(|r| &r.role_config)
-    }
-
-    pub fn volumes(&self) -> &Vec<Volume> {
-        &self.spec.cluster_config.volumes
-    }
-
-    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
-        if self.git_sync().is_some() {
-            mounts.push(VolumeMount {
-                name: GIT_CONTENT.into(),
-                mount_path: GIT_SYNC_DIR.into(),
-                ..VolumeMount::default()
-            });
-        }
-        mounts
-    }
-
-    pub fn git_sync(&self) -> Option<&GitSync> {
-        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
-        // dags_git_sync is a list but only the first element is considered
-        // (this avoids a later breaking change when all list elements are processed)
-        if dags_git_sync.len() > 1 {
-            tracing::warn!(
-                "{:?} git-sync elements: only first will be considered...",
-                dags_git_sync.len()
-            );
-        }
-        dags_git_sync.first()
-    }
-
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<AirflowCluster>,
-    ) -> Result<AirflowConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
-
-        let role = match role {
-            AirflowRole::Webserver => {
-                self.spec
-                    .webservers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
-
-    /// Retrieve and merge resource configs for the executor template
-    pub fn merged_executor_config(
-        &self,
-        config: &ExecutorConfigFragment,
-    ) -> Result<ExecutorConfig, Error> {
-        // use the worker defaults for executor pods
-        let resources = default_resources(&AirflowRole::Worker);
-        let logging = product_logging::spec::default_logging();
-        let affinity = get_executor_affinity(&self.name_any());
-        let graceful_shutdown_timeout = Some(DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT);
-
-        let executor_defaults = ExecutorConfigFragment {
-            resources,
-            logging,
-            affinity,
-            graceful_shutdown_timeout,
-        };
-
-        let mut conf_executor = config.to_owned();
-        conf_executor.merge(&executor_defaults);
-
-        tracing::debug!("Merged executor config: {:?}", conf_executor);
-        fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
-    }
-}
-
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
 #[fragment_attrs(
@@ -649,7 +659,7 @@ pub enum Container {
     ),
     serde(rename_all = "camelCase")
 )]
-pub struct AirflowConfig {
+pub struct ExecutorConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
 
@@ -678,7 +688,7 @@ pub struct AirflowConfig {
     ),
     serde(rename_all = "camelCase")
 )]
-pub struct ExecutorConfig {
+pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
 
@@ -709,6 +719,40 @@ impl AirflowConfig {
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
+    }
+}
+
+impl Configuration for AirflowConfigFragment {
+    type Configurable = v1alpha1::AirflowCluster;
+
+    fn compute_env(
+        &self,
+        cluster: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
+        env.insert(
+            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            Some(cluster.spec.cluster_config.credentials_secret.clone()),
+        );
+        Ok(env)
+    }
+
+    fn compute_cli(
+        &self,
+        _cluster: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        Ok(BTreeMap::new())
+    }
+
+    fn compute_files(
+        &self,
+        _cluster: &Self::Configurable,
+        _role_name: &str,
+        _file: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
+        Ok(BTreeMap::new())
     }
 }
 
@@ -753,56 +797,6 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     }
 }
 
-impl Configuration for AirflowConfigFragment {
-    type Configurable = AirflowCluster;
-
-    fn compute_env(
-        &self,
-        cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
-        env.insert(
-            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.cluster_config.credentials_secret.clone()),
-        );
-        Ok(env)
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        _file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowClusterStatus {
-    #[serde(default)]
-    pub conditions: Vec<ClusterCondition>,
-}
-
-impl HasStatusCondition for AirflowCluster {
-    fn conditions(&self) -> Vec<ClusterCondition> {
-        match &self.status {
-            Some(status) => status.conditions.clone(),
-            None => vec![],
-        }
-    }
-}
-
 /// Creates recommended `ObjectLabels` to be used in deployed resources
 pub fn build_recommended_labels<'a, T>(
     owner: &'a T,
@@ -826,7 +820,7 @@ pub fn build_recommended_labels<'a, T>(
 mod tests {
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
-    use crate::AirflowCluster;
+    use crate::v1alpha1::AirflowCluster;
 
     #[test]
     fn test_cluster_config() {

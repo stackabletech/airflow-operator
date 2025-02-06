@@ -1,4 +1,4 @@
-//! Ensures that `Pod`s are configured and running for each [`AirflowCluster`]
+//! Ensures that `Pod`s are configured and running for each [`v1alpha1::AirflowCluster`]
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
@@ -13,18 +13,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_airflow_crd::{
-    authentication::{
-        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-    },
-    build_recommended_labels,
-    git_sync::GitSync,
-    AirflowCluster, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
-    AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
-    AIRFLOW_UID, APP_NAME, CONFIG_PATH, GIT_CONTENT, GIT_ROOT, GIT_SYNC_NAME, LOG_CONFIG_DIR,
-    OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
-    TEMPLATE_VOLUME_NAME,
-};
 use stackable_operator::{
     builder::{
         self,
@@ -86,6 +74,18 @@ use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    crd::{
+        self,
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        },
+        build_recommended_labels,
+        git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT},
+        v1alpha1, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
+        AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
+        AIRFLOW_UID, APP_NAME, CONFIG_PATH, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+    },
     env_vars::{
         self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
     },
@@ -113,7 +113,6 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
@@ -129,19 +128,19 @@ pub enum Error {
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
     },
 
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
     },
 
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
     },
 
     #[snafu(display("invalid product config"))]
@@ -192,19 +191,17 @@ pub enum Error {
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
-        rolegroup: RoleGroupRef<AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
     },
 
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::builder::configmap::Error,
-        rolegroup: RoleGroupRef<AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
     },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig {
-        source: stackable_airflow_crd::Error,
-    },
+    FailedToResolveConfig { source: crd::Error },
 
     #[snafu(display("could not parse Airflow role [{role}]"))]
     UnidentifiedAirflowRole {
@@ -249,9 +246,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to apply authentication configuration"))]
-    InvalidAuthenticationConfig {
-        source: stackable_airflow_crd::authentication::Error,
-    },
+    InvalidAuthenticationConfig { source: crd::authentication::Error },
 
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
@@ -336,7 +331,7 @@ impl ReconcilerError for Error {
 }
 
 pub async fn reconcile_airflow(
-    airflow: Arc<DeserializeGuard<AirflowCluster>>,
+    airflow: Arc<DeserializeGuard<v1alpha1::AirflowCluster>>,
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconcile");
@@ -558,7 +553,7 @@ pub async fn reconcile_airflow(
 
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
@@ -612,7 +607,7 @@ async fn build_executor_template(
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside the cluster.
 fn build_role_service(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     role_name: &str,
     port: u16,
@@ -674,9 +669,9 @@ fn role_port(role_name: &str) -> Option<u16> {
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<AirflowCluster>,
+    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     logging: &Logging<Container>,
@@ -760,9 +755,9 @@ fn build_rolegroup_config_map(
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<AirflowCluster>,
+    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
 ) -> Result<Service> {
     let mut ports = vec![ServicePort {
         name: Some(METRICS_PORT_NAME.into()),
@@ -807,9 +802,9 @@ fn build_rolegroup_service(
 }
 
 fn build_rolegroup_metadata(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &&ResolvedProductImage,
-    rolegroup: &&RoleGroupRef<AirflowCluster>,
+    rolegroup: &&RoleGroupRef<v1alpha1::AirflowCluster>,
     prometheus_label: Label,
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
@@ -835,10 +830,10 @@ fn build_rolegroup_metadata(
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     airflow_role: &AirflowRole,
-    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     service_account: &ServiceAccount,
@@ -1008,7 +1003,7 @@ fn build_server_rolegroup_statefulset(
         )?;
 
         pb.add_volume(
-            VolumeBuilder::new(GIT_CONTENT)
+            VolumeBuilder::new(GIT_SYNC_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         )
@@ -1116,14 +1111,14 @@ fn build_logging_container(
 
 #[allow(clippy::too_many_arguments)]
 fn build_executor_template_config_map(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
-    rolegroup_ref: &RoleGroupRef<AirflowCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
@@ -1203,7 +1198,7 @@ fn build_executor_template_config_map(
             airflow.volume_mounts(),
         )?;
         pb.add_volume(
-            VolumeBuilder::new(GIT_CONTENT)
+            VolumeBuilder::new(GIT_SYNC_CONTENT)
                 .empty_dir(EmptyDirVolumeSource::default())
                 .build(),
         )
@@ -1275,7 +1270,7 @@ fn build_gitsync_container(
             "-c".to_string(),
         ])
         .args(vec![gitsync.get_args(one_time).join("\n")])
-        .add_volume_mount(GIT_CONTENT, GIT_ROOT)
+        .add_volume_mount(GIT_SYNC_CONTENT, GIT_SYNC_ROOT)
         .context(AddVolumeMountSnafu)?
         .add_volume_mounts(volume_mounts)
         .context(AddVolumeMountSnafu)?
@@ -1292,7 +1287,7 @@ fn build_gitsync_container(
 }
 
 pub fn error_policy(
-    _obj: Arc<DeserializeGuard<AirflowCluster>>,
+    _obj: Arc<DeserializeGuard<v1alpha1::AirflowCluster>>,
     error: &Error,
     _ctx: Arc<Ctx>,
 ) -> Action {

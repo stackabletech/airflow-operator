@@ -110,11 +110,6 @@ pub fn default_user_registration_role() -> String {
     "Public".to_string()
 }
 
-/// Matches Flask's default mode of syncing at registration
-pub fn default_sync_roles_at() -> FlaskRolesSyncMoment {
-    FlaskRolesSyncMoment::Registration
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, Default)]
 pub enum FlaskRolesSyncMoment {
     #[default]

@@ -5,7 +5,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
 
-use crate::{AirflowRole, APP_NAME};
+use crate::crd::{AirflowRole, APP_NAME};
 
 /// Used for all [`AirflowRole`]s besides executors.
 pub fn get_affinity(cluster_name: &str, role: &AirflowRole) -> StackableAffinityFragment {
@@ -40,7 +40,6 @@ fn get_affinity_for_role(cluster_name: &str, role: &str) -> StackableAffinityFra
 }
 #[cfg(test)]
 mod tests {
-
     use std::collections::BTreeMap;
 
     use rstest::rstest;
@@ -56,7 +55,7 @@ mod tests {
         role_utils::RoleGroupRef,
     };
 
-    use crate::{AirflowCluster, AirflowRole};
+    use crate::crd::{v1alpha1, AirflowExecutor, AirflowRole};
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -88,7 +87,7 @@ mod tests {
         ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: AirflowCluster =
+        let airflow: v1alpha1::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let rolegroup_ref = RoleGroupRef {
@@ -179,7 +178,7 @@ mod tests {
           ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: AirflowCluster =
+        let airflow: v1alpha1::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {
@@ -236,8 +235,8 @@ mod tests {
         };
 
         let executor_config = match &airflow.spec.executor {
-            crate::AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
-            crate::AirflowExecutor::KubernetesExecutor {
+            AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
+            AirflowExecutor::KubernetesExecutor {
                 common_configuration,
             } => &common_configuration.config,
         };
