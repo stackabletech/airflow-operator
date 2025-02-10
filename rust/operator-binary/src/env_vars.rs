@@ -1,51 +1,58 @@
-use crate::util::env_var_from_secret;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
 use product_config::types::PropertyNameKind;
-use stackable_airflow_crd::{
-    authentication::{
-        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-    },
-    authorization::AirflowAuthorizationResolved,
-    git_sync::GitSync,
-    AirflowCluster, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, GIT_LINK,
-    GIT_SYNC_DIR, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
-};
 use stackable_operator::{
     commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
 };
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+use crate::{
+    crd::{
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        },
+        authorization::AirflowAuthorizationResolved,
+        git_sync::{GitSync, GIT_SYNC_DIR, GIT_SYNC_LINK},
+        v1alpha1, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+    },
+    util::env_var_from_secret,
+};
 
 const AIRFLOW__CORE__AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
-const AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
-const AIRFLOW__METRICS__STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
-const AIRFLOW__METRICS__STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
-const AIRFLOW__METRICS__STATSD_PORT: &str = "AIRFLOW__METRICS__STATSD_PORT";
+const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
+const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
+const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
+const AIRFLOW_METRICS_STATSD_PORT: &str = "AIRFLOW__METRICS__STATSD_PORT";
+const AIRFLOW_API_AUTH_BACKEND: &str = "AIRFLOW__API__AUTH_BACKEND";
+const AIRFLOW_WEBSERVER_SECRET_KEY: &str = "AIRFLOW__WEBSERVER__SECRET_KEY";
+const AIRFLOW_CORE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__CORE__SQL_ALCHEMY_CONN";
+const AIRFLOW_CELERY_RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
+const AIRFLOW_CELERY_BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
+const AIRFLOW_CORE_DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
+const AIRFLOW_CORE_LOAD_EXAMPLES: &str = "AIRFLOW__CORE__LOAD_EXAMPLES";
+const AIRFLOW_WEBSERVER_EXPOSE_CONFIG: &str = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG";
+const AIRFLOW_CORE_EXECUTOR: &str = "AIRFLOW__CORE__EXECUTOR";
+const AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE: &str =
+    "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE";
+const AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE: &str = "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE";
+
+const ADMIN_FIRSTNAME: &str = "ADMIN_FIRSTNAME";
+const ADMIN_USERNAME: &str = "ADMIN_USERNAME";
+const ADMIN_LASTNAME: &str = "ADMIN_LASTNAME";
+const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
+const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
+
 const GITSYNC_USERNAME: &str = "GITSYNC_USERNAME";
 const GITSYNC_PASSWORD: &str = "GITSYNC_PASSWORD";
-const AIRFLOW__API__AUTH_BACKEND: &str = "AIRFLOW__API__AUTH_BACKEND";
-const AIRFLOW__WEBSERVER__SECRET_KEY: &str = "AIRFLOW__WEBSERVER__SECRET_KEY";
-const AIRFLOW__CORE__SQL_ALCHEMY_CONN: &str = "AIRFLOW__CORE__SQL_ALCHEMY_CONN";
-const AIRFLOW__CELERY__RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
-const AIRFLOW__CELERY__BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
-const AIRFLOW__CORE__DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
+
 const PYTHONPATH: &str = "PYTHONPATH";
-const AIRFLOW__CORE__LOAD_EXAMPLES: &str = "AIRFLOW__CORE__LOAD_EXAMPLES";
-const AIRFLOW__WEBSERVER__EXPOSE_CONFIG: &str = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG";
-const AIRFLOW__CORE__EXECUTOR: &str = "AIRFLOW__CORE__EXECUTOR";
-const AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE: &str =
-    "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE";
-const AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: &str = "AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE";
-const ADMIN_USERNAME: &str = "ADMIN_USERNAME";
-const ADMIN_FIRSTNAME: &str = "ADMIN_FIRSTNAME";
-const ADMIN_LASTNAME: &str = "ADMIN_LASTNAME";
-const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
-const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
 pub fn build_airflow_statefulset_envs(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     airflow_role: &AirflowRole,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
@@ -64,19 +71,19 @@ pub fn build_airflow_statefulset_envs(
 
     if let Some(secret) = secret_prop {
         env.insert(
-            AIRFLOW__WEBSERVER__SECRET_KEY.into(),
+            AIRFLOW_WEBSERVER_SECRET_KEY.into(),
             // The secret key is used to run the webserver flask app and also used to authorize
             // requests to Celery workers when logs are retrieved.
             env_var_from_secret(
-                AIRFLOW__WEBSERVER__SECRET_KEY,
+                AIRFLOW_WEBSERVER_SECRET_KEY,
                 secret,
                 "connections.secretKey",
             ),
         );
         env.insert(
-            AIRFLOW__CORE__SQL_ALCHEMY_CONN.into(),
+            AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
             env_var_from_secret(
-                AIRFLOW__CORE__SQL_ALCHEMY_CONN,
+                AIRFLOW_CORE_SQL_ALCHEMY_CONN,
                 secret,
                 "connections.sqlalchemyDatabaseUri",
             ),
@@ -86,17 +93,17 @@ pub fn build_airflow_statefulset_envs(
         // see https://github.com/stackabletech/airflow-operator/issues/424 for details
         if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
             env.insert(
-                AIRFLOW__CELERY__RESULT_BACKEND.into(),
+                AIRFLOW_CELERY_RESULT_BACKEND.into(),
                 env_var_from_secret(
-                    AIRFLOW__CELERY__RESULT_BACKEND,
+                    AIRFLOW_CELERY_RESULT_BACKEND,
                     secret,
                     "connections.celeryResultBackend",
                 ),
             );
             env.insert(
-                AIRFLOW__CELERY__BROKER_URL.into(),
+                AIRFLOW_CELERY_BROKER_URL.into(),
                 env_var_from_secret(
-                    AIRFLOW__CELERY__BROKER_URL,
+                    AIRFLOW_CELERY_BROKER_URL,
                     secret,
                     "connections.celeryBrokerUrl",
                 ),
@@ -106,9 +113,9 @@ pub fn build_airflow_statefulset_envs(
 
     let dags_folder = get_dags_folder(airflow);
     env.insert(
-        AIRFLOW__CORE__DAGS_FOLDER.into(),
+        AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
-            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+            name: AIRFLOW_CORE_DAGS_FOLDER.into(),
             value: Some(dags_folder),
             ..Default::default()
         },
@@ -116,18 +123,18 @@ pub fn build_airflow_statefulset_envs(
 
     if airflow.spec.cluster_config.load_examples {
         env.insert(
-            AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+            AIRFLOW_CORE_LOAD_EXAMPLES.into(),
             EnvVar {
-                name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+                name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
                 value: Some("True".into()),
                 ..Default::default()
             },
         );
     } else {
         env.insert(
-            AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+            AIRFLOW_CORE_LOAD_EXAMPLES.into(),
             EnvVar {
-                name: AIRFLOW__CORE__LOAD_EXAMPLES.into(),
+                name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
                 value: Some("False".into()),
                 ..Default::default()
             },
@@ -136,9 +143,9 @@ pub fn build_airflow_statefulset_envs(
 
     if airflow.spec.cluster_config.expose_config {
         env.insert(
-            AIRFLOW__WEBSERVER__EXPOSE_CONFIG.into(),
+            AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
             EnvVar {
-                name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG.into(),
+                name: AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
                 value: Some("True".into()),
                 ..Default::default()
             },
@@ -146,9 +153,9 @@ pub fn build_airflow_statefulset_envs(
     }
 
     env.insert(
-        AIRFLOW__CORE__EXECUTOR.into(),
+        AIRFLOW_CORE_EXECUTOR.into(),
         EnvVar {
-            name: AIRFLOW__CORE__EXECUTOR.into(),
+            name: AIRFLOW_CORE_EXECUTOR.into(),
             value: Some(executor.to_string()),
             ..Default::default()
         },
@@ -156,17 +163,17 @@ pub fn build_airflow_statefulset_envs(
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         env.insert(
-            AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE.into(),
+            AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE.into(),
             EnvVar {
-                name: AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE.into(),
+                name: AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE.into(),
                 value: Some(format!("{TEMPLATE_LOCATION}/{TEMPLATE_NAME}")),
                 ..Default::default()
             },
         );
         env.insert(
-            AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+            AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
             EnvVar {
-                name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+                name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
                 value: airflow.namespace(),
                 ..Default::default()
             },
@@ -234,25 +241,25 @@ pub fn build_airflow_statefulset_envs(
     transform_map_to_vec(env)
 }
 
-fn get_dags_folder(airflow: &AirflowCluster) -> String {
-    if let Some(GitSync {
+fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
+    return if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
     {
-        format!("{GIT_SYNC_DIR}/{GIT_LINK}/{dags_folder}")
+        format!("{GIT_SYNC_DIR}/{GIT_SYNC_LINK}/{dags_folder}")
     } else {
         // if this has not been set for dag-provisioning via gitsync (above), set the default value
         // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
         // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
         "/stackable/airflow/dags".to_string()
-    }
+    };
 }
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     let dags_folder = get_dags_folder(airflow);
@@ -269,48 +276,48 @@ fn static_envs(airflow: &AirflowCluster) -> BTreeMap<String, EnvVar> {
         },
     );
     env.insert(
-        AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS.into(),
+        AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(),
         EnvVar {
-            name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS.into(),
+            name: AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(),
             value: Some("log_config.LOGGING_CONFIG".into()),
             ..Default::default()
         },
     );
 
     env.insert(
-        AIRFLOW__METRICS__STATSD_ON.into(),
+        AIRFLOW_METRICS_STATSD_ON.into(),
         EnvVar {
-            name: AIRFLOW__METRICS__STATSD_ON.into(),
+            name: AIRFLOW_METRICS_STATSD_ON.into(),
             value: Some("True".into()),
             ..Default::default()
         },
     );
 
     env.insert(
-        AIRFLOW__METRICS__STATSD_HOST.into(),
+        AIRFLOW_METRICS_STATSD_HOST.into(),
         EnvVar {
-            name: AIRFLOW__METRICS__STATSD_HOST.into(),
+            name: AIRFLOW_METRICS_STATSD_HOST.into(),
             value: Some("0.0.0.0".into()),
             ..Default::default()
         },
     );
 
     env.insert(
-        AIRFLOW__METRICS__STATSD_PORT.into(),
+        AIRFLOW_METRICS_STATSD_PORT.into(),
         EnvVar {
-            name: AIRFLOW__METRICS__STATSD_PORT.into(),
+            name: AIRFLOW_METRICS_STATSD_PORT.into(),
             value: Some("9125".into()),
             ..Default::default()
         },
     );
 
     env.insert(
-        AIRFLOW__API__AUTH_BACKEND.into(),
+        AIRFLOW_API_AUTH_BACKEND.into(),
         // Authentication for the API is handled separately to the Web Authentication.
         // Basic authentication is used by the integration tests.
         // The default is to deny all requests to the API.
         EnvVar {
-            name: AIRFLOW__API__AUTH_BACKEND.into(),
+            name: AIRFLOW_API_AUTH_BACKEND.into(),
             value: Some("airflow.api.auth.backend.basic_auth".into()),
             ..Default::default()
         },
@@ -359,7 +366,7 @@ fn add_gitsync_credentials(
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
-    airflow: &AirflowCluster,
+    airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
 ) -> Vec<EnvVar> {
@@ -367,27 +374,27 @@ pub fn build_airflow_template_envs(
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
     env.insert(
-        AIRFLOW__CORE__SQL_ALCHEMY_CONN.into(),
+        AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
         env_var_from_secret(
-            AIRFLOW__CORE__SQL_ALCHEMY_CONN,
+            AIRFLOW_CORE_SQL_ALCHEMY_CONN,
             secret,
             "connections.sqlalchemyDatabaseUri",
         ),
     );
 
     env.insert(
-        AIRFLOW__CORE__EXECUTOR.into(),
+        AIRFLOW_CORE_EXECUTOR.into(),
         EnvVar {
-            name: AIRFLOW__CORE__EXECUTOR.into(),
+            name: AIRFLOW_CORE_EXECUTOR.into(),
             value: Some("LocalExecutor".to_string()),
             ..Default::default()
         },
     );
 
     env.insert(
-        AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+        AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
         EnvVar {
-            name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.into(),
+            name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
             value: airflow.namespace(),
             ..Default::default()
         },
@@ -397,9 +404,9 @@ pub fn build_airflow_template_envs(
     // to the pods started by airflow.
     let dags_folder = get_dags_folder(airflow);
     env.insert(
-        AIRFLOW__CORE__DAGS_FOLDER.into(),
+        AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
-            name: AIRFLOW__CORE__DAGS_FOLDER.into(),
+            name: AIRFLOW_CORE_DAGS_FOLDER.into(),
             value: Some(dags_folder),
             ..Default::default()
         },

@@ -1,11 +1,20 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     schemars::{self, JsonSchema},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::collections::BTreeMap;
 
-use crate::{GIT_LINK, GIT_ROOT, GIT_SAFE_DIR, GIT_SYNC_DEPTH, GIT_SYNC_PERIOD_SECONDS};
+pub const GIT_SYNC_CONTENT: &str = "content-from-git";
+pub const GIT_SYNC_SAFE_DIR: &str = "safe.directory";
+pub const GIT_SYNC_DIR: &str = "/stackable/app/git";
+pub const GIT_SYNC_ROOT: &str = "/tmp/git";
+pub const GIT_SYNC_LINK: &str = "current";
+pub const GIT_SYNC_NAME: &str = "gitsync";
+
+const GIT_SYNC_PERIOD_SECONDS: u16 = 20u16;
+const GIT_SYNC_DEPTH: u8 = 1u8;
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,7 +46,7 @@ impl GitSync {
     /// a pod template and is terminated by airflow itself). The `one_time` parameter is used
     /// to indicate this.
     pub fn get_args(&self, one_time: bool) -> Vec<String> {
-        let mut git_config = format!("{GIT_SAFE_DIR}:{GIT_ROOT}");
+        let mut git_config = format!("{GIT_SYNC_SAFE_DIR}:{GIT_SYNC_ROOT}");
         let mut git_sync_command = vec![
             "/stackable/git-sync".to_string(),
             format!("--repo={}", self.repo.clone()),
@@ -47,8 +56,8 @@ impl GitSync {
             ),
             format!("--depth={}", self.depth.unwrap_or(GIT_SYNC_DEPTH)),
             format!("--period={}s", self.wait.unwrap_or(GIT_SYNC_PERIOD_SECONDS)),
-            format!("--link={GIT_LINK}"),
-            format!("--root={GIT_ROOT}"),
+            format!("--link={GIT_SYNC_LINK}"),
+            format!("--root={GIT_SYNC_ROOT}"),
         ];
         if let Some(git_sync_conf) = self.git_sync_conf.as_ref() {
             for (key, value) in git_sync_conf {
@@ -59,8 +68,8 @@ impl GitSync {
                 } else {
                     // both "-git-config" and "--gitconfig" are recognized by gitsync
                     if key.to_lowercase().ends_with("-git-config") {
-                        if value.to_lowercase().contains(GIT_SAFE_DIR) {
-                            tracing::warn!("Config option {value:?} contains a value for {GIT_SAFE_DIR} that overrides
+                        if value.to_lowercase().contains(GIT_SYNC_SAFE_DIR) {
+                            tracing::warn!("Config option {value:?} contains a value for {GIT_SYNC_SAFE_DIR} that overrides
                                 the value of this operator. Git-sync functionality will probably not work as expected!");
                         }
                         git_config = format!("{git_config},{value}");
@@ -96,8 +105,9 @@ impl GitSync {
 
 #[cfg(test)]
 mod tests {
-    use crate::AirflowCluster;
     use rstest::rstest;
+
+    use crate::v1alpha1::AirflowCluster;
 
     #[test]
     fn test_git_sync() {
