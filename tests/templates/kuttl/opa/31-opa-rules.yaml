@@ -26,7 +26,6 @@ data:
         input.method == "POST"
         input.resource_name == "Users"
 
-        input.user.id == 1
         input.user.name == "airflow"
     }
 
@@ -35,7 +34,6 @@ data:
         input.method == "GET"
         input.details.section == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -44,7 +42,6 @@ data:
         input.method == "GET"
         input.details.section == "core"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -53,7 +50,6 @@ data:
         input.method == "GET"
         input.details.conn_id == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -62,7 +58,6 @@ data:
         input.method == "GET"
         input.details.conn_id == "postgres_default"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -72,7 +67,6 @@ data:
         input.access_entity == null
         input.details.id == "example_trigger_target_dag"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -82,7 +76,6 @@ data:
         input.access_entity == "RUN"
         input.details.id == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -92,7 +85,6 @@ data:
         input.access_entity == "RUN"
         input.details.id == "example_trigger_target_dag"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -101,16 +93,14 @@ data:
         input.method == "GET"
         input.details.uri == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/datasets/s3%3A%2F%2Fbucket%2Fmy-task
+    # GET /api/v1/datasets/s3%3A%2F%2Fdag1%2Foutput_1.txt
     is_authorized_dataset if {
         input.method == "GET"
-        input.details.uri == "s3://bucket/my-task"
+        input.details.uri == "s3://dag1/output_1.txt"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -119,7 +109,6 @@ data:
         input.method == "GET"
         input.details.name == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -128,7 +117,6 @@ data:
         input.method == "GET"
         input.details.name == "default_pool"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -137,7 +125,6 @@ data:
         input.method == "POST"
         input.details.key == null
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -146,7 +133,6 @@ data:
         input.method == "GET"
         input.details.key == "myVar"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -154,7 +140,6 @@ data:
     is_authorized_view if {
         input.access_view == "WEBSITE"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }
 
@@ -163,6 +148,5 @@ data:
         input.method == "PUT"
         input.resource_name == "Users"
 
-        input.user.id == 2
         input.user.name == "jane.doe"
     }

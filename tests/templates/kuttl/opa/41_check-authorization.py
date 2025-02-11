@@ -106,7 +106,7 @@ def test_is_authorized_dataset():
     # uri == null
     check_api_authorization("GET", "datasets")
     # uri != null
-    check_api_authorization("GET", "datasets/s3%3A%2F%2Fbucket%2Fmy-task")
+    check_api_authorization("GET", "datasets/s3%3A%2F%2Fdag1%2Foutput_1.txt")
 
 
 def test_is_authorized_pool():
