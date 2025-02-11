@@ -19,7 +19,7 @@ use crate::{
     util::env_var_from_secret,
 };
 
-const AIRFLOW__CORE__AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
+const AIRFLOW_CORE_AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
 const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
@@ -517,7 +517,7 @@ fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -
 
     if authorization_config.opa.is_some() {
         env.push(EnvVar {
-            name: AIRFLOW__CORE__AUTH_MANAGER.into(),
+            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
             value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
             ..Default::default()
         });

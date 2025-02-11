@@ -204,6 +204,17 @@ pub mod versioned {
         #[serde(default)]
         pub authentication: Vec<AirflowClientAuthenticationDetails>,
 
+        /// Authorization options.
+        /// Learn more in the [Airflow authorization usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security#_authorization).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub authorization: Option<AirflowAuthorization>,
+
+        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// Read the
+        /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
+        /// to find out more.
+        pub credentials_secret: String,
+
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
         /// Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
@@ -249,17 +260,6 @@ pub mod versioned {
         #[serde(default)]
         #[schemars(schema_with = "raw_object_list_schema")]
         pub volume_mounts: Vec<VolumeMount>,
-
-        /// Authorization options.
-        /// Learn more in the [Airflow authorization usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security#_authorization).
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub authorization: Option<AirflowAuthorization>,
-
-        /// The name of the Secret object containing the admin user credentials and database connection details.
-        /// Read the
-        /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
-        /// to find out more.
-        pub credentials_secret: String,
     }
 }
 
