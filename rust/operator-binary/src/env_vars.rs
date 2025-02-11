@@ -242,7 +242,7 @@ pub fn build_airflow_statefulset_envs(
 }
 
 fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
-    return if let Some(GitSync {
+    if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
@@ -254,7 +254,7 @@ fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
         // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
         "/stackable/airflow/dags".to_string()
-    };
+    }
 }
 
 // This set of environment variables is a standard set that is not dependent on any
