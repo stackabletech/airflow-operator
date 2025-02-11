@@ -11,6 +11,7 @@ use crate::{
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
+        authorization::AirflowAuthorizationResolved,
         git_sync::{GitSync, GIT_SYNC_DIR, GIT_SYNC_LINK},
         v1alpha1, AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
         STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
@@ -18,6 +19,7 @@ use crate::{
     util::env_var_from_secret,
 };
 
+const AIRFLOW_CORE_AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
 const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
@@ -55,6 +57,7 @@ pub fn build_airflow_statefulset_envs(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -204,8 +207,9 @@ pub fn build_airflow_statefulset_envs(
             );
         }
         AirflowRole::Webserver => {
-            let auth_vars = authentication_env_vars(auth_config);
-            env.extend(auth_vars.into_iter().map(|var| (var.name.to_owned(), var)));
+            let mut vars = authentication_env_vars(auth_config);
+            vars.extend(authorization_env_vars(authorization_config));
+            env.extend(vars.into_iter().map(|var| (var.name.to_owned(), var)));
         }
         _ => {}
     }
@@ -238,7 +242,7 @@ pub fn build_airflow_statefulset_envs(
 }
 
 fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
-    return if let Some(GitSync {
+    if let Some(GitSync {
         git_folder: Some(dags_folder),
         ..
     }) = airflow.git_sync()
@@ -250,7 +254,7 @@ fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
         // /stackable/airflow is used instead of $AIRFLOW_HOME.
         // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
         "/stackable/airflow/dags".to_string()
-    };
+    }
 }
 
 // This set of environment variables is a standard set that is not dependent on any
@@ -506,4 +510,18 @@ fn authentication_env_vars(
         .cloned()
         .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
+}
+
+fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -> Vec<EnvVar> {
+    let mut env = vec![];
+
+    if authorization_config.opa.is_some() {
+        env.push(EnvVar {
+            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+            value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
+            ..Default::default()
+        });
+    }
+
+    env
 }

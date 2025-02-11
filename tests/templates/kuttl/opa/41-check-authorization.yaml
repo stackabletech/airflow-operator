@@ -1,0 +1,10 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: login
+commands:
+  - script: >
+      kubectl cp
+      41_check-authorization.py
+      $NAMESPACE/test-runner-0:/stackable/check-authorization.py

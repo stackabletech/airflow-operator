@@ -6,7 +6,9 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
+        cache::UserInformationCache,
         cluster_operation::ClusterOperation,
+        opa::OpaConfig,
         product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -53,6 +55,7 @@ use crate::crd::{
 
 pub mod affinity;
 pub mod authentication;
+pub mod authorization;
 pub mod git_sync;
 
 pub const AIRFLOW_UID: i64 = 1000;
@@ -110,6 +113,10 @@ pub enum AirflowConfigOptions {
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
     AuthLdapAllowSelfSigned,
+    AuthOpaCacheMaxsize,
+    AuthOpaCacheTtlInSec,
+    AuthOpaRequestUrl,
+    AuthOpaRequestTimeout,
 }
 
 impl FlaskAppConfigOptions for AirflowConfigOptions {
@@ -135,6 +142,10 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
             AirflowConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
+            AirflowConfigOptions::AuthOpaCacheMaxsize => PythonType::IntLiteral,
+            AirflowConfigOptions::AuthOpaCacheTtlInSec => PythonType::IntLiteral,
+            AirflowConfigOptions::AuthOpaRequestUrl => PythonType::StringLiteral,
+            AirflowConfigOptions::AuthOpaRequestTimeout => PythonType::IntLiteral,
         }
     }
 }
@@ -192,6 +203,11 @@ pub mod versioned {
     pub struct AirflowClusterConfig {
         #[serde(default)]
         pub authentication: Vec<AirflowClientAuthenticationDetails>,
+
+        /// Authorization options.
+        /// Learn more in the [Airflow authorization usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/security#_authorization).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub authorization: Option<AirflowAuthorization>,
 
         /// The name of the Secret object containing the admin user credentials and database connection details.
         /// Read the
@@ -401,6 +417,22 @@ impl v1alpha1::AirflowCluster {
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowAuthorization {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opa: Option<AirflowOpaConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowOpaConfig {
+    #[serde(flatten)]
+    pub opa: OpaConfig,
+    #[serde(default)]
+    pub cache: UserInformationCache,
 }
 
 // TODO: Temporary solution until listener-operator is finished

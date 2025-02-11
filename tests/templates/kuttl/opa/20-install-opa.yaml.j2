@@ -1,0 +1,29 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-opa
+---
+apiVersion: opa.stackable.tech/v1alpha1
+kind: OpaCluster
+metadata:
+  name: opa
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['opa-latest'] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  servers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          opa:
+            loggers:
+              decision:
+                level: INFO
+    roleGroups:
+      default: {}
