@@ -38,7 +38,8 @@ Afterwards the Pod is immediately terminated and e.g. console output or logs are
 
 In order to persist task logs, Airflow can be configured to store its https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/kubernetes_executor.html#managing-dags-and-logs[executor logs on disk (PV)] or as described in the following section on S3.
 
-=== Airflow Web UI
+[#s3-connection]
+=== Add S3 connection in Airflow Web UI
 
 In the Airflow Web UI, click on `Admin` -> `Connections` -> `Add a new record` (the plus).
 Then enter your MinIO host and credentials as shown.
@@ -67,3 +68,47 @@ include::example$example-airflow-kubernetes-executor-s3-logging.yaml[]
 Now you should be able to fetch and inspect logs in the Airflow Web UI from S3 for each DAG run.
 
 image::airflow_dag_s3_logs.png[Airflow DAG S3 logs]
+
+== Store xComs objects in object storage (e.g. S3)
+
+By default Airflow stores the xCom (cross-communications) objects in the Airflow database (often times PostgreSQL), which can cause the database to run out of disk space (especially if you have high xCom traffic).
+To prevent this, you can configure Airflow to do the xCom exchange via an object store backend (such as S3) and not the database.
+You can read on details in https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html#object-storage-xcom-backend[the official documentation].
+
+[TIP]
+====
+Airflow stores the xCom objects in the Postgres table `xcom` (e.g. `airflow.public.xcom`).
+You can have a look at that table to see what exactly is getting stored.
+
+To e.g. determine the biggest xCom objects you can use
+[source,sql]
+----
+select
+	length(value) as size,
+	dag_run_id,
+	task_id,
+	map_index,
+	key,
+	dag_id,
+	run_id,
+	"timestamp"
+from xcom
+order by length(value) desc limit 20;
+----
+
+*Being careful* you can also clean up the table to save space in the database.
+In our testing, running `VACUUM FULL` was enough for the changes to take effect on the PostgreSQL disk.
+====
+
+=== Add S3 connection in Airflow Web UI
+
+Please add an S3 connection in the Admin WebUI according to <<#s3-connection>>
+
+=== Executor configuration
+
+In order to configure the S3 xCom backend, you need to add the following environment variables to the Airflow cluster definition:
+
+[source,yaml]
+----
+include::example$example-airflow-kubernetes-executor-s3-xcom.yaml[]
+----
