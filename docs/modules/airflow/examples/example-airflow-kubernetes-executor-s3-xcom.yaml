@@ -1,0 +1,26 @@
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+    productVersion: 2.9.3
+  clusterConfig: {}
+  webservers:
+    envOverrides: &envOverrides
+      AIRFLOW__CORE__XCOM_BACKEND: airflow.providers.common.io.xcom.backend.XComObjectStorageBackend
+      # The connection id is obtained from the user part of the url that you will provide
+      AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_PATH: s3://minio@como-data-platform/airflow/xcom
+      # Any object smaller than the threshold in bytes will be stored in the database and anything larger will be be put in object storage
+      AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_THRESHOLD: "1048576" # 1MB
+      AIRFLOW__COMMON_IO__XCOM_OBJECTSTORAGE_COMPRESSION: gzip
+    roleGroups:
+      default:
+        replicas: 1
+  schedulers:
+    envOverrides: *envOverrides
+    roleGroups:
+      default:
+        replicas: 1
+  kubernetesExecutors:
+    envOverrides: *envOverrides
