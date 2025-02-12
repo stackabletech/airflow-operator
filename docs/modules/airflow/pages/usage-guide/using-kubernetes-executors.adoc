@@ -97,7 +97,7 @@ order by length(value) desc limit 20;
 ----
 
 *Being careful* you can also clean up the table to save space in the database.
-You need to run something like `VACUUM FULL` for the changes to take effect on the PostgreSQL disk.
+In our testing, running `VACUUM FULL` was enough for the changes to take effect on the PostgreSQL disk.
 ====
 
 === Add S3 connection in Airflow Web UI
