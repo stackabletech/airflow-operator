@@ -9,8 +9,6 @@ data:
   airflow.rego: |
     package airflow
 
-    import rego.v1
-
     default is_authorized_configuration := false
     default is_authorized_connection := false
     default is_authorized_dag := false
