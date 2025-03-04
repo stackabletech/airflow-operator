@@ -10,12 +10,14 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.87.0 and stackable-versioned to 0.6.0 ([#591]).
 - Default to OCI for image metadata and product image selection ([#572]).
 
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
 [#572]: https://github.com/stackabletech/airflow-operator/pull/572
 [#573]: https://github.com/stackabletech/airflow-operator/pull/573
+[#591]: https://github.com/stackabletech/airflow-operator/pull/591
 
 ## [24.11.1] - 2025-01-09
 
