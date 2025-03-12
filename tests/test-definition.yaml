@@ -29,60 +29,60 @@ dimensions:
       - "false"
   - name: executor
     values:
-      #- celery
+      - celery
       - kubernetes
 tests:
-  # - name: smoke
-  #   dimensions:
-  #     - airflow
-  #     - openshift
-  #     - executor
-  # - name: mount-dags-configmap
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
-  #     - executor
+  - name: smoke
+    dimensions:
+      - airflow
+      - openshift
+      - executor
+  - name: mount-dags-configmap
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
   - name: mount-dags-gitsync
     dimensions:
       - airflow-latest
       - openshift
       - executor
-  # - name: ldap
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
-  #     - ldap-authentication
-  #     - executor
-  # - name: oidc
-  #   dimensions:
-  #     - airflow
-  #     - openshift
-  # - name: opa
-  #   dimensions:
-  #     - airflow
-  #     - opa-latest
-  #     - openshift
-  # - name: resources
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
-  # - name: orphaned-resources
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
-  # - name: logging
-  #   dimensions:
-  #     - airflow
-  #     - openshift
-  #     - executor
-  # - name: cluster-operation
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
-  # - name: overrides
-  #   dimensions:
-  #     - airflow-latest
-  #     - openshift
+  - name: ldap
+    dimensions:
+      - airflow-latest
+      - openshift
+      - ldap-authentication
+      - executor
+  - name: oidc
+    dimensions:
+      - airflow
+      - openshift
+  - name: opa
+    dimensions:
+      - airflow
+      - opa-latest
+      - openshift
+  - name: resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: orphaned-resources
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: logging
+    dimensions:
+      - airflow
+      - openshift
+      - executor
+  - name: cluster-operation
+    dimensions:
+      - airflow-latest
+      - openshift
+  - name: overrides
+    dimensions:
+      - airflow-latest
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow
