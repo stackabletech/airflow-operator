@@ -7,17 +7,23 @@
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#571]).
 - Add OPA support ([#573]).
+- Support for `2.10.4` ([#594]).
 
 ### Changed
 
 - Bump stackable-operator to 0.87.0 and stackable-versioned to 0.6.0 ([#591]).
 - Default to OCI for image metadata and product image selection ([#572]).
 
+### Removed
+
+- Support for `2.9.2` and `2.10.2` (experimental) ([#594]).
+
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
 [#572]: https://github.com/stackabletech/airflow-operator/pull/572
 [#573]: https://github.com/stackabletech/airflow-operator/pull/573
 [#591]: https://github.com/stackabletech/airflow-operator/pull/591
+[#594]: https://github.com/stackabletech/airflow-operator/pull/594
 
 ## [24.11.1] - 2025-01-09
 
