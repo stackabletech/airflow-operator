@@ -27,7 +27,7 @@ helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgre
   --wait
 # end::helm-add-bitnami-pgs[]
 # tag::helm-add-bitnami-redis[]
-helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/redis \
+helm install airflow-redis oci://registry-1.docker.io/bitnamicharts/redis \
   --version 20.11.3 \
   --set replica.replicaCount=1 \
   --set auth.password=redis \
