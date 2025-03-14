@@ -11,19 +11,27 @@
 
 ### Changed
 
-- Bump stackable-operator to 0.87.0 and stackable-versioned to 0.6.0 ([#591]).
 - Default to OCI for image metadata and product image selection ([#572]).
+- BREAKING: The field `.spec.clusterConfig.dagsGitSync[].wait` changed from `uint8` to our human-readable `Duration` struct.
+  In case you have used `wait: 20` before, you need to change it to `wait: 20s` ([#596]).
+- The field `.spec.clusterConfig.dagsGitSync[].depth` was promoted from `uint8` to `uint32` to allow for more cloning depth.
+  This is a non-breaking change as all previous values are still valid ([#596]).
 
 ### Removed
 
 - Remove support for `2.9.2` and `2.10.2` (experimental) ([#594]).
 
+### Fixed
+
+- Fix `git-sync` functionality in case no `gitFolder` is specified.
+  The `gitFolder` field is now non-nullable, but has a default value, resulting in no breaking change ([#596]).
+
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
 [#572]: https://github.com/stackabletech/airflow-operator/pull/572
 [#573]: https://github.com/stackabletech/airflow-operator/pull/573
-[#591]: https://github.com/stackabletech/airflow-operator/pull/591
 [#594]: https://github.com/stackabletech/airflow-operator/pull/594
+[#596]: https://github.com/stackabletech/airflow-operator/pull/596
 
 ## [24.11.1] - 2025-01-09
 

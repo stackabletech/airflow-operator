@@ -241,19 +241,18 @@ pub fn build_airflow_statefulset_envs(
     transform_map_to_vec(env)
 }
 
-fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
-    if let Some(GitSync {
-        git_folder: Some(dags_folder),
-        ..
-    }) = airflow.git_sync()
-    {
-        format!("{GIT_SYNC_DIR}/{GIT_SYNC_LINK}/{dags_folder}")
-    } else {
-        // if this has not been set for dag-provisioning via gitsync (above), set the default value
-        // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
-        // /stackable/airflow is used instead of $AIRFLOW_HOME.
-        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-        "/stackable/airflow/dags".to_string()
+pub fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
+    match airflow.git_sync() {
+        Some(GitSync { git_folder, .. }) => {
+            format!("{GIT_SYNC_DIR}/{GIT_SYNC_LINK}/{git_folder}")
+        }
+        None => {
+            // if this has not been set for dag-provisioning via gitsync (above), set the default value
+            // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
+            // /stackable/airflow is used instead of $AIRFLOW_HOME.
+            // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+            "/stackable/airflow/dags".to_string()
+        }
     }
 }
 
