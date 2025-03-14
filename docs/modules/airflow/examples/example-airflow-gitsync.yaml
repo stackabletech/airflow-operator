@@ -15,7 +15,7 @@ spec:
         branch: "main" # <4>
         gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <5>
         depth: 10 # <6>
-        wait: 20 # <7>
+        wait: 20s # <7>
         credentialsSecret: git-credentials # <8>
         gitSyncConf: # <9>
           --rev: HEAD # <10>

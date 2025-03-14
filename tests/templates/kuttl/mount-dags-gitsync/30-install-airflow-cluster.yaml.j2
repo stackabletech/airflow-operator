@@ -63,7 +63,7 @@ spec:
     dagsGitSync:
       - repo: https://github.com/stackable-airflow/dags
         branch: "main"
-        wait: 20
+        wait: 20s
         credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set

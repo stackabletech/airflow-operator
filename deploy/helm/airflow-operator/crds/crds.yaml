@@ -537,38 +537,36 @@ spec:
                       items:
                         properties:
                           branch:
+                            default: main
                             description: The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
-                            nullable: true
                             type: string
                           credentialsSecret:
                             description: 'The name of the Secret used to access the repository if it is not public. This should include two fields: `user` and `password`. The `password` field can either be an actual password (not recommended) or a GitHub token, as described [here](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual).'
                             nullable: true
                             type: string
                           depth:
+                            default: 1
                             description: The depth of syncing i.e. the number of commits to clone; defaults to 1.
-                            format: uint8
+                            format: uint32
                             minimum: 0.0
-                            nullable: true
                             type: integer
                           gitFolder:
-                            description: The location of the DAG folder, relative to the synced repository root.
-                            nullable: true
+                            default: ''
+                            description: The location of the DAG folder, relative to the synced repository root. An empty string ("") corresponds to the root folder.
                             type: string
                           gitSyncConf:
                             additionalProperties:
                               type: string
+                            default: {}
                             description: A map of optional configuration settings that are listed in the [git-sync documentation](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual). Read the [git sync example](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_example).
-                            nullable: true
                             type: object
                           repo:
                             description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.'
                             type: string
                           wait:
-                            description: The synchronization interval in seconds; defaults to 20 seconds. Since git-sync v4.x.x this field is mapped to the flag `--period`.
-                            format: uint16
-                            minimum: 0.0
-                            nullable: true
-                            type: integer
+                            default: 20s
+                            description: The synchronization interval, defaults to `20s`. Since git-sync v4.x.x this field is mapped to the flag `--period`.
+                            type: string
                         required:
                           - repo
                         type: object
