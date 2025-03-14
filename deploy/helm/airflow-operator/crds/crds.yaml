@@ -538,7 +538,10 @@ spec:
                         properties:
                           branch:
                             default: main
-                            description: The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
+                            description: |-
+                              The branch to clone. Defaults to `main`.
+
+                              Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             type: string
                           credentialsSecret:
                             description: 'The name of the Secret used to access the repository if it is not public. This should include two fields: `user` and `password`. The `password` field can either be an actual password (not recommended) or a GitHub token, as described [here](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual).'
@@ -565,7 +568,10 @@ spec:
                             type: string
                           wait:
                             default: 20s
-                            description: The synchronization interval, defaults to `20s`. Since git-sync v4.x.x this field is mapped to the flag `--period`.
+                            description: |-
+                              The synchronization interval, e.g. `20s` or `5m`, defaults to `20s`.
+
+                              Since git-sync v4.x.x this field is mapped to the flag `--period`.
                             type: string
                         required:
                           - repo

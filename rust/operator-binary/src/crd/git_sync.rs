@@ -20,7 +20,9 @@ pub struct GitSync {
     /// The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.
     pub repo: String,
 
-    /// The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
+    /// The branch to clone. Defaults to `main`.
+    ///
+    /// Since git-sync v4.x.x this field is mapped to the flag `--ref`.
     #[serde(default = "GitSync::default_branch")]
     pub branch: String,
 
@@ -33,7 +35,9 @@ pub struct GitSync {
     #[serde(default = "GitSync::default_depth")]
     pub depth: u32,
 
-    /// The synchronization interval, defaults to `20s`. Since git-sync v4.x.x this field is mapped to the flag `--period`.
+    /// The synchronization interval, e.g. `20s` or `5m`, defaults to `20s`.
+    ///
+    /// Since git-sync v4.x.x this field is mapped to the flag `--period`.
     #[serde(default = "GitSync::default_wait")]
     pub wait: Duration,
 
