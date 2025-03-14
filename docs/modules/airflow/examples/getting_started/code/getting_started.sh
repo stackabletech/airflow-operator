@@ -18,20 +18,20 @@ then
 fi
 
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
-# tag::helm-add-bitnami-repo[]
-helm repo add bitnami https://charts.bitnami.com/bitnami
-# end::helm-add-bitnami-repo[]
 # tag::helm-add-bitnami-pgs[]
-helm install --wait airflow-postgresql bitnami/postgresql --version 12.1.5 \
-    --set auth.username=airflow \
-    --set auth.password=airflow \
-    --set auth.database=airflow
+helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
+  --version 16.5.0 \
+  --set auth.database=airflow \
+  --set auth.username=airflow \
+  --set auth.password=airflow \
+  --wait
 # end::helm-add-bitnami-pgs[]
 # tag::helm-add-bitnami-redis[]
-helm install --wait airflow-redis bitnami/redis \
-    --set auth.password=redis \
-    --version 17.3.7 \
-    --set replica.replicaCount=1
+helm install airflow-redis oci://registry-1.docker.io/bitnamicharts/redis \
+  --version 20.11.3 \
+  --set replica.replicaCount=1 \
+  --set auth.password=redis \
+  --wait
 # end::helm-add-bitnami-redis[]
 
 case "$1" in
