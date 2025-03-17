@@ -13,10 +13,6 @@ Note that specific versions are declared:
 
 [source,bash]
 ----
-include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-repo]
-----
-[source,bash]
-----
 include::example$getting_started/code/getting_started.sh[tag=helm-add-bitnami-pgs]
 ----
 [source,bash]
