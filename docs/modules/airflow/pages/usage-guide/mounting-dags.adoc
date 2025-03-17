@@ -45,9 +45,12 @@ include::example$example-airflow-gitsync.yaml[]
 <2> The git-gync configuration block that contains list of git-sync elements
 <3> The repository to clone (required)
 <4> The branch name (defaults to `main`)
-<5> The location of the DAG folder, relative to the synced repository root (required)
+<5> The location of the DAG folder, relative to the synced repository root.
+    It can optionally start with `/`, however, no trailing slash is recommended.
+    An empty string (``) or slash (`/`) corresponds to the root folder in Git.
+    Defaults to "/".
 <6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
-<7> The synchronisation interval in seconds (defaults to 20 seconds)
+<7> The synchronisation interval in seconds, e.g. `20s` or `1h` (defaults to "20s")
 <8> The name of the Secret used to access the repository if it is not public.
     This should include two fields: `user` and `password` (which can be either a password -- which is not recommended -- or a GitHub token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
 <9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v4.2.1?tab=readme-ov-file#manual[this] configuration section (and the ones that follow on that link)

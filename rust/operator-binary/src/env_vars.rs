@@ -1,6 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::PathBuf,
+};
 
 use product_config::types::PropertyNameKind;
+use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
@@ -48,6 +52,14 @@ const GITSYNC_PASSWORD: &str = "GITSYNC_PASSWORD";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display(
+        "failed to construct Git DAG folder - Is the git folder a valid path?: {dag_folder:?}"
+    ))]
+    ConstructGitDagFolder { dag_folder: PathBuf },
+}
+
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
@@ -58,10 +70,10 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-) -> Vec<EnvVar> {
+) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    env.extend(static_envs(airflow));
+    env.extend(static_envs(airflow)?);
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -111,7 +123,7 @@ pub fn build_airflow_statefulset_envs(
         }
     }
 
-    let dags_folder = get_dags_folder(airflow);
+    let dags_folder = get_dags_folder(airflow)?;
     env.insert(
         AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
@@ -238,31 +250,40 @@ pub fn build_airflow_statefulset_envs(
     );
 
     tracing::debug!("Env-var set [{:?}]", env);
-    transform_map_to_vec(env)
+    Ok(transform_map_to_vec(env))
 }
 
-fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> String {
-    if let Some(GitSync {
-        git_folder: Some(dags_folder),
-        ..
-    }) = airflow.git_sync()
-    {
-        format!("{GIT_SYNC_DIR}/{GIT_SYNC_LINK}/{dags_folder}")
-    } else {
-        // if this has not been set for dag-provisioning via gitsync (above), set the default value
-        // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
-        // /stackable/airflow is used instead of $AIRFLOW_HOME.
-        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-        "/stackable/airflow/dags".to_string()
+pub fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> Result<String, Error> {
+    match airflow.git_sync() {
+        Some(GitSync { git_folder, .. }) => {
+            let mut dag_folder = PathBuf::from(GIT_SYNC_DIR);
+            dag_folder.push(GIT_SYNC_LINK);
+            // Remove trailing slash
+            let sanitized_git_folder = git_folder.strip_prefix("/").unwrap_or(git_folder);
+            dag_folder.push(sanitized_git_folder);
+            Ok(dag_folder
+                .to_str()
+                .with_context(|| ConstructGitDagFolderSnafu {
+                    dag_folder: dag_folder.clone(),
+                })?
+                .to_string())
+        }
+        None => {
+            // if this has not been set for dag-provisioning via gitsync (above), set the default value
+            // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
+            // /stackable/airflow is used instead of $AIRFLOW_HOME.
+            // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+            Ok("/stackable/airflow/dags".to_string())
+        }
     }
 }
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    let dags_folder = get_dags_folder(airflow);
+    let dags_folder = get_dags_folder(airflow)?;
 
     env.insert(
         PYTHONPATH.into(),
@@ -322,7 +343,7 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
             ..Default::default()
         },
     );
-    env
+    Ok(env)
 }
 
 /// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
@@ -369,7 +390,7 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-) -> Vec<EnvVar> {
+) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
@@ -402,7 +423,7 @@ pub fn build_airflow_template_envs(
 
     // the config map also requires the dag-folder location as this will be passed on
     // to the pods started by airflow.
-    let dags_folder = get_dags_folder(airflow);
+    let dags_folder = get_dags_folder(airflow)?;
     env.insert(
         AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
@@ -412,7 +433,7 @@ pub fn build_airflow_template_envs(
         },
     );
 
-    env.extend(static_envs(airflow));
+    env.extend(static_envs(airflow)?);
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -448,7 +469,7 @@ pub fn build_airflow_template_envs(
     }
 
     tracing::debug!("Env-var set [{:?}]", env);
-    transform_map_to_vec(env)
+    Ok(transform_map_to_vec(env))
 }
 
 /// Return environment variables to be applied to the configuration map used in conjunction with

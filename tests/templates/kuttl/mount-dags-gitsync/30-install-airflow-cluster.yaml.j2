@@ -62,8 +62,11 @@ spec:
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
       - repo: https://github.com/stackable-airflow/dags
-        branch: "main"
-        wait: 20
+{% if test_scenario['values']['executor'] == 'celery' %}
+        # Just setting some values to increase the test coverage (defaults should work just fine)
+        branch: main
+        wait: 5s
+{% endif %}
         credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
