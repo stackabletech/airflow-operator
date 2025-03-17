@@ -259,7 +259,7 @@ pub fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> Result<String, Err
             let mut dag_folder = PathBuf::from(GIT_SYNC_DIR);
             dag_folder.push(GIT_SYNC_LINK);
             // Remove trailing slash
-            let sanitized_git_folder = git_folder.strip_prefix("/").unwrap_or(&git_folder);
+            let sanitized_git_folder = git_folder.strip_prefix("/").unwrap_or(git_folder);
             dag_folder.push(sanitized_git_folder);
             Ok(dag_folder
                 .to_str()
