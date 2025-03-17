@@ -554,8 +554,11 @@ spec:
                             minimum: 0.0
                             type: integer
                           gitFolder:
-                            default: ''
-                            description: The location of the DAG folder, relative to the synced repository root. An empty string ("") corresponds to the root folder.
+                            default: /
+                            description: |-
+                              The location of the DAG folder, relative to the synced repository root.
+
+                              It can optionally start with `/`, however, no trailing slash is recommended. An empty string (``) or slash (`/`) corresponds to the root folder in Git.
                             type: string
                           gitSyncConf:
                             additionalProperties:

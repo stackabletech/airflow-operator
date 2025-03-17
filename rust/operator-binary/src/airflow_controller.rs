@@ -321,6 +321,9 @@ pub enum Error {
     InvalidAirflowCluster {
         source: error_boundary::InvalidObject,
     },
+
+    #[snafu(display("failed to build Statefulset environmental variables"))]
+    BuildStatefulsetEnvVars { source: env_vars::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -914,14 +917,17 @@ fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
-        airflow,
-        airflow_role,
-        rolegroup_config,
-        executor,
-        authentication_config,
-        authorization_config,
-    ));
+    airflow_container.add_env_vars(
+        env_vars::build_airflow_statefulset_envs(
+            airflow,
+            airflow_role,
+            rolegroup_config,
+            executor,
+            authentication_config,
+            authorization_config,
+        )
+        .context(BuildStatefulsetEnvVarsSnafu)?,
+    );
 
     let volume_mounts = airflow.volume_mounts();
     airflow_container
@@ -1180,11 +1186,10 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(merged_executor_config.resources.clone().into())
-        .add_env_vars(build_airflow_template_envs(
-            airflow,
-            env_overrides,
-            merged_executor_config,
-        ))
+        .add_env_vars(
+            build_airflow_template_envs(airflow, env_overrides, merged_executor_config)
+                .context(BuildStatefulsetEnvVarsSnafu)?,
+        )
         .add_volume_mounts(airflow.volume_mounts())
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)

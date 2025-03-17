@@ -45,7 +45,10 @@ include::example$example-airflow-gitsync.yaml[]
 <2> The git-gync configuration block that contains list of git-sync elements
 <3> The repository to clone (required)
 <4> The branch name (defaults to `main`)
-<5> The location of the DAG folder, relative to the synced repository root (defaults to "", which corresponds to the root folder)
+<5> The location of the DAG folder, relative to the synced repository root.
+    It can optionally start with `/`, however, no trailing slash is recommended.
+    An empty string (``) or slash (`/`) corresponds to the root folder in Git.
+    Defaults to "/".
 <6> The depth of syncing i.e. the number of commits to clone (defaults to 1)
 <7> The synchronisation interval in seconds, e.g. `20s` or `1h` (defaults to "20s")
 <8> The name of the Secret used to access the repository if it is not public.

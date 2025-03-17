@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -27,9 +27,11 @@ pub struct GitSync {
     pub branch: String,
 
     /// The location of the DAG folder, relative to the synced repository root.
-    /// An empty string ("") corresponds to the root folder.
+    ///
+    /// It can optionally start with `/`, however, no trailing slash is recommended.
+    /// An empty string (``) or slash (`/`) corresponds to the root folder in Git.
     #[serde(default = "GitSync::default_git_folder")]
-    pub git_folder: String,
+    pub git_folder: PathBuf,
 
     /// The depth of syncing i.e. the number of commits to clone; defaults to 1.
     #[serde(default = "GitSync::default_depth")]
@@ -58,8 +60,8 @@ impl GitSync {
         "main".to_string()
     }
 
-    fn default_git_folder() -> String {
-        "".to_string()
+    fn default_git_folder() -> PathBuf {
+        PathBuf::from("/")
     }
 
     fn default_depth() -> u32 {
@@ -179,7 +181,7 @@ mod tests {
             "https://github.com/stackabletech/airflow-operator"
         );
         assert_eq!(git_sync.branch, "main");
-        assert_eq!(git_sync.git_folder, "");
+        assert_eq!(git_sync.git_folder, PathBuf::from("/"));
         assert_eq!(git_sync.depth, 1);
         assert_eq!(git_sync.wait, Duration::from_secs(20));
         assert_eq!(git_sync.git_sync_conf, BTreeMap::new());
@@ -192,7 +194,7 @@ mod tests {
           &"/stackable/git-sync --repo=https://github.com/stackabletech/airflow-operator --ref=main --depth=1 --period=20s --link=current --root=/tmp/git --one-time=true".to_string()
         ));
         assert_eq!(
-            crate::env_vars::get_dags_folder(&airflow),
+            crate::env_vars::get_dags_folder(&airflow).unwrap(),
             "/stackable/app/git/current/"
         );
     }
@@ -218,7 +220,8 @@ mod tests {
                 wait: 42h
                 gitSyncConf:
                   --ref: c63921857618a8c392ad757dda13090fff3d879a
-                gitFolder: tests/templates/kuttl/mount-dags-gitsync/dags
+                # Intentionally using trailing slashes here
+                gitFolder: ////////tests/templates/kuttl/mount-dags-gitsync/dags
           webservers:
             roleGroups:
               default:
@@ -246,7 +249,7 @@ mod tests {
           &"/stackable/git-sync --repo=https://github.com/stackabletech/airflow-operator --ref=feat/git-sync --depth=1 --period=151200s --link=current --root=/tmp/git --ref=c63921857618a8c392ad757dda13090fff3d879a --git-config='safe.directory:/tmp/git' --one-time=true".to_string()
         ));
         assert_eq!(
-            crate::env_vars::get_dags_folder(&airflow),
+            crate::env_vars::get_dags_folder(&airflow).unwrap(),
             "/stackable/app/git/current/tests/templates/kuttl/mount-dags-gitsync/dags"
         );
     }
