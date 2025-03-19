@@ -52,6 +52,26 @@ spec:
           ROLE_HEADER_VAR = "role-value"
         EXPERIMENTAL_FILE_FOOTER: |
           ROLE_FOOTER_VAR = "role-value"
+        WTF_CSRF_ENABLED: "False"
+        AUTH_ROLES_SYNC_AT_LOGIN: "true"
+        AUTH_USER_REGISTRATION: "false"
+        AUTH_USER_REGISTRATION_ROLE: "Role"
+        OAUTH_PROVIDERS: |
+          [
+            { 'name': 'azure',
+              'icon': 'fa-windows',
+              'token_key': 'access_token',
+              'remote_app': {
+                'client_id': os.environ.get('OIDC_XXX_CLIENT_ID'),
+                'client_secret': os.environ.get('OIDC_XXX_CLIENT_SECRET'),
+                'client_kwargs': {
+                  'scope': 'openid profile'
+                },
+                'api_base_url': 'https://keycloak/realms/sdp/protocol/test-url',
+                'server_metadata_url': 'https://keycloak/realms/sdp/.well-known/openid-configuration-test',
+              },
+            }
+          ]
     roleGroups:
       default:
         replicas: 1
@@ -59,6 +79,7 @@ spec:
           webserver_config.py:
             EXPERIMENTAL_FILE_HEADER: |
               COMMON_HEADER_VAR = "group-value"
+            AUTH_USER_REGISTRATION_ROLE: "Rolegroup"
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     config:

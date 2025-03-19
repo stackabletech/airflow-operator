@@ -696,13 +696,37 @@ fn build_rolegroup_config_map(
     vector_aggregator_address: Option<&str>,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
-    let mut config = rolegroup_config
+    let mut config: BTreeMap<String, String> = BTreeMap::new();
+
+    // this will call default values
+    config::add_airflow_config(&mut config, authentication_config, authorization_config)
+        .context(ConstructConfigSnafu)?;
+
+    tracing::debug!(
+        "Default config for {}: {:?}",
+        rolegroup.object_name(),
+        config
+    );
+
+    let mut file_config = rolegroup_config
         .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
         .cloned()
         .unwrap_or_default();
 
-    config::add_airflow_config(&mut config, authentication_config, authorization_config)
-        .context(ConstructConfigSnafu)?;
+    tracing::debug!(
+        "Config overrides for {}: {:?}",
+        rolegroup.object_name(),
+        file_config
+    );
+
+    // now add any overrides, replacing any defaults
+    config.append(&mut file_config);
+
+    tracing::debug!(
+        "Merged config for {}: {:?}",
+        rolegroup.object_name(),
+        config
+    );
 
     let mut config_file = Vec::new();
 
