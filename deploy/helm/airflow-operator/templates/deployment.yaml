@@ -51,10 +51,6 @@ spec:
             - name: KUBERNETES_CLUSTER_DOMAIN
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
-            {{- if .Values.logLevel }}
-            - name: AIRFLOW_OPERATOR_LOG
-              value: {{ .Values.logLevel | quote }}
-            {{- end }}
       volumes:
         - name: config-spec
           configMap:
