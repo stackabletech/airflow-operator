@@ -1,6 +1,7 @@
 # If tilt_options.json exists read it and load the default_registry value from it
 settings = read_json('tilt_options.json', default={})
 registry = settings.get('default_registry', 'oci.stackable.tech/sandbox')
+loglevel = settings.get('loglevel', '')
 
 # Configure default registry either read from config file above, or with default value of "oci.stackable.tech/sandbox"
 default_registry(registry)
@@ -35,6 +36,7 @@ helm_crds, helm_non_crds = filter_yaml(
       namespace="stackable-operators",
       set=[
          'image.repository=' + registry + '/' + operator_name,
+         'logLevel=' + loglevel
       ],
    ),
    api_version = "^apiextensions\\.k8s\\.io/.*$",
