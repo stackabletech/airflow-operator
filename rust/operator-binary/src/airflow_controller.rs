@@ -698,7 +698,7 @@ fn build_rolegroup_config_map(
 ) -> Result<ConfigMap, Error> {
     let mut config: BTreeMap<String, String> = BTreeMap::new();
 
-    // this will call default values
+    // this will call default values from AirflowClientAuthenticationDetails
     config::add_airflow_config(&mut config, authentication_config, authorization_config)
         .context(ConstructConfigSnafu)?;
 
