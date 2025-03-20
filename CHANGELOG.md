@@ -25,6 +25,7 @@
 
 - Fix `git-sync` functionality in case no `gitFolder` is specified.
   The `gitFolder` field is now non-nullable, but has a default value, resulting in no breaking change ([#596]).
+- Fix configOverrides by applying after defaults ([#597]).
 
 [#557]: https://github.com/stackabletech/airflow-operator/pull/557
 [#571]: https://github.com/stackabletech/airflow-operator/pull/571
@@ -32,6 +33,7 @@
 [#573]: https://github.com/stackabletech/airflow-operator/pull/573
 [#594]: https://github.com/stackabletech/airflow-operator/pull/594
 [#596]: https://github.com/stackabletech/airflow-operator/pull/596
+[#597]: https://github.com/stackabletech/airflow-operator/pull/597
 
 ## [24.11.1] - 2025-01-09
 

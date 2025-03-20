@@ -19,3 +19,7 @@ commands:
       echo "$AIRFLOW_CONFIG" | grep 'COMMON_HEADER_VAR = "group-value"'
       echo "$AIRFLOW_CONFIG" | grep 'ROLE_FOOTER_VAR = "role-value"'
       echo "$AIRFLOW_CONFIG" | grep -v 'ROLE_HEADER_VAR = "role-value"'
+      echo "$AIRFLOW_CONFIG" | grep 'AUTH_ROLES_SYNC_AT_LOGIN = True'
+      echo "$AIRFLOW_CONFIG" | grep 'AUTH_USER_REGISTRATION = False'
+      echo "$AIRFLOW_CONFIG" | grep 'AUTH_USER_REGISTRATION_ROLE = "Rolegroup"'
+      echo "$AIRFLOW_CONFIG" | grep 'OAUTH_PROVIDERS'
