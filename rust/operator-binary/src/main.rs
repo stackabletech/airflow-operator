@@ -5,7 +5,7 @@ use futures::StreamExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::ConfigMap, core::v1::Service},
     kube::{
         core::DeserializeGuard,
         runtime::{
@@ -98,6 +98,7 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let airflow_store_1 = airflow_controller.store();
+            let airflow_store_2 = airflow_controller.store();
             airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -120,6 +121,17 @@ async fn main() -> anyhow::Result<()> {
                                     references_authentication_class(airflow, &authentication_class)
                                 },
                             )
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        airflow_store_2
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow| references_config_map(airflow, &config_map))
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -170,4 +182,27 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_config_map(
+    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+
+    let config_map_name = config_map.name_any();
+    airflow
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        == Some(config_map_name.to_owned())
+        || match airflow.spec.cluster_config.authorization.clone() {
+            Some(airflow_authorization) => match airflow_authorization.opa {
+                Some(opa_config) => opa_config.opa.config_map_name == config_map_name,
+                None => false,
+            },
+            None => false,
+        }
 }
