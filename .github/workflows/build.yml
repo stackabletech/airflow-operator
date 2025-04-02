@@ -136,9 +136,9 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@c5a29ddb4d9d194e7c84ec8c3fba61b1c31fee8c
         with:
-          toolchain: nightly-2025-01-15
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
           components: rustfmt
-      - run: cargo +nightly-2025-01-15 fmt --all -- --check
+      - run: cargo fmt --all -- --check
 
   run_clippy:
     name: Run Clippy
