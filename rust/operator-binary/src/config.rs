@@ -8,12 +8,12 @@ use stackable_operator::commons::{
 };
 
 use crate::crd::{
+    AirflowConfigOptions,
     authentication::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-        FlaskRolesSyncMoment, DEFAULT_OIDC_PROVIDER,
+        DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
     },
     authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
-    AirflowConfigOptions,
 };
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -324,8 +324,8 @@ mod tests {
         config::add_airflow_config,
         crd::{
             authentication::{
-                default_user_registration, AirflowAuthenticationClassResolved,
-                AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
+                AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+                FlaskRolesSyncMoment, default_user_registration,
             },
             authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
         },
@@ -482,9 +482,7 @@ mod tests {
                 ("AUTH_TYPE".into(), "AUTH_OAUTH".into()),
                 ("AUTH_USER_REGISTRATION".into(), "true".into()),
                 ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into()),
-                (
-                    "OAUTH_PROVIDERS".into(),
-                    formatdoc! {"
+                ("OAUTH_PROVIDERS".into(), formatdoc! {"
               [
               {{ 'name': 'keycloak',
                 'icon': 'fa-key',
@@ -513,8 +511,7 @@ mod tests {
                 }},
               }}
               ]
-              "}
-                )
+              "})
             ]),
             result
         );
