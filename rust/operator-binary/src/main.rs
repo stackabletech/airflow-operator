@@ -1,28 +1,29 @@
 use std::sync::Arc;
 
-use clap::{crate_description, crate_version, Parser};
+use clap::{Parser, crate_description, crate_version};
 use futures::StreamExt;
 use stackable_operator::{
+    YamlSchema,
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
+        ResourceExt,
         core::DeserializeGuard,
         runtime::{
+            Controller,
             events::{Recorder, Reporter},
             reflector::ObjectRef,
-            watcher, Controller,
+            watcher,
         },
-        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
-    YamlSchema,
 };
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
-    crd::{v1alpha1, AirflowCluster, APP_NAME, OPERATOR_NAME},
+    crd::{APP_NAME, AirflowCluster, OPERATOR_NAME, v1alpha1},
 };
 
 mod airflow_controller;
@@ -84,13 +85,10 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let event_recorder = Arc::new(Recorder::new(
-                client.as_kube_client(),
-                Reporter {
-                    controller: AIRFLOW_FULL_CONTROLLER_NAME.to_string(),
-                    instance: None,
-                },
-            ));
+            let event_recorder = Arc::new(Recorder::new(client.as_kube_client(), Reporter {
+                controller: AIRFLOW_FULL_CONTROLLER_NAME.to_string(),
+                instance: None,
+            }));
 
             let airflow_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::AirflowCluster>>(&client),
