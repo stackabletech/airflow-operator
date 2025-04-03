@@ -1,6 +1,6 @@
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
 
-use crate::crd::{v1alpha1, AirflowAuthorization, AirflowOpaConfig};
+use crate::crd::{AirflowAuthorization, AirflowOpaConfig, v1alpha1};
 
 pub struct AirflowAuthorizationResolved {
     pub opa: Option<OpaConfigResolved>,
