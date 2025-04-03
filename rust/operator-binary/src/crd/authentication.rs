@@ -1,13 +1,12 @@
 use std::{collections::BTreeSet, future::Future, mem};
 
 use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::{
     client::Client,
     commons::authentication::{
-        ldap,
+        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails, ldap,
         oidc::{self, IdentityProviderHint},
-        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
     schemars::{self, JsonSchema},
 };
@@ -40,11 +39,15 @@ pub enum Error {
         auth_class_name: String,
         provider: String,
     },
-    #[snafu(display("Only one authentication type at a time is supported by Airflow, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924."))]
+    #[snafu(display(
+        "Only one authentication type at a time is supported by Airflow, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924."
+    ))]
     MultipleAuthenticationTypesNotSupported,
     #[snafu(display("Only one LDAP provider at a time is supported by Airflow."))]
     MultipleLdapProvidersNotSupported,
-    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})."))]
+    #[snafu(display(
+        "The OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})."
+    ))]
     OidcProviderNotSupported {
         auth_class_name: String,
         oidc_provider: String,
@@ -147,6 +150,7 @@ impl AirflowClientAuthenticationDetailsResolved {
         };
         AirflowClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
     }
+
     pub async fn resolve<R>(
         auth_details: &[AirflowClientAuthenticationDetails],
         resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
@@ -264,8 +268,11 @@ impl AirflowClientAuthenticationDetailsResolved {
     ) -> Result<AirflowAuthenticationClassResolved> {
         let oidc_provider = match &provider.provider_hint {
             None => {
-                info!("No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
-                default_oidc_provider_name = serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap());
+                info!(
+                    "No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
+                    default_oidc_provider_name =
+                        serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap()
+                );
                 DEFAULT_OIDC_PROVIDER
             }
             Some(oidc_provider) => oidc_provider.to_owned(),
