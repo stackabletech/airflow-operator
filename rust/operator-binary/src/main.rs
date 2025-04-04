@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
                 .with_file_output(telemetry_arguments.rolling_logs.map(|log_directory| {
                     let rotation_period = telemetry_arguments
                         .rolling_logs_period
-                        .unwrap_or(RollingPeriod::Never)
+                        .unwrap_or(RollingPeriod::Hourly)
                         .deref()
                         .clone();
 
