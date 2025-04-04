@@ -39,7 +39,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
-    utils::{crds::raw_object_list_schema, COMMON_BASH_TRAP_FUNCTIONS},
+    utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
 };
 use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -50,7 +50,7 @@ use crate::crd::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
         AirflowClientAuthenticationDetailsResolved,
     },
-    git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_DIR},
+    git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_DIR, GitSync},
 };
 
 pub mod affinity;
@@ -517,7 +517,9 @@ impl AirflowRole {
         auth_config: &AirflowClientAuthenticationDetailsResolved,
     ) -> Vec<String> {
         let mut command = vec![
-            format!("cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"),
+            format!(
+                "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
+            ),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
@@ -547,12 +549,16 @@ impl AirflowRole {
                     --role \"Admin\""
                     .to_string(),
                 "prepare_signal_handlers".to_string(),
-                format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                format!(
+                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                ),
                 "airflow scheduler &".to_string(),
             ]),
             AirflowRole::Worker => command.extend(vec![
                 "prepare_signal_handlers".to_string(),
-                format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                format!(
+                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                ),
                 "airflow celery worker &".to_string(),
             ]),
         }

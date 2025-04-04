@@ -6,7 +6,7 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
-    crd::{v1alpha1, AirflowExecutor, AirflowRole, APP_NAME, OPERATOR_NAME},
+    crd::{APP_NAME, AirflowExecutor, AirflowRole, OPERATOR_NAME, v1alpha1},
 };
 
 #[derive(Snafu, Debug)]
