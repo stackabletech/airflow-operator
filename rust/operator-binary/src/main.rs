@@ -191,17 +191,12 @@ fn references_config_map(
     let Ok(airflow) = &airflow.0 else {
         return false;
     };
-
-    airflow
-        .spec
-        .cluster_config
-        .vector_aggregator_config_map_name
-        == Some(config_map.name_any())
-        || match airflow.spec.cluster_config.authorization.clone() {
-            Some(airflow_authorization) => match airflow_authorization.opa {
-                Some(opa_config) => opa_config.opa.config_map_name == config_map.name_any(),
-                None => false,
-            },
+    // Check for ConfigMaps that are referenced by the spec and not directly attached to a Pod
+    match airflow.spec.cluster_config.authorization.clone() {
+        Some(airflow_authorization) => match airflow_authorization.opa {
+            Some(opa_config) => opa_config.opa.config_map_name == config_map.name_any(),
             None => false,
-        }
+        },
+        None => false,
+    }
 }
