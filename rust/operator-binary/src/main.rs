@@ -95,10 +95,10 @@ async fn main() -> anyhow::Result<()> {
                     LevelFilter::DEBUG,
                     telemetry_arguments.otlp_logs,
                 ))
-                .with_otlp_log_exporter((
+                .with_otlp_trace_exporter((
                     "OTLP_TRACE",
                     LevelFilter::DEBUG,
-                    telemetry_arguments.otlp_logs,
+                    telemetry_arguments.otlp_traces,
                 ))
                 .build()
                 .init()?;
