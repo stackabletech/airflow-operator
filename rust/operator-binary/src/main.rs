@@ -64,8 +64,10 @@ async fn main() -> anyhow::Result<()> {
             cluster_info_opts,
         }) => {
             let _tracing_guard = Tracing::builder()
+                // TODO (@Techassi): This should be a constant
                 .service_name("airflow-operator")
                 .with_console_output((
+                    // TODO (@Techassi): Change to CONSOLE_LOG, create constant
                     "AIRFLOW_OPERATOR_LOG",
                     LevelFilter::INFO,
                     !telemetry_arguments.no_console_output,
@@ -81,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
                         .clone();
 
                     Settings::builder()
+                        // TODO (@Techassi): Change to CONSOLE_LOG or FILE_LOG, create constant
                         .with_environment_variable("AIRFLOW_OPERATOR_LOG")
                         .with_default_level(LevelFilter::INFO)
                         .file_log_settings_builder(log_directory, "tracing-rs.log")
