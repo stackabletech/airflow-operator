@@ -586,16 +586,7 @@ spec:
                       type: boolean
                     listenerClass:
                       default: cluster-internal
-                      description: |-
-                        This field controls which type of Service the Operator creates for this AirflowCluster:
-
-                        * cluster-internal: Use a ClusterIP service
-
-                        * external-unstable: Use a NodePort service
-
-                        * external-stable: Use a LoadBalancer service
-
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+                      description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
                       enum:
                         - cluster-internal
                         - external-unstable

@@ -26,10 +26,12 @@ user_richard_roe = {
     "password": "NvfpU518",
 }
 
+url = "http://airflow-webserver-default:8080"
+
 
 def create_user(user):
     requests.post(
-        "http://airflow-webserver:8080/auth/fab/v1/users",
+        f"{url}/auth/fab/v1/users",
         auth=("airflow", "airflow"),
         json=user,
     )
@@ -38,7 +40,7 @@ def create_user(user):
 def check_api_authorization_for_user(
     user, expected_status_code, method, endpoint, data=None, api="api/v1"
 ):
-    api_url = f"http://airflow-webserver:8080/{api}"
+    api_url = f"{url}/{api}"
 
     auth = (user["username"], user["password"])
     response = requests.request(method, f"{api_url}/{endpoint}", auth=auth, json=data)
@@ -59,18 +61,16 @@ def check_website_authorization_for_user(user, expected_status_code):
     password = user["password"]
     with requests.Session() as session:
         login_response = session.post(
-            "http://airflow-webserver:8080/login/",
+            f"{url}/login/",
             data=f"username={username}&password={password}",
             allow_redirects=False,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         assert login_response.ok, f"Login for {username} failed"
-        home_response = session.get(
-            "http://airflow-webserver:8080/home", allow_redirects=False
+        home_response = session.get(f"{url}/home", allow_redirects=False)
+        assert home_response.status_code == expected_status_code, (
+            f"GET /home returned status code {home_response.status_code}, but {expected_status_code} was expected."
         )
-        assert (
-            home_response.status_code == expected_status_code
-        ), f"GET /home returned status code {home_response.status_code}, but {expected_status_code} was expected."
 
 
 def test_is_authorized_configuration():

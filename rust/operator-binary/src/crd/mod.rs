@@ -17,7 +17,7 @@ use stackable_operator::{
     },
     config::{
         fragment::{self, Fragment, ValidationError},
-        merge::Merge,
+        merge::{Atomic, Merge},
     },
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -71,6 +71,9 @@ pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
+
+pub const LISTENER_VOLUME_NAME: &str = "listener";
+pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -230,19 +233,9 @@ pub mod versioned {
         #[serde(default)]
         pub load_examples: bool,
 
-        /// This field controls which type of Service the Operator creates for this AirflowCluster:
-        ///
-        /// * cluster-internal: Use a ClusterIP service
-        ///
-        /// * external-unstable: Use a NodePort service
-        ///
-        /// * external-stable: Use a LoadBalancer service
-        ///
-        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+        /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default)]
-        pub listener_class: CurrentlySupportedListenerClasses,
+        pub listener_class: SupportedListenerClasses,
 
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
@@ -435,27 +428,31 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-// TODO: Temporary solution until listener-operator is finished
 #[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "PascalCase")]
-pub enum CurrentlySupportedListenerClasses {
+pub enum SupportedListenerClasses {
     #[default]
     #[serde(rename = "cluster-internal")]
+    #[strum(serialize = "cluster-internal")]
     ClusterInternal,
 
     #[serde(rename = "external-unstable")]
+    #[strum(serialize = "external-unstable")]
     ExternalUnstable,
 
     #[serde(rename = "external-stable")]
+    #[strum(serialize = "external-stable")]
     ExternalStable,
 }
 
-impl CurrentlySupportedListenerClasses {
-    pub fn k8s_service_type(&self) -> String {
+impl Atomic for SupportedListenerClasses {}
+
+impl SupportedListenerClasses {
+    pub fn discoverable(&self) -> bool {
         match self {
-            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+            SupportedListenerClasses::ClusterInternal => false,
+            SupportedListenerClasses::ExternalUnstable => true,
+            SupportedListenerClasses::ExternalStable => true,
         }
     }
 }
