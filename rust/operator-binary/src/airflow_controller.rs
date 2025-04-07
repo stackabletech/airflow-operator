@@ -83,17 +83,19 @@ use crate::{
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        ExecutorConfigFragment, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
-        OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION,
-        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        ExecutorConfigFragment, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
+        LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
+        TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
         git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT, GitSync},
+        utils::PodRef,
         v1alpha1,
     },
+    discovery::build_discovery_configmap,
     env_vars::{
         self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
     },
@@ -341,6 +343,17 @@ pub enum Error {
     LabelBuild {
         source: stackable_operator::kvp::LabelError,
     },
+
+    #[snafu(display("cannot collect discovery configuration"))]
+    CollectDiscoveryConfig { source: crate::crd::Error },
+
+    #[snafu(display("failed to apply discovery configmap"))]
+    ApplyDiscoveryConfigMap {
+        source: stackable_operator::cluster_resources::Error,
+    },
+
+    #[snafu(display("failed to build discovery configmap"))]
+    BuildDiscoveryConfigMap { source: super::discovery::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -477,6 +490,8 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
+    let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
+
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
             AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
@@ -545,6 +560,45 @@ pub async fn reconcile_airflow(
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+
+            // if the replicas are changed at the same time as the reconciliation
+            // being paused, it may be possible to have listeners that are *expected*
+            // (according to their replica number) but which are not yet created, so
+            // deactivate this action in such cases.
+            if airflow.spec.cluster_operation.reconciliation_paused
+                || airflow.spec.cluster_operation.stopped
+            {
+                tracing::info!(
+                    "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+                );
+            } else {
+                listener_refs.insert(
+                    airflow_role.to_string(),
+                    airflow
+                        .listener_refs(
+                            client,
+                            &airflow_role,
+                            airflow.spec.cluster_config.listener_class.clone(),
+                        )
+                        .await
+                        .context(CollectDiscoveryConfigSnafu)?,
+                );
+            }
+        }
+
+        tracing::info!(
+            "Listener references prepared for the ConfigMap {:#?}",
+            listener_refs
+        );
+
+        if !listener_refs.is_empty() {
+            let endpoint_cm =
+                build_discovery_configmap(airflow, &resolved_product_image, &listener_refs)
+                    .context(BuildDiscoveryConfigMapSnafu)?;
+            cluster_resources
+                .add(client, endpoint_cm)
+                .await
+                .context(ApplyDiscoveryConfigMapSnafu)?;
         }
 
         let role_config = airflow.role_config(&airflow_role);
@@ -956,7 +1010,7 @@ fn build_server_rolegroup_statefulset(
         };
         airflow_container.readiness_probe(probe.clone());
         airflow_container.liveness_probe(probe);
-        airflow_container.add_container_port("http", http_port.into());
+        airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
 
         let listener_class = &airflow.spec.cluster_config.listener_class;
         pvcs = if listener_class.discoverable() {

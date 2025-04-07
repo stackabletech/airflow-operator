@@ -30,6 +30,7 @@ mod airflow_controller;
 mod config;
 mod controller_commons;
 mod crd;
+mod discovery;
 mod env_vars;
 mod operations;
 mod product_logging;

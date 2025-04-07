@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ use stackable_operator::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
     },
-    kube::{CustomResource, ResourceExt},
+    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{self, Configuration},
@@ -43,6 +43,7 @@ use stackable_operator::{
 };
 use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use utils::{PodRef, get_persisted_listener_podrefs};
 
 use crate::crd::{
     affinity::{get_affinity, get_executor_affinity},
@@ -57,6 +58,7 @@ pub mod affinity;
 pub mod authentication;
 pub mod authorization;
 pub mod git_sync;
+pub mod utils;
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -75,6 +77,8 @@ pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
+pub const HTTP_PORT_NAME: &str = "http";
+
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
@@ -87,10 +91,18 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 pub enum Error {
     #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
     UnknownAirflowRole { role: String, roles: Vec<String> },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
     #[snafu(display("Configuration/Executor conflict!"))]
     NoRoleForExecutorFailure,
+
+    #[snafu(display("object has no associated namespace"))]
+    NoNamespace,
+
+    #[snafu(display("listener podrefs could not be resolved"))]
+    ListenerPodRef { source: utils::Error },
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -409,6 +421,82 @@ impl v1alpha1::AirflowCluster {
 
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn rolegroup_ref(
+        &self,
+        role_name: impl Into<String>,
+        group_name: impl Into<String>,
+    ) -> RoleGroupRef<v1alpha1::AirflowCluster> {
+        RoleGroupRef {
+            cluster: ObjectRef::from_obj(self),
+            role: role_name.into(),
+            role_group: group_name.into(),
+        }
+    }
+
+    pub fn rolegroup_ref_and_replicas(
+        &self,
+        role: &AirflowRole,
+    ) -> Vec<(RoleGroupRef<v1alpha1::AirflowCluster>, u16)> {
+        match role {
+            AirflowRole::Webserver => self
+                .spec
+                .webservers
+                .iter()
+                .flat_map(|role| &role.role_groups)
+                // Order rolegroups consistently, to avoid spurious downstream rewrites
+                .collect::<BTreeMap<_, _>>()
+                .into_iter()
+                .map(|(rolegroup_name, role_group)| {
+                    (
+                        self.rolegroup_ref(AirflowRole::Webserver.to_string(), rolegroup_name),
+                        role_group.replicas.unwrap_or_default(),
+                    )
+                })
+                .collect(),
+            AirflowRole::Scheduler | AirflowRole::Worker => vec![],
+        }
+    }
+
+    pub fn pod_refs(&self, role: &AirflowRole) -> Result<Vec<PodRef>, Error> {
+        if let Some(port) = role.get_http_port() {
+            let ns = self.metadata.namespace.clone().context(NoNamespaceSnafu)?;
+            let rolegroup_ref_and_replicas = self.rolegroup_ref_and_replicas(role);
+
+            Ok(rolegroup_ref_and_replicas
+                .iter()
+                .flat_map(|(rolegroup_ref, replicas)| {
+                    let ns = ns.clone();
+                    (0..*replicas).map(move |i| PodRef {
+                        namespace: ns.clone(),
+                        role_group_service_name: rolegroup_ref.object_name(),
+                        pod_name: format!("{}-{}", rolegroup_ref.object_name(), i),
+                        ports: HashMap::from([("http".to_owned(), port)]),
+                        fqdn_override: None,
+                    })
+                })
+                .collect())
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    pub async fn listener_refs(
+        &self,
+        client: &stackable_operator::client::Client,
+        role: &AirflowRole,
+        listener_class: SupportedListenerClasses,
+    ) -> Result<Vec<PodRef>, Error> {
+        // only externally-reachable listeners are relevant
+        if listener_class.discoverable() {
+            let pod_refs = self.pod_refs(role)?;
+            get_persisted_listener_podrefs(client, pod_refs, LISTENER_VOLUME_NAME)
+                .await
+                .context(ListenerPodRefSnafu)
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
