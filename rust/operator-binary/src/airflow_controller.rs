@@ -8,9 +8,9 @@ use std::{
 
 use const_format::concatcp;
 use product_config::{
+    ProductConfigManager,
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
     types::PropertyNameKind,
-    ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -19,19 +19,19 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, volume::VolumeBuilder, PodBuilder,
+            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{ldap, AuthenticationClass},
+        authentication::{AuthenticationClass, ldap},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
     config::fragment::ValidationError,
     k8s_openapi::{
-        self,
+        self, DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
@@ -40,19 +40,18 @@ use stackable_operator::{
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
-        DeepMerge,
     },
     kube::{
-        api::ObjectMeta,
-        core::{error_boundary, DeserializeGuard},
-        runtime::{controller::Action, reflector::ObjectRef},
         Resource, ResourceExt,
+        api::ObjectMeta,
+        core::{DeserializeGuard, error_boundary},
+        runtime::{controller::Action, reflector::ObjectRef},
     },
     kvp::{Label, LabelError, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
-        transform_all_roles_to_config, validate_all_roles_and_groups_config,
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
+        transform_all_roles_to_config, validate_all_roles_and_groups_config,
     },
     product_logging::{
         self,
@@ -75,17 +74,17 @@ use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self,
+        self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
+        AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
+        ExecutorConfigFragment, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
-        git_sync::{GitSync, GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT},
-        v1alpha1, AirflowClusterStatus, AirflowConfig, AirflowConfigOptions, AirflowExecutor,
-        AirflowRole, Container, ExecutorConfig, ExecutorConfigFragment, AIRFLOW_CONFIG_FILENAME,
-        AIRFLOW_UID, APP_NAME, CONFIG_PATH, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT, GitSync},
+        v1alpha1,
     },
     env_vars::{
         self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
@@ -536,10 +535,10 @@ pub async fn reconcile_airflow(
         .context(DeleteOrphanedResourcesSnafu)?;
 
     let status = AirflowClusterStatus {
-        conditions: compute_conditions(
-            airflow,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
-        ),
+        conditions: compute_conditions(airflow, &[
+            &ss_cond_builder,
+            &cluster_operation_cond_builder,
+        ]),
     };
 
     client
@@ -981,13 +980,15 @@ fn build_server_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![[
-            COMMON_BASH_TRAP_FUNCTIONS.to_string(),
-            "prepare_signal_handlers".to_string(),
-            "/stackable/statsd_exporter &".to_string(),
-            "wait_for_termination $!".to_string(),
-        ]
-        .join("\n")])
+        .args(vec![
+            [
+                COMMON_BASH_TRAP_FUNCTIONS.to_string(),
+                "prepare_signal_handlers".to_string(),
+                "/stackable/statsd_exporter &".to_string(),
+                "wait_for_termination $!".to_string(),
+            ]
+            .join("\n"),
+        ])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .resources(
             ResourceRequirementsBuilder::new()

@@ -276,8 +276,8 @@ mod tests {
         "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt'"
     )]
     #[case(
-    "--git-config: 'http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'",
-    "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'"
+        "--git-config: 'http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'",
+        "--git-config='safe.directory:/tmp/git,http.sslCAInfo:/tmp/ca-cert/ca.crt,safe.directory:/tmp/git2'"
     )]
     fn test_git_sync_git_config(#[case] input: &str, #[case] output: &str) {
         let cluster = format!(
@@ -317,11 +317,13 @@ mod tests {
         let cluster: AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        assert!(cluster
-            .git_sync()
-            .unwrap()
-            .get_args(false)
-            .iter()
-            .any(|c| c.contains(output)));
+        assert!(
+            cluster
+                .git_sync()
+                .unwrap()
+                .get_args(false)
+                .iter()
+                .any(|c| c.contains(output))
+        );
     }
 }

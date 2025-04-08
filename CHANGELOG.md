@@ -2,15 +2,21 @@
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` ([#600]).
+- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601]).
+  - BREAKING: The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR`
+    (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+- BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
+    of having the operator write it to the vector config ([#600]).
 
 ### Fixed
 
 - Fix a bug where changes to ConfigMaps that are referenced in the Airflow spec didn't trigger a reconciliation ([#600]).
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
+[#601]: https://github.com/stackabletech/airflow-operator/pull/601
 
 ## [25.3.0] - 2025-03-21
 
