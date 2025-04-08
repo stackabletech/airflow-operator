@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601]).
+  - BREAKING: The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR`
+    (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+
+[#601]: https://github.com/stackabletech/airflow-operator/pull/601
+
 ## [25.3.0] - 2025-03-21
 
 ### Added
