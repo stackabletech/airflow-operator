@@ -74,9 +74,10 @@ async fn main() -> anyhow::Result<()> {
                     LevelFilter::INFO,
                     !telemetry_arguments.no_console_output,
                 ))
-                // note, before, log dir was set via an env: `AIRFLOW_OPERATOR_LOG_DIRECTORY`.
+                // NOTE (@NickLarsenNZ): Before stackable-telemetry was used, the log directory was
+                // set via an env: `AIRFLOW_OPERATOR_LOG_DIRECTORY`.
                 // See: https://github.com/stackabletech/operator-rs/blob/f035997fca85a54238c8de895389cc50b4d421e2/crates/stackable-operator/src/logging/mod.rs#L40
-                // Now it will be `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`)
+                // Now it will be `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
                 .with_file_output(telemetry_arguments.rolling_logs.map(|log_directory| {
                     let rotation_period = telemetry_arguments
                         .rolling_logs_period
