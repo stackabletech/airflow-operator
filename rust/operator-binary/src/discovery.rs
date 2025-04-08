@@ -61,23 +61,19 @@ pub fn build_discovery_configmap(
     );
 
     for role_podref in role_podrefs {
-        let role_name = role_podref.0;
-        // podrefs are written into the collection by replica index
-        // and can be retrieved in the same order
-        let mut i = 0;
         for podref in role_podref.1 {
             if let PodRef {
                 fqdn_override: Some(fqdn_override),
                 ports,
+                pod_name,
                 ..
             } = podref
             {
                 if let Some(ui_port) = ports.get(HTTP_PORT_NAME) {
                     cmm.add_data(
-                        format!("airflow.{role_name}-{i}.http"),
+                        format!("{pod_name}.http"),
                         format!("{fqdn_override}:{ui_port}"),
                     );
-                    i += 1;
                 }
             }
         }

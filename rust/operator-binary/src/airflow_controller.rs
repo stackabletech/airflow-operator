@@ -84,8 +84,8 @@ use crate::{
         self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
         ExecutorConfigFragment, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME,
-        TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -112,9 +112,6 @@ pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
-
-const METRICS_PORT_NAME: &str = "metrics";
-const METRICS_PORT: i32 = 9102;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -490,8 +487,6 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
-    let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
-
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
             AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
@@ -560,30 +555,27 @@ pub async fn reconcile_airflow(
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+        }
 
-            // if the replicas are changed at the same time as the reconciliation
-            // being paused, it may be possible to have listeners that are *expected*
-            // (according to their replica number) but which are not yet created, so
-            // deactivate this action in such cases.
-            if airflow.spec.cluster_operation.reconciliation_paused
-                || airflow.spec.cluster_operation.stopped
-            {
-                tracing::info!(
-                    "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
-                );
-            } else {
-                listener_refs.insert(
-                    airflow_role.to_string(),
-                    airflow
-                        .listener_refs(
-                            client,
-                            &airflow_role,
-                            airflow.spec.cluster_config.listener_class.clone(),
-                        )
-                        .await
-                        .context(CollectDiscoveryConfigSnafu)?,
-                );
-            }
+        let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
+        // if the replicas are changed at the same time as the reconciliation
+        // being paused, it may be possible to have listeners that are *expected*
+        // (according to their replica number) but which are not yet created, so
+        // deactivate this action in such cases.
+        if airflow.spec.cluster_operation.reconciliation_paused
+            || airflow.spec.cluster_operation.stopped
+        {
+            tracing::info!(
+                "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+            );
+        } else {
+            listener_refs.insert(
+                airflow_role.to_string(),
+                airflow
+                    .listener_refs(client, &airflow_role)
+                    .await
+                    .context(CollectDiscoveryConfigSnafu)?,
+            );
         }
 
         tracing::info!(
@@ -606,7 +598,7 @@ pub async fn reconcile_airflow(
             pod_disruption_budget: pdb,
         }) = role_config
         {
-            add_pdbs(pdb, airflow, &airflow_role, client, &mut cluster_resources)
+            add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
@@ -689,7 +681,7 @@ async fn build_executor_template(
 
 fn role_ports(port: u16) -> Vec<ServicePort> {
     vec![ServicePort {
-        name: Some("http".to_string()),
+        name: Some(HTTP_PORT_NAME.to_owned()),
         port: port.into(),
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
@@ -818,7 +810,7 @@ fn build_rolegroup_service(
 ) -> Result<Service> {
     let mut ports = vec![ServicePort {
         name: Some(METRICS_PORT_NAME.into()),
-        port: METRICS_PORT,
+        port: METRICS_PORT.into(),
         protocol: Some("TCP".to_string()),
         ..Default::default()
     }];
@@ -1012,25 +1004,30 @@ fn build_server_rolegroup_statefulset(
         airflow_container.liveness_probe(probe);
         airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
 
-        let listener_class = &airflow.spec.cluster_config.listener_class;
-        pvcs = if listener_class.discoverable() {
+        pvcs = if let Some(listener_class) =
+            airflow.merged_listener_class(airflow_role, &rolegroup_ref.role_group)
+        {
             // externally-reachable listener endpoints should use a pvc volume...
-            let pvc = ListenerOperatorVolumeSourceBuilder::new(
-                &ListenerReference::ListenerClass(listener_class.to_string()),
-                &recommended_labels,
-            )
-            .context(BuildListenerVolumeSnafu)?
-            .build_pvc(LISTENER_VOLUME_NAME.to_string())
-            .context(BuildListenerVolumeSnafu)?;
-            Some(vec![pvc])
+            if listener_class.discoverable() {
+                let pvc = ListenerOperatorVolumeSourceBuilder::new(
+                    &ListenerReference::ListenerClass(listener_class.to_string()),
+                    &recommended_labels,
+                )
+                .context(BuildListenerVolumeSnafu)?
+                .build_pvc(LISTENER_VOLUME_NAME.to_string())
+                .context(BuildListenerVolumeSnafu)?;
+                Some(vec![pvc])
+            } else {
+                // ...whereas others will use ephemeral volumes
+                pb.add_listener_volume_by_listener_class(
+                    LISTENER_VOLUME_NAME,
+                    &listener_class.to_string(),
+                    &recommended_labels,
+                )
+                .context(AddVolumeSnafu)?;
+                None
+            }
         } else {
-            // ...whereas others will use ephemeral volumes
-            pb.add_listener_volume_by_listener_class(
-                LISTENER_VOLUME_NAME,
-                &listener_class.to_string(),
-                &recommended_labels,
-            )
-            .context(AddVolumeSnafu)?;
             None
         };
     }
@@ -1056,7 +1053,7 @@ fn build_server_rolegroup_statefulset(
             ]
             .join("\n"),
         ])
-        .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
