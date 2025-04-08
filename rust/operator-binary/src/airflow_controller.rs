@@ -1134,7 +1134,7 @@ fn build_server_rolegroup_statefulset(
 fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
     log_config: Option<&ContainerLogConfig>,
-    vector_aggregator_config_map_name: &String,
+    vector_aggregator_config_map_name: &str,
 ) -> Result<k8s_openapi::api::core::v1::Container> {
     product_logging::framework::vector_container(
         resolved_product_image,
@@ -1147,7 +1147,7 @@ fn build_logging_container(
             .with_memory_request("128Mi")
             .with_memory_limit("128Mi")
             .build(),
-        &vector_aggregator_config_map_name,
+        vector_aggregator_config_map_name,
     )
     .context(ConfigureLoggingSnafu)
 }

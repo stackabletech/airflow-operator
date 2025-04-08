@@ -6,7 +6,10 @@ use stackable_operator::{
     YamlSchema,
     cli::{Command, ProductOperatorRun, RollingPeriod},
     commons::authentication::AuthenticationClass,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::ConfigMap, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kube::{
         ResourceExt,
         core::DeserializeGuard,
