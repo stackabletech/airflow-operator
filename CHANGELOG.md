@@ -5,7 +5,7 @@
 ### Changed
 
 - Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601]).
-  - BREAKING: The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR`
+  - BREAKING: The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
     (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
