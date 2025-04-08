@@ -13,7 +13,7 @@
 
 ### Fixed
 
-- Fix a bug where changes to ConfigMaps that are referenced in the Airflow spec didn't trigger a reconciliation ([#600]).
+- Fix a bug where changes to ConfigMaps that are referenced in the AirflowCluster spec didn't trigger a reconciliation ([#600]).
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
