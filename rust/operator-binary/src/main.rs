@@ -138,8 +138,8 @@ async fn main() -> anyhow::Result<()> {
                 watcher::Config::default(),
             );
 
-            let airflow_store_1 = airflow_controller.store();
-            let airflow_store_2 = airflow_controller.store();
+            let authentication_class_store = airflow_controller.store();
+            let config_map_store = airflow_controller.store();
             airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -154,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
-                        airflow_store_1
+                        authentication_class_store
                             .state()
                             .into_iter()
                             .filter(
@@ -169,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
-                        airflow_store_2
+                        config_map_store
                             .state()
                             .into_iter()
                             .filter(move |airflow| references_config_map(airflow, &config_map))
