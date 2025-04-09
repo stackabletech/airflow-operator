@@ -9,7 +9,12 @@
     (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 
+### Fixed
+
+- Use `json` file extension for log files ([#607]).
+
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#607]: https://github.com/stackabletech/airflow-operator/pull/607
 
 ## [25.3.0] - 2025-03-21
 
