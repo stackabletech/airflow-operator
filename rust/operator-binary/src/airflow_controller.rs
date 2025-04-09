@@ -487,6 +487,8 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
+    let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
+
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
             AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
@@ -557,7 +559,6 @@ pub async fn reconcile_airflow(
                 })?;
         }
 
-        let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
         // if the replicas are changed at the same time as the reconciliation
         // being paused, it may be possible to have listeners that are *expected*
         // (according to their replica number) but which are not yet created, so
@@ -578,21 +579,6 @@ pub async fn reconcile_airflow(
             );
         }
 
-        tracing::info!(
-            "Listener references prepared for the ConfigMap {:#?}",
-            listener_refs
-        );
-
-        if !listener_refs.is_empty() {
-            let endpoint_cm =
-                build_discovery_configmap(airflow, &resolved_product_image, &listener_refs)
-                    .context(BuildDiscoveryConfigMapSnafu)?;
-            cluster_resources
-                .add(client, endpoint_cm)
-                .await
-                .context(ApplyDiscoveryConfigMapSnafu)?;
-        }
-
         let role_config = airflow.role_config(&airflow_role);
         if let Some(GenericRoleConfig {
             pod_disruption_budget: pdb,
@@ -602,6 +588,21 @@ pub async fn reconcile_airflow(
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
+    }
+
+    tracing::info!(
+        "Listener references prepared for the ConfigMap {:#?}",
+        listener_refs
+    );
+
+    if !listener_refs.is_empty() {
+        let endpoint_cm =
+            build_discovery_configmap(airflow, &resolved_product_image, &listener_refs)
+                .context(BuildDiscoveryConfigMapSnafu)?;
+        cluster_resources
+            .add(client, endpoint_cm)
+            .await
+            .context(ApplyDiscoveryConfigMapSnafu)?;
     }
 
     cluster_resources
