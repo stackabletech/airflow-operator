@@ -10,7 +10,10 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
-    crd::{AirflowRole, HTTP_PORT_NAME, build_recommended_labels, utils::PodRef, v1alpha1},
+    crd::{
+        AirflowRole, HTTP_PORT_NAME, METRICS_PORT_NAME, build_recommended_labels, utils::PodRef,
+        v1alpha1,
+    },
 };
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -71,8 +74,14 @@ pub fn build_discovery_configmap(
             {
                 if let Some(ui_port) = ports.get(HTTP_PORT_NAME) {
                     cmm.add_data(
-                        format!("{pod_name}.http"),
+                        format!("{pod_name}.{HTTP_PORT_NAME}"),
                         format!("{fqdn_override}:{ui_port}"),
+                    );
+                }
+                if let Some(metrics_port) = ports.get(METRICS_PORT_NAME) {
+                    cmm.add_data(
+                        format!("{pod_name}.{METRICS_PORT_NAME}"),
+                        format!("{fqdn_override}:{metrics_port}"),
                     );
                 }
             }

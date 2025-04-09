@@ -41,9 +41,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EmptyDirVolumeSource, EnvVar, PersistentVolumeClaim, PodTemplateSpec,
-                Probe, Service, ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction,
-                VolumeMount,
+                ConfigMap, EmptyDirVolumeSource, EnvVar, PodTemplateSpec, Probe, Service,
+                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -983,14 +982,8 @@ fn build_server_rolegroup_statefulset(
             .context(AddVolumeMountSnafu)?;
     }
 
-    let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
-
     // for roles with an http endpoint
     if let Some(http_port) = airflow_role.get_http_port() {
-        airflow_container
-            .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
-            .context(AddVolumeMountSnafu)?;
-
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(http_port.into()),
@@ -1004,34 +997,33 @@ fn build_server_rolegroup_statefulset(
         airflow_container.readiness_probe(probe.clone());
         airflow_container.liveness_probe(probe);
         airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
-
-        pvcs = if let Some(listener_class) =
-            airflow.merged_listener_class(airflow_role, &rolegroup_ref.role_group)
-        {
-            // externally-reachable listener endpoints should use a pvc volume...
-            if listener_class.discoverable() {
-                let pvc = ListenerOperatorVolumeSourceBuilder::new(
-                    &ListenerReference::ListenerClass(listener_class.to_string()),
-                    &recommended_labels,
-                )
-                .context(BuildListenerVolumeSnafu)?
-                .build_pvc(LISTENER_VOLUME_NAME.to_string())
-                .context(BuildListenerVolumeSnafu)?;
-                Some(vec![pvc])
-            } else {
-                // ...whereas others will use ephemeral volumes
-                pb.add_listener_volume_by_listener_class(
-                    LISTENER_VOLUME_NAME,
-                    &listener_class.to_string(),
-                    &recommended_labels,
-                )
-                .context(AddVolumeSnafu)?;
-                None
-            }
-        } else {
-            None
-        };
     }
+
+    let listener_class = &merged_airflow_config.listener_class;
+    // externally-reachable listener endpoints should use a pvc volume...
+    let pvcs = if listener_class.discoverable() {
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerClass(listener_class.to_string()),
+            &recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .context(BuildListenerVolumeSnafu)?;
+        Some(vec![pvc])
+    } else {
+        // ...whereas others will use ephemeral volumes
+        pb.add_listener_volume_by_listener_class(
+            LISTENER_VOLUME_NAME,
+            &listener_class.to_string(),
+            &recommended_labels,
+        )
+        .context(AddVolumeSnafu)?;
+        None
+    };
+
+    airflow_container
+        .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+        .context(AddVolumeMountSnafu)?;
 
     pb.add_container(airflow_container.build());
 
