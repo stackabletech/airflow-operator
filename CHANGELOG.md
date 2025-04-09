@@ -13,10 +13,12 @@
 
 ### Fixed
 
+- Use `json` file extension for log files ([#607]).
 - Fix a bug where changes to ConfigMaps that are referenced in the AirflowCluster spec didn't trigger a reconciliation ([#600]).
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#607]: https://github.com/stackabletech/airflow-operator/pull/607
 
 ## [25.3.0] - 2025-03-21
 
