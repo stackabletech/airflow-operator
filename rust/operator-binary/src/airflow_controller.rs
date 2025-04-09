@@ -1059,7 +1059,11 @@ fn build_server_rolegroup_statefulset(
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
-        match &airflow.spec.cluster_config.vector_aggregator_config_map_name {
+        match &airflow
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+        {
             Some(vector_aggregator_config_map_name) => {
                 pb.add_container(build_logging_container(
                     resolved_product_image,
@@ -1244,7 +1248,11 @@ fn build_executor_template_config_map(
     }
 
     if merged_executor_config.logging.enable_vector_agent {
-        match &airflow.spec.cluster_config.vector_aggregator_config_map_name {
+        match &airflow
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+        {
             Some(vector_aggregator_config_map_name) => {
                 pb.add_container(build_logging_container(
                     resolved_product_image,
