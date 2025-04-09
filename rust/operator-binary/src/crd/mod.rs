@@ -440,7 +440,7 @@ impl v1alpha1::AirflowCluster {
             .unwrap_or_default();
         listener_class_role.merge(&listener_class_default);
         listener_class_rolegroup.merge(&listener_class_role);
-        tracing::info!("Merged listener-class: {:?}", listener_class_rolegroup);
+        tracing::debug!("Merged listener-class: {:?}", listener_class_rolegroup);
         Ok(listener_class_rolegroup)
     }
 
@@ -535,10 +535,7 @@ impl v1alpha1::AirflowCluster {
                         })
                         .map(|(rolegroup_name, role_group)| {
                             (
-                                self.rolegroup_ref(
-                                    AirflowRole::Scheduler.to_string(),
-                                    rolegroup_name,
-                                ),
+                                self.rolegroup_ref(AirflowRole::Worker.to_string(), rolegroup_name),
                                 role_group.replicas.unwrap_or_default(),
                             )
                         })
@@ -556,22 +553,11 @@ impl v1alpha1::AirflowCluster {
         rolegroup_name: &&String,
     ) -> bool {
         if let Ok(Some(listener_class)) = self.merged_listener_class(role, rolegroup_name) {
-            tracing::info!(
-                "Merged listener-class for role is discoverable?: {}/{}/{}",
-                role,
-                listener_class,
-                listener_class.discoverable()
-            );
             listener_class.discoverable()
         } else {
             // merged_listener_class returns an error is one of the roles was not found:
             // all roles are mandatory for airflow to work, but a missing role will by
             // definition not have a listener class
-            tracing::info!(
-                "Merged listener-class for role is NOT discoverable?: {}/{}",
-                role,
-                rolegroup_name
-            );
             false
         }
     }
@@ -605,7 +591,7 @@ impl v1alpha1::AirflowCluster {
     ) -> Result<Vec<PodRef>, Error> {
         let pod_refs = self.pod_refs(role)?;
 
-        tracing::info!("pod_refs for role {role}: {:#?}", pod_refs);
+        tracing::debug!("Pod references for role {role}: {:#?}", pod_refs);
         get_persisted_listener_podrefs(client, pod_refs, LISTENER_VOLUME_NAME)
             .await
             .context(ListenerPodRefSnafu)

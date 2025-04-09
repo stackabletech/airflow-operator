@@ -589,7 +589,7 @@ pub async fn reconcile_airflow(
         }
     }
 
-    tracing::info!(
+    tracing::debug!(
         "Listener references prepared for the ConfigMap {:#?}",
         listener_refs
     );
