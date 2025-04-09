@@ -6,7 +6,10 @@ use stackable_operator::{
     YamlSchema,
     cli::{Command, ProductOperatorRun, RollingPeriod},
     commons::authentication::AuthenticationClass,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kube::{
         ResourceExt,
         core::DeserializeGuard,
@@ -135,7 +138,8 @@ async fn main() -> anyhow::Result<()> {
                 watcher::Config::default(),
             );
 
-            let airflow_store_1 = airflow_controller.store();
+            let authentication_class_store = airflow_controller.store();
+            let config_map_store = airflow_controller.store();
             airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -150,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
-                        airflow_store_1
+                        authentication_class_store
                             .state()
                             .into_iter()
                             .filter(
@@ -158,6 +162,17 @@ async fn main() -> anyhow::Result<()> {
                                     references_authentication_class(airflow, &authentication_class)
                                 },
                             )
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        config_map_store
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow| references_config_map(airflow, &config_map))
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -208,4 +223,21 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_config_map(
+    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+    // Check for ConfigMaps that are referenced by the spec and not directly attached to a Pod
+    match &airflow.spec.cluster_config.authorization {
+        Some(airflow_authorization) => match &airflow_authorization.opa {
+            Some(opa_config) => opa_config.opa.config_map_name == config_map.name_any(),
+            None => false,
+        },
+        None => false,
+    }
 }
