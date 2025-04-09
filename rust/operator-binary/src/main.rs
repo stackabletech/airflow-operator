@@ -233,8 +233,8 @@ fn references_config_map(
         return false;
     };
     // Check for ConfigMaps that are referenced by the spec and not directly attached to a Pod
-    match airflow.spec.cluster_config.authorization.clone() {
-        Some(airflow_authorization) => match airflow_authorization.opa {
+    match &airflow.spec.cluster_config.authorization {
+        Some(airflow_authorization) => match &airflow_authorization.opa {
             Some(opa_config) => opa_config.opa.config_map_name == config_map.name_any(),
             None => false,
         },
