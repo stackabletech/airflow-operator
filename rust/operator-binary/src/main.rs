@@ -1,10 +1,10 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, ProductOperatorRun, RollingPeriod},
+    cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -22,8 +22,11 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
+    telemetry::{
+        Tracing,
+        tracing::{RollingPeriod, settings::Settings},
+    },
 };
-use stackable_telemetry::{Tracing, tracing::settings::Settings};
 use tracing::level_filters::LevelFilter;
 
 use crate::{
@@ -84,7 +87,6 @@ async fn main() -> anyhow::Result<()> {
                     let rotation_period = telemetry_arguments
                         .rolling_logs_period
                         .unwrap_or(RollingPeriod::Hourly)
-                        .deref()
                         .clone();
 
                     Settings::builder()
