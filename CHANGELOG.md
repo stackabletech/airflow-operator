@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added listener support for Airflow ([#604]).
+
 ### Changed
 
 - Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601]).
@@ -14,6 +18,7 @@
 - Use `json` file extension for log files ([#607]).
 
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#604]: https://github.com/stackabletech/airflow-operator/pull/604
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
 
 ## [25.3.0] - 2025-03-21
