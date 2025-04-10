@@ -4,9 +4,11 @@
 
 ### Changed
 
-- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601]).
-  - BREAKING: The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
-    (or via `--rolling-logs <DIRECTORY>`).
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608]).
+  - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `CONSOLE_LOG`.
+  - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `FILE_LOG`.
+  - The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set
+    by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#600]).
@@ -19,6 +21,7 @@
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
+[#608]: https://github.com/stackabletech/airflow-operator/pull/608
 
 ## [25.3.0] - 2025-03-21
 
