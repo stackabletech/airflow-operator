@@ -1,12 +1,15 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, ProductOperatorRun, RollingPeriod},
+    cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kube::{
         ResourceExt,
         core::DeserializeGuard,
@@ -19,9 +22,8 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
+    telemetry::Tracing,
 };
-use stackable_telemetry::{Tracing, tracing::settings::Settings};
-use tracing::level_filters::LevelFilter;
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
@@ -41,9 +43,6 @@ mod util;
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
-
-// TODO (@NickLarsenNZ): Change the variable to `CONSOLE_LOG`
-pub const ENV_VAR_CONSOLE_LOG: &str = "AIRFLOW_OPERATOR_LOG";
 
 #[derive(Parser)]
 #[clap(about, author)]
@@ -67,44 +66,12 @@ async fn main() -> anyhow::Result<()> {
             telemetry_arguments,
             cluster_info_opts,
         }) => {
-            let _tracing_guard = Tracing::builder()
-                // TODO (@Techassi): This should be a constant
-                .service_name("airflow-operator")
-                .with_console_output((
-                    ENV_VAR_CONSOLE_LOG,
-                    LevelFilter::INFO,
-                    !telemetry_arguments.no_console_output,
-                ))
-                // note, before, log dir was set via an env: `AIRFLOW_OPERATOR_LOG_DIRECTORY`.
-                // See: https://github.com/stackabletech/operator-rs/blob/f035997fca85a54238c8de895389cc50b4d421e2/crates/stackable-operator/src/logging/mod.rs#L40
-                // Now it will be `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`)
-                .with_file_output(telemetry_arguments.rolling_logs.map(|log_directory| {
-                    let rotation_period = telemetry_arguments
-                        .rolling_logs_period
-                        .unwrap_or(RollingPeriod::Hourly)
-                        .deref()
-                        .clone();
-
-                    Settings::builder()
-                        // TODO (@Techassi): Change to CONSOLE_LOG or FILE_LOG, create constant
-                        .with_environment_variable(ENV_VAR_CONSOLE_LOG)
-                        .with_default_level(LevelFilter::INFO)
-                        .file_log_settings_builder(log_directory, "tracing-rs.json")
-                        .with_rotation_period(rotation_period)
-                        .build()
-                }))
-                .with_otlp_log_exporter((
-                    "OTLP_LOG",
-                    LevelFilter::DEBUG,
-                    telemetry_arguments.otlp_logs,
-                ))
-                .with_otlp_trace_exporter((
-                    "OTLP_TRACE",
-                    LevelFilter::DEBUG,
-                    telemetry_arguments.otlp_traces,
-                ))
-                .build()
-                .init()?;
+            // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
+            // - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
+            // - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
+            // - The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
@@ -136,7 +103,8 @@ async fn main() -> anyhow::Result<()> {
                 watcher::Config::default(),
             );
 
-            let airflow_store_1 = airflow_controller.store();
+            let authentication_class_store = airflow_controller.store();
+            let config_map_store = airflow_controller.store();
             airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -151,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
-                        airflow_store_1
+                        authentication_class_store
                             .state()
                             .into_iter()
                             .filter(
@@ -159,6 +127,17 @@ async fn main() -> anyhow::Result<()> {
                                     references_authentication_class(airflow, &authentication_class)
                                 },
                             )
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        config_map_store
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow| references_config_map(airflow, &config_map))
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -209,4 +188,21 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_config_map(
+    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+    // Check for ConfigMaps that are referenced by the spec and not directly attached to a Pod
+    match &airflow.spec.cluster_config.authorization {
+        Some(airflow_authorization) => match &airflow_authorization.opa {
+            Some(opa_config) => opa_config.opa.config_map_name == config_map.name_any(),
+            None => false,
+        },
+        None => false,
+    }
 }

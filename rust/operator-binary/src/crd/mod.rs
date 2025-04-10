@@ -40,8 +40,8 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
+    versioned::versioned,
 };
-use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 use utils::{PodRef, get_persisted_listener_podrefs};
 

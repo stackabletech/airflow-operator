@@ -104,7 +104,7 @@ use crate::{
         },
         pdb::add_pdbs,
     },
-    product_logging::{extend_config_map_with_log_config, resolve_vector_aggregator_address},
+    product_logging::extend_config_map_with_log_config,
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -235,10 +235,8 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to resolve the Vector aggregator address"))]
-    ResolveVectorAggregatorAddress {
-        source: crate::product_logging::Error,
-    },
+    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
+    VectorAggregatorConfigMapMissing,
 
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
@@ -425,18 +423,6 @@ pub async fn reconcile_airflow(
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let vector_aggregator_address = resolve_vector_aggregator_address(
-        client,
-        airflow,
-        airflow
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-            .as_deref(),
-    )
-    .await
-    .context(ResolveVectorAggregatorAddressSnafu)?;
-
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
         OPERATOR_NAME,
@@ -478,7 +464,6 @@ pub async fn reconcile_airflow(
             &resolved_product_image,
             &authentication_config,
             &authorization_config,
-            &vector_aggregator_address,
             &mut cluster_resources,
             client,
             &rbac_sa,
@@ -547,7 +532,6 @@ pub async fn reconcile_airflow(
                 &authentication_config,
                 &authorization_config,
                 &merged_airflow_config.logging,
-                vector_aggregator_address.as_deref(),
                 &Container::Airflow,
             )?;
             cluster_resources
@@ -631,7 +615,6 @@ async fn build_executor_template(
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    vector_aggregator_address: &Option<String>,
     cluster_resources: &mut ClusterResources,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
@@ -653,7 +636,6 @@ async fn build_executor_template(
         authentication_config,
         authorization_config,
         &merged_executor_config.logging,
-        vector_aggregator_address.as_deref(),
         &Container::Base,
     )?;
     cluster_resources
@@ -698,7 +680,6 @@ fn build_rolegroup_config_map(
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     logging: &Logging<Container>,
-    vector_aggregator_address: Option<&str>,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
     let mut config: BTreeMap<String, String> = BTreeMap::new();
@@ -782,7 +763,6 @@ fn build_rolegroup_config_map(
 
     extend_config_map_with_log_config(
         rolegroup,
-        vector_aggregator_address,
         logging,
         container,
         &Container::Vector,
@@ -1116,15 +1096,26 @@ fn build_server_rolegroup_statefulset(
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
-        pb.add_container(build_logging_container(
-            resolved_product_image,
-            merged_airflow_config
-                .logging
-                .containers
-                .get(&Container::Vector),
-        )?);
+        match &airflow
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+        {
+            Some(vector_aggregator_config_map_name) => {
+                pb.add_container(build_logging_container(
+                    resolved_product_image,
+                    merged_airflow_config
+                        .logging
+                        .containers
+                        .get(&Container::Vector),
+                    vector_aggregator_config_map_name,
+                )?);
+            }
+            None => {
+                VectorAggregatorConfigMapMissingSnafu.fail()?;
+            }
+        }
     }
-
     let mut pod_template = pb.build_template();
     pod_template.merge_from(role.config.pod_overrides.clone());
     if let Some(rolegroup) = rolegroup {
@@ -1180,6 +1171,7 @@ fn build_server_rolegroup_statefulset(
 fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
     log_config: Option<&ContainerLogConfig>,
+    vector_aggregator_config_map_name: &str,
 ) -> Result<k8s_openapi::api::core::v1::Container> {
     product_logging::framework::vector_container(
         resolved_product_image,
@@ -1192,6 +1184,7 @@ fn build_logging_container(
             .with_memory_request("128Mi")
             .with_memory_limit("128Mi")
             .build(),
+        vector_aggregator_config_map_name,
     )
     .context(ConfigureLoggingSnafu)
 }
@@ -1293,13 +1286,25 @@ fn build_executor_template_config_map(
     }
 
     if merged_executor_config.logging.enable_vector_agent {
-        pb.add_container(build_logging_container(
-            resolved_product_image,
-            merged_executor_config
-                .logging
-                .containers
-                .get(&Container::Vector),
-        )?);
+        match &airflow
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+        {
+            Some(vector_aggregator_config_map_name) => {
+                pb.add_container(build_logging_container(
+                    resolved_product_image,
+                    merged_executor_config
+                        .logging
+                        .containers
+                        .get(&Container::Vector),
+                    vector_aggregator_config_map_name,
+                )?);
+            }
+            None => {
+                VectorAggregatorConfigMapMissingSnafu.fail()?;
+            }
+        }
     }
 
     let mut pod_template = pb.build_template();
