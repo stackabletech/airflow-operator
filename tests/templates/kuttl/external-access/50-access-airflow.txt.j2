@@ -75,25 +75,25 @@ data:
   script.sh: |
     set -euxo pipefail
 
-    echo "Attempting to reach master at $SCHEDULER_METRICS..."
+    echo "Attempting to reach scheduler at $SCHEDULER_METRICS..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${SCHEDULER_METRICS}" | grep 200
 
-    echo "Attempting to reach master at $WORKER_0_METRICS..."
+    echo "Attempting to reach worker at $WORKER_0_METRICS..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WORKER_0_METRICS}" | grep 200
 
-    echo "Attempting to reach region-server at $WORKER_1_METRICS..."
+    echo "Attempting to reach worker at $WORKER_1_METRICS..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WORKER_1_METRICS}" | grep 200
 
-    echo "Attempting to reach rest-server at $WEBSERVER_DEFAULT_HTTP..."
+    echo "Attempting to reach webserver at $WEBSERVER_DEFAULT_HTTP..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WEBSERVER_DEFAULT_HTTP}" | grep 200
 
-    echo "Attempting to reach rest-server at $WEBSERVER_DEFAULT_METRICS..."
+    echo "Attempting to reach webserver at $WEBSERVER_DEFAULT_METRICS..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WEBSERVER_DEFAULT_METRICS}" | grep 200
 
-    echo "Attempting to reach rest-server at $WEBSERVER_EXTERNAL_HTTP..."
+    echo "Attempting to reach webserver at $WEBSERVER_EXTERNAL_HTTP..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WEBSERVER_EXTERNAL_HTTP}" | grep 200
 
-    echo "Attempting to reach rest-server at $WEBSERVER_EXTERNAL_METRICS..."
+    echo "Attempting to reach webserver at $WEBSERVER_EXTERNAL_METRICS..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${WEBSERVER_EXTERNAL_METRICS}" | grep 200
 
     echo "All tests successful!"
