@@ -535,7 +535,7 @@ impl v1alpha1::AirflowCluster {
                         })
                         .map(|(rolegroup_name, role_group)| {
                             (
-                                self.rolegroup_ref(AirflowRole::Worker.to_string(), rolegroup_name),
+                                self.rolegroup_ref(role.to_string(), rolegroup_name),
                                 role_group.replicas.unwrap_or_default(),
                             )
                         })
