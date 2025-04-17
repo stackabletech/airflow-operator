@@ -40,7 +40,6 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
-{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -53,7 +52,6 @@ spec:
 status:
   readyReplicas: 2
   replicas: 2
-{% endif %}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -75,7 +73,6 @@ status:
   expectedPods: 3
   currentHealthy: 3
   disruptionsAllowed: 1
-{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -85,7 +82,6 @@ status:
   expectedPods: 2
   currentHealthy: 2
   disruptionsAllowed: 1
-{% endif %}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

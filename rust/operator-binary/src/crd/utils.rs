@@ -59,15 +59,15 @@ impl PodRef {
     }
 }
 
-pub async fn get_persisted_listener_podrefs(
+pub async fn get_listener_podrefs(
     client: &stackable_operator::client::Client,
     pod_refs: Vec<PodRef>,
     listener_prefix: &str,
 ) -> Result<Vec<PodRef>, Error> {
     try_join_all(pod_refs.into_iter().map(|pod_ref| async {
-        // N.B. use the naming convention for persistent listener volumes as we
-        // only want externally-reachable endpoints.
-        let listener_name = format!("{listener_prefix}-{}", pod_ref.pod_name);
+        // N.B. use the naming convention for ephemeral listener volumes as we
+        // have defined all listeners to be so.
+        let listener_name = format!("{}-{listener_prefix}", pod_ref.pod_name);
         let listener_ref = || ObjectRef::<Listener>::new(&listener_name).within(&pod_ref.namespace);
         let pod_obj_ref = || ObjectRef::<Pod>::new(&pod_ref.pod_name).within(&pod_ref.namespace);
         let listener = client

@@ -1,4 +1,3 @@
-{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
@@ -21,4 +20,3 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
-{% endif %}

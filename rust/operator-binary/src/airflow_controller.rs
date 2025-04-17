@@ -23,10 +23,7 @@ use stackable_operator::{
             container::ContainerBuilder,
             resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
-            volume::{
-                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-                ListenerReference, VolumeBuilder,
-            },
+            volume::{ListenerOperatorVolumeSourceBuilderError, VolumeBuilder},
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -980,26 +977,14 @@ fn build_server_rolegroup_statefulset(
     }
 
     let listener_class = &merged_airflow_config.listener_class;
-    // externally-reachable listener endpoints should use a pvc volume...
-    let pvcs = if listener_class.discoverable() {
-        let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerClass(listener_class.to_string()),
-            &recommended_labels,
-        )
-        .context(BuildListenerVolumeSnafu)?
-        .build_pvc(LISTENER_VOLUME_NAME.to_string())
-        .context(BuildListenerVolumeSnafu)?;
-        Some(vec![pvc])
-    } else {
-        // ...whereas others will use ephemeral volumes
-        pb.add_listener_volume_by_listener_class(
-            LISTENER_VOLUME_NAME,
-            &listener_class.to_string(),
-            &recommended_labels,
-        )
-        .context(AddVolumeSnafu)?;
-        None
-    };
+    // all listeners will use ephemeral volumes as they can/should
+    // be removed when the pods is re-started, and no data needs to be preserved
+    pb.add_listener_volume_by_listener_class(
+        LISTENER_VOLUME_NAME,
+        &listener_class.to_string(),
+        &recommended_labels,
+    )
+    .context(AddVolumeSnafu)?;
 
     airflow_container
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
@@ -1157,7 +1142,6 @@ fn build_server_rolegroup_statefulset(
         },
         service_name: rolegroup_ref.object_name(),
         template: pod_template,
-        volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
     };
 

@@ -43,7 +43,7 @@ use stackable_operator::{
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-use utils::{PodRef, get_persisted_listener_podrefs};
+use utils::{PodRef, get_listener_podrefs};
 
 use crate::crd::{
     affinity::{get_affinity, get_executor_affinity},
@@ -555,7 +555,7 @@ impl v1alpha1::AirflowCluster {
         if let Ok(Some(listener_class)) = self.merged_listener_class(role, rolegroup_name) {
             listener_class.discoverable()
         } else {
-            // merged_listener_class returns an error is one of the roles was not found:
+            // merged_listener_class returns an error if one of the roles was not found:
             // all roles are mandatory for airflow to work, but a missing role will by
             // definition not have a listener class
             false
@@ -592,7 +592,7 @@ impl v1alpha1::AirflowCluster {
         let pod_refs = self.pod_refs(role)?;
 
         tracing::debug!("Pod references for role {role}: {:#?}", pod_refs);
-        get_persisted_listener_podrefs(client, pod_refs, LISTENER_VOLUME_NAME)
+        get_listener_podrefs(client, pod_refs, LISTENER_VOLUME_NAME)
             .await
             .context(ListenerPodRefSnafu)
     }
