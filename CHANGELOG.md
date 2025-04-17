@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added listener support for Airflow ([#604]).
+
 ### Changed
 
 - BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608]).
@@ -20,6 +24,7 @@
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#604]: https://github.com/stackabletech/airflow-operator/pull/604
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
 

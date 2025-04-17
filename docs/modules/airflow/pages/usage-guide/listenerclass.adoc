@@ -1,18 +1,37 @@
 = Service exposition with ListenerClasses
 :description: Configure Airflow service exposure with ListenerClasses: cluster-internal, external-unstable, or external-stable.
 
-Airflow offers a web UI and an API, both are exposed by the webserver process under the `webserver` role.
-The Operator deploys a service called `<name>-webserver` (where `<name>` is the name of the AirflowCluster) through which Airflow can be reached.
-
-This service can have three different types: `cluster-internal`, `external-unstable` and `external-stable`.
-Read more about the types in the xref:concepts:service-exposition.adoc[service exposition] documentation at platform level.
-
-This is how the listener class is configured:
+The operator deploys a xref:listener-operator:listener.adoc[Listener] for each Scheduler, Webserver and (Celery-)Worker pod.
+They all default to only being accessible from within the Kubernetes cluster, but this can be changed by setting `.spec.{schedulers,celeryExecutors,webservers}.config.listenerClass`:
 
 [source,yaml]
 ----
 spec:
-  clusterConfig:
-    listenerClass: cluster-internal  # <1>
+  schedulers:
+    config:
+      listenerClass: external-unstable  # <1>
+  webservers:
+    config:
+      listenerClass: external-unstable
+  celeryExecutors:
+    config:
+      listenerClass: external-unstable
 ----
-<1> The default `cluster-internal` setting.
+<1> Specify one of `external-stable`, `external-unstable`, `cluster-internal` (the default setting is `cluster-internal`).
+This can be set separately for all three roles (but not for kuberneetesExecutors as the resulting worker pods are temporary).
+
+Externally-reachable endpoints (i.e. where listener-class = `external-unstable` or `external-unstable`) are written to a ConfigMap called `<airflow-cluster-name>`, listing each rolegroup by replica.
+Both the http and metrics ports are exposed:
+
+[source,yaml]
+----
+apiVersion: v1
+data:
+  airflow-scheduler-default-0.metrics: 172.19.0.5:30589
+  airflow-webserver-default-0.http: 172.19.0.3:31891
+  airflow-webserver-default-0.metrics: 172.19.0.3:30414
+  airflow-worker-default-0.metrics: 172.19.0.5:30371
+  airflow-worker-default-1.metrics: 172.19.0.3:30514
+kind: ConfigMap
+...
+----

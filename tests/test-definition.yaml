@@ -83,6 +83,10 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
+  - name: external-access
+    dimensions:
+      - airflow
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow

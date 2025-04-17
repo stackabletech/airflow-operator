@@ -1,0 +1,30 @@
+---
+volumePermissions:
+  enabled: false
+  securityContext:
+    runAsUser: auto
+
+primary:
+  podSecurityContext:
+{% if test_scenario['values']['openshift'] == 'true' %}
+    enabled: false
+{% else %}
+    enabled: true
+{% endif %}
+  containerSecurityContext:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "128Mi"
+      cpu: "400m"
+shmVolume:
+  chmod:
+    enabled: false
+
+auth:
+  username: airflow
+  password: airflow
+  database: airflow
