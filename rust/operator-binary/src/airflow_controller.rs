@@ -338,12 +338,12 @@ pub enum Error {
     #[snafu(display("cannot collect discovery configuration"))]
     CollectDiscoveryConfig { source: crate::crd::Error },
 
-    #[snafu(display("failed to apply discovery configmap"))]
+    #[snafu(display("failed to apply discovery ConfigMap"))]
     ApplyDiscoveryConfigMap {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to build discovery configmap"))]
+    #[snafu(display("failed to build discovery ConfigMap"))]
     BuildDiscoveryConfigMap { source: super::discovery::Error },
 }
 
@@ -539,15 +539,18 @@ pub async fn reconcile_airflow(
                 })?;
         }
 
-        // if the replicas are changed at the same time as the reconciliation
+        // If the replicas are changed at the same time as the reconciliation
         // being paused, it may be possible to have listeners that are *expected*
         // (according to their replica number) but which are not yet created, so
-        // deactivate this action in such cases.
+        // deactivate this action in such cases. If the cluster is stopping or
+        // scaling down (which may take a while depending on the graceful
+        // shutdown period), the discovery configmap will be empty, but the
+        // listeners will exist (and endpoints reachable) until the Pod is gone.
         if airflow.spec.cluster_operation.reconciliation_paused
             || airflow.spec.cluster_operation.stopped
         {
             tracing::info!(
-                "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+                "Cluster is in a transitional state (either the cluster or its reconciliation has been stopped) so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
             );
         } else {
             listener_refs.insert(
@@ -982,7 +985,8 @@ fn build_server_rolegroup_statefulset(
 
     let listener_class = &merged_airflow_config.listener_class;
     // all listeners will use ephemeral volumes as they can/should
-    // be removed when the pods is re-started, and no data needs to be preserved
+    // be removed when the pods are *terminated* (ephemeral PVCs will
+    // survive re-starts)
     pb.add_listener_volume_by_listener_class(
         LISTENER_VOLUME_NAME,
         &listener_class.to_string(),
