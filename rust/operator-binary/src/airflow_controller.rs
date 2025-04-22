@@ -575,7 +575,11 @@ pub async fn reconcile_airflow(
         listener_refs
     );
 
-    if !listener_refs.is_empty() {
+    // if paused or stopped the podrefs have not been collected (see comment
+    // above): the config map should remain unchanged if paused, but the
+    // refs removed from it if the cluster is stopped as replicas will
+    // have been set to 0.
+    if !airflow.spec.cluster_operation.reconciliation_paused {
         let endpoint_cm =
             build_discovery_configmap(airflow, &resolved_product_image, &listener_refs)
                 .context(BuildDiscoveryConfigMapSnafu)?;
