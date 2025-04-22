@@ -22,7 +22,7 @@ pub enum Error {
         pod: ObjectRef<Pod>,
     },
 
-    #[snafu(display("port {port} ({port_name:?}) is out of bounds, must be within {range:?}", range = 0..=u16::MAX))]
+    #[snafu(display("port {port} ({port_name:?}) must be in-bounds and cannot be privileged: must be within {range:?}", range = 1024..=u16::MAX))]
     PortOutOfBounds {
         source: TryFromIntError,
         port_name: String,
