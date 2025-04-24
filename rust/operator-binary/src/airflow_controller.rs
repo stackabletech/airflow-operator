@@ -19,11 +19,8 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder,
-            container::ContainerBuilder,
-            resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder,
-            volume::{ListenerOperatorVolumeSourceBuilderError, VolumeBuilder},
+            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -322,11 +319,6 @@ pub enum Error {
 
     #[snafu(display("failed to build Statefulset environmental variables"))]
     BuildStatefulsetEnvVars { source: env_vars::Error },
-
-    #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
 
     #[snafu(display("failed to build Labels"))]
     LabelBuild {
