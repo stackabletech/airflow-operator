@@ -283,14 +283,11 @@ impl v1alpha1::AirflowCluster {
     /// the kubernetes executor is specified)
     pub fn get_role(&self, role: &AirflowRole) -> Option<Role<AirflowConfigFragment>> {
         match role {
-            AirflowRole::Webserver => {
-                if let Some(webserver_config) = self.spec.webservers.to_owned() {
-                    let role = extract_role_from_webserver_config(webserver_config);
-                    Some(role)
-                } else {
-                    None
-                }
-            }
+            AirflowRole::Webserver => self
+                .spec
+                .webservers
+                .to_owned()
+                .map(extract_role_from_webserver_config),
             AirflowRole::Scheduler => self.spec.schedulers.to_owned(),
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
