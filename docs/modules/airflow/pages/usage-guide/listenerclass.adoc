@@ -7,10 +7,10 @@ The listener defaults to only being accessible from within the Kubernetes cluste
 [source,yaml]
 ----
 spec:
-  schedulers:
+  webservers:
     config:
       listenerClass: external-unstable  # <1>
-  webservers:
+  schedulers:
     ...
   celeryExecutors:
     ...
