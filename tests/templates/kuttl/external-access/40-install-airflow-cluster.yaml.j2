@@ -51,14 +51,10 @@ spec:
         config:
           listenerClass: cluster-internal
   celeryExecutors:
-    config:
-      listenerClass: external-stable
     roleGroups:
       default:
         replicas: 2
   schedulers:
-    config:
-      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

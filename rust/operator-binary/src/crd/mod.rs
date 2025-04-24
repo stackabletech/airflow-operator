@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ use stackable_operator::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
     },
-    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
+    kube::{CustomResource, ResourceExt},
     kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{self, Configuration},
@@ -34,7 +34,7 @@ use stackable_operator::{
     },
     role_utils::{
         CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, Role,
-        RoleGroupRef,
+        RoleGroup, RoleGroupRef,
     },
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -43,7 +43,6 @@ use stackable_operator::{
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-use utils::{PodRef, get_listener_podrefs};
 
 use crate::crd::{
     affinity::{get_affinity, get_executor_affinity},
@@ -58,7 +57,6 @@ pub mod affinity;
 pub mod authentication;
 pub mod authorization;
 pub mod git_sync;
-pub mod utils;
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -103,9 +101,6 @@ pub enum Error {
 
     #[snafu(display("object has no associated namespace"))]
     NoNamespace,
-
-    #[snafu(display("listener podrefs could not be resolved"))]
-    ListenerPodRef { source: utils::Error },
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -205,7 +200,7 @@ pub mod versioned {
 
         /// The `webserver` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment>>,
+        pub webservers: Option<Role<WebserverConfigFragment>>,
 
         /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
@@ -288,7 +283,14 @@ impl v1alpha1::AirflowCluster {
     /// the kubernetes executor is specified)
     pub fn get_role(&self, role: &AirflowRole) -> Option<Role<AirflowConfigFragment>> {
         match role {
-            AirflowRole::Webserver => self.spec.webservers.to_owned(),
+            AirflowRole::Webserver => {
+                if let Some(webserver_config) = self.spec.webservers.to_owned() {
+                    let role = extract_role_from_webserver_config(webserver_config);
+                    Some(role)
+                } else {
+                    None
+                }
+            }
             AirflowRole::Scheduler => self.spec.schedulers.to_owned(),
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
@@ -349,13 +351,12 @@ impl v1alpha1::AirflowCluster {
 
         let role = match role {
             AirflowRole::Webserver => {
-                self.spec
-                    .webservers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
+                &extract_role_from_webserver_config(self.spec.webservers.to_owned().context(
+                    UnknownAirflowRoleSnafu {
                         role: role.to_string(),
                         roles: AirflowRole::roles(),
-                    })?
+                    },
+                )?)
             }
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
@@ -401,47 +402,28 @@ impl v1alpha1::AirflowCluster {
         &self,
         role: &AirflowRole,
         rolegroup_name: &String,
-    ) -> Result<Option<SupportedListenerClasses>, Error> {
-        let listener_class_default = Some(SupportedListenerClasses::ClusterInternal);
+    ) -> Option<SupportedListenerClasses> {
+        if role == &AirflowRole::Webserver {
+            if let Some(webservers) = self.spec.webservers.as_ref() {
+                let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
+                let mut conf_role = webservers.config.config.listener_class.to_owned();
+                let mut conf_rolegroup = webservers
+                    .role_groups
+                    .get(rolegroup_name)
+                    .map(|rg| rg.config.config.listener_class.clone())
+                    .unwrap_or_default();
 
-        let role = match role {
-            AirflowRole::Webserver => {
-                self.spec
-                    .webservers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
+                conf_role.merge(&conf_defaults);
+                conf_rolegroup.merge(&conf_role);
 
-        let mut listener_class_role = role.config.config.listener_class.to_owned();
-        let mut listener_class_rolegroup = role
-            .role_groups
-            .get(rolegroup_name)
-            .map(|rg| rg.config.config.listener_class.clone())
-            .unwrap_or_default();
-        listener_class_role.merge(&listener_class_default);
-        listener_class_rolegroup.merge(&listener_class_role);
-        tracing::debug!("Merged listener-class: {:?}", listener_class_rolegroup);
-        Ok(listener_class_rolegroup)
+                tracing::debug!("Merged listener-class: {:?}", conf_rolegroup);
+                conf_rolegroup
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     /// Retrieve and merge resource configs for the executor template
@@ -468,133 +450,38 @@ impl v1alpha1::AirflowCluster {
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
+}
 
-    pub fn rolegroup_ref(
-        &self,
-        role_name: impl Into<String>,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<v1alpha1::AirflowCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role_name.into(),
-            role_group: group_name.into(),
-        }
-    }
-
-    pub fn rolegroup_ref_and_replicas(
-        &self,
-        role: &AirflowRole,
-    ) -> Vec<(RoleGroupRef<v1alpha1::AirflowCluster>, u16)> {
-        match role {
-            AirflowRole::Webserver => self
-                .spec
-                .webservers
-                .iter()
-                .flat_map(|role| &role.role_groups)
-                // Order rolegroups consistently, to avoid spurious downstream rewrites
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .filter(|(rolegroup_name, _)| {
-                    self.resolved_listener_class_discoverable(role, rolegroup_name)
-                })
-                .map(|(rolegroup_name, role_group)| {
-                    (
-                        self.rolegroup_ref(role.to_string(), rolegroup_name),
-                        role_group.replicas.unwrap_or_default(),
-                    )
-                })
-                .collect(),
-            AirflowRole::Scheduler => self
-                .spec
-                .schedulers
-                .iter()
-                .flat_map(|role| &role.role_groups)
-                // Order rolegroups consistently, to avoid spurious downstream rewrites
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .filter(|(rolegroup_name, _)| {
-                    self.resolved_listener_class_discoverable(role, rolegroup_name)
-                })
-                .map(|(rolegroup_name, role_group)| {
-                    (
-                        self.rolegroup_ref(role.to_string(), rolegroup_name),
-                        role_group.replicas.unwrap_or_default(),
-                    )
-                })
-                .collect(),
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                        .role_groups
-                        .iter()
-                        // Order rolegroups consistently, to avoid spurious downstream rewrites
-                        .collect::<BTreeMap<_, _>>()
-                        .into_iter()
-                        .filter(|(rolegroup_name, _)| {
-                            self.resolved_listener_class_discoverable(role, rolegroup_name)
-                        })
-                        .map(|(rolegroup_name, role_group)| {
-                            (
-                                self.rolegroup_ref(role.to_string(), rolegroup_name),
-                                role_group.replicas.unwrap_or_default(),
-                            )
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                }
-            }
-        }
-    }
-
-    fn resolved_listener_class_discoverable(
-        &self,
-        role: &AirflowRole,
-        rolegroup_name: &&String,
-    ) -> bool {
-        if let Ok(Some(listener_class)) = self.merged_listener_class(role, rolegroup_name) {
-            listener_class.discoverable()
-        } else {
-            // merged_listener_class returns an error if one of the roles was not found:
-            // all roles are mandatory for airflow to work, but a missing role will by
-            // definition not have a listener class
-            false
-        }
-    }
-
-    pub fn pod_refs(&self, role: &AirflowRole) -> Result<Vec<PodRef>, Error> {
-        let ns = self.metadata.namespace.clone().context(NoNamespaceSnafu)?;
-        let rolegroup_ref_and_replicas = self.rolegroup_ref_and_replicas(role);
-
-        Ok(rolegroup_ref_and_replicas
-            .iter()
-            .flat_map(|(rolegroup_ref, replicas)| {
-                let ns = ns.clone();
-                (0..*replicas).map(move |i| PodRef {
-                    namespace: ns.clone(),
-                    role_group_service_name: rolegroup_ref.object_name(),
-                    pod_name: format!("{}-{}", rolegroup_ref.object_name(), i),
-                    ports: HashMap::from([
-                        (HTTP_PORT_NAME.to_owned(), HTTP_PORT),
-                        (METRICS_PORT_NAME.to_owned(), METRICS_PORT),
-                    ]),
-                    fqdn_override: None,
+fn extract_role_from_webserver_config(
+    fragment: Role<WebserverConfigFragment>,
+) -> Role<AirflowConfigFragment> {
+    Role {
+        config: CommonConfiguration {
+            config: fragment.config.config.airflow_config,
+            config_overrides: fragment.config.config_overrides,
+            env_overrides: fragment.config.env_overrides,
+            cli_overrides: fragment.config.cli_overrides,
+            pod_overrides: fragment.config.pod_overrides,
+            product_specific_common_config: fragment.config.product_specific_common_config,
+        },
+        role_config: fragment.role_config,
+        role_groups: fragment
+            .role_groups
+            .into_iter()
+            .map(|(k, v)| {
+                (k, RoleGroup {
+                    config: CommonConfiguration {
+                        config: v.config.config.airflow_config,
+                        config_overrides: v.config.config_overrides,
+                        env_overrides: v.config.env_overrides,
+                        cli_overrides: v.config.cli_overrides,
+                        pod_overrides: v.config.pod_overrides,
+                        product_specific_common_config: v.config.product_specific_common_config,
+                    },
+                    replicas: v.replicas,
                 })
             })
-            .collect())
-    }
-
-    pub async fn listener_refs(
-        &self,
-        client: &stackable_operator::client::Client,
-        role: &AirflowRole,
-    ) -> Result<Vec<PodRef>, Error> {
-        let pod_refs = self.pod_refs(role)?;
-
-        tracing::debug!("Pod references for role {role}: {:#?}", pod_refs);
-        get_listener_podrefs(client, pod_refs, LISTENER_VOLUME_NAME)
-            .await
-            .context(ListenerPodRefSnafu)
+            .collect(),
     }
 }
 
@@ -922,8 +809,28 @@ pub struct AirflowConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+}
 
-    /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the airflow services.
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct WebserverConfig {
+    #[fragment_attrs(serde(default))]
+    #[serde(flatten)]
+    pub airflow_config: AirflowConfig,
+
+    /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
     #[serde(default)]
     pub listener_class: SupportedListenerClasses,
 }
@@ -943,7 +850,6 @@ impl AirflowConfig {
                 }
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
-            listener_class: Some(SupportedListenerClasses::ClusterInternal),
         }
     }
 }

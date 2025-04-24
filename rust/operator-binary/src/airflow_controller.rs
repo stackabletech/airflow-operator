@@ -88,10 +88,8 @@ use crate::{
         authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
         git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT, GitSync},
-        utils::PodRef,
         v1alpha1,
     },
-    discovery::build_discovery_configmap,
     env_vars::{
         self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
     },
@@ -334,17 +332,6 @@ pub enum Error {
     LabelBuild {
         source: stackable_operator::kvp::LabelError,
     },
-
-    #[snafu(display("cannot collect discovery configuration"))]
-    CollectDiscoveryConfig { source: crate::crd::Error },
-
-    #[snafu(display("failed to apply discovery ConfigMap"))]
-    ApplyDiscoveryConfigMap {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build discovery ConfigMap"))]
-    BuildDiscoveryConfigMap { source: super::discovery::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -468,8 +455,6 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
-    let mut listener_refs: BTreeMap<String, Vec<PodRef>> = BTreeMap::new();
-
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
             AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
@@ -539,29 +524,6 @@ pub async fn reconcile_airflow(
                 })?;
         }
 
-        // If the replicas are changed at the same time as the reconciliation
-        // being paused, it may be possible to have listeners that are *expected*
-        // (according to their replica number) but which are not yet created, so
-        // deactivate this action in such cases. If the cluster is stopping or
-        // scaling down (which may take a while depending on the graceful
-        // shutdown period), the discovery configmap will be empty, but the
-        // listeners will exist (and endpoints reachable) until the Pod is gone.
-        if airflow.spec.cluster_operation.reconciliation_paused
-            || airflow.spec.cluster_operation.stopped
-        {
-            tracing::info!(
-                "Cluster is in a transitional state (either the cluster or its reconciliation has been stopped) so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
-            );
-        } else {
-            listener_refs.insert(
-                airflow_role.to_string(),
-                airflow
-                    .listener_refs(client, &airflow_role)
-                    .await
-                    .context(CollectDiscoveryConfigSnafu)?,
-            );
-        }
-
         let role_config = airflow.role_config(&airflow_role);
         if let Some(GenericRoleConfig {
             pod_disruption_budget: pdb,
@@ -571,25 +533,6 @@ pub async fn reconcile_airflow(
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
-    }
-
-    tracing::debug!(
-        "Listener references prepared for the ConfigMap {:#?}",
-        listener_refs
-    );
-
-    // if paused or stopped the podrefs have not been collected (see comment
-    // above): the config map should remain unchanged if paused, but the
-    // refs removed from it if the cluster is stopped as replicas will
-    // have been set to 0.
-    if !airflow.spec.cluster_operation.reconciliation_paused {
-        let endpoint_cm =
-            build_discovery_configmap(airflow, &resolved_product_image, &listener_refs)
-                .context(BuildDiscoveryConfigMapSnafu)?;
-        cluster_resources
-            .add(client, endpoint_cm)
-            .await
-            .context(ApplyDiscoveryConfigMapSnafu)?;
     }
 
     cluster_resources
@@ -983,20 +926,23 @@ fn build_server_rolegroup_statefulset(
         airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
     }
 
-    let listener_class = &merged_airflow_config.listener_class;
-    // all listeners will use ephemeral volumes as they can/should
-    // be removed when the pods are *terminated* (ephemeral PVCs will
-    // survive re-starts)
-    pb.add_listener_volume_by_listener_class(
-        LISTENER_VOLUME_NAME,
-        &listener_class.to_string(),
-        &recommended_labels,
-    )
-    .context(AddVolumeSnafu)?;
+    if let Some(listener_class) =
+        airflow.merged_listener_class(airflow_role, &rolegroup_ref.role_group)
+    {
+        // all listeners will use ephemeral volumes as they can/should
+        // be removed when the pods are *terminated* (ephemeral PVCs will
+        // survive re-starts)
+        pb.add_listener_volume_by_listener_class(
+            LISTENER_VOLUME_NAME,
+            &listener_class.to_string(),
+            &recommended_labels,
+        )
+        .context(AddVolumeSnafu)?;
 
-    airflow_container
-        .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
-        .context(AddVolumeMountSnafu)?;
+        airflow_container
+            .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+            .context(AddVolumeMountSnafu)?;
+    }
 
     pb.add_container(airflow_container.build());
 
