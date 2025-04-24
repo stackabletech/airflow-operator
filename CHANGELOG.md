@@ -5,14 +5,18 @@
 ### Added
 
 - Added listener support for Airflow ([#604]).
+- Adds new telemetry CLI arguments and environment variables ([#613]).
+  - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
+  - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
+  - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 
 ### Changed
 
-- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608]).
-  - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `CONSOLE_LOG`.
-  - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `FILE_LOG`.
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608], [#613]).
+  - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `CONSOLE_LOG_LEVEL`.
+  - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `FILE_LOG_LEVEL`.
   - The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set
-    by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+    by `FILE_LOG_DIRECTORY` (or via `--file-log-directory <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#600]).
@@ -27,6 +31,7 @@
 [#604]: https://github.com/stackabletech/airflow-operator/pull/604
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
+[#613]: https://github.com/stackabletech/airflow-operator/pull/613
 
 ## [25.3.0] - 2025-03-21
 
