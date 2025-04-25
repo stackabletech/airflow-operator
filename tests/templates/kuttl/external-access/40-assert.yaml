@@ -102,13 +102,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-default-0-listener
+  name: listener-airflow-webserver-default-0
 spec:
   type: NodePort # external-stable
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-external-unstable-0-listener
+  name: listener-airflow-webserver-external-unstable-0
 spec:
   type: NodePort # external-unstable

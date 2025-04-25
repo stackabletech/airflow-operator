@@ -19,8 +19,14 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, volume::VolumeBuilder,
+            PodBuilder,
+            container::ContainerBuilder,
+            resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
+            volume::{
+                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
+                ListenerReference, VolumeBuilder,
+            },
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -35,8 +41,9 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EmptyDirVolumeSource, EnvVar, PodTemplateSpec, Probe, Service,
-                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, VolumeMount,
+                ConfigMap, EmptyDirVolumeSource, EnvVar, PersistentVolumeClaim, PodTemplateSpec,
+                Probe, Service, ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction,
+                VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -323,6 +330,11 @@ pub enum Error {
     #[snafu(display("failed to build Labels"))]
     LabelBuild {
         source: stackable_operator::kvp::LabelError,
+    },
+
+    #[snafu(display("failed to build listener volume"))]
+    BuildListenerVolume {
+        source: ListenerOperatorVolumeSourceBuilderError,
     },
 }
 
@@ -918,19 +930,31 @@ fn build_server_rolegroup_statefulset(
         airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
     }
 
+    let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
+
     if let Some(listener_class) =
         airflow.merged_listener_class(airflow_role, &rolegroup_ref.role_group)
     {
-        // all listeners will use ephemeral volumes as they can/should
-        // be removed when the pods are *terminated* (ephemeral PVCs will
-        // survive re-starts)
-        pb.add_listener_volume_by_listener_class(
-            LISTENER_VOLUME_NAME,
-            &listener_class.to_string(),
-            &recommended_labels,
-        )
-        .context(AddVolumeSnafu)?;
-
+        if listener_class.discoverable() {
+            // externally reachable listener endpoints will use persistent volumes
+            // so that load balancers can hard-code the target addresses
+            let pvc = ListenerOperatorVolumeSourceBuilder::new(
+                &ListenerReference::ListenerClass(listener_class.to_string()),
+                &recommended_labels,
+            )
+            .context(BuildListenerVolumeSnafu)?
+            .build_pvc(LISTENER_VOLUME_NAME.to_string())
+            .context(BuildListenerVolumeSnafu)?;
+            pvcs = Some(vec![pvc]);
+        } else {
+            // non-reachable endpoints use ephemeral volumes
+            pb.add_listener_volume_by_listener_class(
+                LISTENER_VOLUME_NAME,
+                &listener_class.to_string(),
+                &recommended_labels,
+            )
+            .context(AddVolumeSnafu)?;
+        }
         airflow_container
             .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
             .context(AddVolumeMountSnafu)?;
@@ -1088,6 +1112,7 @@ fn build_server_rolegroup_statefulset(
         },
         service_name: rolegroup_ref.object_name(),
         template: pod_template,
+        volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
     };
 
