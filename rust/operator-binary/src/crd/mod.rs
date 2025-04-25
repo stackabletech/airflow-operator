@@ -823,8 +823,7 @@ pub struct AirflowConfig {
     serde(rename_all = "camelCase")
 )]
 pub struct WebserverConfig {
-    #[fragment_attrs(serde(default))]
-    #[serde(flatten)]
+    #[fragment_attrs(serde(default, flatten))]
     pub airflow_config: AirflowConfig,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
