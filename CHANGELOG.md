@@ -20,6 +20,7 @@
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#600]).
 - test: Bump to Vector 0.46.1 ([#620]).
+- Move the git-sync implementation to operator-rs ([#623]). The functionality should not have changed.
 
 ### Fixed
 
@@ -32,6 +33,7 @@
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
 [#613]: https://github.com/stackabletech/airflow-operator/pull/613
 [#620]: https://github.com/stackabletech/airflow-operator/pull/620
+[#623]: https://github.com/stackabletech/airflow-operator/pull/623
 
 ## [25.3.0] - 2025-03-21
 

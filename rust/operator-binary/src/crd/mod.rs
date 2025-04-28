@@ -19,6 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    git_sync::spec::GitSync,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
@@ -50,13 +51,11 @@ use crate::crd::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
         AirflowClientAuthenticationDetailsResolved,
     },
-    git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_DIR, GitSync},
 };
 
 pub mod affinity;
 pub mod authentication;
 pub mod authorization;
-pub mod git_sync;
 
 pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
@@ -305,28 +304,7 @@ impl v1alpha1::AirflowCluster {
     }
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        let mut mounts = self.spec.cluster_config.volume_mounts.clone();
-        if self.git_sync().is_some() {
-            mounts.push(VolumeMount {
-                name: GIT_SYNC_CONTENT.into(),
-                mount_path: GIT_SYNC_DIR.into(),
-                ..VolumeMount::default()
-            });
-        }
-        mounts
-    }
-
-    pub fn git_sync(&self) -> Option<&GitSync> {
-        let dags_git_sync = &self.spec.cluster_config.dags_git_sync;
-        // dags_git_sync is a list but only the first element is considered
-        // (this avoids a later breaking change when all list elements are processed)
-        if dags_git_sync.len() > 1 {
-            tracing::warn!(
-                "{:?} git-sync elements: only first will be considered...",
-                dags_git_sync.len()
-            );
-        }
-        dags_git_sync.first()
+        self.spec.cluster_config.volume_mounts.clone()
     }
 
     /// The name of the role-level load-balanced Kubernetes `Service`

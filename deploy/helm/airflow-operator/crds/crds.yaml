@@ -539,7 +539,7 @@ spec:
                           branch:
                             default: main
                             description: |-
-                              The branch to clone. Defaults to `main`.
+                              The branch to clone; defaults to `main`.
 
                               Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             type: string
@@ -549,7 +549,7 @@ spec:
                             type: string
                           depth:
                             default: 1
-                            description: The depth of syncing i.e. the number of commits to clone; defaults to 1.
+                            description: The depth of syncing, i.e. the number of commits to clone; defaults to 1.
                             format: uint32
                             minimum: 0.0
                             type: integer
@@ -572,7 +572,7 @@ spec:
                           wait:
                             default: 20s
                             description: |-
-                              The synchronization interval, e.g. `20s` or `5m`, defaults to `20s`.
+                              The synchronization interval, e.g. `20s` or `5m`; defaults to `20s`.
 
                               Since git-sync v4.x.x this field is mapped to the flag `--period`.
                             type: string
