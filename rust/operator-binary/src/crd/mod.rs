@@ -17,7 +17,7 @@ use stackable_operator::{
     },
     config::{
         fragment::{self, Fragment, ValidationError},
-        merge::{Atomic, Merge},
+        merge::Merge,
     },
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -406,10 +406,10 @@ impl v1alpha1::AirflowCluster {
         &self,
         role: &AirflowRole,
         rolegroup_name: &String,
-    ) -> Option<SupportedListenerClasses> {
+    ) -> Option<String> {
         if role == &AirflowRole::Webserver {
             if let Some(webservers) = self.spec.webservers.as_ref() {
-                let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
+                let conf_defaults = Some("cluster-internal".to_string());
                 let mut conf_role = webservers.config.config.listener_class.to_owned();
                 let mut conf_rolegroup = webservers
                     .role_groups
@@ -503,35 +503,6 @@ pub struct AirflowOpaConfig {
     pub opa: OpaConfig,
     #[serde(default)]
     pub cache: UserInformationCache,
-}
-
-#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum SupportedListenerClasses {
-    #[default]
-    #[serde(rename = "cluster-internal")]
-    #[strum(serialize = "cluster-internal")]
-    ClusterInternal,
-
-    #[serde(rename = "external-unstable")]
-    #[strum(serialize = "external-unstable")]
-    ExternalUnstable,
-
-    #[serde(rename = "external-stable")]
-    #[strum(serialize = "external-stable")]
-    ExternalStable,
-}
-
-impl Atomic for SupportedListenerClasses {}
-
-impl SupportedListenerClasses {
-    pub fn discoverable(&self) -> bool {
-        match self {
-            SupportedListenerClasses::ClusterInternal => false,
-            SupportedListenerClasses::ExternalUnstable => true,
-            SupportedListenerClasses::ExternalStable => true,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -835,7 +806,7 @@ pub struct WebserverConfig {
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
     #[serde(default)]
-    pub listener_class: SupportedListenerClasses,
+    pub listener_class: String,
 }
 
 impl AirflowConfig {

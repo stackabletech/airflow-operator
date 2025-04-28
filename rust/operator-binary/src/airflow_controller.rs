@@ -511,18 +511,16 @@ pub async fn reconcile_airflow(
             if let Some(listener_class) =
                 airflow.merged_listener_class(&airflow_role, &rolegroup.role_group)
             {
-                if listener_class.discoverable() {
-                    let rg_group_listener = build_group_listener(
-                        airflow,
-                        &resolved_product_image,
-                        &rolegroup,
-                        listener_class.to_string(),
-                    )?;
-                    cluster_resources
-                        .add(client, rg_group_listener)
-                        .await
-                        .context(ApplyGroupListenerSnafu)?;
-                }
+                let rg_group_listener = build_group_listener(
+                    airflow,
+                    &resolved_product_image,
+                    &rolegroup,
+                    listener_class.to_string(),
+                )?;
+                cluster_resources
+                    .add(client, rg_group_listener)
+                    .await
+                    .context(ApplyGroupListenerSnafu)?;
             }
 
             ss_cond_builder.add(
@@ -903,8 +901,6 @@ fn build_server_rolegroup_statefulset(
         &rolegroup_ref.role,
         &rolegroup_ref.role_group,
     );
-    let recommended_labels =
-        Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
     // Used for PVC templates that cannot be modified once they are deployed
     let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
         airflow,
@@ -1011,29 +1007,23 @@ fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if let Some(listener_class) =
-        airflow.merged_listener_class(airflow_role, &rolegroup_ref.role_group)
+    if airflow
+        .merged_listener_class(airflow_role, &rolegroup_ref.role_group)
+        .is_some()
     {
-        if listener_class.discoverable() {
-            // externally reachable listener endpoints will use persistent volumes
-            // so that load balancers can hard-code the target addresses
-            let pvc = ListenerOperatorVolumeSourceBuilder::new(
-                &ListenerReference::ListenerName(airflow.group_listener_name(rolegroup_ref)),
-                &unversioned_recommended_labels,
-            )
-            .context(BuildListenerVolumeSnafu)?
-            .build_pvc(LISTENER_VOLUME_NAME.to_string())
-            .context(BuildListenerVolumeSnafu)?;
-            pvcs = Some(vec![pvc]);
-        } else {
-            // non-reachable endpoints use ephemeral volumes
-            pb.add_listener_volume_by_listener_class(
-                LISTENER_VOLUME_NAME,
-                &listener_class.to_string(),
-                &recommended_labels,
-            )
-            .context(AddVolumeSnafu)?;
-        }
+        // Listener endpoints for the Webserver role will use persistent volumes
+        // so that load balancers can hard-code the target addresses. This will
+        // be the case even when no class is set (and the value defaults to
+        // cluster-internal) as the address should still be consistent.
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerName(airflow.group_listener_name(rolegroup_ref)),
+            &unversioned_recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .context(BuildListenerVolumeSnafu)?;
+        pvcs = Some(vec![pvc]);
+
         airflow_container
             .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
             .context(AddVolumeMountSnafu)?;

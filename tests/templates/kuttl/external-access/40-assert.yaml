@@ -95,7 +95,7 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-cluster-internal-0-listener
+  name: airflow-webserver-cluster-internal-group
 spec:
   type: ClusterIP # cluster-internal
 ---
