@@ -32,6 +32,7 @@ use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         authentication::{AuthenticationClass, ldap},
+        listener::{Listener, ListenerPort, ListenerSpec},
         product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
@@ -83,9 +84,10 @@ use crate::{
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        ExecutorConfigFragment, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
+        STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -336,6 +338,11 @@ pub enum Error {
     BuildListenerVolume {
         source: ListenerOperatorVolumeSourceBuilderError,
     },
+
+    #[snafu(display("failed to apply group listener"))]
+    ApplyGroupListener {
+        source: stackable_operator::cluster_resources::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -500,6 +507,23 @@ pub async fn reconcile_airflow(
                 &merged_airflow_config,
                 airflow_executor,
             )?;
+
+            if let Some(listener_class) =
+                airflow.merged_listener_class(&airflow_role, &rolegroup.role_group)
+            {
+                if listener_class.discoverable() {
+                    let rg_group_listener = build_group_listener(
+                        airflow,
+                        &resolved_product_image,
+                        &rolegroup,
+                        listener_class.to_string(),
+                    )?;
+                    cluster_resources
+                        .add(client, rg_group_listener)
+                        .await
+                        .context(ApplyGroupListenerSnafu)?;
+                }
+            }
 
             ss_cond_builder.add(
                 cluster_resources
@@ -805,6 +829,51 @@ fn build_rolegroup_metadata(
     Ok(metadata)
 }
 
+pub fn build_group_listener(
+    airflow: &v1alpha1::AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    listener_class: String,
+) -> Result<Listener> {
+    Ok(Listener {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(airflow)
+            .name(airflow.group_listener_name(rolegroup))
+            .ownerreference_from_resource(airflow, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(build_recommended_labels(
+                airflow,
+                AIRFLOW_CONTROLLER_NAME,
+                &resolved_product_image.app_version_label,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            ))
+            .context(ObjectMetaSnafu)?
+            .build(),
+        spec: ListenerSpec {
+            class_name: Some(listener_class),
+            ports: Some(listener_ports()),
+            ..ListenerSpec::default()
+        },
+        status: None,
+    })
+}
+
+fn listener_ports() -> Vec<ListenerPort> {
+    vec![
+        ListenerPort {
+            name: METRICS_PORT_NAME.to_string(),
+            port: METRICS_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        },
+        ListenerPort {
+            name: HTTP_PORT_NAME.to_string(),
+            port: HTTP_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        },
+    ]
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
@@ -836,6 +905,16 @@ fn build_server_rolegroup_statefulset(
     );
     let recommended_labels =
         Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
+    // Used for PVC templates that cannot be modified once they are deployed
+    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+        airflow,
+        AIRFLOW_CONTROLLER_NAME,
+        // A version value is required, and we do want to use the "recommended" format for the other desired labels
+        "none",
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    ))
+    .context(LabelBuildSnafu)?;
 
     let pb_metadata = ObjectMetaBuilder::new()
         .with_recommended_labels(recommended_object_labels)
@@ -939,8 +1018,8 @@ fn build_server_rolegroup_statefulset(
             // externally reachable listener endpoints will use persistent volumes
             // so that load balancers can hard-code the target addresses
             let pvc = ListenerOperatorVolumeSourceBuilder::new(
-                &ListenerReference::ListenerClass(listener_class.to_string()),
-                &recommended_labels,
+                &ListenerReference::ListenerName(airflow.group_listener_name(rolegroup_ref)),
+                &unversioned_recommended_labels,
             )
             .context(BuildListenerVolumeSnafu)?
             .build_pvc(LISTENER_VOLUME_NAME.to_string())
