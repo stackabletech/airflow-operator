@@ -38,18 +38,18 @@ spec:
     credentialsSecret: test-airflow-credentials
   webservers:
     config:
-      listenerClass: external-stable
+      listenerClass: test-external-stable
     roleGroups:
       default:
         replicas: 2
       external-unstable:
         replicas: 1
         config:
-          listenerClass: external-unstable
+          listenerClass: test-external-unstable
       cluster-internal:
         replicas: 1
         config:
-          listenerClass: cluster-internal
+          listenerClass: test-cluster-internal
   celeryExecutors:
     roleGroups:
       default:
