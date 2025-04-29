@@ -15,5 +15,5 @@ spec:
   celeryExecutors:
     ...
 ----
-<1> Specify one of `external-stable`, `external-unstable`, `cluster-internal` (the default setting is `cluster-internal`).
+<1> Specify a ListenerClass, such as `external-stable`, `external-unstable`, or `cluster-internal` (the default setting is `cluster-internal`).
 This can be set only for the webservers role.
