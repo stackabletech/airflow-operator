@@ -511,16 +511,21 @@ pub async fn reconcile_airflow(
             if let Some(listener_class) =
                 airflow.merged_listener_class(&airflow_role, &rolegroup.role_group)
             {
-                let rg_group_listener = build_group_listener(
-                    airflow,
-                    &resolved_product_image,
-                    &rolegroup,
-                    listener_class.to_string(),
-                )?;
-                cluster_resources
-                    .add(client, rg_group_listener)
-                    .await
-                    .context(ApplyGroupListenerSnafu)?;
+                if let Some(listener_group_name) =
+                    airflow.group_listener_name(&airflow_role, &rolegroup)
+                {
+                    let rg_group_listener = build_group_listener(
+                        airflow,
+                        &resolved_product_image,
+                        &rolegroup,
+                        listener_class.to_string(),
+                        listener_group_name,
+                    )?;
+                    cluster_resources
+                        .add(client, rg_group_listener)
+                        .await
+                        .context(ApplyGroupListenerSnafu)?;
+                }
             }
 
             ss_cond_builder.add(
@@ -832,11 +837,12 @@ pub fn build_group_listener(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
     listener_class: String,
+    listener_group_name: String,
 ) -> Result<Listener> {
     Ok(Listener {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
-            .name(airflow.group_listener_name(rolegroup))
+            .name(listener_group_name)
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
@@ -857,19 +863,14 @@ pub fn build_group_listener(
     })
 }
 
+/// We only use the http port here and intentionally omit
+/// the metrics one.
 fn listener_ports() -> Vec<ListenerPort> {
-    vec![
-        ListenerPort {
-            name: METRICS_PORT_NAME.to_string(),
-            port: METRICS_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        },
-        ListenerPort {
-            name: HTTP_PORT_NAME.to_string(),
-            port: HTTP_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        },
-    ]
+    vec![ListenerPort {
+        name: HTTP_PORT_NAME.to_string(),
+        port: HTTP_PORT.into(),
+        protocol: Some("TCP".to_string()),
+    }]
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -1007,16 +1008,13 @@ fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if airflow
-        .merged_listener_class(airflow_role, &rolegroup_ref.role_group)
-        .is_some()
-    {
+    if let Some(listener_group_name) = airflow.group_listener_name(airflow_role, rolegroup_ref) {
         // Listener endpoints for the Webserver role will use persistent volumes
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
         // cluster-internal) as the address should still be consistent.
         let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerName(airflow.group_listener_name(rolegroup_ref)),
+            &ListenerReference::ListenerName(listener_group_name),
             &unversioned_recommended_labels,
         )
         .context(BuildListenerVolumeSnafu)?

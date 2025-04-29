@@ -282,8 +282,15 @@ impl v1alpha1::AirflowCluster {
     /// The name of the group-listener provided for a specific role-group.
     /// Webservers will use this group listener so that only one load balancer
     /// is needed (per role group).
-    pub fn group_listener_name(&self, rolegroup: &RoleGroupRef<Self>) -> String {
-        format!("{}-group", rolegroup.object_name())
+    pub fn group_listener_name(
+        &self,
+        role: &AirflowRole,
+        rolegroup: &RoleGroupRef<Self>,
+    ) -> Option<String> {
+        match role {
+            AirflowRole::Webserver => Some(format!("{}-group", rolegroup.object_name())),
+            AirflowRole::Scheduler | AirflowRole::Worker => None,
+        }
     }
 
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
