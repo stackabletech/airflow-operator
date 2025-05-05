@@ -8602,6 +8602,10 @@ rec {
             packageId = "anyhow";
           }
           {
+            name = "base64";
+            packageId = "base64 0.22.1";
+          }
+          {
             name = "clap";
             packageId = "clap";
           }
@@ -8623,8 +8627,16 @@ rec {
             packageId = "indoc";
           }
           {
+            name = "lazy_static";
+            packageId = "lazy_static";
+          }
+          {
             name = "product-config";
             packageId = "product-config";
+          }
+          {
+            name = "rand";
+            packageId = "rand";
           }
           {
             name = "serde";

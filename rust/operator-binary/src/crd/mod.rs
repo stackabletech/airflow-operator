@@ -329,11 +329,6 @@ impl v1alpha1::AirflowCluster {
         dags_git_sync.first()
     }
 
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
     /// Retrieve and merge resource configs for role and role groups
     pub fn merged_config(
         &self,
@@ -534,15 +529,16 @@ impl AirflowRole {
                 command.extend(Self::authentication_start_commands(auth_config));
                 command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
-                    "airflow webserver &".to_string(),
+                    // format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                    //"airflow webserver &".to_string(),
+                    "airflow db migrate".to_string(),
+                    "airflow api-server &".to_string(),
                 ]);
             }
 
             AirflowRole::Scheduler => command.extend(vec![
                 // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
-                "airflow db init".to_string(),
-                "airflow db upgrade".to_string(),
+                "airflow db migrate".to_string(),
                 "airflow users create \
                     --username \"$ADMIN_USERNAME\" \
                     --firstname \"$ADMIN_FIRSTNAME\" \
@@ -552,16 +548,18 @@ impl AirflowRole {
                     --role \"Admin\""
                     .to_string(),
                 "prepare_signal_handlers".to_string(),
-                format!(
-                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                ),
+                // format!(
+                //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                // ),
+                "airflow dag-processor &".to_string(),
                 "airflow scheduler &".to_string(),
             ]),
             AirflowRole::Worker => command.extend(vec![
                 "prepare_signal_handlers".to_string(),
-                format!(
-                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                ),
+                // format!(
+                //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                // ),
+                "airflow db migrate".to_string(),
                 "airflow celery worker &".to_string(),
             ]),
         }
@@ -798,31 +796,31 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     let (cpu, memory) = match role {
         AirflowRole::Worker => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".into())),
+                min: Some(Quantity("1".into())),
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("2Gi".into())),
+                limit: Some(Quantity("4Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
         AirflowRole::Webserver => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".into())),
+                min: Some(Quantity("1".into())),
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("3Gi".into())),
+                limit: Some(Quantity("4Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
         AirflowRole::Scheduler => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".to_owned())),
+                min: Some(Quantity("1".to_owned())),
                 max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("512Mi".to_owned())),
+                limit: Some(Quantity("4Gi".to_owned())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),

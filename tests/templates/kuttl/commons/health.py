@@ -17,7 +17,7 @@ if __name__ == "__main__":
     except IndexError:
         role_group = "default"
 
-    url = f"http://airflow-webserver-{role_group}:8080/api/v1/health"
+    url = f"http://airflow-webserver-{role_group}:8080/api/v2/monitor/health"
     count = 0
 
     while True:
