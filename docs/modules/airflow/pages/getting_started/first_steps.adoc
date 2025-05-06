@@ -71,7 +71,7 @@ It is set to `true` here as the example DAGs are used when verifying the install
 
 NOTE: The version you need to specify for `spec.image.productVersion` is the desired version of Apache Airflow.
 You can optionally specify the `spec.image.stackableVersion` to a certain release like `23.11.0` but it is recommended to leave it out and use the default provided by the operator.
-Check our https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%airflow%2Ftags[image registry] for a list of available versions.
+Check our https://oci.stackable.tech/[image registry,window=_blank] for a list of available versions. Information on how to browse the registry can be found xref:contributor:project-overview.adoc#docker-images[here,window=_blank].
 It should generally be safe to simply use the latest version that is available.
 
 This creates the actual Airflow cluster.
