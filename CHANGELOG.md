@@ -12,6 +12,7 @@
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#600]).
+- test: Bump to Vector 0.46.1 ([#620]).
 
 ### Fixed
 
@@ -22,6 +23,7 @@
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
+[#620]: https://github.com/stackabletech/airflow-operator/pull/620
 
 ## [25.3.0] - 2025-03-21
 
