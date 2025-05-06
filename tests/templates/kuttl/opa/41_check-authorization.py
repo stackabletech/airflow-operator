@@ -26,7 +26,7 @@ user_richard_roe = {
     "password": "NvfpU518",
 }
 
-url = "http://airflow-webserver-default-group:8080"
+url = "http://airflow-webserver-default:8080"
 
 
 def create_user(user):

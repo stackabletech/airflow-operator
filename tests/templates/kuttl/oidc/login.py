@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 
 session = requests.Session()
-url = "http://airflow-webserver-default-group:8080"
+url = "http://airflow-webserver-default:8080"
 
 # Click on "Sign In with keycloak" in Airflow
 login_page = session.get(f"{url}/login/keycloak?next=")
