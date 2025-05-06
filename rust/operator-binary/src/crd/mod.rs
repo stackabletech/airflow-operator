@@ -288,7 +288,7 @@ impl v1alpha1::AirflowCluster {
         rolegroup: &RoleGroupRef<Self>,
     ) -> Option<String> {
         match role {
-            AirflowRole::Webserver => Some(format!("{}-group", rolegroup.object_name())),
+            AirflowRole::Webserver => Some(rolegroup.object_name()),
             AirflowRole::Scheduler | AirflowRole::Worker => None,
         }
     }

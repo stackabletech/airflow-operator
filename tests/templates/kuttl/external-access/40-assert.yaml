@@ -95,20 +95,20 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-cluster-internal-group
+  name: airflow-webserver-cluster-internal
 spec:
   type: ClusterIP # cluster-internal
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-default-group
+  name: airflow-webserver-default
 spec:
   type: NodePort # external-stable
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-external-unstable-group
+  name: airflow-webserver-external-unstable
 spec:
   type: NodePort # external-unstable

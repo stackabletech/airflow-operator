@@ -483,12 +483,7 @@ pub async fn reconcile_airflow(
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let rg_service = build_rolegroup_service(
-                airflow,
-                &airflow_role,
-                &resolved_product_image,
-                &rolegroup,
-            )?;
+            let rg_service = build_rolegroup_service(airflow, &resolved_product_image, &rolegroup)?;
             cluster_resources.add(client, rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -639,15 +634,6 @@ async fn build_executor_template(
     Ok(())
 }
 
-fn role_ports(port: u16) -> Vec<ServicePort> {
-    vec![ServicePort {
-        name: Some(HTTP_PORT_NAME.to_owned()),
-        port: port.into(),
-        protocol: Some("TCP".to_string()),
-        ..ServicePort::default()
-    }]
-}
-
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
@@ -762,20 +748,15 @@ fn build_rolegroup_config_map(
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
     airflow: &v1alpha1::AirflowCluster,
-    airflow_role: &AirflowRole,
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
 ) -> Result<Service> {
-    let mut ports = vec![ServicePort {
+    let ports = vec![ServicePort {
         name: Some(METRICS_PORT_NAME.into()),
         port: METRICS_PORT.into(),
         protocol: Some("TCP".to_string()),
         ..Default::default()
     }];
-
-    if let Some(http_port) = airflow_role.get_http_port() {
-        ports.append(&mut role_ports(http_port));
-    }
 
     let prometheus_label =
         Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
@@ -785,6 +766,7 @@ fn build_rolegroup_service(
         &resolved_product_image,
         &rolegroup,
         prometheus_label,
+        format!("{name}-metrics", name = rolegroup.object_name()),
     )?;
 
     let service_selector_labels =
@@ -813,10 +795,11 @@ fn build_rolegroup_metadata(
     resolved_product_image: &&ResolvedProductImage,
     rolegroup: &&RoleGroupRef<v1alpha1::AirflowCluster>,
     prometheus_label: Label,
+    name: String,
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(airflow)
-        .name(rolegroup.object_name())
+        .name(name)
         .ownerreference_from_resource(airflow, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -1152,6 +1135,7 @@ fn build_server_rolegroup_statefulset(
         &resolved_product_image,
         &rolegroup_ref,
         restarter_label,
+        rolegroup_ref.object_name(),
     )?;
 
     let statefulset_match_labels = Labels::role_group_selector(
