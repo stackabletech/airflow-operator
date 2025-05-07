@@ -13,10 +13,12 @@ sys.excepthook = exception_handler
 
 
 def assert_metric(role, role_group, metric):
-    metric_response = requests.get(f"http://airflow-{role}-{role_group}:9102/metrics")
-    assert (
-        metric_response.status_code == 200
-    ), f"Metrics could not be retrieved from the {role}-{role_group}."
+    metric_response = requests.get(
+        f"http://airflow-{role}-{role_group}-metrics:9102/metrics"
+    )
+    assert metric_response.status_code == 200, (
+        f"Metrics could not be retrieved from the {role}-{role_group}."
+    )
     return metric in metric_response.text
 
 

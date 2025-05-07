@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added listener support for Airflow ([#604]).
 - Adds new telemetry CLI arguments and environment variables ([#613]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
@@ -28,6 +29,7 @@
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#604]: https://github.com/stackabletech/airflow-operator/pull/604
 [#607]: https://github.com/stackabletech/airflow-operator/pull/607
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
 [#613]: https://github.com/stackabletech/airflow-operator/pull/613
