@@ -24,12 +24,9 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        authentication::{AuthenticationClass, ldap},
-        product_image_selection::ResolvedProductImage,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     config::fragment::ValidationError,
+    crd::authentication::{core as auth_core, ldap},
     k8s_openapi::{
         self, DeepMerge,
         api::{
@@ -176,7 +173,7 @@ pub enum Error {
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::cluster_resources::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display(
@@ -185,7 +182,7 @@ pub enum Error {
     ))]
     AuthenticationClassProviderNotSupported {
         authentication_class_provider: String,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display("failed to build config file for {rolegroup}"))]
@@ -283,7 +280,7 @@ pub enum Error {
     #[snafu(display(
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
     ))]
-    VolumeAndMounts { source: ldap::Error },
+    VolumeAndMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to construct config"))]
     ConstructConfig { source: config::Error },
@@ -305,9 +302,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
-    AddLdapVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::ldap::Error,
-    },
+    AddLdapVolumesAndVolumeMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {

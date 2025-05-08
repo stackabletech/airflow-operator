@@ -6,7 +6,7 @@ use std::{
 use product_config::types::PropertyNameKind;
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
-    commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
+    crd::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
 };
 
@@ -473,7 +473,7 @@ fn authentication_env_vars(
     oidc_client_credentials_secrets
         .iter()
         .cloned()
-        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .flat_map(oidc::v1alpha1::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
 }
 
