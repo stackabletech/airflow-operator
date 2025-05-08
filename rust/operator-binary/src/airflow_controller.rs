@@ -24,13 +24,12 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        authentication::{AuthenticationClass, ldap},
-        product_image_selection::ResolvedProductImage,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     config::fragment::ValidationError,
-    git_sync::framework::GitSyncResources,
+    crd::{
+        authentication::{core as auth_core, ldap},
+        git_sync,
+    },
     k8s_openapi::{
         self, DeepMerge,
         api::{
@@ -174,7 +173,7 @@ pub enum Error {
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::cluster_resources::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display(
@@ -183,7 +182,7 @@ pub enum Error {
     ))]
     AuthenticationClassProviderNotSupported {
         authentication_class_provider: String,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display("failed to build config file for {rolegroup}"))]
@@ -218,9 +217,7 @@ pub enum Error {
     },
 
     #[snafu(display("invalid git-sync specification"))]
-    InvalidGitSyncSpec {
-        source: stackable_operator::git_sync::framework::Error,
-    },
+    InvalidGitSyncSpec { source: git_sync::v1alpha1::Error },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -286,7 +283,7 @@ pub enum Error {
     #[snafu(display(
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
     ))]
-    VolumeAndMounts { source: ldap::Error },
+    VolumeAndMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to construct config"))]
     ConstructConfig { source: config::Error },
@@ -308,9 +305,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
-    AddLdapVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::ldap::Error,
-    },
+    AddLdapVolumesAndVolumeMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {
@@ -474,7 +469,7 @@ pub async fn reconcile_airflow(
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let git_sync_resources = GitSyncResources::new(
+            let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &resolved_product_image,
                 &env_vars_from_rolegroup_config(rolegroup_config),
@@ -598,7 +593,7 @@ async fn build_executor_template(
             rolegroup: rolegroup.clone(),
         })?;
 
-    let git_sync_resources = GitSyncResources::new(
+    let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
         resolved_product_image,
         &env_vars_from(&common_config.env_overrides),
@@ -884,7 +879,7 @@ fn build_server_rolegroup_statefulset(
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
-    git_sync_resources: &GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<StatefulSet> {
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
@@ -1162,7 +1157,7 @@ fn build_executor_template_config_map(
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
     rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    git_sync_resources: &GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
@@ -1350,7 +1345,7 @@ fn add_authentication_volumes_and_volume_mounts(
 fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
-    git_sync_resources: &GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
     add_sidecar_containers: bool,
     add_init_containers: bool,
 ) -> Result<()> {

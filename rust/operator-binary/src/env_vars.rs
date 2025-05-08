@@ -6,8 +6,9 @@ use std::{
 use product_config::types::PropertyNameKind;
 use snafu::Snafu;
 use stackable_operator::{
-    commons::authentication::oidc, git_sync::framework::GitSyncResources,
-    k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
+    crd::{authentication::oidc, git_sync},
+    k8s_openapi::api::core::v1::EnvVar,
+    kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
 };
 
@@ -68,7 +69,7 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    git_sync_resources: &GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -228,7 +229,7 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-pub fn get_dags_folder(git_sync_resources: &GitSyncResources) -> String {
+pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> String {
     let git_sync_count = git_sync_resources.git_content_folders.len();
     if git_sync_count > 1 {
         tracing::warn!(
@@ -249,7 +250,9 @@ pub fn get_dags_folder(git_sync_resources: &GitSyncResources) -> String {
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(git_sync_resources: &GitSyncResources) -> BTreeMap<String, EnvVar> {
+fn static_envs(
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     let dags_folder = get_dags_folder(git_sync_resources);
@@ -307,7 +310,7 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-    git_sync_resources: &GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
@@ -403,7 +406,7 @@ fn authentication_env_vars(
     oidc_client_credentials_secrets
         .iter()
         .cloned()
-        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .flat_map(oidc::v1alpha1::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
 }
 

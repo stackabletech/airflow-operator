@@ -19,7 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    git_sync::spec::GitSync,
+    crd::git_sync,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
@@ -218,7 +218,7 @@ pub mod versioned {
         /// Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
-        pub dags_git_sync: Vec<GitSync>,
+        pub dags_git_sync: Vec<git_sync::v1alpha1::GitSync>,
 
         /// for internal use only - not for production use.
         #[serde(default)]
