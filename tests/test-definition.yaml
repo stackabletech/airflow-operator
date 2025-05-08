@@ -18,7 +18,7 @@ dimensions:
       # - 2.9.3,oci.stackable.tech/sandbox/airflow:2.9.3-stackable0.0.0-dev
   - name: opa-latest
     values:
-      - 1.0.1
+      - 1.4.2
   - name: ldap-authentication
     values:
       - no-tls
@@ -82,6 +82,10 @@ tests:
   - name: overrides
     dimensions:
       - airflow-latest
+      - openshift
+  - name: external-access
+    dimensions:
+      - airflow
       - openshift
 suites:
   - name: nightly

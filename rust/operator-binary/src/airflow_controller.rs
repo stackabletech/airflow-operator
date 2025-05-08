@@ -19,8 +19,14 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, volume::VolumeBuilder,
+            PodBuilder,
+            container::ContainerBuilder,
+            resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
+            volume::{
+                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
+                ListenerReference, VolumeBuilder,
+            },
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -28,15 +34,15 @@ use stackable_operator::{
     config::fragment::ValidationError,
     crd::{
         authentication::{core as auth_core, ldap},
-        git_sync,
+        git_sync, listener,
     },
     k8s_openapi::{
         self, DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, PodTemplateSpec, Probe, Service, ServiceAccount, ServicePort,
-                ServiceSpec, TCPSocketAction,
+                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, Service, ServiceAccount,
+                ServicePort, ServiceSpec, TCPSocketAction,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -77,8 +83,10 @@ use crate::{
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        ExecutorConfigFragment, LOG_CONFIG_DIR, OPERATOR_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
+        STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -99,9 +107,6 @@ pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
-
-const METRICS_PORT_NAME: &str = "metrics";
-const METRICS_PORT: i32 = 9102;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -319,6 +324,21 @@ pub enum Error {
 
     #[snafu(display("failed to build Statefulset environmental variables"))]
     BuildStatefulsetEnvVars { source: env_vars::Error },
+
+    #[snafu(display("failed to build Labels"))]
+    LabelBuild {
+        source: stackable_operator::kvp::LabelError,
+    },
+
+    #[snafu(display("failed to build listener volume"))]
+    BuildListenerVolume {
+        source: ListenerOperatorVolumeSourceBuilderError,
+    },
+
+    #[snafu(display("failed to apply group listener"))]
+    ApplyGroupListener {
+        source: stackable_operator::cluster_resources::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -448,16 +468,6 @@ pub async fn reconcile_airflow(
                 role: role_name.to_string(),
             })?;
 
-        // some roles will only run "internally" and do not need to be created as services
-        if let Some(resolved_port) = role_port(role_name) {
-            let role_service =
-                build_role_service(airflow, &resolved_product_image, role_name, resolved_port)?;
-            cluster_resources
-                .add(client, role_service)
-                .await
-                .context(ApplyRoleServiceSnafu)?;
-        }
-
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
                 cluster: ObjectRef::from_obj(airflow),
@@ -498,6 +508,26 @@ pub async fn reconcile_airflow(
                 &git_sync_resources,
             )?;
 
+            if let Some(listener_class) =
+                airflow.merged_listener_class(&airflow_role, &rolegroup.role_group)
+            {
+                if let Some(listener_group_name) =
+                    airflow.group_listener_name(&airflow_role, &rolegroup)
+                {
+                    let rg_group_listener = build_group_listener(
+                        airflow,
+                        &resolved_product_image,
+                        &rolegroup,
+                        listener_class.to_string(),
+                        listener_group_name,
+                    )?;
+                    cluster_resources
+                        .add(client, rg_group_listener)
+                        .await
+                        .context(ApplyGroupListenerSnafu)?;
+                }
+            }
+
             ss_cond_builder.add(
                 cluster_resources
                     .add(client, rg_statefulset)
@@ -530,7 +560,7 @@ pub async fn reconcile_airflow(
             pod_disruption_budget: pdb,
         }) = role_config
         {
-            add_pdbs(pdb, airflow, &airflow_role, client, &mut cluster_resources)
+            add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
@@ -617,68 +647,6 @@ async fn build_executor_template(
         .await
         .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
     Ok(())
-}
-
-/// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
-/// including targets outside the cluster.
-fn build_role_service(
-    airflow: &v1alpha1::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    role_name: &str,
-    port: u16,
-) -> Result<Service> {
-    let role_svc_name = format!("{}-{}", airflow.name_any(), role_name);
-    let ports = role_ports(port);
-
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
-        .name(&role_svc_name)
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            airflow,
-            AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            role_name,
-            "global",
-        ))
-        .context(ObjectMetaSnafu)?
-        .build();
-
-    let service_selector_labels =
-        Labels::role_selector(airflow, APP_NAME, role_name).context(BuildLabelSnafu)?;
-
-    let service_spec = ServiceSpec {
-        type_: Some(
-            airflow
-                .spec
-                .cluster_config
-                .listener_class
-                .k8s_service_type(),
-        ),
-        ports: Some(ports),
-        selector: Some(service_selector_labels.into()),
-        ..ServiceSpec::default()
-    };
-
-    Ok(Service {
-        metadata,
-        spec: Some(service_spec),
-        status: None,
-    })
-}
-
-fn role_ports(port: u16) -> Vec<ServicePort> {
-    vec![ServicePort {
-        name: Some("http".to_string()),
-        port: port.into(),
-        protocol: Some("TCP".to_string()),
-        ..ServicePort::default()
-    }]
-}
-
-fn role_port(role_name: &str) -> Option<u16> {
-    AirflowRole::from_str(role_name).unwrap().get_http_port()
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
@@ -798,16 +766,12 @@ fn build_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
 ) -> Result<Service> {
-    let mut ports = vec![ServicePort {
+    let ports = vec![ServicePort {
         name: Some(METRICS_PORT_NAME.into()),
-        port: METRICS_PORT,
+        port: METRICS_PORT.into(),
         protocol: Some("TCP".to_string()),
         ..Default::default()
     }];
-
-    if let Some(http_port) = role_port(&rolegroup.role) {
-        ports.append(&mut role_ports(http_port));
-    }
 
     let prometheus_label =
         Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
@@ -817,6 +781,7 @@ fn build_rolegroup_service(
         &resolved_product_image,
         &rolegroup,
         prometheus_label,
+        format!("{name}-metrics", name = rolegroup.object_name()),
     )?;
 
     let service_selector_labels =
@@ -845,10 +810,11 @@ fn build_rolegroup_metadata(
     resolved_product_image: &&ResolvedProductImage,
     rolegroup: &&RoleGroupRef<v1alpha1::AirflowCluster>,
     prometheus_label: Label,
+    name: String,
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(airflow)
-        .name(rolegroup.object_name())
+        .name(name)
         .ownerreference_from_resource(airflow, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -862,6 +828,47 @@ fn build_rolegroup_metadata(
         .with_label(prometheus_label)
         .build();
     Ok(metadata)
+}
+
+pub fn build_group_listener(
+    airflow: &v1alpha1::AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    listener_class: String,
+    listener_group_name: String,
+) -> Result<listener::v1alpha1::Listener> {
+    Ok(listener::v1alpha1::Listener {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(airflow)
+            .name(listener_group_name)
+            .ownerreference_from_resource(airflow, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(build_recommended_labels(
+                airflow,
+                AIRFLOW_CONTROLLER_NAME,
+                &resolved_product_image.app_version_label,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            ))
+            .context(ObjectMetaSnafu)?
+            .build(),
+        spec: listener::v1alpha1::ListenerSpec {
+            class_name: Some(listener_class),
+            ports: Some(listener_ports()),
+            ..listener::v1alpha1::ListenerSpec::default()
+        },
+        status: None,
+    })
+}
+
+/// We only use the http port here and intentionally omit
+/// the metrics one.
+fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
+    vec![listener::v1alpha1::ListenerPort {
+        name: HTTP_PORT_NAME.to_string(),
+        port: HTTP_PORT.into(),
+        protocol: Some("TCP".to_string()),
+    }]
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -887,15 +894,26 @@ fn build_server_rolegroup_statefulset(
     let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
 
     let mut pb = PodBuilder::new();
+    let recommended_object_labels = build_recommended_labels(
+        airflow,
+        AIRFLOW_CONTROLLER_NAME,
+        &resolved_product_image.app_version_label,
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    );
+    // Used for PVC templates that cannot be modified once they are deployed
+    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+        airflow,
+        AIRFLOW_CONTROLLER_NAME,
+        // A version value is required, and we do want to use the "recommended" format for the other desired labels
+        "none",
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    ))
+    .context(LabelBuildSnafu)?;
 
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(build_recommended_labels(
-            airflow,
-            AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
+        .with_recommended_labels(recommended_object_labels)
         .context(ObjectMetaSnafu)?
         .build();
 
@@ -971,10 +989,11 @@ fn build_server_rolegroup_statefulset(
             .context(AddVolumeMountSnafu)?;
     }
 
-    if let Some(resolved_port) = airflow_role.get_http_port() {
+    // for roles with an http endpoint
+    if let Some(http_port) = airflow_role.get_http_port() {
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(resolved_port.into()),
+                port: IntOrString::Int(http_port.into()),
                 ..TCPSocketAction::default()
             }),
             initial_delay_seconds: Some(60),
@@ -984,7 +1003,28 @@ fn build_server_rolegroup_statefulset(
         };
         airflow_container.readiness_probe(probe.clone());
         airflow_container.liveness_probe(probe);
-        airflow_container.add_container_port("http", resolved_port.into());
+        airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
+    }
+
+    let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
+
+    if let Some(listener_group_name) = airflow.group_listener_name(airflow_role, rolegroup_ref) {
+        // Listener endpoints for the Webserver role will use persistent volumes
+        // so that load balancers can hard-code the target addresses. This will
+        // be the case even when no class is set (and the value defaults to
+        // cluster-internal) as the address should still be consistent.
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerName(listener_group_name),
+            &unversioned_recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .context(BuildListenerVolumeSnafu)?;
+        pvcs = Some(vec![pvc]);
+
+        airflow_container
+            .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+            .context(AddVolumeMountSnafu)?;
     }
 
     // If the DAG is modularized we may encounter a timing issue whereby the celery worker
@@ -1022,7 +1062,7 @@ fn build_server_rolegroup_statefulset(
             ]
             .join("\n"),
         ])
-        .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
@@ -1089,6 +1129,7 @@ fn build_server_rolegroup_statefulset(
         &resolved_product_image,
         &rolegroup_ref,
         restarter_label,
+        rolegroup_ref.object_name(),
     )?;
 
     let statefulset_match_labels = Labels::role_group_selector(
@@ -1116,6 +1157,7 @@ fn build_server_rolegroup_statefulset(
         },
         service_name: rolegroup_ref.object_name(),
         template: pod_template,
+        volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
     };
 
