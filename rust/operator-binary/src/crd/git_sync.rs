@@ -148,7 +148,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.10.4
+            productVersion: 2.10.5
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -208,7 +208,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.10.4
+            productVersion: 2.10.5
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -288,7 +288,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.10.4
+            productVersion: 2.10.5
           clusterConfig:
             loadExamples: false
             exposeConfig: false
