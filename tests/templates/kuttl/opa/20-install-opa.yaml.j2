@@ -11,6 +11,12 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['opa-latest'] }}"
+{% if test_scenario['values']['opa-latest'].find(",") > 0 %}
+          custom: "{{ test_scenario['values']['opa-latest'].split(',')[1] }}"
+          productVersion: "{{ test_scenario['values']['opa-latest'].split(',')[0] }}"
+{% else %}
+          productVersion: "{{ test_scenario['values']['opa-latest'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
