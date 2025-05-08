@@ -455,10 +455,16 @@ spec:
                       items:
                         properties:
                           authenticationClass:
-                            description: Name of the [AuthenticationClass](https://docs.stackable.tech/home/nightly/concepts/authentication) used to authenticate users.
+                            description: |-
+                              Name of the [AuthenticationClass](https://docs.stackable.tech/home/nightly/concepts/authentication) used to authenticate users.
+
+                              To get the concrete [`AuthenticationClass`], we must resolve it. This resolution can be achieved by using [`ClientAuthenticationDetails::resolve_class`].
                             type: string
                           oidc:
-                            description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
+                            description: |-
+                              This field contains OIDC-specific configuration. It is only required in case OIDC is used.
+
+                              Use [`ClientAuthenticationDetails::oidc_or_error`] to get the value or report an error to the user.
                             nullable: true
                             properties:
                               clientCredentialsSecret:
@@ -466,7 +472,10 @@ spec:
                                 type: string
                               extraScopes:
                                 default: []
-                                description: An optional list of extra scopes which get merged with the scopes defined in the [`AuthenticationClass`].
+                                description: |-
+                                  An optional list of extra scopes which get merged with the scopes defined in the [`AuthenticationClass`][1].
+
+                                  [1]: crate::crd::authentication::core::v1alpha1::AuthenticationClass
                                 items:
                                   type: string
                                 type: array
@@ -539,7 +548,7 @@ spec:
                           branch:
                             default: main
                             description: |-
-                              The branch to clone. Defaults to `main`.
+                              The branch to clone; defaults to `main`.
 
                               Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             type: string
@@ -549,7 +558,7 @@ spec:
                             type: string
                           depth:
                             default: 1
-                            description: The depth of syncing i.e. the number of commits to clone; defaults to 1.
+                            description: The depth of syncing, i.e. the number of commits to clone; defaults to 1.
                             format: uint32
                             minimum: 0.0
                             type: integer
@@ -572,7 +581,7 @@ spec:
                           wait:
                             default: 20s
                             description: |-
-                              The synchronization interval, e.g. `20s` or `5m`, defaults to `20s`.
+                              The synchronization interval, e.g. `20s` or `5m`; defaults to `20s`.
 
                               Since git-sync v4.x.x this field is mapped to the flag `--period`.
                             type: string
