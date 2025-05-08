@@ -148,7 +148,7 @@ metadata:
   name: airflow-insecure-tls
 spec:
   image:
-    productVersion: 2.10.4
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: true
     exposeConfig: true
