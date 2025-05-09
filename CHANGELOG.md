@@ -29,6 +29,7 @@
 
 - Use `json` file extension for log files ([#607]).
 - Fix a bug where changes to ConfigMaps that are referenced in the AirflowCluster spec didn't trigger a reconciliation ([#600]).
+- Use headless service for StatefulSets ([#626]).
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
@@ -39,6 +40,7 @@
 [#620]: https://github.com/stackabletech/airflow-operator/pull/620
 [#624]: https://github.com/stackabletech/airflow-operator/pull/624
 [#625]: https://github.com/stackabletech/airflow-operator/pull/625
+[#626]: https://github.com/stackabletech/airflow-operator/pull/626
 
 ## [25.3.0] - 2025-03-21
 
