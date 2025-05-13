@@ -1435,7 +1435,7 @@ dependencies = [
 [[package]]
 name = "k8s-version"
 version = "0.1.2"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "darling",
  "regex",
@@ -2641,7 +2641,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.92.0"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "chrono",
  "clap",
@@ -2678,7 +2678,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2689,7 +2689,7 @@ dependencies = [
 [[package]]
 name = "stackable-shared"
 version = "0.0.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "kube",
  "semver",
@@ -2701,7 +2701,7 @@ dependencies = [
 [[package]]
 name = "stackable-telemetry"
 version = "0.6.0"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "axum",
  "clap",
@@ -2724,7 +2724,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned"
 version = "0.7.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "stackable-versioned-macros",
 ]
@@ -2732,7 +2732,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned-macros"
 version = "0.7.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#5d7a0076b1e51b6105375e46e44e79198d6e233a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat%2Fgit-sync#6619fe4cc96ba1fbe97b99de5ddf43e7f3d14647"
 dependencies = [
  "convert_case",
  "darling",

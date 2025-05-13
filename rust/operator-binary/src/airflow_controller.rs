@@ -484,6 +484,10 @@ pub async fn reconcile_airflow(
                 &resolved_product_image,
                 &env_vars_from_rolegroup_config(rolegroup_config),
                 &airflow.volume_mounts(),
+                LOG_VOLUME_NAME,
+                &merged_airflow_config
+                    .logging
+                    .for_container(&Container::GitSync),
             )
             .context(InvalidGitSyncSpecSnafu)?;
 
@@ -628,6 +632,10 @@ async fn build_executor_template(
         resolved_product_image,
         &env_vars_from(&common_config.env_overrides),
         &airflow.volume_mounts(),
+        LOG_VOLUME_NAME,
+        &merged_executor_config
+            .logging
+            .for_container(&Container::GitSync),
     )
     .context(InvalidGitSyncSpecSnafu)?;
 

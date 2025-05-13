@@ -711,6 +711,7 @@ pub enum Container {
     Airflow,
     Vector,
     Base,
+    GitSync,
 }
 
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
