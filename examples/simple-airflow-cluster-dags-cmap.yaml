@@ -82,7 +82,7 @@ metadata:
   name: airflow-dags-cmap
 spec:
   image:
-    productVersion: 2.10.4
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: false
     exposeConfig: false

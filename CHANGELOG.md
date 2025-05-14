@@ -9,6 +9,7 @@
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- Add support for airflow `2.10.5` ([#625]).
 
 ### Changed
 
@@ -22,6 +23,7 @@
     of having the operator write it to the vector config ([#600]).
 - test: Bump to Vector 0.46.1 ([#620]).
 - test: Bump OPA to `1.4.2` ([#624]).
+- Deprecate airflow `2.10.4` ([#625]).
 - Move the git-sync implementation to operator-rs ([#623]). The functionality should not have changed.
 
 ### Fixed
@@ -38,6 +40,7 @@
 [#620]: https://github.com/stackabletech/airflow-operator/pull/620
 [#623]: https://github.com/stackabletech/airflow-operator/pull/623
 [#624]: https://github.com/stackabletech/airflow-operator/pull/624
+[#625]: https://github.com/stackabletech/airflow-operator/pull/625
 
 ## [25.3.0] - 2025-03-21
 
