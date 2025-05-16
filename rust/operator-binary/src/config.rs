@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::{
-    authentication::{ldap::AuthenticationProvider, oidc},
-    tls_verification::TlsVerification,
+use stackable_operator::{
+    commons::tls_verification::TlsVerification,
+    crd::authentication::{ldap, oidc},
 };
 
 use crate::crd::{
@@ -28,19 +28,13 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("Failed to create LDAP endpoint url."))]
-    FailedToCreateLdapEndpointUrl {
-        source: stackable_operator::commons::authentication::ldap::Error,
-    },
+    FailedToCreateLdapEndpointUrl { source: ldap::v1alpha1::Error },
 
     #[snafu(display("invalid OIDC endpoint"))]
-    InvalidOidcEndpoint {
-        source: stackable_operator::commons::authentication::oidc::Error,
-    },
+    InvalidOidcEndpoint { source: oidc::v1alpha1::Error },
 
     #[snafu(display("invalid well-known OIDC configuration URL"))]
-    InvalidWellKnownConfigUrl {
-        source: stackable_operator::commons::authentication::oidc::Error,
-    },
+    InvalidWellKnownConfigUrl { source: oidc::v1alpha1::Error },
 }
 
 pub fn add_airflow_config(
@@ -116,7 +110,7 @@ fn append_authentication_config(
 
 fn append_ldap_config(
     config: &mut BTreeMap<String, String>,
-    ldap: &AuthenticationProvider,
+    ldap: &ldap::v1alpha1::AuthenticationProvider,
 ) -> Result<()> {
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
@@ -206,8 +200,8 @@ fn append_ldap_config(
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     providers: &[(
-        &oidc::AuthenticationProvider,
-        &oidc::ClientAuthenticationOptions<()>,
+        &oidc::v1alpha1::AuthenticationProvider,
+        &oidc::v1alpha1::ClientAuthenticationOptions<()>,
     )],
 ) -> Result<(), Error> {
     // Debatable: AUTH_OAUTH or AUTH_OID
@@ -221,7 +215,7 @@ fn append_oidc_config(
 
     for (oidc, client_options) in providers {
         let (env_client_id, env_client_secret) =
-            oidc::AuthenticationProvider::client_credentials_env_names(
+            oidc::v1alpha1::AuthenticationProvider::client_credentials_env_names(
                 &client_options.client_credentials_secret_ref,
             );
         let mut scopes = oidc.scopes.clone();
@@ -233,7 +227,7 @@ fn append_oidc_config(
             .unwrap_or(&DEFAULT_OIDC_PROVIDER);
 
         let oauth_providers_config_entry = match oidc_provider {
-            oidc::IdentityProviderHint::Keycloak => {
+            oidc::v1alpha1::IdentityProviderHint::Keycloak => {
                 let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
                 let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
                 api_base_url.push_str("/protocol/");
@@ -316,7 +310,7 @@ mod tests {
     use indoc::formatdoc;
     use rstest::rstest;
     use stackable_operator::{
-        commons::authentication::{ldap, oidc},
+        crd::authentication::{ldap, oidc},
         time::Duration,
     };
 
@@ -373,7 +367,7 @@ mod tests {
                     secretClass: openldap-tls
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(ldap_provider_yaml);
-        let ldap_provider: ldap::AuthenticationProvider =
+        let ldap_provider: ldap::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
@@ -433,7 +427,7 @@ mod tests {
         "
         );
         let deserializer = serde_yaml::Deserializer::from_str(&oidc_provider_yaml1);
-        let oidc_provider1: oidc::AuthenticationProvider =
+        let oidc_provider1: oidc::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let oidc_provider_yaml2 = r#"
@@ -444,14 +438,14 @@ mod tests {
             provider_hint: Keycloak
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml2);
-        let oidc_provider2: oidc::AuthenticationProvider =
+        let oidc_provider2: oidc::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: vec![
                 AirflowAuthenticationClassResolved::Oidc {
                     provider: oidc_provider1,
-                    oidc: oidc::ClientAuthenticationOptions {
+                    oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
                         product_specific_fields: (),
@@ -459,7 +453,7 @@ mod tests {
                 },
                 AirflowAuthenticationClassResolved::Oidc {
                     provider: oidc_provider2,
-                    oidc: oidc::ClientAuthenticationOptions {
+                    oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
                         product_specific_fields: (),

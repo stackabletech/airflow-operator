@@ -30,6 +30,12 @@ customConfig:
       condition: >-
         .pod == "airflow-webserver-automatic-log-config-0" &&
         .container == "airflow"
+    filteredAutomaticLogConfigWebserverGitSync:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .container == "git-sync-0"
     filteredAutomaticLogConfigWebserverVector:
       type: filter
       inputs: [validEvents]
@@ -54,6 +60,12 @@ customConfig:
       condition: >-
         .pod == "airflow-scheduler-automatic-log-config-0" &&
         .container == "airflow"
+    filteredAutomaticLogConfigSchedulerGitSync:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .container == "git-sync-0"
     filteredAutomaticLogConfigSchedulerVector:
       type: filter
       inputs: [validEvents]
@@ -79,6 +91,18 @@ customConfig:
       condition: >-
         .pod == "airflow-worker-automatic-log-config-0" &&
         .container == "airflow"
+    filteredAutomaticLogConfigWorkerGitSync:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "git-sync-0"
+    filteredAutomaticLogConfigWorkerGitSyncInit:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "git-sync-0-init"
     filteredAutomaticLogConfigWorkerVector:
       type: filter
       inputs: [validEvents]
@@ -104,6 +128,12 @@ customConfig:
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
         .container == "base"
+    filteredExampleTriggerTargetDagBashGitSyncInit:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
+        .container == "git-sync-0-init"
     filteredExampleTriggerTargetDagBashTaskVector:
       type: filter
       inputs: [validEvents]
@@ -116,6 +146,12 @@ customConfig:
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
         .container == "base"
+    filteredExampleTriggerTargetDagRunThisGitSyncInit:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
+        .container == "git-sync-0-init"
     filteredExampleTriggerTargetDagRunThisVector:
       type: filter
       inputs: [validEvents]

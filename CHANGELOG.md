@@ -24,6 +24,7 @@
 - test: Bump to Vector 0.46.1 ([#620]).
 - test: Bump OPA to `1.4.2` ([#624]).
 - Deprecate airflow `2.10.4` ([#625]).
+- Move the git-sync implementation to operator-rs ([#623]). The functionality should not have changed.
 
 ### Fixed
 
@@ -37,6 +38,7 @@
 [#608]: https://github.com/stackabletech/airflow-operator/pull/608
 [#613]: https://github.com/stackabletech/airflow-operator/pull/613
 [#620]: https://github.com/stackabletech/airflow-operator/pull/620
+[#623]: https://github.com/stackabletech/airflow-operator/pull/623
 [#624]: https://github.com/stackabletech/airflow-operator/pull/624
 [#625]: https://github.com/stackabletech/airflow-operator/pull/625
 
