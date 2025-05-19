@@ -53,7 +53,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::{controller::Action, reflector::ObjectRef},
     },
-    kvp::{Label, LabelError, Labels},
+    kvp::{Annotation, Label, LabelError, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY, env_vars_from,
@@ -923,6 +923,13 @@ fn build_server_rolegroup_statefulset(
     let pb_metadata = ObjectMetaBuilder::new()
         .with_recommended_labels(recommended_object_labels)
         .context(ObjectMetaSnafu)?
+        .with_annotation(
+            Annotation::try_from((
+                "kubectl.kubernetes.io/default-container",
+                format!("{}", Container::Airflow),
+            ))
+            .unwrap(),
+        )
         .build();
 
     pb.metadata(pb_metadata)
