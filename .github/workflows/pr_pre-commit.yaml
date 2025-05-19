@@ -26,10 +26,11 @@ jobs:
           persist-credentials: false
           submodules: recursive
           fetch-depth: 0
-      - uses: stackabletech/actions/run-pre-commit@4bfd3b65f22af597fe784599c077dc34bf5894a7 # v0.8.0
+      - uses: stackabletech/actions/run-pre-commit@feat/run-pre-commit-pin-rustup-version # TODO: Use released version
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           rust: ${{ env.RUST_TOOLCHAIN_VERSION }}
+          rustup-version: "1.28.1"
           hadolint: ${{ env.HADOLINT_VERSION }}
           nix: ${{ env.NIX_PKG_MANAGER_VERSION }}
           nix-github-token: ${{ secrets.GITHUB_TOKEN }}

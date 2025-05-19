@@ -43,6 +43,9 @@ mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+// TODO: Remove me again
+// Trigger pre-commit hooks
+
 #[derive(Parser)]
 #[clap(about, author)]
 struct Opts {
