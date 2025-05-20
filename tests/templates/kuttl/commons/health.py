@@ -3,6 +3,7 @@ import logging
 import requests
 import sys
 import time
+import argparse
 
 if __name__ == "__main__":
     log_level = "DEBUG"
@@ -12,12 +13,15 @@ if __name__ == "__main__":
         stream=sys.stdout,
     )
 
-    try:
-        role_group = sys.argv[1]
-    except IndexError:
-        role_group = "default"
+    parser = argparse.ArgumentParser(description="Health check script")
+    parser.add_argument("--role-group", type=str, default="default", help="Role group to check")
+    parser.add_argument("--airflow-version", type=str, help="Airflow version")
+    opts = parser.parse_args()
 
-    url = f"http://airflow-webserver-{role_group}:8080/api/v2/monitor/health"
+    url = f"http://airflow-webserver-{opts.role_group}:8080/api/v1/health"
+    if opts.airflow_version and opts.airflow_version.startswith("3"):
+        url = f"http://airflow-webserver-{opts.role_group}:8080/api/v2/monitor/health"
+
     count = 0
 
     while True:
