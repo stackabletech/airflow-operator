@@ -32,9 +32,7 @@ const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CO
 const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
 const AIRFLOW_METRICS_STATSD_PORT: &str = "AIRFLOW__METRICS__STATSD_PORT";
-//const AIRFLOW_API_AUTH_BACKEND: &str = "AIRFLOW__API__AUTH_BACKEND";
 const AIRFLOW_WEBSERVER_SECRET_KEY: &str = "AIRFLOW__WEBSERVER__SECRET_KEY";
-//const AIRFLOW_CORE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__CORE__SQL_ALCHEMY_CONN";
 const AIRFLOW_CELERY_RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
 const AIRFLOW_CELERY_BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
 const AIRFLOW_CORE_DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
@@ -112,14 +110,6 @@ pub fn build_airflow_statefulset_envs(
                 "connections.secretKey",
             ),
         );
-        // env.insert(
-        //     AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
-        //     env_var_from_secret(
-        //         AIRFLOW_CORE_SQL_ALCHEMY_CONN,
-        //         secret,
-        //         "connections.sqlalchemyDatabaseUri",
-        //     ),
-        // );
         env.insert(
             "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN".into(),
             env_var_from_secret(
@@ -329,27 +319,11 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, En
         ..Default::default()
     });
 
-    // env.insert(
-    //     AIRFLOW_API_AUTH_BACKEND.into(),
-    //     // Authentication for the API is handled separately to the Web Authentication.
-    //     // Basic authentication is used by the integration tests.
-    //     // The default is to deny all requests to the API.
-    //     EnvVar {
-    //         name: AIRFLOW_API_AUTH_BACKEND.into(),
-    //         value: Some("airflow.api.auth.backend.basic_auth".into()),
-    //         ..Default::default()
-    //     },
-    // );
-    env.insert("AIRFLOW_API_AUTH_BACKENDS".into(), EnvVar {
-        name: "AIRFLOW_API_AUTH_BACKENDS".into(),
-        value: Some("airflow.api.auth.backend.session".into()),
+    env.insert("AIRFLOW__API__AUTH_BACKENDS".into(), EnvVar {
+        name: "AIRFLOW__API__AUTH_BACKENDS".into(),
+        value: Some("airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into()),
         ..Default::default()
     });
-    // env.insert("AIRFLOW__CORE__HOSTNAME_CALLABLE".into(), EnvVar {
-    //     name: "AIRFLOW__CORE__HOSTNAME_CALLABLE".into(),
-    //     value: Some("airflow.utils.net.getfqdn".into()),
-    //     ..Default::default()
-    // });
 
     let rolegroup = airflow
         .spec
@@ -381,23 +355,13 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, En
         ..Default::default()
     });
 
-    // let jwt_key = jwt_key();
-
     env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
         name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-        //value: Some("yAYiFDwnAll1YNh165NS6w==".into()),
         value: Some(JWT_KEY.clone()),
         ..Default::default()
     });
     Ok(env)
 }
-
-// fn jwt_key() -> String {
-//     let mut rng = rand::thread_rng();
-//     // Generate 16 random bytes and encode to base64 string
-//     let random_bytes: [u8; 16] = rng.gen();
-//     STANDARD.encode(random_bytes)
-// }
 
 /// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
 /// webserver (and worker, for clusters utilizing `celeryExecutor`). N.B. the git credentials-secret is passed
@@ -447,14 +411,6 @@ pub fn build_airflow_template_envs(
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
-    // env.insert(
-    //     AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
-    //     env_var_from_secret(
-    //         AIRFLOW_CORE_SQL_ALCHEMY_CONN,
-    //         secret,
-    //         "connections.sqlalchemyDatabaseUri",
-    //     ),
-    // );
     env.insert(
         "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN".into(),
         env_var_from_secret(

@@ -5,4 +5,4 @@ metadata:
   name: test-airflow-webserver-health-check
 timeout: 480
 commands:
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py {{ test_scenario['values']['airflow'] }}

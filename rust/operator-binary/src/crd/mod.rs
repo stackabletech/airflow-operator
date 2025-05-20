@@ -9,7 +9,7 @@ use stackable_operator::{
         cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
-        product_image_selection::ProductImage,
+        product_image_selection::{ProductImage, ResolvedProductImage},
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
             Resources, ResourcesFragment,
@@ -513,6 +513,7 @@ impl AirflowRole {
     pub fn get_commands(
         &self,
         auth_config: &AirflowClientAuthenticationDetailsResolved,
+        resolved_product_image: &ResolvedProductImage,
     ) -> Vec<String> {
         let mut command = vec![
             format!(
@@ -523,46 +524,83 @@ impl AirflowRole {
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
 
-        match &self {
-            AirflowRole::Webserver => {
-                // Getting auth commands for AuthClass
-                command.extend(Self::authentication_start_commands(auth_config));
-                command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    // format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
-                    //"airflow webserver &".to_string(),
+        if resolved_product_image.product_version.starts_with("3.") {
+            match &self {
+                AirflowRole::Webserver => {
+                    command.extend(Self::authentication_start_commands(auth_config));
+                    command.extend(vec![
+                        "prepare_signal_handlers".to_string(),
+                        // format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                        //"airflow webserver &".to_string(),
+                        "airflow db migrate".to_string(),
+                        "airflow api-server &".to_string(),
+                    ]);
+                }
+                AirflowRole::Scheduler => command.extend(vec![
                     "airflow db migrate".to_string(),
-                    "airflow api-server &".to_string(),
-                ]);
+                    "airflow users create \
+                        --username \"$ADMIN_USERNAME\" \
+                        --firstname \"$ADMIN_FIRSTNAME\" \
+                        --lastname \"$ADMIN_LASTNAME\" \
+                        --email \"$ADMIN_EMAIL\" \
+                        --password \"$ADMIN_PASSWORD\" \
+                        --role \"Admin\""
+                        .to_string(),
+                    "prepare_signal_handlers".to_string(),
+                    // format!(
+                    //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    // ),
+                    "airflow dag-processor &".to_string(),
+                    "airflow scheduler &".to_string(),
+                ]),
+                AirflowRole::Worker => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    // format!(
+                    //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    // ),
+                    "airflow db migrate".to_string(),
+                    "airflow celery worker &".to_string(),
+                ]),
             }
-
-            AirflowRole::Scheduler => command.extend(vec![
-                // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
-                "airflow db migrate".to_string(),
-                "airflow users create \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" \
-                    --role \"Admin\""
-                    .to_string(),
-                "prepare_signal_handlers".to_string(),
-                // format!(
-                //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                // ),
-                "airflow dag-processor &".to_string(),
-                "airflow scheduler &".to_string(),
-            ]),
-            AirflowRole::Worker => command.extend(vec![
-                "prepare_signal_handlers".to_string(),
-                // format!(
-                //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                // ),
-                "airflow db migrate".to_string(),
-                "airflow celery worker &".to_string(),
-            ]),
+        } else {
+            match &self {
+                AirflowRole::Webserver => {
+                    // Getting auth commands for AuthClass
+                    command.extend(Self::authentication_start_commands(auth_config));
+                    command.extend(vec![
+                        "prepare_signal_handlers".to_string(),
+                        format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                        "airflow webserver &".to_string(),
+                    ]);
+                }
+                AirflowRole::Scheduler => command.extend(vec![
+                    // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
+                    "airflow db init".to_string(),
+                    "airflow db upgrade".to_string(),
+                    "airflow users create \
+                        --username \"$ADMIN_USERNAME\" \
+                        --firstname \"$ADMIN_FIRSTNAME\" \
+                        --lastname \"$ADMIN_LASTNAME\" \
+                        --email \"$ADMIN_EMAIL\" \
+                        --password \"$ADMIN_PASSWORD\" \
+                        --role \"Admin\""
+                        .to_string(),
+                    "prepare_signal_handlers".to_string(),
+                    format!(
+                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    ),
+                    "airflow scheduler &".to_string(),
+                ]),
+                AirflowRole::Worker => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    format!(
+                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    ),
+                    "airflow celery worker &".to_string(),
+                ]),
+            }
         }
+
         // graceful shutdown part
         command.extend(vec![
             "wait_for_termination $!".to_string(),
