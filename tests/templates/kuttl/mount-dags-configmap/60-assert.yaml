@@ -5,4 +5,8 @@ metadata:
   name: metrics
 timeout: 480
 commands:
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/metrics.py
+{% if test_scenario['values']['airflow'].find(",") > 0 %}
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/metrics.py --airflow-version "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% else %}
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/metrics.py --airflow-version "{{ test_scenario['values']['airflow'] }}"
+{% endif %}

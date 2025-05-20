@@ -10,3 +10,4 @@ commands:
 {% else %}
   - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ test_scenario['values']['airflow'] }}"
 {% endif %}
+
