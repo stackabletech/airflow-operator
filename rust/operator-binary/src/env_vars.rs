@@ -73,9 +73,6 @@ pub enum Error {
 
     #[snafu(display("object is missing metadata"))]
     NoMetadata,
-
-    #[snafu(display("cluster is missing webservers role"))]
-    NoWebserver,
 }
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
@@ -325,36 +322,39 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, En
         ..Default::default()
     });
 
-    let rolegroup = airflow
-        .spec
-        .webservers
-        .as_ref()
-        .context(NoWebserverSnafu)?
-        .role_groups
-        .iter()
-        .next()
-        .context(NoMetadataSnafu)?;
+    if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
+        let rolegroup = webserver_role
+            .role_groups
+            .iter()
+            .next()
+            .context(NoMetadataSnafu)?;
 
-    let webserver = format!(
-        "{name}-webserver-{rolegroup}",
-        name = airflow.metadata.name.as_ref().context(NoMetadataSnafu)?,
-        rolegroup = rolegroup.0
-    );
-    tracing::info!("Webserver set [{webserver}]");
+        let webserver = format!(
+            "{name}-webserver-{rolegroup}",
+            name = airflow.metadata.name.as_ref().context(NoMetadataSnafu)?,
+            rolegroup = rolegroup.0
+        );
+        tracing::info!("Webserver set [{webserver}]");
 
-    env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
-        name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-        value: Some("http://airflow-webserver:8080/execution/".into()),
-        //value: Some(format!("http://{webserver}:8080/execution/")),
-        ..Default::default()
-    });
-    env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
-        name: "AIRFLOW__CORE__BASE_URL".into(),
-        value: Some("http://airflow-webserver:8080/".into()),
-        //value: Some(format!("http://{webserver}:8080/")),
-        ..Default::default()
-    });
+        env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
+            name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+            value: Some("http://airflow-webserver:8080/execution/".into()),
+            //value: Some(format!("http://{webserver}:8080/execution/")),
+            ..Default::default()
+        });
+        env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
+            name: "AIRFLOW__CORE__BASE_URL".into(),
+            value: Some("http://airflow-webserver:8080/".into()),
+            //value: Some(format!("http://{webserver}:8080/")),
+            ..Default::default()
+        });
+    }
 
+    // As of 3.x a JWT key is required.
+    // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+    // This must be random, but must also be consistent across api-services.
+    // The key will be consistent for all clusters started by this
+    // operator instance. TODO: Make this cluster specific.
     env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
         name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
         value: Some(JWT_KEY.clone()),

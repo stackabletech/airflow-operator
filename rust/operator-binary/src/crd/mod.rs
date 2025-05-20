@@ -525,13 +525,19 @@ impl AirflowRole {
         ];
 
         if resolved_product_image.product_version.starts_with("3.") {
+            // Start-up commands have changed in 3.x.
+            // See https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/upgrading_to_airflow3.html#step-6-changes-to-your-startup-scripts and
+            // https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/setting-up-the-database.html#setting-up-the-database.
+            // If `airflow db migrate` is not run for each role there may be
+            // timing issues (services which require the db start before the
+            // migration is complete). DB-migrations should be eventually be
+            // optional. See https://github.com/stackabletech/airflow-operator/issues/589.
             match &self {
                 AirflowRole::Webserver => {
                     command.extend(Self::authentication_start_commands(auth_config));
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        // format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
-                        //"airflow webserver &".to_string(),
+                        format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
                         "airflow db migrate".to_string(),
                         "airflow api-server &".to_string(),
                     ]);
@@ -547,17 +553,17 @@ impl AirflowRole {
                         --role \"Admin\""
                         .to_string(),
                     "prepare_signal_handlers".to_string(),
-                    // format!(
-                    //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    // ),
+                    format!(
+                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    ),
                     "airflow dag-processor &".to_string(),
                     "airflow scheduler &".to_string(),
                 ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    // format!(
-                    //     "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    // ),
+                    format!(
+                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+                    ),
                     "airflow db migrate".to_string(),
                     "airflow celery worker &".to_string(),
                 ]),
