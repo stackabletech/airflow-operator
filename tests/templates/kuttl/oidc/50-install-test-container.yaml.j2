@@ -71,6 +71,17 @@ spec:
           env:
             - name: REQUESTS_CA_BUNDLE
               value: /stackable/tls/ca.crt
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: AIRFLOW_VERSION
+{% if test_scenario['values']['airflow-non-experimental'].find(",") > 0 %}
+              value: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[0] }}"
+{% else %}
+              value: "{{ test_scenario['values']['airflow-non-experimental'] }}"
+{% endif %}
+              
       volumes:
         - name: tls
           csi:
