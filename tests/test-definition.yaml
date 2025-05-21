@@ -92,7 +92,7 @@ tests:
       - openshift
   - name: external-access
     dimensions:
-      - airflow
+      - airflow-latest
       - openshift
 suites:
   - name: nightly

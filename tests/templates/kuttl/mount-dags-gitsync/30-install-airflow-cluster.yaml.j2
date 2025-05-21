@@ -71,6 +71,8 @@ spec:
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false
+        # N.B. dags definitions changed from 2.x to 3.x:
+        # this test assumes airflow-latest > 2
         gitFolder: "mount-dags-gitsync/dags_airflow3"
     volumeMounts:
       - name: test-cm-gitsync

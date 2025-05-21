@@ -466,17 +466,14 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
                 );
                 tracing::info!("Webserver set [{webserver}]");
 
-                // TODO hard-coded string replace this where needed...
                 env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
                     name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                    value: Some("http://airflow-webserver:8080/execution/".into()),
-                    //value: Some(format!("http://{webserver}:8080/execution/")),
+                    value: Some(format!("http://{webserver}:8080/execution/")),
                     ..Default::default()
                 });
                 env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
                     name: "AIRFLOW__CORE__BASE_URL".into(),
-                    value: Some("http://airflow-webserver:8080/".into()),
-                    //value: Some(format!("http://{webserver}:8080/")),
+                    value: Some(format!("http://{webserver}:8080/")),
                     ..Default::default()
                 });
             }
