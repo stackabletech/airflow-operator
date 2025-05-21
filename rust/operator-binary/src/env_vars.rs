@@ -38,6 +38,8 @@ const AIRFLOW_CELERY_RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
 const AIRFLOW_CELERY_BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
 const AIRFLOW_CORE_DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
 const AIRFLOW_CORE_LOAD_EXAMPLES: &str = "AIRFLOW__CORE__LOAD_EXAMPLES";
+const AIRFLOW_API_AUTH_BACKENDS: &str = "AIRFLOW__API__AUTH_BACKENDS";
+const AIRFLOW_DATABASE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN";
 
 const AIRFLOW_WEBSERVER_EXPOSE_CONFIG: &str = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG";
 const AIRFLOW_CORE_EXECUTOR: &str = "AIRFLOW__CORE__EXECUTOR";
@@ -105,9 +107,9 @@ pub fn build_airflow_statefulset_envs(
             ),
         );
         env.insert(
-            "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN".into(),
+            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
             env_var_from_secret(
-                "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
+                AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
                 secret,
                 "connections.sqlalchemyDatabaseUri",
             ),
@@ -310,9 +312,20 @@ fn static_envs(
         ..Default::default()
     });
 
-    env.insert("AIRFLOW__API__AUTH_BACKENDS".into(), EnvVar {
-        name: "AIRFLOW__API__AUTH_BACKENDS".into(),
+    env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+        name: AIRFLOW_API_AUTH_BACKENDS.into(),
         value: Some("airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into()),
+        ..Default::default()
+    });
+
+    // As of 3.x a JWT key is required.
+    // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+    // This must be random, but must also be consistent across api-services.
+    // The key will be consistent for all clusters started by this
+    // operator instance. TODO: Make this cluster specific.
+    env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
+        name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+        value: Some(JWT_KEY.clone()),
         ..Default::default()
     });
 
@@ -331,9 +344,9 @@ pub fn build_airflow_template_envs(
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
     env.insert(
-        "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN".into(),
+        AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         env_var_from_secret(
-            "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
+            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
             secret,
             "connections.sqlalchemyDatabaseUri",
         ),
@@ -453,6 +466,7 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
                 );
                 tracing::info!("Webserver set [{webserver}]");
 
+                // TODO hard-coded string replace this where needed...
                 env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
                     name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
                     value: Some("http://airflow-webserver:8080/execution/".into()),
