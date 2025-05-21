@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 
 
 def assert_metric(role, metric):
-    metric_response = requests.get(f"http://airflow-{role}-default:9102/metrics")
+    metric_response = requests.get(
+        f"http://airflow-{role}-default-metrics:9102/metrics"
+    )
     assert metric_response.status_code == 200, (
         f"Metrics could not be retrieved from the {role}."
     )

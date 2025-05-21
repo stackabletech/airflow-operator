@@ -37,7 +37,7 @@ metadata:
   name: airflow-with-ldap
 spec:
   image:
-    productVersion: 2.10.4
+    productVersion: 2.10.5
   clusterConfig:
     authentication:
       - authenticationClass: ldap    # <1>
@@ -71,7 +71,7 @@ metadata:
   name: airflow-with-oidc
 spec:
   image:
-    productVersion: 2.10.4
+    productVersion: 2.10.5
   clusterConfig:
     authentication:
     - authenticationClass: keycloak                       # <1>
