@@ -30,21 +30,19 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        authentication::{AuthenticationClass, ldap},
-        listener::{Listener, ListenerPort, ListenerSpec},
-        product_image_selection::ResolvedProductImage,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     config::fragment::ValidationError,
+    crd::{
+        authentication::{core as auth_core, ldap},
+        git_sync, listener,
+    },
     k8s_openapi::{
         self, DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EmptyDirVolumeSource, EnvVar, PersistentVolumeClaim, PodTemplateSpec,
-                Probe, Service, ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction,
-                VolumeMount,
+                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, Service, ServiceAccount,
+                ServicePort, ServiceSpec, TCPSocketAction,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -55,11 +53,12 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::{controller::Action, reflector::ObjectRef},
     },
-    kvp::{Label, LabelError, Labels},
+    kvp::{Annotation, Label, LabelError, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
-        CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
-        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+        CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY, env_vars_from,
+        env_vars_from_rolegroup_config, transform_all_roles_to_config,
+        validate_all_roles_and_groups_config,
     },
     product_logging::{
         self,
@@ -92,13 +91,9 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        build_recommended_labels,
-        git_sync::{GIT_SYNC_CONTENT, GIT_SYNC_NAME, GIT_SYNC_ROOT, GitSync},
-        v1alpha1,
+        build_recommended_labels, v1alpha1,
     },
-    env_vars::{
-        self, build_airflow_template_envs, build_gitsync_statefulset_envs, build_gitsync_template,
-    },
+    env_vars::{self, build_airflow_template_envs},
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -183,7 +178,7 @@ pub enum Error {
     #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::cluster_resources::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display(
@@ -192,7 +187,7 @@ pub enum Error {
     ))]
     AuthenticationClassProviderNotSupported {
         authentication_class_provider: String,
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display("failed to build config file for {rolegroup}"))]
@@ -225,6 +220,9 @@ pub enum Error {
     InvalidContainerName {
         source: stackable_operator::builder::pod::container::Error,
     },
+
+    #[snafu(display("invalid git-sync specification"))]
+    InvalidGitSyncSpec { source: git_sync::v1alpha1::Error },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -290,7 +288,7 @@ pub enum Error {
     #[snafu(display(
         "failed to build volume or volume mount spec for the LDAP backend TLS config"
     ))]
-    VolumeAndMounts { source: ldap::Error },
+    VolumeAndMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to construct config"))]
     ConstructConfig { source: config::Error },
@@ -312,9 +310,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
-    AddLdapVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::ldap::Error,
-    },
+    AddLdapVolumesAndVolumeMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {
@@ -483,6 +479,18 @@ pub async fn reconcile_airflow(
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
+            let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+                &airflow.spec.cluster_config.dags_git_sync,
+                &resolved_product_image,
+                &env_vars_from_rolegroup_config(rolegroup_config),
+                &airflow.volume_mounts(),
+                LOG_VOLUME_NAME,
+                &merged_airflow_config
+                    .logging
+                    .for_container(&Container::GitSync),
+            )
+            .context(InvalidGitSyncSpecSnafu)?;
+
             let rg_service = build_rolegroup_service(airflow, &resolved_product_image, &rolegroup)?;
             cluster_resources.add(client, rg_service).await.context(
                 ApplyRoleGroupServiceSnafu {
@@ -501,6 +509,7 @@ pub async fn reconcile_airflow(
                 &rbac_sa,
                 &merged_airflow_config,
                 airflow_executor,
+                &git_sync_resources,
             )?;
 
             if let Some(listener_class) =
@@ -617,6 +626,19 @@ async fn build_executor_template(
         .with_context(|_| ApplyRoleGroupConfigSnafu {
             rolegroup: rolegroup.clone(),
         })?;
+
+    let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+        &airflow.spec.cluster_config.dags_git_sync,
+        resolved_product_image,
+        &env_vars_from(&common_config.env_overrides),
+        &airflow.volume_mounts(),
+        LOG_VOLUME_NAME,
+        &merged_executor_config
+            .logging
+            .for_container(&Container::GitSync),
+    )
+    .context(InvalidGitSyncSpecSnafu)?;
+
     let worker_pod_template_config_map = build_executor_template_config_map(
         airflow,
         resolved_product_image,
@@ -626,6 +648,7 @@ async fn build_executor_template(
         &common_config.env_overrides,
         &common_config.pod_overrides,
         &rolegroup,
+        &git_sync_resources,
     )?;
     cluster_resources
         .add(client, worker_pod_template_config_map)
@@ -821,8 +844,8 @@ pub fn build_group_listener(
     rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
     listener_class: String,
     listener_group_name: String,
-) -> Result<Listener> {
-    Ok(Listener {
+) -> Result<listener::v1alpha1::Listener> {
+    Ok(listener::v1alpha1::Listener {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(airflow)
             .name(listener_group_name)
@@ -837,10 +860,10 @@ pub fn build_group_listener(
             ))
             .context(ObjectMetaSnafu)?
             .build(),
-        spec: ListenerSpec {
+        spec: listener::v1alpha1::ListenerSpec {
             class_name: Some(listener_class),
             ports: Some(listener_ports()),
-            ..ListenerSpec::default()
+            ..listener::v1alpha1::ListenerSpec::default()
         },
         status: None,
     })
@@ -848,8 +871,8 @@ pub fn build_group_listener(
 
 /// We only use the http port here and intentionally omit
 /// the metrics one.
-fn listener_ports() -> Vec<ListenerPort> {
-    vec![ListenerPort {
+fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
+    vec![listener::v1alpha1::ListenerPort {
         name: HTTP_PORT_NAME.to_string(),
         port: HTTP_PORT.into(),
         protocol: Some("TCP".to_string()),
@@ -871,6 +894,7 @@ fn build_server_rolegroup_statefulset(
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<StatefulSet> {
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
@@ -899,6 +923,13 @@ fn build_server_rolegroup_statefulset(
     let pb_metadata = ObjectMetaBuilder::new()
         .with_recommended_labels(recommended_object_labels)
         .context(ObjectMetaSnafu)?
+        .with_annotation(
+            Annotation::try_from((
+                "kubectl.kubernetes.io/default-container",
+                format!("{}", Container::Airflow),
+            ))
+            .unwrap(),
+        )
         .build();
 
     pb.metadata(pb_metadata)
@@ -948,6 +979,7 @@ fn build_server_rolegroup_statefulset(
             executor,
             authentication_config,
             authorization_config,
+            git_sync_resources,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );
@@ -1010,6 +1042,20 @@ fn build_server_rolegroup_statefulset(
             .context(AddVolumeMountSnafu)?;
     }
 
+    // If the DAG is modularized we may encounter a timing issue whereby the celery worker
+    // has started *before* all modules referenced by the DAG have been fetched by gitsync
+    // and registered. This will result in ModuleNotFoundError errors. This can be avoided
+    // by running a one-off git-sync process in an init-container so that all DAG
+    // dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
+    let use_git_sync_init_containers = matches!(executor, AirflowExecutor::CeleryExecutor { .. });
+    add_git_sync_resources(
+        &mut pb,
+        &mut airflow_container,
+        git_sync_resources,
+        true,
+        use_git_sync_init_containers,
+    )?;
+
     pb.add_container(airflow_container.build());
 
     let metrics_container = ContainerBuilder::new("metrics")
@@ -1061,43 +1107,6 @@ fn build_server_rolegroup_statefulset(
                 .build(),
         )
         .context(AddVolumeSnafu)?;
-    }
-
-    if let Some(gitsync) = airflow.git_sync() {
-        let gitsync_container = build_gitsync_container(
-            resolved_product_image,
-            &gitsync,
-            false,
-            &format!("{}-{}", GIT_SYNC_NAME, 1),
-            build_gitsync_statefulset_envs(rolegroup_config, &gitsync.credentials_secret),
-            airflow.volume_mounts(),
-        )?;
-
-        pb.add_volume(
-            VolumeBuilder::new(GIT_SYNC_CONTENT)
-                .empty_dir(EmptyDirVolumeSource::default())
-                .build(),
-        )
-        .context(AddVolumeSnafu)?;
-
-        pb.add_container(gitsync_container);
-
-        if let AirflowExecutor::CeleryExecutor { .. } = executor {
-            let gitsync_init_container = build_gitsync_container(
-                resolved_product_image,
-                &gitsync,
-                true,
-                &format!("{}-{}", GIT_SYNC_NAME, 0),
-                build_gitsync_statefulset_envs(rolegroup_config, &gitsync.credentials_secret),
-                airflow.volume_mounts(),
-            )?;
-            // If the DAG is modularized we may encounter a timing issue whereby the celery worker has started
-            // *before* all modules referenced by the DAG have been fetched by gitsync and registered. This
-            // will result in ModuleNotFoundError errors. This can be avoided by running a one-off git-sync
-            // process in an init-container so that all DAG dependencies are fully loaded. The sidecar
-            // git-sync is then used for regular updates.
-            pb.add_init_container(gitsync_init_container);
-        }
     }
 
     if merged_airflow_config.logging.enable_vector_agent {
@@ -1161,7 +1170,7 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: rolegroup_ref.object_name(),
+        service_name: Some(rolegroup_ref.object_name()),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
@@ -1205,6 +1214,7 @@ fn build_executor_template_config_map(
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
     rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
@@ -1248,10 +1258,12 @@ fn build_executor_template_config_map(
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(merged_executor_config.resources.clone().into())
-        .add_env_vars(
-            build_airflow_template_envs(airflow, env_overrides, merged_executor_config)
-                .context(BuildStatefulsetEnvVarsSnafu)?,
-        )
+        .add_env_vars(build_airflow_template_envs(
+            airflow,
+            env_overrides,
+            merged_executor_config,
+            git_sync_resources,
+        ))
         .add_volume_mounts(airflow.volume_mounts())
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
@@ -1260,6 +1272,14 @@ fn build_executor_template_config_map(
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?;
+
+    add_git_sync_resources(
+        &mut pb,
+        &mut airflow_container,
+        git_sync_resources,
+        false,
+        true,
+    )?;
 
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes().clone())
@@ -1272,24 +1292,6 @@ fn build_executor_template_config_map(
             .get(&Container::Airflow),
     ))
     .context(AddVolumeSnafu)?;
-
-    if let Some(gitsync) = airflow.git_sync() {
-        let gitsync_container = build_gitsync_container(
-            resolved_product_image,
-            &gitsync,
-            true,
-            &format!("{}-{}", GIT_SYNC_NAME, 0),
-            build_gitsync_template(env_overrides, &gitsync.credentials_secret),
-            airflow.volume_mounts(),
-        )?;
-        pb.add_volume(
-            VolumeBuilder::new(GIT_SYNC_CONTENT)
-                .empty_dir(EmptyDirVolumeSource::default())
-                .build(),
-        )
-        .context(AddVolumeSnafu)?;
-        pb.add_init_container(gitsync_container);
-    }
 
     if merged_executor_config.logging.enable_vector_agent {
         match &airflow
@@ -1347,42 +1349,6 @@ fn build_executor_template_config_map(
     cm_builder.build().context(PodTemplateConfigMapSnafu)
 }
 
-fn build_gitsync_container(
-    resolved_product_image: &ResolvedProductImage,
-    gitsync: &&GitSync,
-    one_time: bool,
-    name: &str,
-    env_vars: Vec<EnvVar>,
-    volume_mounts: Vec<VolumeMount>,
-) -> Result<k8s_openapi::api::core::v1::Container, Error> {
-    let gitsync_container = ContainerBuilder::new(name)
-        .context(InvalidContainerNameSnafu)?
-        .add_env_vars(env_vars)
-        .image_from_product_image(resolved_product_image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
-        ])
-        .args(vec![gitsync.get_args(one_time).join("\n")])
-        .add_volume_mount(GIT_SYNC_CONTENT, GIT_SYNC_ROOT)
-        .context(AddVolumeMountSnafu)?
-        .add_volume_mounts(volume_mounts)
-        .context(AddVolumeMountSnafu)?
-        .resources(
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("100m")
-                .with_cpu_limit("200m")
-                .with_memory_request("64Mi")
-                .with_memory_limit("64Mi")
-                .build(),
-        )
-        .build();
-    Ok(gitsync_container)
-}
-
 pub fn error_policy(
     _obj: Arc<DeserializeGuard<v1alpha1::AirflowCluster>>,
     error: &Error,
@@ -1430,5 +1396,30 @@ fn add_authentication_volumes_and_volume_mounts(
         tls.add_volumes_and_mounts(pb, vec![cb])
             .context(AddTlsVolumesAndVolumeMountsSnafu)?;
     }
+    Ok(())
+}
+
+fn add_git_sync_resources(
+    pb: &mut PodBuilder,
+    cb: &mut ContainerBuilder,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    add_sidecar_containers: bool,
+    add_init_containers: bool,
+) -> Result<()> {
+    if add_sidecar_containers {
+        for container in git_sync_resources.git_sync_containers.iter().cloned() {
+            pb.add_container(container);
+        }
+    }
+    if add_init_containers {
+        for container in git_sync_resources.git_sync_init_containers.iter().cloned() {
+            pb.add_init_container(container);
+        }
+    }
+    pb.add_volumes(git_sync_resources.git_content_volumes.to_owned())
+        .context(AddVolumeSnafu)?;
+    cb.add_volume_mounts(git_sync_resources.git_content_volume_mounts.to_owned())
+        .context(AddVolumeMountSnafu)?;
+
     Ok(())
 }
