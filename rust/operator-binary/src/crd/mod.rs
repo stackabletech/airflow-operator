@@ -568,7 +568,6 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
-                        "airflow db migrate".to_string(),
                         "airflow api-server &".to_string(),
                     ]);
                 }

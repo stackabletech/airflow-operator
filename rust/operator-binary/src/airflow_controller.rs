@@ -981,6 +981,7 @@ fn build_server_rolegroup_statefulset(
             authentication_config,
             authorization_config,
             git_sync_resources,
+            &rolegroup_ref.role_group,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );
@@ -1171,7 +1172,10 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(rolegroup_ref.object_name()),
+        service_name: Some(format!(
+            "{name}-metrics",
+            name = rolegroup_ref.object_name()
+        )),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()

@@ -44,18 +44,6 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-default
-spec:
-  template:
-    spec:
-      terminationGracePeriodSeconds: 300
-status:
-  readyReplicas: 2
-  replicas: 2
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
   name: airflow-scheduler-default
 spec:
   template:
@@ -72,15 +60,6 @@ metadata:
 status:
   expectedPods: 4
   currentHealthy: 4
-  disruptionsAllowed: 1
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: airflow-worker
-status:
-  expectedPods: 2
-  currentHealthy: 2
   disruptionsAllowed: 1
 ---
 apiVersion: policy/v1
@@ -112,3 +91,27 @@ metadata:
   name: airflow-webserver-external-unstable
 spec:
   type: NodePort # external-unstable
+
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 300
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-worker
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+{% endif %}

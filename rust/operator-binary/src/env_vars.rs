@@ -75,6 +75,7 @@ pub enum Error {
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
+#[allow(clippy::too_many_arguments)]
 pub fn build_airflow_statefulset_envs(
     airflow: &v1alpha1::AirflowCluster,
     airflow_role: &AirflowRole,
@@ -83,11 +84,12 @@ pub fn build_airflow_statefulset_envs(
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    rolegroup: &String,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.extend(static_envs(git_sync_resources));
-    env.extend(execution_server_env_vars(airflow));
+    env.extend(execution_server_env_vars(airflow, rolegroup));
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -312,6 +314,8 @@ fn static_envs(
         ..Default::default()
     });
 
+    // Basic auth is only relevant to 2.x and can be removed once
+    // that version is no longer supported.
     env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
         name: AIRFLOW_API_AUTH_BACKENDS.into(),
         value: Some("airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into()),
@@ -374,7 +378,16 @@ pub fn build_airflow_template_envs(
     });
 
     env.extend(static_envs(git_sync_resources));
-    env.extend(execution_server_env_vars(airflow));
+
+    // It does not appear to be possible for kubernetesExecutors to work with
+    // multiple webserver rolegroups. For the celery case, each executor sets
+    // the execution server from the associated rolegroup, but for kubernetes
+    // workers this is not possible.
+    if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
+        if let Some(rolegroup) = webserver_role.role_groups.iter().next() {
+            env.extend(execution_server_env_vars(airflow, rolegroup.0));
+        }
+    }
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -453,31 +466,28 @@ fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -
     env
 }
 
-fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn execution_server_env_vars(
+    airflow: &v1alpha1::AirflowCluster,
+    rolegroup: &String,
+) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
-        if let Some(rolegroup) = webserver_role.role_groups.iter().next() {
-            if let Some(name) = airflow.metadata.name.as_ref() {
-                let webserver = format!(
-                    "{name}-webserver-{rolegroup}",
-                    name = name,
-                    rolegroup = rolegroup.0
-                );
-                tracing::info!("Webserver set [{webserver}]");
+    if let Some(name) = airflow.metadata.name.as_ref() {
+        let webserver = format!("{name}-webserver-{rolegroup}-metrics",);
+        tracing::debug!("Webserver set [{webserver}]");
 
-                env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
-                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/execution/")),
-                    ..Default::default()
-                });
-                env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
-                    name: "AIRFLOW__CORE__BASE_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/")),
-                    ..Default::default()
-                });
-            }
-        }
+        // These settings are new in 3.x and will have no affect with earlier versions.
+        env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
+            name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+            value: Some(format!("http://{webserver}:8080/execution/")),
+            ..Default::default()
+        });
+        env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
+            name: "AIRFLOW__CORE__BASE_URL".into(),
+            value: Some(format!("http://{webserver}:8080/")),
+            ..Default::default()
+        });
     }
+
     env
 }
