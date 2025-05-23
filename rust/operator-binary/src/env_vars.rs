@@ -85,46 +85,13 @@ pub fn build_airflow_statefulset_envs(
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
-    rolegroup: &String,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.extend(static_envs(git_sync_resources));
 
-    if resolved_product_image.product_version.starts_with("3.") {
-        env.extend(execution_server_env_vars(airflow, rolegroup));
-        env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
-            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
-            value: Some(
-                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
-            ),
-            ..Default::default()
-        });
-        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-            name: AIRFLOW_API_AUTH_BACKENDS.into(),
-            value: Some("airflow.api.auth.backend.session".into()),
-            ..Default::default()
-        });
-        // As of 3.x a JWT key is required.
-        // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
-        // This must be random, but must also be consistent across api-services.
-        // The key will be consistent for all clusters started by this
-        // operator instance. TODO: Make this cluster specific.
-        env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
-            name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-            value: Some(JWT_KEY.clone()),
-            ..Default::default()
-        });
-    } else {
-        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-            name: AIRFLOW_API_AUTH_BACKENDS.into(),
-            value: Some(
-                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
-            ),
-            ..Default::default()
-        });
-    }
+    add_version_specific_env_vars(airflow, resolved_product_image, &mut env);
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -388,48 +355,7 @@ pub fn build_airflow_template_envs(
 
     env.extend(static_envs(git_sync_resources));
 
-    if resolved_product_image.product_version.starts_with("3.") {
-        // It does not appear to be possible for kubernetesExecutors to work with
-        // multiple webserver rolegroups. For the celery case, each executor sets
-        // the execution server from the associated rolegroup, but for kubernetes
-        // workers this is not possible.
-        if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
-            if let Some(rolegroup) = webserver_role.role_groups.iter().next() {
-                env.extend(execution_server_env_vars(airflow, rolegroup.0));
-            }
-            env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
-                name: AIRFLOW_CORE_AUTH_MANAGER.into(),
-                value: Some(
-                    "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
-                        .to_string(),
-                ),
-                ..Default::default()
-            });
-            env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-                name: AIRFLOW_API_AUTH_BACKENDS.into(),
-                value: Some("airflow.api.auth.backend.session".into()),
-                ..Default::default()
-            });
-            // As of 3.x a JWT key is required.
-            // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
-            // This must be random, but must also be consistent across api-services.
-            // The key will be consistent for all clusters started by this
-            // operator instance. TODO: Make this cluster specific.
-            env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
-                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-                value: Some(JWT_KEY.clone()),
-                ..Default::default()
-            });
-        }
-    } else {
-        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-            name: AIRFLOW_API_AUTH_BACKENDS.into(),
-            value: Some(
-                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
-            ),
-            ..Default::default()
-        });
-    }
+    add_version_specific_env_vars(airflow, resolved_product_image, &mut env);
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -460,6 +386,46 @@ pub fn build_airflow_template_envs(
 
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
+}
+
+fn add_version_specific_env_vars(
+    airflow: &v1alpha1::AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    env: &mut BTreeMap<String, EnvVar>,
+) {
+    if resolved_product_image.product_version.starts_with("3.") {
+        env.extend(execution_server_env_vars(airflow));
+        env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
+            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+            value: Some(
+                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
+            ),
+            ..Default::default()
+        });
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some("airflow.api.auth.backend.session".into()),
+            ..Default::default()
+        });
+        // As of 3.x a JWT key is required.
+        // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+        // This must be random, but must also be consistent across api-services.
+        // The key will be consistent for all clusters started by this
+        // operator instance. TODO: Make this cluster specific.
+        env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
+            name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+            value: Some(JWT_KEY.clone()),
+            ..Default::default()
+        });
+    } else {
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some(
+                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
+            ),
+            ..Default::default()
+        });
+    }
 }
 
 // Internally the environment variable collection uses a map so that overrides can actually
@@ -508,27 +474,39 @@ fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -
     env
 }
 
-fn execution_server_env_vars(
-    airflow: &v1alpha1::AirflowCluster,
-    rolegroup: &String,
-) -> BTreeMap<String, EnvVar> {
+fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     if let Some(name) = airflow.metadata.name.as_ref() {
-        let webserver = format!("{name}-webserver-{rolegroup}",);
-        tracing::debug!("Webserver set [{webserver}]");
-
-        // These settings are new in 3.x and will have no affect with earlier versions.
-        env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
-            name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-            value: Some(format!("http://{webserver}:8080/execution/")),
-            ..Default::default()
-        });
-        env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
-            name: "AIRFLOW__CORE__BASE_URL".into(),
-            value: Some(format!("http://{webserver}:8080/")),
-            ..Default::default()
-        });
+        // The execution API server URL can be any webserver (if there
+        // are multiple ones). Parse the list of webservers in a deterministic
+        // way by iterating over a BTree map rather than the HashMap.
+        if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
+            if let Some(rolegroup) = webserver_role
+                .role_groups
+                .iter()
+                .collect::<BTreeMap<_, _>>()
+                .first_entry()
+            {
+                let webserver = format!(
+                    "{name}-webserver-{rolegroup}",
+                    name = name,
+                    rolegroup = rolegroup.key()
+                );
+                tracing::debug!("Webserver set [{webserver}]");
+                // These settings are new in 3.x and will have no affect with earlier versions.
+                env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
+                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/execution/")),
+                    ..Default::default()
+                });
+                env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
+                    name: "AIRFLOW__CORE__BASE_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/")),
+                    ..Default::default()
+                });
+            }
+        }
     }
 
     env
