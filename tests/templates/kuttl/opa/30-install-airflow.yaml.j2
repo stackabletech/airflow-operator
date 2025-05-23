@@ -52,6 +52,7 @@ spec:
     configOverrides:
       webserver_config.py:
         WTF_CSRF_ENABLED: "False" # Allow "POST /login/" without CSRF token
+        AUTH_OPA_CACHE_MAXSIZE_DEFAULT: "0" # disable decision caching for easy debugging
     roleGroups:
       default:
         replicas: 1

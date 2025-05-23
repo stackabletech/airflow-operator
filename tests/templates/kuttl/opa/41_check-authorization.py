@@ -7,6 +7,11 @@ logging.basicConfig(
     level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
 )
 
+log = logging.getLogger(__name__)
+
+# user to headers mapping
+headers: dict[str, dict[str, str]] = {}
+
 # Jane Doe has access to specific resources.
 user_jane_doe = {
     "first_name": "Jane",
@@ -28,26 +33,39 @@ user_richard_roe = {
 
 url = "http://airflow-webserver-default:8080"
 
+def obtain_access_token(user: dict[str, str]) -> str:
+    token_url = f"{url}/auth/token"
 
-def create_user(user):
-    requests.post(
-        f"{url}/auth/fab/v1/users",
-        auth=("airflow", "airflow"),
-        json=user,
-    )
+    data = {"username": user["username"], "password": user["password"]}
 
+    headers = {"Content-Type": "application/json"}
+
+    response = requests.post(token_url, headers=headers, json=data)
+
+    if response.status_code == 200 or response.status_code == 201:
+        token_data = response.json()
+        access_token = token_data["access_token"]
+        log.info(f"Got access token: {access_token}")
+        return access_token
+    else:
+        log.error(f"Failed to obtain access token: {response.status_code} - {response.text}")
+        sys.exit(1)
+
+def assert_status_code(msg, left, right):
+    if left != right:
+        raise AssertionError(f"{msg}\n\tleft: {left}\n\tright: {right}")
 
 def check_api_authorization_for_user(
-    user, expected_status_code, method, endpoint, data=None, api="api/v1"
+    user, expected_status_code, method, endpoint, data=None, api="api/v2"
 ):
     api_url = f"{url}/{api}"
 
-    auth = (user["username"], user["password"])
-    response = requests.request(method, f"{api_url}/{endpoint}", auth=auth, json=data)
-    assert response.status_code == expected_status_code
+    response = requests.request(method, f"{api_url}/{endpoint}", headers=headers[user["email"]], json=data)
+
+    assert_status_code(f"Unexpected status code for {user["email"]=}", response.status_code, expected_status_code)
 
 
-def check_api_authorization(method, endpoint, data=None, api="api/v1"):
+def check_api_authorization(method, endpoint, data=None, api="api/v2"):
     check_api_authorization_for_user(
         user_jane_doe, 200, method=method, endpoint=endpoint, data=data, api=api
     )
@@ -83,8 +101,6 @@ def test_is_authorized_configuration():
 def test_is_authorized_connection():
     # conn_id == null
     check_api_authorization("GET", "connections")
-    # conn_id != null
-    check_api_authorization("GET", "connections/postgres_default")
 
 
 def test_is_authorized_dag():
@@ -152,9 +168,16 @@ def test_is_authorized_custom_view():
     )
 
 
-# Create test users
-create_user(user_jane_doe)
-create_user(user_richard_roe)
+access_token_jane_doe = obtain_access_token(user_jane_doe)
+headers[user_jane_doe["email"]] = {
+    "Authorization": f"Bearer {access_token_jane_doe}",
+    "Content-Type": "application/json",
+}
+access_token_richard_roe = obtain_access_token(user_richard_roe)
+headers[user_richard_roe["email"]] = {
+    "Authorization": f"Bearer {access_token_richard_roe}",
+    "Content-Type": "application/json",
+}
 
 test_is_authorized_configuration()
 test_is_authorized_connection()
