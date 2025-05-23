@@ -981,7 +981,6 @@ fn build_server_rolegroup_statefulset(
             authentication_config,
             authorization_config,
             git_sync_resources,
-            &rolegroup_ref.role_group,
             resolved_product_image,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
