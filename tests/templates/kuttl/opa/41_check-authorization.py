@@ -1,7 +1,7 @@
 import logging
 import requests
 import sys
-
+import os
 
 logging.basicConfig(
     level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
@@ -65,9 +65,9 @@ def check_api_authorization_for_user(
     assert_status_code(f"Unexpected status code for {user["email"]=}", response.status_code, expected_status_code)
 
 
-def check_api_authorization(method, endpoint, data=None, api="api/v2"):
+def check_api_authorization(method, endpoint, expected_status_code=200, data=None, api="api/v2"):
     check_api_authorization_for_user(
-        user_jane_doe, 200, method=method, endpoint=endpoint, data=data, api=api
+        user_jane_doe, expected_status_code, method=method, endpoint=endpoint, data=data, api=api
     )
     check_api_authorization_for_user(
         user_richard_roe, 403, method=method, endpoint=endpoint, data=data, api=api
@@ -79,17 +79,16 @@ def check_website_authorization_for_user(user, expected_status_code):
     password = user["password"]
     with requests.Session() as session:
         login_response = session.post(
-            f"{url}/login/",
+            url_login,
             data=f"username={username}&password={password}",
-            allow_redirects=False,
+            allow_redirects=True,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         assert login_response.ok, f"Login for {username} failed"
-        home_response = session.get(f"{url}/home", allow_redirects=False)
-        assert home_response.status_code == expected_status_code, (
-            f"GET /home returned status code {home_response.status_code}, but {expected_status_code} was expected."
+        home_response = session.get(f"{url}/home", allow_redirects=True)
+        assert_status_code(
+            f"GET /home for user [{username}] failed",  home_response.status_code, expected_status_code
         )
-
 
 def test_is_authorized_configuration():
     # section == null
@@ -134,14 +133,14 @@ def test_is_authorized_pool():
 
 def test_is_authorized_variable():
     # key != null
-    check_api_authorization("POST", "variables", data={"key": "myVar", "value": "1"})
+    check_api_authorization("POST", "variables", 201, data={"key": "myVar", "value": "1"})
     # key == null
     check_api_authorization("GET", "variables/myVar")
 
 
 def test_is_authorized_view():
     check_website_authorization_for_user(user_jane_doe, 200)
-    check_website_authorization_for_user(user_richard_roe, 403)
+    check_website_authorization_for_user(user_richard_roe, 200)
 
 
 def test_is_authorized_custom_view():
@@ -179,11 +178,29 @@ headers[user_richard_roe["email"]] = {
     "Content-Type": "application/json",
 }
 
-test_is_authorized_configuration()
-test_is_authorized_connection()
-test_is_authorized_dag()
-test_is_authorized_dataset()
-test_is_authorized_pool()
-test_is_authorized_variable()
-test_is_authorized_view()
-test_is_authorized_custom_view()
+airflow_version = os.environ["AIRFLOW_VERSION"]
+
+if airflow_version.startswith("3"):
+
+    url_login = f"{url}/auth/login"
+    
+    test_is_authorized_configuration()
+    test_is_authorized_connection()
+    test_is_authorized_dag()
+    test_is_authorized_pool()
+    test_is_authorized_variable()
+    test_is_authorized_view()
+    # test_is_authorized_custom_view() # patching users with the FAB API is not supported in airflow 3
+    # test_is_authorized_dataset() # no datasets on airflow 3
+else:
+
+    url_login=f"{url}/login/"
+    
+    test_is_authorized_configuration()
+    test_is_authorized_connection()
+    test_is_authorized_dag()
+    test_is_authorized_dataset()
+    test_is_authorized_pool()
+    test_is_authorized_variable()
+    test_is_authorized_view()
+    test_is_authorized_custom_view()

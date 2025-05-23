@@ -1,13 +1,12 @@
 ---
 apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
+kind: TestStep
 metadata:
-  name: login
+  name: create-users
 timeout: 300
 commands:
   - script: |
-      kubectl exec -n $NAMESPACE airflow-webserver-default-0 --
-      airflow users create \
+      kubectl exec -n $NAMESPACE airflow-webserver-default-0 -- airflow users create \
       --username "jane.doe" \
       --firstname "Jane" \
       --lastname "Doe" \
@@ -15,8 +14,7 @@ commands:
       --password "T8mn72D9" \
       --role "User"
 
-      kubectl exec -n $NAMESPACE airflow-webserver-default-0 --
-      airflow users create \
+      kubectl exec -n $NAMESPACE airflow-webserver-default-0 -- airflow users create \
         --username "richard.roe" \
         --firstname "Richard" \
         --lastname "Roe" \
