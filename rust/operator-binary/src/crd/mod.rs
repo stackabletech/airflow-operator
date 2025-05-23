@@ -897,7 +897,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("4Gi".into())),
+                limit: Some(Quantity("3Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
@@ -907,7 +907,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("4Gi".into())),
+                limit: Some(Quantity("3Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
@@ -917,7 +917,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
                 max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("4Gi".to_owned())),
+                limit: Some(Quantity("1Gi".to_owned())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
