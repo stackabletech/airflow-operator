@@ -34,9 +34,15 @@ spec:
   webservers:
     config:
       listenerClass: test-external-stable-$NAMESPACE
+      resources:
+        cpu:
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 2Gi
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
       external-unstable:
         replicas: 1
         config:
@@ -49,7 +55,7 @@ spec:
   celeryExecutors:
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
@@ -61,6 +67,13 @@ spec:
           limit: 1Gi
 {% endif %}
   schedulers:
+    config:
+      resources:
+        cpu:
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 1Gi
     roleGroups:
       default:
         replicas: 1

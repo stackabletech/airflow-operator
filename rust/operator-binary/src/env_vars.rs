@@ -9,6 +9,7 @@ use product_config::types::PropertyNameKind;
 use rand::Rng;
 use snafu::Snafu;
 use stackable_operator::{
+    commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
@@ -85,11 +86,45 @@ pub fn build_airflow_statefulset_envs(
     authorization_config: &AirflowAuthorizationResolved,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
     rolegroup: &String,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.extend(static_envs(git_sync_resources));
-    env.extend(execution_server_env_vars(airflow, rolegroup));
+
+    if resolved_product_image.product_version.starts_with("3.") {
+        env.extend(execution_server_env_vars(airflow, rolegroup));
+        env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
+            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+            value: Some(
+                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
+            ),
+            ..Default::default()
+        });
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some("airflow.api.auth.backend.session".into()),
+            ..Default::default()
+        });
+        // As of 3.x a JWT key is required.
+        // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+        // This must be random, but must also be consistent across api-services.
+        // The key will be consistent for all clusters started by this
+        // operator instance. TODO: Make this cluster specific.
+        env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
+            name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+            value: Some(JWT_KEY.clone()),
+            ..Default::default()
+        });
+    } else {
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some(
+                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
+            ),
+            ..Default::default()
+        });
+    }
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -306,33 +341,6 @@ fn static_envs(
         ..Default::default()
     });
 
-    env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
-        name: AIRFLOW_CORE_AUTH_MANAGER.into(),
-        value: Some(
-            "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
-        ),
-        ..Default::default()
-    });
-
-    // Basic auth is only relevant to 2.x and can be removed once
-    // that version is no longer supported.
-    env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-        name: AIRFLOW_API_AUTH_BACKENDS.into(),
-        value: Some("airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into()),
-        ..Default::default()
-    });
-
-    // As of 3.x a JWT key is required.
-    // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
-    // This must be random, but must also be consistent across api-services.
-    // The key will be consistent for all clusters started by this
-    // operator instance. TODO: Make this cluster specific.
-    env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
-        name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-        value: Some(JWT_KEY.clone()),
-        ..Default::default()
-    });
-
     env
 }
 
@@ -343,6 +351,7 @@ pub fn build_airflow_template_envs(
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
@@ -379,14 +388,47 @@ pub fn build_airflow_template_envs(
 
     env.extend(static_envs(git_sync_resources));
 
-    // It does not appear to be possible for kubernetesExecutors to work with
-    // multiple webserver rolegroups. For the celery case, each executor sets
-    // the execution server from the associated rolegroup, but for kubernetes
-    // workers this is not possible.
-    if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
-        if let Some(rolegroup) = webserver_role.role_groups.iter().next() {
-            env.extend(execution_server_env_vars(airflow, rolegroup.0));
+    if resolved_product_image.product_version.starts_with("3.") {
+        // It does not appear to be possible for kubernetesExecutors to work with
+        // multiple webserver rolegroups. For the celery case, each executor sets
+        // the execution server from the associated rolegroup, but for kubernetes
+        // workers this is not possible.
+        if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
+            if let Some(rolegroup) = webserver_role.role_groups.iter().next() {
+                env.extend(execution_server_env_vars(airflow, rolegroup.0));
+            }
+            env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
+                name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+                value: Some(
+                    "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+                        .to_string(),
+                ),
+                ..Default::default()
+            });
+            env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+                name: AIRFLOW_API_AUTH_BACKENDS.into(),
+                value: Some("airflow.api.auth.backend.session".into()),
+                ..Default::default()
+            });
+            // As of 3.x a JWT key is required.
+            // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+            // This must be random, but must also be consistent across api-services.
+            // The key will be consistent for all clusters started by this
+            // operator instance. TODO: Make this cluster specific.
+            env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
+                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+                value: Some(JWT_KEY.clone()),
+                ..Default::default()
+            });
         }
+    } else {
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some(
+                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
+            ),
+            ..Default::default()
+        });
     }
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
@@ -473,7 +515,7 @@ fn execution_server_env_vars(
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     if let Some(name) = airflow.metadata.name.as_ref() {
-        let webserver = format!("{name}-webserver-{rolegroup}-metrics",);
+        let webserver = format!("{name}-webserver-{rolegroup}",);
         tracing::debug!("Webserver set [{webserver}]");
 
         // These settings are new in 3.x and will have no affect with earlier versions.

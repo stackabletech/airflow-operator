@@ -22,8 +22,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
 status:
-  readyReplicas: 2
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -58,8 +58,8 @@ kind: PodDisruptionBudget
 metadata:
   name: airflow-webserver
 status:
-  expectedPods: 4
-  currentHealthy: 4
+  expectedPods: 3
+  currentHealthy: 3
   disruptionsAllowed: 1
 ---
 apiVersion: policy/v1
@@ -103,15 +103,15 @@ spec:
     spec:
       terminationGracePeriodSeconds: 300
 status:
-  readyReplicas: 2
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: airflow-worker
 status:
-  expectedPods: 2
-  currentHealthy: 2
+  expectedPods: 1
+  currentHealthy: 1
   disruptionsAllowed: 1
 {% endif %}

@@ -982,6 +982,7 @@ fn build_server_rolegroup_statefulset(
             authorization_config,
             git_sync_resources,
             &rolegroup_ref.role_group,
+            resolved_product_image,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );
@@ -1268,6 +1269,7 @@ fn build_executor_template_config_map(
             env_overrides,
             merged_executor_config,
             git_sync_resources,
+            resolved_product_image,
         ))
         .add_volume_mounts(airflow.volume_mounts())
         .context(AddVolumeMountSnafu)?
