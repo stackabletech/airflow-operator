@@ -36,11 +36,11 @@ metadata:
   name: airflow
 spec:
   image:
-{% if test_scenario['values']['airflow'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% if test_scenario['values']['airflow-non-experimental'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[0] }}"
 {% else %}
-    productVersion: "{{ test_scenario['values']['airflow'] }}"
+    productVersion: "{{ test_scenario['values']['airflow-non-experimental'] }}"
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:

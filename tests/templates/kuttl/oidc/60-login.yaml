@@ -4,6 +4,5 @@ kind: TestStep
 metadata:
   name: login
 commands:
-  - script: >
-      envsubst '$NAMESPACE' < login.py |
-      kubectl exec -n $NAMESPACE -i python-0 -- tee /stackable/login.py > /dev/null
+  - script: |
+      kubectl cp -n $NAMESPACE login.py python-0:/stackable/login.py
