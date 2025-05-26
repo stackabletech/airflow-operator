@@ -7,6 +7,8 @@ spec:
     productVersion: 2.10.5
   clusterConfig: {}
   webservers:
+    config:
+      listenerClass: external-unstable
     envOverrides: &envOverrides
       AIRFLOW__CORE__XCOM_BACKEND: airflow.providers.common.io.xcom.backend.XComObjectStorageBackend
       # The connection id is obtained from the user part of the url that you will provide
