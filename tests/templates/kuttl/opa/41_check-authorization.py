@@ -56,7 +56,7 @@ def assert_status_code(msg, left, right):
         raise AssertionError(f"{msg}\n\tleft: {left}\n\tright: {right}")
 
 def check_api_authorization_for_user(
-    user, expected_status_code, method, endpoint, data=None, api="api/v2"
+    user, expected_status_code, method, endpoint, data=None
 ):
     api_url = f"{url}/{api}"
 
@@ -65,12 +65,12 @@ def check_api_authorization_for_user(
     assert_status_code(f"Unexpected status code for {user["email"]=}", response.status_code, expected_status_code)
 
 
-def check_api_authorization(method, endpoint, expected_status_code=200, data=None, api="api/v2"):
+def check_api_authorization(method, endpoint, expected_status_code=200, data=None):
     check_api_authorization_for_user(
-        user_jane_doe, expected_status_code, method=method, endpoint=endpoint, data=data, api=api
+        user_jane_doe, expected_status_code, method=method, endpoint=endpoint, data=data
     )
     check_api_authorization_for_user(
-        user_richard_roe, 403, method=method, endpoint=endpoint, data=data, api=api
+        user_richard_roe, 403, method=method, endpoint=endpoint, data=data
     )
 
 
@@ -137,6 +137,11 @@ def test_is_authorized_variable():
     # key == null
     check_api_authorization("GET", "variables/myVar")
 
+def test_is_authorized_asset():
+    # name == null
+    check_api_authorization("GET", "assets")
+    # name != null
+    check_api_authorization("GET", "assets/3") ## 'test-asset' has id 3
 
 def test_is_authorized_view():
     check_website_authorization_for_user(user_jane_doe, 200)
@@ -182,6 +187,7 @@ airflow_version = os.environ["AIRFLOW_VERSION"]
 
 if airflow_version.startswith("3"):
 
+    api = "api/v2"
     url_login = f"{url}/auth/login"
     
     test_is_authorized_configuration()
@@ -190,10 +196,11 @@ if airflow_version.startswith("3"):
     test_is_authorized_pool()
     test_is_authorized_variable()
     test_is_authorized_view()
+    test_is_authorized_asset()
     # test_is_authorized_custom_view() # patching users with the FAB API is not supported in airflow 3
-    # test_is_authorized_dataset() # no datasets on airflow 3
 else:
 
+    api = "api/v1"
     url_login=f"{url}/login/"
     
     test_is_authorized_configuration()

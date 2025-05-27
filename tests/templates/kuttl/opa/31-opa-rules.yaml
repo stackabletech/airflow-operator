@@ -190,17 +190,21 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # TODO
+    # GET /api/v2/backfills
     is_authorized_backfill if {
         input.method == "GET"
 
         input.user.name == "jane.doe"
     }
+
+    # GET /api/v2/assets
     is_authorized_asset if {
         input.method == "GET"
 
         input.user.name == "jane.doe"
     }
+
+    # GET /api/v2/assets/aliases
     is_authorized_asset_alias if {
         input.method == "GET"
 
