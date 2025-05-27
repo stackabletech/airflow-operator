@@ -957,7 +957,8 @@ fn build_server_rolegroup_statefulset(
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
-    airflow_container_args.extend(airflow_role.get_commands(authentication_config));
+    airflow_container_args
+        .extend(airflow_role.get_commands(authentication_config, resolved_product_image));
 
     airflow_container
         .image_from_product_image(resolved_product_image)
@@ -980,6 +981,7 @@ fn build_server_rolegroup_statefulset(
             authentication_config,
             authorization_config,
             git_sync_resources,
+            resolved_product_image,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );
@@ -1170,7 +1172,10 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(rolegroup_ref.object_name()),
+        service_name: Some(format!(
+            "{name}-metrics",
+            name = rolegroup_ref.object_name()
+        )),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
@@ -1263,6 +1268,7 @@ fn build_executor_template_config_map(
             env_overrides,
             merged_executor_config,
             git_sync_resources,
+            resolved_product_image,
         ))
         .add_volume_mounts(airflow.volume_mounts())
         .context(AddVolumeMountSnafu)?

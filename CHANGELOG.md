@@ -10,6 +10,7 @@
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - Add support for airflow `2.10.5` ([#625]).
+- Add experimental support for airflow `3.0.1` ([#630]).
 
 ### Changed
 
@@ -41,6 +42,7 @@
 [#623]: https://github.com/stackabletech/airflow-operator/pull/623
 [#624]: https://github.com/stackabletech/airflow-operator/pull/624
 [#625]: https://github.com/stackabletech/airflow-operator/pull/625
+[#630]: https://github.com/stackabletech/airflow-operator/pull/630
 
 ## [25.3.0] - 2025-03-21
 

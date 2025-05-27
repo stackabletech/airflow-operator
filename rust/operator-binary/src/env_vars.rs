@@ -3,9 +3,13 @@ use std::{
     path::PathBuf,
 };
 
+use base64::{Engine, engine::general_purpose::STANDARD};
+use lazy_static::lazy_static;
 use product_config::types::PropertyNameKind;
+use rand::Rng;
 use snafu::Snafu;
 use stackable_operator::{
+    commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
@@ -30,13 +34,14 @@ const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CO
 const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
 const AIRFLOW_METRICS_STATSD_PORT: &str = "AIRFLOW__METRICS__STATSD_PORT";
-const AIRFLOW_API_AUTH_BACKEND: &str = "AIRFLOW__API__AUTH_BACKEND";
 const AIRFLOW_WEBSERVER_SECRET_KEY: &str = "AIRFLOW__WEBSERVER__SECRET_KEY";
-const AIRFLOW_CORE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__CORE__SQL_ALCHEMY_CONN";
 const AIRFLOW_CELERY_RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
 const AIRFLOW_CELERY_BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
 const AIRFLOW_CORE_DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
 const AIRFLOW_CORE_LOAD_EXAMPLES: &str = "AIRFLOW__CORE__LOAD_EXAMPLES";
+const AIRFLOW_API_AUTH_BACKENDS: &str = "AIRFLOW__API__AUTH_BACKENDS";
+const AIRFLOW_DATABASE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN";
+
 const AIRFLOW_WEBSERVER_EXPOSE_CONFIG: &str = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG";
 const AIRFLOW_CORE_EXECUTOR: &str = "AIRFLOW__CORE__EXECUTOR";
 const AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE: &str =
@@ -51,6 +56,15 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
+lazy_static! {
+    pub static ref JWT_KEY: String = {
+        let mut rng = rand::thread_rng();
+        // Generate 16 random bytes and encode to base64 string
+        let random_bytes: [u8; 16] = rng.gen();
+        STANDARD.encode(random_bytes)
+    };
+}
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display(
@@ -62,6 +76,7 @@ pub enum Error {
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
+#[allow(clippy::too_many_arguments)]
 pub fn build_airflow_statefulset_envs(
     airflow: &v1alpha1::AirflowCluster,
     airflow_role: &AirflowRole,
@@ -70,10 +85,13 @@ pub fn build_airflow_statefulset_envs(
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.extend(static_envs(git_sync_resources));
+
+    add_version_specific_env_vars(airflow, resolved_product_image, &mut env);
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -93,9 +111,9 @@ pub fn build_airflow_statefulset_envs(
             ),
         );
         env.insert(
-            AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
+            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
             env_var_from_secret(
-                AIRFLOW_CORE_SQL_ALCHEMY_CONN,
+                AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
                 secret,
                 "connections.sqlalchemyDatabaseUri",
             ),
@@ -207,6 +225,7 @@ pub fn build_airflow_statefulset_envs(
         }
         _ => {}
     }
+
     // apply overrides last of all with a fixed ordering
     if let Some(env_vars) = env_vars {
         for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
@@ -289,18 +308,6 @@ fn static_envs(
         ..Default::default()
     });
 
-    env.insert(
-        AIRFLOW_API_AUTH_BACKEND.into(),
-        // Authentication for the API is handled separately to the Web Authentication.
-        // Basic authentication is used by the integration tests.
-        // The default is to deny all requests to the API.
-        EnvVar {
-            name: AIRFLOW_API_AUTH_BACKEND.into(),
-            value: Some("airflow.api.auth.backend.basic_auth".into()),
-            ..Default::default()
-        },
-    );
-
     env
 }
 
@@ -311,14 +318,15 @@ pub fn build_airflow_template_envs(
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
     git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
     env.insert(
-        AIRFLOW_CORE_SQL_ALCHEMY_CONN.into(),
+        AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         env_var_from_secret(
-            AIRFLOW_CORE_SQL_ALCHEMY_CONN,
+            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
             secret,
             "connections.sqlalchemyDatabaseUri",
         ),
@@ -346,6 +354,8 @@ pub fn build_airflow_template_envs(
     });
 
     env.extend(static_envs(git_sync_resources));
+
+    add_version_specific_env_vars(airflow, resolved_product_image, &mut env);
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -376,6 +386,46 @@ pub fn build_airflow_template_envs(
 
     tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
+}
+
+fn add_version_specific_env_vars(
+    airflow: &v1alpha1::AirflowCluster,
+    resolved_product_image: &ResolvedProductImage,
+    env: &mut BTreeMap<String, EnvVar>,
+) {
+    if resolved_product_image.product_version.starts_with("3.") {
+        env.extend(execution_server_env_vars(airflow));
+        env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
+            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+            value: Some(
+                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
+            ),
+            ..Default::default()
+        });
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some("airflow.api.auth.backend.session".into()),
+            ..Default::default()
+        });
+        // As of 3.x a JWT key is required.
+        // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+        // This must be random, but must also be consistent across api-services.
+        // The key will be consistent for all clusters started by this
+        // operator instance. TODO: Make this cluster specific.
+        env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
+            name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+            value: Some(JWT_KEY.clone()),
+            ..Default::default()
+        });
+    } else {
+        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
+            name: AIRFLOW_API_AUTH_BACKENDS.into(),
+            value: Some(
+                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
+            ),
+            ..Default::default()
+        });
+    }
 }
 
 // Internally the environment variable collection uses a map so that overrides can actually
@@ -419,6 +469,44 @@ fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -
             value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
             ..Default::default()
         });
+    }
+
+    env
+}
+
+fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+    if let Some(name) = airflow.metadata.name.as_ref() {
+        // The execution API server URL can be any webserver (if there
+        // are multiple ones). Parse the list of webservers in a deterministic
+        // way by iterating over a BTree map rather than the HashMap.
+        if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
+            if let Some(rolegroup) = webserver_role
+                .role_groups
+                .iter()
+                .collect::<BTreeMap<_, _>>()
+                .first_entry()
+            {
+                let webserver = format!(
+                    "{name}-webserver-{rolegroup}",
+                    name = name,
+                    rolegroup = rolegroup.key()
+                );
+                tracing::debug!("Webserver set [{webserver}]");
+                // These settings are new in 3.x and will have no affect with earlier versions.
+                env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
+                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/execution/")),
+                    ..Default::default()
+                });
+                env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
+                    name: "AIRFLOW__CORE__BASE_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/")),
+                    ..Default::default()
+                });
+            }
+        }
     }
 
     env
