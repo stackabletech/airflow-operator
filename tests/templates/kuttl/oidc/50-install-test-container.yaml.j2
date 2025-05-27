@@ -77,12 +77,12 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: AIRFLOW_VERSION
-{% if test_scenario['values']['airflow-non-experimental'].find(",") > 0 %}
-              value: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[0] }}"
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+              value: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
 {% else %}
-              value: "{{ test_scenario['values']['airflow-non-experimental'] }}"
+              value: "{{ test_scenario['values']['airflow-latest'] }}"
 {% endif %}
-              
+
       volumes:
         - name: tls
           csi:
