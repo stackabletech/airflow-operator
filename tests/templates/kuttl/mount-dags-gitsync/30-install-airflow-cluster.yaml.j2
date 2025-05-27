@@ -83,6 +83,7 @@ spec:
           name: test-cm-gitsync
   webservers:
     config:
+      listenerClass: external-unstable
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
