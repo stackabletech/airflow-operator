@@ -558,10 +558,10 @@ impl AirflowRole {
             // Start-up commands have changed in 3.x.
             // See https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/upgrading_to_airflow3.html#step-6-changes-to-your-startup-scripts and
             // https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/setting-up-the-database.html#setting-up-the-database.
-            // If `airflow db migrate` is not run for each role there may be
-            // timing issues (services which require the db start before the
-            // migration is complete). DB-migrations should be eventually be
-            // optional. See https://github.com/stackabletech/airflow-operator/issues/589.
+            // `airflow db migrate` is not run for each role so there may be
+            // re-starts of webserver and/or workers (which require the DB).
+            // DB-migrations should be eventually be optional:
+            // See https://github.com/stackabletech/airflow-operator/issues/589.
             match &self {
                 AirflowRole::Webserver => {
                     command.extend(Self::authentication_start_commands(auth_config));
@@ -593,7 +593,6 @@ impl AirflowRole {
                     format!(
                         "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
                     ),
-                    "airflow db migrate".to_string(),
                     "airflow celery worker &".to_string(),
                 ]),
             }

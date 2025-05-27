@@ -20,7 +20,7 @@ dimensions:
       # - 2.9.3,oci.stackable.tech/sandbox/airflow:2.9.3-stackable0.0.0-dev
   - name: airflow-non-experimental
     values:
-      - 3.0.1
+      - 2.10.5
       # To use a custom image, add a comma and the full name after the product version
       # - 2.9.3,oci.stackable.tech/sandbox/airflow:2.9.3-stackable0.0.0-dev
   - name: opa-latest
@@ -62,7 +62,7 @@ tests:
       - executor
   - name: oidc
     dimensions:
-      - airflow-non-experimental
+      - airflow-latest
       - openshift
   - name: opa
     dimensions:

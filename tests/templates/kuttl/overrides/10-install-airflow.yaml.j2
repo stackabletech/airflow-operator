@@ -47,9 +47,10 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    listenerClass: external-unstable
     credentialsSecret: airflow-credentials
   webservers:
+    config:
+      listenerClass: external-unstable
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level
