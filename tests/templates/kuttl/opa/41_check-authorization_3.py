@@ -1,7 +1,6 @@
 import logging
 import requests
 import sys
-import os
 
 logging.basicConfig(
     level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
@@ -32,6 +31,9 @@ user_richard_roe = {
 }
 
 url = "http://airflow-webserver-default:8080"
+api = "api/v2"
+url_login = f"{url}/auth/login"
+
 
 def obtain_access_token(user: dict[str, str]) -> str:
     token_url = f"{url}/auth/token"
@@ -48,21 +50,31 @@ def obtain_access_token(user: dict[str, str]) -> str:
         log.info(f"Got access token: {access_token}")
         return access_token
     else:
-        log.error(f"Failed to obtain access token: {response.status_code} - {response.text}")
+        log.error(
+            f"Failed to obtain access token: {response.status_code} - {response.text}"
+        )
         sys.exit(1)
+
 
 def assert_status_code(msg, left, right):
     if left != right:
         raise AssertionError(f"{msg}\n\tleft: {left}\n\tright: {right}")
+
 
 def check_api_authorization_for_user(
     user, expected_status_code, method, endpoint, data=None
 ):
     api_url = f"{url}/{api}"
 
-    response = requests.request(method, f"{api_url}/{endpoint}", headers=headers[user["email"]], json=data)
+    response = requests.request(
+        method, f"{api_url}/{endpoint}", headers=headers[user["email"]], json=data
+    )
 
-    assert_status_code(f"Unexpected status code for {user["email"]=}", response.status_code, expected_status_code)
+    assert_status_code(
+        f"Unexpected status code for {user["email"]=}",
+        response.status_code,
+        expected_status_code,
+    )
 
 
 def check_api_authorization(method, endpoint, expected_status_code=200, data=None):
@@ -87,8 +99,11 @@ def check_website_authorization_for_user(user, expected_status_code):
         assert login_response.ok, f"Login for {username} failed"
         home_response = session.get(f"{url}/home", allow_redirects=True)
         assert_status_code(
-            f"GET /home for user [{username}] failed",  home_response.status_code, expected_status_code
+            f"GET /home for user [{username}] failed",
+            home_response.status_code,
+            expected_status_code,
         )
+
 
 def test_is_authorized_configuration():
     # section == null
@@ -133,43 +148,23 @@ def test_is_authorized_pool():
 
 def test_is_authorized_variable():
     # key != null
-    check_api_authorization("POST", "variables", 201, data={"key": "myVar", "value": "1"})
+    check_api_authorization(
+        "POST", "variables", 201, data={"key": "myVar", "value": "1"}
+    )
     # key == null
     check_api_authorization("GET", "variables/myVar")
+
 
 def test_is_authorized_asset():
     # name == null
     check_api_authorization("GET", "assets")
     # name != null
-    check_api_authorization("GET", "assets/3") ## 'test-asset' has id 3
+    check_api_authorization("GET", "assets/3")  ## 'test-asset' has id 3
+
 
 def test_is_authorized_view():
     check_website_authorization_for_user(user_jane_doe, 200)
     check_website_authorization_for_user(user_richard_roe, 200)
-
-
-def test_is_authorized_custom_view():
-    user_jane_doe_patched = user_jane_doe.copy()
-    user_jane_doe_patched["email"] = "jane@stackable.tech"
-    check_api_authorization_for_user(
-        user_jane_doe,
-        200,
-        "PATCH",
-        "users/jane.doe?update_mask=email",
-        data=user_jane_doe_patched,
-        api="/auth/fab/v1",
-    )
-
-    user_richard_roe_patched = user_richard_roe.copy()
-    user_richard_roe_patched["email"] = "richard@stackable.tech"
-    check_api_authorization_for_user(
-        user_richard_roe,
-        403,
-        "PATCH",
-        "users/richard.roe?update_mask=email",
-        data=user_richard_roe_patched,
-        api="/auth/fab/v1",
-    )
 
 
 access_token_jane_doe = obtain_access_token(user_jane_doe)
@@ -183,31 +178,10 @@ headers[user_richard_roe["email"]] = {
     "Content-Type": "application/json",
 }
 
-airflow_version = os.environ["AIRFLOW_VERSION"]
-
-if airflow_version.startswith("3"):
-
-    api = "api/v2"
-    url_login = f"{url}/auth/login"
-    
-    test_is_authorized_configuration()
-    test_is_authorized_connection()
-    test_is_authorized_dag()
-    test_is_authorized_pool()
-    test_is_authorized_variable()
-    test_is_authorized_view()
-    test_is_authorized_asset()
-    # test_is_authorized_custom_view() # patching users with the FAB API is not supported in airflow 3
-else:
-
-    api = "api/v1"
-    url_login=f"{url}/login/"
-    
-    test_is_authorized_configuration()
-    test_is_authorized_connection()
-    test_is_authorized_dag()
-    test_is_authorized_dataset()
-    test_is_authorized_pool()
-    test_is_authorized_variable()
-    test_is_authorized_view()
-    test_is_authorized_custom_view()
+test_is_authorized_configuration()
+test_is_authorized_connection()
+test_is_authorized_dag()
+test_is_authorized_pool()
+test_is_authorized_variable()
+test_is_authorized_view()
+test_is_authorized_asset()

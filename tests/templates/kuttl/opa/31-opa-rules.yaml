@@ -22,7 +22,7 @@ data:
     default is_authorized_backfill := false
     default is_authorized_asset := false
     default is_authorized_asset_alias := false
-    
+
     # Allow the user "airflow" to create test users
     # POST /auth/fab/v1/users
     is_authorized_custom_view if {
@@ -113,7 +113,9 @@ data:
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
-        input.details.id == "~"
+        # Airflow 2 sets this to null
+        # Ignore for now so this rule can be used with Airflow 2 and 3
+        # input.details.id == "~"
 
         input.user.name == "jane.doe"
     }

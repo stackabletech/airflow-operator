@@ -72,12 +72,6 @@ spec:
           env:
             - name: REQUESTS_CA_BUNDLE
               value: /stackable/tls/ca.crt
-            - name: AIRFLOW_VERSION
-{% if test_scenario['values']['airflow'].find(",") > 0 %}
-              value: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
-{% else %}
-              value: "{{ test_scenario['values']['airflow'] }}"
-{% endif %}
       volumes:
         - name: tls
           csi:
