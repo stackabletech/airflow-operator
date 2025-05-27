@@ -9,9 +9,10 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    listenerClass: external-unstable
     credentialsSecret: simple-airflow-credentials
   webservers:
+    config:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

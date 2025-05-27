@@ -28,6 +28,8 @@ spec:
     exposeConfig: false
     credentialsSecret: simple-airflow-credentials
   webservers:
+    config:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1
