@@ -70,8 +70,12 @@ spec:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
     loadExamples: true
     credentialsSecret: test-airflow-credentials
+    dagsGitSync:
+      - repo: https://github.com/stackabletech/example-dags
+        gitFolder: dags
   webservers:
     config:
+      listenerClass: external-unstable
       resources:
         cpu:
           min: 200m
@@ -86,6 +90,14 @@ spec:
             enableVectorAgent: true
             containers:
               airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              git-sync:
                 console:
                   level: INFO
                 file:
@@ -128,6 +140,8 @@ spec:
         cpu:
           min: 50m
           max: 250m
+        memory:
+          limit: 3Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -143,6 +157,14 @@ spec:
                 loggers:
                   ROOT:
                     level: DEBUG
+              git-sync:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
               vector:
                 console:
                   level: INFO
@@ -181,6 +203,14 @@ spec:
             loggers:
               ROOT:
                 level: DEBUG
+          git-sync:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
           vector:
             console:
               level: INFO
@@ -198,6 +228,8 @@ spec:
         cpu:
           min: 100m
           max: 500m
+        memory:
+          limit: 1Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -206,6 +238,14 @@ spec:
             enableVectorAgent: true
             containers:
               airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              git-sync:
                 console:
                   level: INFO
                 file:

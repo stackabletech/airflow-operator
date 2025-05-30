@@ -4,9 +4,11 @@ use std::{
 };
 
 use product_config::types::PropertyNameKind;
-use snafu::{OptionExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::{
-    commons::authentication::oidc, k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
+    crd::{authentication::oidc, git_sync},
+    k8s_openapi::api::core::v1::EnvVar,
+    kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
 };
 
@@ -18,7 +20,6 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        git_sync::{GIT_SYNC_DIR, GIT_SYNC_LINK, GitSync},
         v1alpha1,
     },
     util::env_var_from_secret,
@@ -48,9 +49,6 @@ const ADMIN_LASTNAME: &str = "ADMIN_LASTNAME";
 const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
 const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
-const GITSYNC_USERNAME: &str = "GITSYNC_USERNAME";
-const GITSYNC_PASSWORD: &str = "GITSYNC_PASSWORD";
-
 const PYTHONPATH: &str = "PYTHONPATH";
 
 #[derive(Snafu, Debug)]
@@ -71,10 +69,11 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    env.extend(static_envs(airflow)?);
+    env.extend(static_envs(git_sync_resources));
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -124,7 +123,7 @@ pub fn build_airflow_statefulset_envs(
         }
     }
 
-    let dags_folder = get_dags_folder(airflow)?;
+    let dags_folder = get_dags_folder(git_sync_resources);
     env.insert(AIRFLOW_CORE_DAGS_FOLDER.into(), EnvVar {
         name: AIRFLOW_CORE_DAGS_FOLDER.into(),
         value: Some(dags_folder),
@@ -230,37 +229,33 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-pub fn get_dags_folder(airflow: &v1alpha1::AirflowCluster) -> Result<String, Error> {
-    match airflow.git_sync() {
-        Some(GitSync { git_folder, .. }) => {
-            let mut dag_folder = PathBuf::from(GIT_SYNC_DIR);
-            dag_folder.push(GIT_SYNC_LINK);
-            // Remove trailing slash
-            let sanitized_git_folder = git_folder.strip_prefix("/").unwrap_or(git_folder);
-            dag_folder.push(sanitized_git_folder);
-            Ok(dag_folder
-                .to_str()
-                .with_context(|| ConstructGitDagFolderSnafu {
-                    dag_folder: dag_folder.clone(),
-                })?
-                .to_string())
-        }
-        None => {
-            // if this has not been set for dag-provisioning via gitsync (above), set the default value
-            // so that PYTHONPATH can refer to this. N.B. nested variables need to be resolved, so that
-            // /stackable/airflow is used instead of $AIRFLOW_HOME.
-            // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-            Ok("/stackable/airflow/dags".to_string())
-        }
+pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> String {
+    let git_sync_count = git_sync_resources.git_content_folders.len();
+    if git_sync_count > 1 {
+        tracing::warn!(
+            "There are {git_sync_count} git-sync entries: Only the first one will be considered.",
+        );
     }
+
+    // If DAG provisioning via git-sync is not configured, set a default value
+    // so that PYTHONPATH can refer to it. N.B. nested variables need to be
+    // resolved, so that /stackable/airflow is used instead of $AIRFLOW_HOME.
+    // see https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+    git_sync_resources
+        .git_content_folders_as_string()
+        .first()
+        .cloned()
+        .unwrap_or("/stackable/airflow/dags".to_string())
 }
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, EnvVar>, Error> {
+fn static_envs(
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    let dags_folder = get_dags_folder(airflow)?;
+    let dags_folder = get_dags_folder(git_sync_resources);
 
     env.insert(PYTHONPATH.into(), EnvVar {
         // PYTHONPATH must be extended to include the dags folder so that dag
@@ -305,45 +300,8 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> Result<BTreeMap<String, En
             ..Default::default()
         },
     );
-    Ok(env)
-}
 
-/// Return environment variables to be applied to the gitsync container in the statefulset for the scheduler,
-/// webserver (and worker, for clusters utilizing `celeryExecutor`). N.B. the git credentials-secret is passed
-/// explicitly here: it is no longer added to the role config (lib/compute_env) as the kubenertes executor wraps
-/// `CommonConfiguration<ExecutorConfigFragment>` that is not linked to a role.
-pub fn build_gitsync_statefulset_envs(
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    git_credentials_secret: &Option<String>,
-) -> Vec<EnvVar> {
-    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-
-    add_gitsync_credentials(git_credentials_secret, &mut env);
-
-    if let Some(git_env) = rolegroup_config.get(&PropertyNameKind::Env) {
-        for (k, v) in git_env.iter() {
-            gitsync_vars_map(k, &mut env, v);
-        }
-    }
-
-    tracing::debug!("Env-var set [{:?}]", env);
-    transform_map_to_vec(env)
-}
-
-fn add_gitsync_credentials(
-    git_credentials_secret: &Option<String>,
-    env: &mut BTreeMap<String, EnvVar>,
-) {
-    if let Some(git_credentials_secret) = &git_credentials_secret {
-        env.insert(
-            GITSYNC_USERNAME.to_string(),
-            env_var_from_secret(GITSYNC_USERNAME, git_credentials_secret, "user"),
-        );
-        env.insert(
-            GITSYNC_PASSWORD.to_string(),
-            env_var_from_secret(GITSYNC_PASSWORD, git_credentials_secret, "password"),
-        );
-    }
+    env
 }
 
 /// Return environment variables to be applied to the configuration map used in conjunction with
@@ -352,7 +310,8 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-) -> Result<Vec<EnvVar>, Error> {
+    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
@@ -379,14 +338,14 @@ pub fn build_airflow_template_envs(
 
     // the config map also requires the dag-folder location as this will be passed on
     // to the pods started by airflow.
-    let dags_folder = get_dags_folder(airflow)?;
+    let dags_folder = get_dags_folder(git_sync_resources);
     env.insert(AIRFLOW_CORE_DAGS_FOLDER.into(), EnvVar {
         name: AIRFLOW_CORE_DAGS_FOLDER.into(),
         value: Some(dags_folder),
         ..Default::default()
     });
 
-    env.extend(static_envs(airflow)?);
+    env.extend(static_envs(git_sync_resources));
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -416,33 +375,7 @@ pub fn build_airflow_template_envs(
     }
 
     tracing::debug!("Env-var set [{:?}]", env);
-    Ok(transform_map_to_vec(env))
-}
-
-/// Return environment variables to be applied to the configuration map used in conjunction with
-/// the `kubernetesExecutor` worker: applied to the gitsync `initContainer`.
-pub fn build_gitsync_template(
-    env_overrides: &HashMap<String, String>,
-    git_credentials_secret: &Option<String>,
-) -> Vec<EnvVar> {
-    let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-
-    add_gitsync_credentials(git_credentials_secret, &mut env);
-
-    for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        gitsync_vars_map(k, &mut env, v);
-    }
-
-    tracing::debug!("Env-var set [{:?}]", env);
     transform_map_to_vec(env)
-}
-
-fn gitsync_vars_map(k: &String, env: &mut BTreeMap<String, EnvVar>, v: &String) {
-    env.insert(k.to_string(), EnvVar {
-        name: k.to_string(),
-        value: Some(v.to_string()),
-        ..Default::default()
-    });
 }
 
 // Internally the environment variable collection uses a map so that overrides can actually
@@ -473,7 +406,7 @@ fn authentication_env_vars(
     oidc_client_credentials_secrets
         .iter()
         .cloned()
-        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .flat_map(oidc::v1alpha1::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
 }
 

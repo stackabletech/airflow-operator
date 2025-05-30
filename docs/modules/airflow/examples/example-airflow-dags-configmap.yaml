@@ -19,6 +19,8 @@ spec:
         mountPath: /dags/test_airflow_dag.py # <6>
         subPath: test_airflow_dag.py # <7>
   webservers:
+    config:
+      listenerClass: external-unstable
     roleGroups:
       default:
         envOverrides:
