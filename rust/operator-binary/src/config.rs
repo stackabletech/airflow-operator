@@ -476,7 +476,9 @@ mod tests {
                 ("AUTH_TYPE".into(), "AUTH_OAUTH".into()),
                 ("AUTH_USER_REGISTRATION".into(), "true".into()),
                 ("AUTH_USER_REGISTRATION_ROLE".into(), "Admin".into()),
-                ("OAUTH_PROVIDERS".into(), formatdoc! {"
+                (
+                    "OAUTH_PROVIDERS".into(),
+                    formatdoc! {"
               [
               {{ 'name': 'keycloak',
                 'icon': 'fa-key',
@@ -505,7 +507,8 @@ mod tests {
                 }},
               }}
               ]
-              "})
+              "}
+                )
             ]),
             result
         );
