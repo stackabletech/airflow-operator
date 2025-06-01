@@ -81,7 +81,7 @@ use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_UID, APP_NAME, AirflowClusterStatus, AirflowConfig,
+        self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
         ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
@@ -936,13 +936,7 @@ fn build_server_rolegroup_statefulset(
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&merged_airflow_config.affinity)
         .service_account_name(service_account.name_any())
-        .security_context(
-            PodSecurityContextBuilder::new()
-                .run_as_user(AIRFLOW_UID)
-                .run_as_group(0)
-                .fs_group(1000)
-                .build(),
-        );
+        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     let mut airflow_container = ContainerBuilder::new(&Container::Airflow.to_string())
         .context(InvalidContainerNameSnafu)?;
@@ -1233,13 +1227,7 @@ fn build_executor_template_config_map(
         .affinity(&merged_executor_config.affinity)
         .service_account_name(sa_name)
         .restart_policy("Never")
-        .security_context(
-            PodSecurityContextBuilder::new()
-                .run_as_user(AIRFLOW_UID)
-                .run_as_group(0)
-                .fs_group(1000)
-                .build(),
-        );
+        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     add_executor_graceful_shutdown_config(merged_executor_config, &mut pb)
         .context(GracefulShutdownSnafu)?;
