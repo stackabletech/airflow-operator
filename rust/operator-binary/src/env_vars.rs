@@ -3,10 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use base64::{Engine, engine::general_purpose::STANDARD};
-use lazy_static::lazy_static;
 use product_config::types::PropertyNameKind;
-use rand::Rng;
 use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
@@ -56,14 +53,12 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
-lazy_static! {
-    pub static ref JWT_KEY: String = {
-        let mut rng = rand::thread_rng();
-        // Generate 16 random bytes and encode to base64 string
-        let random_bytes: [u8; 16] = rng.gen();
-        STANDARD.encode(random_bytes)
-    };
-}
+/// TODO This key is only intended for use during experimental support and will
+/// be replaced with a secret at a later stage. The key should be consistent
+/// across replicas/roles for a given cluster, but should be cluster-specific
+/// and should be accessed from a secret to avoid cluster restarts being
+/// triggered by an operator restart.
+const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -477,7 +472,7 @@ fn add_version_specific_env_vars(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
             EnvVar {
                 name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-                value: Some(JWT_KEY.clone()),
+                value: Some(JWT_KEY.into()),
                 ..Default::default()
             },
         );

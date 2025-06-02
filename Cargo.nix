@@ -8584,10 +8584,6 @@ rec {
             packageId = "anyhow";
           }
           {
-            name = "base64";
-            packageId = "base64 0.22.1";
-          }
-          {
             name = "clap";
             packageId = "clap";
           }
@@ -8615,10 +8611,6 @@ rec {
           {
             name = "product-config";
             packageId = "product-config";
-          }
-          {
-            name = "rand";
-            packageId = "rand 0.8.5";
           }
           {
             name = "serde";
