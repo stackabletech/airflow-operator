@@ -8605,10 +8605,6 @@ rec {
             packageId = "indoc";
           }
           {
-            name = "lazy_static";
-            packageId = "lazy_static";
-          }
-          {
             name = "product-config";
             packageId = "product-config";
           }

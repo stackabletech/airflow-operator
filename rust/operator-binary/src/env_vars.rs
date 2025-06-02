@@ -53,11 +53,9 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
-/// TODO This key is only intended for use during experimental support and will
-/// be replaced with a secret at a later stage. The key should be consistent
-/// across replicas/roles for a given cluster, but should be cluster-specific
-/// and should be accessed from a secret to avoid cluster restarts being
-/// triggered by an operator restart.
+/// This key is only intended for use during experimental support and will
+/// be replaced with a secret at a later stage. See the issue covering
+/// this at <https://github.com/stackabletech/airflow-operator/issues/639>.
 const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
 
 #[derive(Snafu, Debug)]
@@ -465,9 +463,12 @@ fn add_version_specific_env_vars(
         );
         // As of 3.x a JWT key is required.
         // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
-        // This must be random, but must also be consistent across api-services.
-        // The key will be consistent for all clusters started by this
-        // operator instance. TODO: Make this cluster specific.
+        // This should be random, but must also be consistent across
+        // api-services and replicas/roles for a given
+        // cluster, but should also be cluster-specific.
+        // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
+        // later it will be accessed from a secret to avoid cluster restarts
+        // being triggered by an operator restart.
         env.insert(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
             EnvVar {

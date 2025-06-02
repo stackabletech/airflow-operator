@@ -2645,7 +2645,6 @@ dependencies = [
  "fnv",
  "futures 0.3.31",
  "indoc",
- "lazy_static",
  "product-config",
  "rstest",
  "serde",
