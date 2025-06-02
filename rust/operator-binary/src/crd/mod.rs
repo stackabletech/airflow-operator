@@ -570,7 +570,7 @@ impl AirflowRole {
                     command.extend(Self::authentication_start_commands(auth_config));
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                        container_debug_command(),
                         "airflow api-server &".to_string(),
                     ]);
                 }
@@ -585,17 +585,13 @@ impl AirflowRole {
                         --role \"Admin\""
                         .to_string(),
                     "prepare_signal_handlers".to_string(),
-                    format!(
-                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    ),
+                    container_debug_command(),
                     "airflow dag-processor &".to_string(),
                     "airflow scheduler &".to_string(),
                 ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    format!(
-                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    ),
+                    container_debug_command(),
                     "airflow celery worker &".to_string(),
                 ]),
             }
@@ -606,7 +602,7 @@ impl AirflowRole {
                     command.extend(Self::authentication_start_commands(auth_config));
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
+                        container_debug_command(),
                         "airflow webserver &".to_string(),
                     ]);
                 }
@@ -623,16 +619,12 @@ impl AirflowRole {
                         --role \"Admin\""
                         .to_string(),
                     "prepare_signal_handlers".to_string(),
-                    format!(
-                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    ),
+                    container_debug_command(),
                     "airflow scheduler &".to_string(),
                 ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    format!(
-                        "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                    ),
+                    container_debug_command(),
                     "airflow celery worker &".to_string(),
                 ]),
             }
@@ -696,6 +688,10 @@ impl AirflowRole {
         }
         roles
     }
+}
+
+fn container_debug_command() -> String {
+    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
 }
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
