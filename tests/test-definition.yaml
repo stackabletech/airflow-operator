@@ -92,7 +92,7 @@ tests:
       - openshift
   - name: external-access
     dimensions:
-      - airflow-latest
+      - airflow
       - openshift
       - executor
 suites:
