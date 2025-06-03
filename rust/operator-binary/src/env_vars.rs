@@ -477,6 +477,29 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
+        // Sometimes a race condition can arise when both scheduler and
+        // api-server are updating the DB, which adds overhead (conflicts
+        // are logged) and can result in inconsistencies. This setting
+        // ensure that only the scheduler will do this by default.
+        env.insert(
+            "AIRFLOW__FAB__UPDATE_FAB_PERMS".into(),
+            EnvVar {
+                name: "AIRFLOW__FAB__UPDATE_FAB_PERMS".into(),
+                value: Some("False".into()),
+                ..Default::default()
+            },
+        );
+        // Airflow 3.x uses fast-api as a backend: newer versions of uvicorn can
+        // cause issues with child processes. See discussion here: <https://github.com/apache/airflow/discussions/50170#discussioncomment-13265000>.
+        // This will be considered as part of this issue: <https://github.com/stackabletech/airflow-operator/issues/641>.
+        env.insert(
+            "AIRFLOW__API__WORKERS".into(),
+            EnvVar {
+                name: "AIRFLOW__API__WORKERS".into(),
+                value: Some("1".into()),
+                ..Default::default()
+            },
+        );
     } else {
         env.insert(
             AIRFLOW_API_AUTH_BACKENDS.into(),
