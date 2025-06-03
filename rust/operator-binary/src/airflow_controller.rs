@@ -576,10 +576,10 @@ pub async fn reconcile_airflow(
         .context(DeleteOrphanedResourcesSnafu)?;
 
     let status = AirflowClusterStatus {
-        conditions: compute_conditions(airflow, &[
-            &ss_cond_builder,
-            &cluster_operation_cond_builder,
-        ]),
+        conditions: compute_conditions(
+            airflow,
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
     };
 
     client

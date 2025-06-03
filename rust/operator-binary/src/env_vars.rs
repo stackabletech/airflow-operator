@@ -3,10 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use base64::{Engine, engine::general_purpose::STANDARD};
-use lazy_static::lazy_static;
 use product_config::types::PropertyNameKind;
-use rand::Rng;
 use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
@@ -56,14 +53,10 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
-lazy_static! {
-    pub static ref JWT_KEY: String = {
-        let mut rng = rand::thread_rng();
-        // Generate 16 random bytes and encode to base64 string
-        let random_bytes: [u8; 16] = rng.gen();
-        STANDARD.encode(random_bytes)
-    };
-}
+/// This key is only intended for use during experimental support and will
+/// be replaced with a secret at a later stage. See the issue covering
+/// this at <https://github.com/stackabletech/airflow-operator/issues/639>.
+const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -142,39 +135,54 @@ pub fn build_airflow_statefulset_envs(
     }
 
     let dags_folder = get_dags_folder(git_sync_resources);
-    env.insert(AIRFLOW_CORE_DAGS_FOLDER.into(), EnvVar {
-        name: AIRFLOW_CORE_DAGS_FOLDER.into(),
-        value: Some(dags_folder),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_CORE_DAGS_FOLDER.into(),
+        EnvVar {
+            name: AIRFLOW_CORE_DAGS_FOLDER.into(),
+            value: Some(dags_folder),
+            ..Default::default()
+        },
+    );
 
     if airflow.spec.cluster_config.load_examples {
-        env.insert(AIRFLOW_CORE_LOAD_EXAMPLES.into(), EnvVar {
-            name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
-            value: Some("True".into()),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_CORE_LOAD_EXAMPLES.into(),
+            EnvVar {
+                name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
+                value: Some("True".into()),
+                ..Default::default()
+            },
+        );
     } else {
-        env.insert(AIRFLOW_CORE_LOAD_EXAMPLES.into(), EnvVar {
-            name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
-            value: Some("False".into()),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_CORE_LOAD_EXAMPLES.into(),
+            EnvVar {
+                name: AIRFLOW_CORE_LOAD_EXAMPLES.into(),
+                value: Some("False".into()),
+                ..Default::default()
+            },
+        );
     }
 
     if airflow.spec.cluster_config.expose_config {
-        env.insert(AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(), EnvVar {
-            name: AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
-            value: Some("True".into()),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
+            EnvVar {
+                name: AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
+                value: Some("True".into()),
+                ..Default::default()
+            },
+        );
     }
 
-    env.insert(AIRFLOW_CORE_EXECUTOR.into(), EnvVar {
-        name: AIRFLOW_CORE_EXECUTOR.into(),
-        value: Some(executor.to_string()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_CORE_EXECUTOR.into(),
+        EnvVar {
+            name: AIRFLOW_CORE_EXECUTOR.into(),
+            value: Some(executor.to_string()),
+            ..Default::default()
+        },
+    );
 
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         env.insert(
@@ -185,11 +193,14 @@ pub fn build_airflow_statefulset_envs(
                 ..Default::default()
             },
         );
-        env.insert(AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(), EnvVar {
-            name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-            value: airflow.namespace(),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
+            EnvVar {
+                name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
+                value: airflow.namespace(),
+                ..Default::default()
+            },
+        );
     }
 
     match airflow_role {
@@ -229,20 +240,26 @@ pub fn build_airflow_statefulset_envs(
     // apply overrides last of all with a fixed ordering
     if let Some(env_vars) = env_vars {
         for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
-            env.insert(k.into(), EnvVar {
-                name: k.to_string(),
-                value: Some(v.to_string()),
-                ..Default::default()
-            });
+            env.insert(
+                k.into(),
+                EnvVar {
+                    name: k.to_string(),
+                    value: Some(v.to_string()),
+                    ..Default::default()
+                },
+            );
         }
     }
 
     // Needed for the `containerdebug` process to log it's tracing information to.
-    env.insert("CONTAINERDEBUG_LOG_DIRECTORY".to_string(), EnvVar {
-        name: "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
-        value: Some(format!("{STACKABLE_LOG_DIR}/containerdebug")),
-        value_from: None,
-    });
+    env.insert(
+        "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+        EnvVar {
+            name: "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+            value: Some(format!("{STACKABLE_LOG_DIR}/containerdebug")),
+            value_from: None,
+        },
+    );
 
     tracing::debug!("Env-var set [{:?}]", env);
     Ok(transform_map_to_vec(env))
@@ -276,37 +293,52 @@ fn static_envs(
 
     let dags_folder = get_dags_folder(git_sync_resources);
 
-    env.insert(PYTHONPATH.into(), EnvVar {
-        // PYTHONPATH must be extended to include the dags folder so that dag
-        // dependencies can be found: this must be the actual path and not a variable.
-        // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
-        name: PYTHONPATH.into(),
-        value: Some(format!("{LOG_CONFIG_DIR}:{dags_folder}")),
-        ..Default::default()
-    });
-    env.insert(AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(), EnvVar {
-        name: AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(),
-        value: Some("log_config.LOGGING_CONFIG".into()),
-        ..Default::default()
-    });
+    env.insert(
+        PYTHONPATH.into(),
+        EnvVar {
+            // PYTHONPATH must be extended to include the dags folder so that dag
+            // dependencies can be found: this must be the actual path and not a variable.
+            // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
+            name: PYTHONPATH.into(),
+            value: Some(format!("{LOG_CONFIG_DIR}:{dags_folder}")),
+            ..Default::default()
+        },
+    );
+    env.insert(
+        AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(),
+        EnvVar {
+            name: AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS.into(),
+            value: Some("log_config.LOGGING_CONFIG".into()),
+            ..Default::default()
+        },
+    );
 
-    env.insert(AIRFLOW_METRICS_STATSD_ON.into(), EnvVar {
-        name: AIRFLOW_METRICS_STATSD_ON.into(),
-        value: Some("True".into()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_METRICS_STATSD_ON.into(),
+        EnvVar {
+            name: AIRFLOW_METRICS_STATSD_ON.into(),
+            value: Some("True".into()),
+            ..Default::default()
+        },
+    );
 
-    env.insert(AIRFLOW_METRICS_STATSD_HOST.into(), EnvVar {
-        name: AIRFLOW_METRICS_STATSD_HOST.into(),
-        value: Some("0.0.0.0".into()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_METRICS_STATSD_HOST.into(),
+        EnvVar {
+            name: AIRFLOW_METRICS_STATSD_HOST.into(),
+            value: Some("0.0.0.0".into()),
+            ..Default::default()
+        },
+    );
 
-    env.insert(AIRFLOW_METRICS_STATSD_PORT.into(), EnvVar {
-        name: AIRFLOW_METRICS_STATSD_PORT.into(),
-        value: Some("9125".into()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_METRICS_STATSD_PORT.into(),
+        EnvVar {
+            name: AIRFLOW_METRICS_STATSD_PORT.into(),
+            value: Some("9125".into()),
+            ..Default::default()
+        },
+    );
 
     env
 }
@@ -332,26 +364,35 @@ pub fn build_airflow_template_envs(
         ),
     );
 
-    env.insert(AIRFLOW_CORE_EXECUTOR.into(), EnvVar {
-        name: AIRFLOW_CORE_EXECUTOR.into(),
-        value: Some("LocalExecutor".to_string()),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_CORE_EXECUTOR.into(),
+        EnvVar {
+            name: AIRFLOW_CORE_EXECUTOR.into(),
+            value: Some("LocalExecutor".to_string()),
+            ..Default::default()
+        },
+    );
 
-    env.insert(AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(), EnvVar {
-        name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-        value: airflow.namespace(),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
+        EnvVar {
+            name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
+            value: airflow.namespace(),
+            ..Default::default()
+        },
+    );
 
     // the config map also requires the dag-folder location as this will be passed on
     // to the pods started by airflow.
     let dags_folder = get_dags_folder(git_sync_resources);
-    env.insert(AIRFLOW_CORE_DAGS_FOLDER.into(), EnvVar {
-        name: AIRFLOW_CORE_DAGS_FOLDER.into(),
-        value: Some(dags_folder),
-        ..Default::default()
-    });
+    env.insert(
+        AIRFLOW_CORE_DAGS_FOLDER.into(),
+        EnvVar {
+            name: AIRFLOW_CORE_DAGS_FOLDER.into(),
+            value: Some(dags_folder),
+            ..Default::default()
+        },
+    );
 
     env.extend(static_envs(git_sync_resources));
 
@@ -361,27 +402,33 @@ pub fn build_airflow_template_envs(
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
     // that are created and then terminated (we do a similar thing for spark-k8s).
     if config.logging.enable_vector_agent {
-        env.insert("_STACKABLE_POST_HOOK".into(), EnvVar {
-            name: "_STACKABLE_POST_HOOK".into(),
-            value: Some(
-                [
-                    // Wait for Vector to gather the logs.
-                    "sleep 10",
-                    &create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-                ]
-                .join("; "),
-            ),
-            ..Default::default()
-        });
+        env.insert(
+            "_STACKABLE_POST_HOOK".into(),
+            EnvVar {
+                name: "_STACKABLE_POST_HOOK".into(),
+                value: Some(
+                    [
+                        // Wait for Vector to gather the logs.
+                        "sleep 10",
+                        &create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+                    ]
+                    .join("; "),
+                ),
+                ..Default::default()
+            },
+        );
     }
 
     // iterate over a BTreeMap to ensure the vars are written in a predictable order
     for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        env.insert(k.to_string(), EnvVar {
-            name: k.to_string(),
-            value: Some(v.to_string()),
-            ..Default::default()
-        });
+        env.insert(
+            k.to_string(),
+            EnvVar {
+                name: k.to_string(),
+                value: Some(v.to_string()),
+                ..Default::default()
+            },
+        );
     }
 
     tracing::debug!("Env-var set [{:?}]", env);
@@ -395,36 +442,52 @@ fn add_version_specific_env_vars(
 ) {
     if resolved_product_image.product_version.starts_with("3.") {
         env.extend(execution_server_env_vars(airflow));
-        env.insert(AIRFLOW_CORE_AUTH_MANAGER.into(), EnvVar {
-            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
-            value: Some(
-                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager".to_string(),
-            ),
-            ..Default::default()
-        });
-        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-            name: AIRFLOW_API_AUTH_BACKENDS.into(),
-            value: Some("airflow.api.auth.backend.session".into()),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_CORE_AUTH_MANAGER.into(),
+            EnvVar {
+                name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+                value: Some(
+                    "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+                        .to_string(),
+                ),
+                ..Default::default()
+            },
+        );
+        env.insert(
+            AIRFLOW_API_AUTH_BACKENDS.into(),
+            EnvVar {
+                name: AIRFLOW_API_AUTH_BACKENDS.into(),
+                value: Some("airflow.api.auth.backend.session".into()),
+                ..Default::default()
+            },
+        );
         // As of 3.x a JWT key is required.
         // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
-        // This must be random, but must also be consistent across api-services.
-        // The key will be consistent for all clusters started by this
-        // operator instance. TODO: Make this cluster specific.
-        env.insert("AIRFLOW__API_AUTH__JWT_SECRET".into(), EnvVar {
-            name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-            value: Some(JWT_KEY.clone()),
-            ..Default::default()
-        });
+        // This should be random, but must also be consistent across
+        // api-services and replicas/roles for a given
+        // cluster, but should also be cluster-specific.
+        // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
+        // later it will be accessed from a secret to avoid cluster restarts
+        // being triggered by an operator restart.
+        env.insert(
+            "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+            EnvVar {
+                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+                value: Some(JWT_KEY.into()),
+                ..Default::default()
+            },
+        );
     } else {
-        env.insert(AIRFLOW_API_AUTH_BACKENDS.into(), EnvVar {
-            name: AIRFLOW_API_AUTH_BACKENDS.into(),
-            value: Some(
-                "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
-            ),
-            ..Default::default()
-        });
+        env.insert(
+            AIRFLOW_API_AUTH_BACKENDS.into(),
+            EnvVar {
+                name: AIRFLOW_API_AUTH_BACKENDS.into(),
+                value: Some(
+                    "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session".into(),
+                ),
+                ..Default::default()
+            },
+        );
     }
 }
 
@@ -495,16 +558,22 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
                 );
                 tracing::debug!("Webserver set [{webserver}]");
                 // These settings are new in 3.x and will have no affect with earlier versions.
-                env.insert("AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(), EnvVar {
-                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/execution/")),
-                    ..Default::default()
-                });
-                env.insert("AIRFLOW__CORE__BASE_URL".into(), EnvVar {
-                    name: "AIRFLOW__CORE__BASE_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/")),
-                    ..Default::default()
-                });
+                env.insert(
+                    "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                    EnvVar {
+                        name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                        value: Some(format!("http://{webserver}:8080/execution/")),
+                        ..Default::default()
+                    },
+                );
+                env.insert(
+                    "AIRFLOW__CORE__BASE_URL".into(),
+                    EnvVar {
+                        name: "AIRFLOW__CORE__BASE_URL".into(),
+                        value: Some(format!("http://{webserver}:8080/")),
+                        ..Default::default()
+                    },
+                );
             }
         }
     }

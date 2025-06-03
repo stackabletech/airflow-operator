@@ -5,9 +5,9 @@ include::home:concepts:stackable_resource_requests.adoc[]
 
 A minimal HA setup consisting of 2 schedulers, 2 workers and 2 webservers has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
 
-* `5700m` CPU request
+* `8700m` CPU request
 * `17400m` CPU limit
-* `10752Mi` memory request and limit
+* `15872Mi` memory request and limit
 
 Corresponding to the values above, the operator uses the following resource defaults:
 
@@ -18,24 +18,24 @@ spec:
     config:
       resources:
         cpu:
-          min: 500m
+          min: "1"
           max: "2"
         memory:
-          limit: 512Mi
+          limit: 1Gi
   celeryExecutors:
     config:
       resources:
         cpu:
-          min: 500m
+          min: "1"
           max: "2"
         memory:
-          limit: 2Gi
+          limit: 3Gi
   webservers:
     config:
       resources:
         cpu:
-          min: 500m
+          min: "1"
           max: "2"
         memory:
-          limit: 2Gi
+          limit: 3Gi
 ----
