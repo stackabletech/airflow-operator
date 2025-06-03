@@ -37,6 +37,8 @@ data:
 
     LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
 
+    REMOTE_TASK_LOG = None
+
     LOGGING_CONFIG['formatters']['json'] = {
         '()': 'airflow.utils.log.json_formatter.JSONFormatter',
         'json_fields': ['asctime', 'levelname', 'message', 'name']
@@ -78,10 +80,10 @@ spec:
       listenerClass: external-unstable
       resources:
         cpu:
-          min: 200m
-          max: 1000m
+          min: 1000m
+          max: 2000m
         memory:
-          limit: 1Gi
+          limit: 3Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -138,8 +140,8 @@ spec:
     config:
       resources:
         cpu:
-          min: 50m
-          max: 250m
+          min: 1000m
+          max: 2000m
         memory:
           limit: 3Gi
     roleGroups:
@@ -226,8 +228,8 @@ spec:
     config:
       resources:
         cpu:
-          min: 100m
-          max: 500m
+          min: 1000m
+          max: 2000m
         memory:
           limit: 1Gi
     roleGroups:

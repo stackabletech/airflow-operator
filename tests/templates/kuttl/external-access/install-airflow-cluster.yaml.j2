@@ -29,14 +29,20 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
-    loadExamples: true
+    loadExamples: false
     credentialsSecret: test-airflow-credentials
   webservers:
     config:
       listenerClass: test-external-stable-$NAMESPACE
+      resources:
+        cpu:
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 2Gi
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
       external-unstable:
         replicas: 1
         config:
@@ -45,11 +51,29 @@ spec:
         replicas: 1
         config:
           listenerClass: test-cluster-internal-$NAMESPACE
+{% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+  kubernetesExecutors:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 500m
+        memory:
+          limit: 1Gi
+{% endif %}
   schedulers:
+    config:
+      resources:
+        cpu:
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 1Gi
     roleGroups:
       default:
         replicas: 1

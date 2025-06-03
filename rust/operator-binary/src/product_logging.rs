@@ -105,6 +105,8 @@ os.makedirs('{log_dir}', exist_ok=True)
 
 LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
 
+REMOTE_TASK_LOG = None
+
 LOGGING_CONFIG.setdefault('loggers', {{}})
 for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
     logger_config['level'] = logging.NOTSET

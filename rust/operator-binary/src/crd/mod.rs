@@ -9,7 +9,7 @@ use stackable_operator::{
         cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
-        product_image_selection::ProductImage,
+        product_image_selection::{ProductImage, ResolvedProductImage},
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
             Resources, ResourcesFragment,
@@ -324,11 +324,6 @@ impl v1alpha1::AirflowCluster {
         self.spec.cluster_config.volume_mounts.clone()
     }
 
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
     /// Retrieve and merge resource configs for role and role groups
     pub fn merged_config(
         &self,
@@ -551,6 +546,7 @@ impl AirflowRole {
     pub fn get_commands(
         &self,
         auth_config: &AirflowClientAuthenticationDetailsResolved,
+        resolved_product_image: &ResolvedProductImage,
     ) -> Vec<String> {
         let mut command = vec![
             format!(
@@ -561,43 +557,79 @@ impl AirflowRole {
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
 
-        match &self {
-            AirflowRole::Webserver => {
-                // Getting auth commands for AuthClass
-                command.extend(Self::authentication_start_commands(auth_config));
-                command.extend(vec![
+        if resolved_product_image.product_version.starts_with("3.") {
+            // Start-up commands have changed in 3.x.
+            // See https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/upgrading_to_airflow3.html#step-6-changes-to-your-startup-scripts and
+            // https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/setting-up-the-database.html#setting-up-the-database.
+            // `airflow db migrate` is not run for each role so there may be
+            // re-starts of webserver and/or workers (which require the DB).
+            // DB-migrations should be eventually be optional:
+            // See https://github.com/stackabletech/airflow-operator/issues/589.
+            match &self {
+                AirflowRole::Webserver => {
+                    command.extend(Self::authentication_start_commands(auth_config));
+                    command.extend(vec![
+                        "prepare_signal_handlers".to_string(),
+                        container_debug_command(),
+                        "airflow api-server &".to_string(),
+                    ]);
+                }
+                AirflowRole::Scheduler => command.extend(vec![
+                    "airflow db migrate".to_string(),
+                    "airflow users create \
+                        --username \"$ADMIN_USERNAME\" \
+                        --firstname \"$ADMIN_FIRSTNAME\" \
+                        --lastname \"$ADMIN_LASTNAME\" \
+                        --email \"$ADMIN_EMAIL\" \
+                        --password \"$ADMIN_PASSWORD\" \
+                        --role \"Admin\""
+                        .to_string(),
                     "prepare_signal_handlers".to_string(),
-                    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"),
-                    "airflow webserver &".to_string(),
-                ]);
+                    container_debug_command(),
+                    "airflow dag-processor &".to_string(),
+                    "airflow scheduler &".to_string(),
+                ]),
+                AirflowRole::Worker => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow celery worker &".to_string(),
+                ]),
             }
-
-            AirflowRole::Scheduler => command.extend(vec![
-                // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
-                "airflow db init".to_string(),
-                "airflow db upgrade".to_string(),
-                "airflow users create \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" \
-                    --role \"Admin\""
-                    .to_string(),
-                "prepare_signal_handlers".to_string(),
-                format!(
-                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                ),
-                "airflow scheduler &".to_string(),
-            ]),
-            AirflowRole::Worker => command.extend(vec![
-                "prepare_signal_handlers".to_string(),
-                format!(
-                    "containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
-                ),
-                "airflow celery worker &".to_string(),
-            ]),
+        } else {
+            match &self {
+                AirflowRole::Webserver => {
+                    // Getting auth commands for AuthClass
+                    command.extend(Self::authentication_start_commands(auth_config));
+                    command.extend(vec![
+                        "prepare_signal_handlers".to_string(),
+                        container_debug_command(),
+                        "airflow webserver &".to_string(),
+                    ]);
+                }
+                AirflowRole::Scheduler => command.extend(vec![
+                    // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
+                    "airflow db init".to_string(),
+                    "airflow db upgrade".to_string(),
+                    "airflow users create \
+                        --username \"$ADMIN_USERNAME\" \
+                        --firstname \"$ADMIN_FIRSTNAME\" \
+                        --lastname \"$ADMIN_LASTNAME\" \
+                        --email \"$ADMIN_EMAIL\" \
+                        --password \"$ADMIN_PASSWORD\" \
+                        --role \"Admin\""
+                        .to_string(),
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow scheduler &".to_string(),
+                ]),
+                AirflowRole::Worker => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow celery worker &".to_string(),
+                ]),
+            }
         }
+
         // graceful shutdown part
         command.extend(vec![
             "wait_for_termination $!".to_string(),
@@ -656,6 +688,10 @@ impl AirflowRole {
         }
         roles
     }
+}
+
+fn container_debug_command() -> String {
+    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
 }
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
@@ -855,17 +891,17 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     let (cpu, memory) = match role {
         AirflowRole::Worker => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".into())),
+                min: Some(Quantity("1".into())),
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("2Gi".into())),
+                limit: Some(Quantity("3Gi".into())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
         AirflowRole::Webserver => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".into())),
+                min: Some(Quantity("1".into())),
                 max: Some(Quantity("2".into())),
             },
             MemoryLimitsFragment {
@@ -875,11 +911,11 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         ),
         AirflowRole::Scheduler => (
             CpuLimitsFragment {
-                min: Some(Quantity("500m".to_owned())),
+                min: Some(Quantity("1".to_owned())),
                 max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("512Mi".to_owned())),
+                limit: Some(Quantity("1Gi".to_owned())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
