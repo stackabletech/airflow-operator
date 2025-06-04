@@ -1,3 +1,4 @@
+{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: v1
 kind: LimitRange
@@ -9,3 +10,4 @@ spec:
     maxLimitRequestRatio:
       cpu: 5
       memory: 1
+{% endif %}
