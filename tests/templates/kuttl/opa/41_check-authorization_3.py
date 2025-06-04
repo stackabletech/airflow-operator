@@ -1,6 +1,7 @@
 import logging
-import requests
 import sys
+
+import requests
 
 logging.basicConfig(
     level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
@@ -109,7 +110,7 @@ def test_is_authorized_configuration():
     # section == null
     check_api_authorization("GET", "config")
     # section != null
-    check_api_authorization("GET", "config?section=core")
+    check_api_authorization("GET", "config/section/core/option/dags_folder")
 
 
 def test_is_authorized_connection():
