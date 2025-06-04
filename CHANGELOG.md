@@ -26,6 +26,10 @@
 - test: Bump OPA to `1.4.2` ([#624]).
 - Deprecate airflow `2.10.4` ([#625]).
 - Move the git-sync implementation to operator-rs ([#623]). The functionality should not have changed.
+- BREAKING: Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#636])
+  - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
+  - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
+  - This is marked as breaking because tools and policies might exist, which require these fields to be set
 
 ### Fixed
 
@@ -43,6 +47,7 @@
 [#624]: https://github.com/stackabletech/airflow-operator/pull/624
 [#625]: https://github.com/stackabletech/airflow-operator/pull/625
 [#630]: https://github.com/stackabletech/airflow-operator/pull/630
+[#636]: https://github.com/stackabletech/airflow-operator/pull/636
 
 ## [25.3.0] - 2025-03-21
 

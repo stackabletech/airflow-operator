@@ -57,7 +57,6 @@ pub mod affinity;
 pub mod authentication;
 pub mod authorization;
 
-pub const AIRFLOW_UID: i64 = 1000;
 pub const APP_NAME: &str = "airflow";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
