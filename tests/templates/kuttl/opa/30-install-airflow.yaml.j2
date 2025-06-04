@@ -24,11 +24,11 @@ metadata:
   name: airflow
 spec:
   image:
-{% if test_scenario['values']['airflow-non-experimental'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['airflow-non-experimental'].split(',')[0] }}"
+{% if test_scenario['values']['airflow'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
 {% else %}
-    productVersion: "{{ test_scenario['values']['airflow-non-experimental'] }}"
+    productVersion: "{{ test_scenario['values']['airflow'] }}"
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
@@ -53,6 +53,7 @@ spec:
     configOverrides:
       webserver_config.py:
         WTF_CSRF_ENABLED: "False" # Allow "POST /login/" without CSRF token
+        AUTH_OPA_CACHE_MAXSIZE_DEFAULT: "0" # disable decision caching for easy debugging
     roleGroups:
       default:
         replicas: 1

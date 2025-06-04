@@ -29,14 +29,6 @@ user_richard_roe = {
 url = "http://airflow-webserver-default:8080"
 
 
-def create_user(user):
-    requests.post(
-        f"{url}/auth/fab/v1/users",
-        auth=("airflow", "airflow"),
-        json=user,
-    )
-
-
 def check_api_authorization_for_user(
     user, expected_status_code, method, endpoint, data=None, api="api/v1"
 ):
@@ -151,10 +143,6 @@ def test_is_authorized_custom_view():
         api="/auth/fab/v1",
     )
 
-
-# Create test users
-create_user(user_jane_doe)
-create_user(user_richard_roe)
 
 test_is_authorized_configuration()
 test_is_authorized_connection()

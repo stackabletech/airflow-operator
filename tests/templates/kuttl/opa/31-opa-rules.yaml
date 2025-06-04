@@ -12,11 +12,16 @@ data:
     default is_authorized_configuration := false
     default is_authorized_connection := false
     default is_authorized_dag := false
+    # This is no longer present in Airflow 3
     default is_authorized_dataset := false
     default is_authorized_pool := false
     default is_authorized_variable := false
     default is_authorized_view := false
     default is_authorized_custom_view := false
+    # These are new in Airflow 3
+    default is_authorized_backfill := false
+    default is_authorized_asset := false
+    default is_authorized_asset_alias := false
 
     # Allow the user "airflow" to create test users
     # POST /auth/fab/v1/users
@@ -24,6 +29,42 @@ data:
         input.method == "POST"
         input.resource_name == "Users"
 
+        input.user.name == "airflow"
+    }
+    is_authorized_configuration if {
+        input.user.name == "airflow"
+    }
+    is_authorized_configuration if {
+        input.user.name == "airflow"
+    }
+    is_authorized_connection if {
+        input.user.name == "airflow"
+    }
+    is_authorized_dag if {
+        input.user.name == "airflow"
+    }
+    is_authorized_dataset if {
+        input.user.name == "airflow"
+    }
+    is_authorized_pool if {
+        input.user.name == "airflow"
+    }
+    is_authorized_variable if {
+        input.user.name == "airflow"
+    }
+    is_authorized_view if {
+        input.user.name == "airflow"
+    }
+    is_authorized_custom_view if {
+        input.user.name == "airflow"
+    }
+    is_authorized_backfill if {
+        input.user.name == "airflow"
+    }
+    is_authorized_asset if {
+        input.user.name == "airflow"
+    }
+    is_authorized_asset_alias if {
         input.user.name == "airflow"
     }
 
@@ -72,7 +113,9 @@ data:
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
-        input.details.id == null
+        # Airflow 2 sets this to null
+        # Ignore for now so this rule can be used with Airflow 2 and 3
+        # input.details.id == "~"
 
         input.user.name == "jane.doe"
     }
@@ -145,6 +188,27 @@ data:
     is_authorized_custom_view if {
         input.method == "PUT"
         input.resource_name == "Users"
+
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v2/backfills
+    is_authorized_backfill if {
+        input.method == "GET"
+
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v2/assets
+    is_authorized_asset if {
+        input.method == "GET"
+
+        input.user.name == "jane.doe"
+    }
+
+    # GET /api/v2/assets/aliases
+    is_authorized_asset_alias if {
+        input.method == "GET"
 
         input.user.name == "jane.doe"
     }
