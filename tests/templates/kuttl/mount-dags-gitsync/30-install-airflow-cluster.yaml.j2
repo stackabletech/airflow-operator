@@ -82,8 +82,9 @@ spec:
         configMap:
           name: test-cm-gitsync
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
+    config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:

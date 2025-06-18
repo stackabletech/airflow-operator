@@ -38,8 +38,8 @@ def metrics_v3(role_group: str) -> None:
     # allow a few moments for the DAGs to be registered to all roles
     time.sleep(10)
 
-    rest_url = f"http://airflow-webserver-{role_group}:8080/api/v2"
-    token_url = f"http://airflow-webserver-{role_group}:8080/auth/token"
+    rest_url = "http://airflow-webserver:8080/api/v2"
+    token_url = "http://airflow-webserver:8080/auth/token"
 
     data = {"username": "airflow", "password": "airflow"}
 
@@ -110,7 +110,7 @@ def metrics_v2(role_group: str) -> None:
     dag_id = "example_trigger_target_dag"
     dag_conf = {"message": "Hello World"}
 
-    rest_url = f"http://airflow-webserver-{role_group}:8080/api/v1"
+    rest_url = "http://airflow-webserver:8080/api/v1"
     auth = ("airflow", "airflow")
 
     # allow a few moments for the DAGs to be registered to all roles

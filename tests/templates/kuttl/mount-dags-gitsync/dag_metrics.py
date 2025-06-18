@@ -29,8 +29,8 @@ print(f"DAG-Data: {dag_data}")
 # allow a few moments for the DAGs to be registered to all roles
 time.sleep(10)
 
-rest_url = "http://airflow-webserver-default:8080/api/v2"
-token_url = "http://airflow-webserver-default:8080/auth/token"
+rest_url = "http://airflow-webserver:8080/api/v2"
+token_url = "http://airflow-webserver:8080/auth/token"
 
 data = {"username": "airflow", "password": "airflow"}
 

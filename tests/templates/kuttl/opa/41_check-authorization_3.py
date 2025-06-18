@@ -31,7 +31,7 @@ user_richard_roe = {
     "password": "NvfpU518",
 }
 
-url = "http://airflow-webserver-default:8080"
+url = "http://airflow-webserver:8080"
 api = "api/v2"
 url_login = f"{url}/auth/login"
 

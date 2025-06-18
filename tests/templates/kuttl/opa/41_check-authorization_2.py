@@ -26,7 +26,7 @@ user_richard_roe = {
     "password": "NvfpU518",
 }
 
-url = "http://airflow-webserver-default:8080"
+url = "http://airflow-webserver:8080"
 
 
 def check_api_authorization_for_user(
