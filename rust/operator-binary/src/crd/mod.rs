@@ -51,6 +51,7 @@ use crate::crd::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
         AirflowClientAuthenticationDetailsResolved,
     },
+    v1alpha1::WebserverRoleConfig,
 };
 
 pub mod affinity;
@@ -163,6 +164,8 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
+    use crate::crd::v1alpha1::WebserverRoleConfig;
+
     /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
@@ -198,7 +201,7 @@ pub mod versioned {
 
         /// The `webserver` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<WebserverConfigFragment>>,
+        pub webservers: Option<Role<AirflowConfigFragment, WebserverRoleConfig>>,
 
         /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
@@ -258,6 +261,31 @@ pub mod versioned {
         #[schemars(schema_with = "raw_object_list_schema")]
         pub volume_mounts: Vec<VolumeMount>,
     }
+
+    // TODO: move generic version to op-rs?
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct WebserverRoleConfig {
+        #[serde(flatten)]
+        pub common: GenericRoleConfig,
+
+        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+        #[serde(default = "webserver_default_listener_class")]
+        pub listener_class: String,
+    }
+}
+
+impl Default for v1alpha1::WebserverRoleConfig {
+    fn default() -> Self {
+        v1alpha1::WebserverRoleConfig {
+            listener_class: webserver_default_listener_class(),
+            common: Default::default(),
+        }
+    }
+}
+
+fn webserver_default_listener_class() -> String {
+    "cluster-internal".to_string()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
@@ -277,16 +305,15 @@ impl HasStatusCondition for v1alpha1::AirflowCluster {
 }
 
 impl v1alpha1::AirflowCluster {
-    /// The name of the group-listener provided for a specific role-group.
+    /// The name of the group-listener provided for a specific role.
     /// Webservers will use this group listener so that only one load balancer
-    /// is needed (per role group).
-    pub fn group_listener_name(
-        &self,
-        role: &AirflowRole,
-        rolegroup: &RoleGroupRef<Self>,
-    ) -> Option<String> {
+    /// is needed for that role.
+    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
         match role {
-            AirflowRole::Webserver => Some(rolegroup.object_name()),
+            AirflowRole::Webserver => Some(format!(
+                "{cluster_name}-{role}",
+                cluster_name = self.name_any()
+            )),
             AirflowRole::Scheduler | AirflowRole::Worker => None,
         }
     }
@@ -381,34 +408,6 @@ impl v1alpha1::AirflowCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 
-    pub fn merged_listener_class(
-        &self,
-        role: &AirflowRole,
-        rolegroup_name: &String,
-    ) -> Option<String> {
-        if role == &AirflowRole::Webserver {
-            if let Some(webservers) = self.spec.webservers.as_ref() {
-                let conf_defaults = Some("cluster-internal".to_string());
-                let mut conf_role = webservers.config.config.listener_class.to_owned();
-                let mut conf_rolegroup = webservers
-                    .role_groups
-                    .get(rolegroup_name)
-                    .map(|rg| rg.config.config.listener_class.clone())
-                    .unwrap_or_default();
-
-                conf_role.merge(&conf_defaults);
-                conf_rolegroup.merge(&conf_role);
-
-                tracing::debug!("Merged listener-class: {:?}", conf_rolegroup);
-                conf_rolegroup
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
     /// Retrieve and merge resource configs for the executor template
     pub fn merged_executor_config(
         &self,
@@ -436,18 +435,18 @@ impl v1alpha1::AirflowCluster {
 }
 
 fn extract_role_from_webserver_config(
-    fragment: Role<WebserverConfigFragment>,
+    fragment: Role<AirflowConfigFragment, WebserverRoleConfig>,
 ) -> Role<AirflowConfigFragment> {
     Role {
         config: CommonConfiguration {
-            config: fragment.config.config.airflow_config,
+            config: fragment.config.config,
             config_overrides: fragment.config.config_overrides,
             env_overrides: fragment.config.env_overrides,
             cli_overrides: fragment.config.cli_overrides,
             pod_overrides: fragment.config.pod_overrides,
             product_specific_common_config: fragment.config.product_specific_common_config,
         },
-        role_config: fragment.role_config,
+        role_config: fragment.role_config.common,
         role_groups: fragment
             .role_groups
             .into_iter()
@@ -456,7 +455,7 @@ fn extract_role_from_webserver_config(
                     k,
                     RoleGroup {
                         config: CommonConfiguration {
-                            config: v.config.config.airflow_config,
+                            config: v.config.config,
                             config_overrides: v.config.config_overrides,
                             env_overrides: v.config.env_overrides,
                             cli_overrides: v.config.cli_overrides,
@@ -687,6 +686,17 @@ impl AirflowRole {
         }
         roles
     }
+
+    pub fn listener_class_name(&self, airflow: &v1alpha1::AirflowCluster) -> Option<String> {
+        match self {
+            Self::Webserver => airflow
+                .spec
+                .webservers
+                .to_owned()
+                .map(|webserver| webserver.role_config.listener_class),
+            Self::Worker | Self::Scheduler => None,
+        }
+    }
 }
 
 fn container_debug_command() -> String {
@@ -808,29 +818,6 @@ pub struct AirflowConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
-}
-
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
-#[fragment_attrs(
-    derive(
-        Clone,
-        Debug,
-        Default,
-        Deserialize,
-        Merge,
-        JsonSchema,
-        PartialEq,
-        Serialize
-    ),
-    serde(rename_all = "camelCase")
-)]
-pub struct WebserverConfig {
-    #[fragment_attrs(serde(default, flatten))]
-    pub airflow_config: AirflowConfig,
-
-    /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
-    #[serde(default)]
-    pub listener_class: String,
 }
 
 impl AirflowConfig {

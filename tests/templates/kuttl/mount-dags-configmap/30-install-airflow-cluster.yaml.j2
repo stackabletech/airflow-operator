@@ -85,8 +85,9 @@ spec:
         mountPath: /dags/example_trigger_target_dag.py
         subPath: example_trigger_target_dag.py
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
+    config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:

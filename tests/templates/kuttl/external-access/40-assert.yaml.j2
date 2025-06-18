@@ -28,22 +28,6 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-webserver-external-unstable
-status:
-  readyReplicas: 1
-  replicas: 1
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: airflow-webserver-cluster-internal
-status:
-  readyReplicas: 1
-  replicas: 1
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
   name: airflow-scheduler-default
 spec:
   template:
@@ -58,8 +42,8 @@ kind: PodDisruptionBudget
 metadata:
   name: airflow-webserver
 status:
-  expectedPods: 3
-  currentHealthy: 3
+  expectedPods: 1
+  currentHealthy: 1
   disruptionsAllowed: 1
 ---
 apiVersion: policy/v1
@@ -74,23 +58,9 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-webserver-cluster-internal
-spec:
-  type: ClusterIP # cluster-internal
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: airflow-webserver-default
+  name: airflow-webserver
 spec:
   type: NodePort # external-stable
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: airflow-webserver-external-unstable
-spec:
-  type: NodePort # external-unstable
 
 {% if test_scenario['values']['executor'] == 'celery' %}
 ---

@@ -53,7 +53,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::{controller::Action, reflector::ObjectRef},
     },
-    kvp::{Annotation, Label, LabelError, Labels},
+    kvp::{Annotation, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     product_config_utils::{
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY, env_vars_from,
@@ -512,26 +512,6 @@ pub async fn reconcile_airflow(
                 &git_sync_resources,
             )?;
 
-            if let Some(listener_class) =
-                airflow.merged_listener_class(&airflow_role, &rolegroup.role_group)
-            {
-                if let Some(listener_group_name) =
-                    airflow.group_listener_name(&airflow_role, &rolegroup)
-                {
-                    let rg_group_listener = build_group_listener(
-                        airflow,
-                        &resolved_product_image,
-                        &rolegroup,
-                        listener_class.to_string(),
-                        listener_group_name,
-                    )?;
-                    cluster_resources
-                        .add(client, rg_group_listener)
-                        .await
-                        .context(ApplyGroupListenerSnafu)?;
-                }
-            }
-
             ss_cond_builder.add(
                 cluster_resources
                     .add(client, rg_statefulset)
@@ -567,6 +547,27 @@ pub async fn reconcile_airflow(
             add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
+        }
+
+        if let Some(listener_class) = airflow_role.listener_class_name(airflow) {
+            if let Some(listener_group_name) = airflow.group_listener_name(&airflow_role) {
+                let rg_group_listener = build_group_listener(
+                    airflow,
+                    build_recommended_labels(
+                        airflow,
+                        AIRFLOW_CONTROLLER_NAME,
+                        &resolved_product_image.app_version_label,
+                        role_name,
+                        "none",
+                    ),
+                    listener_class.to_string(),
+                    listener_group_name,
+                )?;
+                cluster_resources
+                    .add(client, rg_group_listener)
+                    .await
+                    .context(ApplyGroupListenerSnafu)?;
+            }
         }
     }
 
@@ -840,8 +841,7 @@ fn build_rolegroup_metadata(
 
 pub fn build_group_listener(
     airflow: &v1alpha1::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    object_labels: ObjectLabels<v1alpha1::AirflowCluster>,
     listener_class: String,
     listener_group_name: String,
 ) -> Result<listener::v1alpha1::Listener> {
@@ -851,13 +851,7 @@ pub fn build_group_listener(
             .name(listener_group_name)
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                airflow,
-                AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
+            .with_recommended_labels(object_labels)
             .context(ObjectMetaSnafu)?
             .build(),
         spec: listener::v1alpha1::ListenerSpec {
@@ -916,7 +910,7 @@ fn build_server_rolegroup_statefulset(
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
         "none",
         &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
+        "none",
     ))
     .context(LabelBuildSnafu)?;
 
@@ -1019,7 +1013,7 @@ fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if let Some(listener_group_name) = airflow.group_listener_name(airflow_role, rolegroup_ref) {
+    if let Some(listener_group_name) = airflow.group_listener_name(airflow_role) {
         // Listener endpoints for the Webserver role will use persistent volumes
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
