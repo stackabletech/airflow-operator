@@ -2,7 +2,7 @@
 :description: Configure Airflow service exposure with ListenerClasses: cluster-internal, external-unstable, or external-stable.
 
 The operator deploys a xref:listener-operator:listener.adoc[Listener] for the Webserver pod.
-The listener defaults to only being accessible from within the Kubernetes cluster, but this can be changed by setting `.spec.webservers.config.listenerClass`:
+The listener defaults to only being accessible from within the Kubernetes cluster, but this can be changed by setting `.spec.webservers.roleConfig.listenerClass`:
 
 [source,yaml]
 ----

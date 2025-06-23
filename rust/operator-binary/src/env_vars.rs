@@ -23,7 +23,7 @@ use crate::{
         authorization::AirflowAuthorizationResolved,
         v1alpha1,
     },
-    util::env_var_from_secret,
+    util::{env_var_from_secret, role_service_name},
 };
 
 const AIRFLOW_CORE_AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
@@ -576,7 +576,7 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
         // are multiple ones). Parse the list of webservers in a deterministic
         // way by iterating over a BTree map rather than the HashMap.
         if airflow.spec.webservers.as_ref().is_some() {
-            let webserver = format!("{name}-webserver", name = name,);
+            let webserver = role_service_name(name, "webserver");
             tracing::debug!("Webserver set [{webserver}]");
             // These settings are new in 3.x and will have no affect with earlier versions.
             env.insert(

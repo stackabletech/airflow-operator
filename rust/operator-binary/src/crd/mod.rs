@@ -45,13 +45,16 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::crd::{
-    affinity::{get_affinity, get_executor_affinity},
-    authentication::{
-        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
-        AirflowClientAuthenticationDetailsResolved,
+use crate::{
+    crd::{
+        affinity::{get_affinity, get_executor_affinity},
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
+            AirflowClientAuthenticationDetailsResolved,
+        },
+        v1alpha1::WebserverRoleConfig,
     },
-    v1alpha1::WebserverRoleConfig,
+    util::role_service_name,
 };
 
 pub mod affinity;
@@ -310,10 +313,7 @@ impl v1alpha1::AirflowCluster {
     /// is needed for that role.
     pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
         match role {
-            AirflowRole::Webserver => Some(format!(
-                "{cluster_name}-{role}",
-                cluster_name = self.name_any()
-            )),
+            AirflowRole::Webserver => Some(role_service_name(&self.name_any(), &role.to_string())),
             AirflowRole::Scheduler | AirflowRole::Worker => None,
         }
     }

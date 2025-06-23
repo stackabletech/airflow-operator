@@ -14,9 +14,6 @@ if __name__ == "__main__":
     )
 
     parser = argparse.ArgumentParser(description="Health check script")
-    parser.add_argument(
-        "--role-group", type=str, default="default", help="Role group to check"
-    )
     parser.add_argument("--airflow-version", type=str, help="Airflow version")
     opts = parser.parse_args()
 
