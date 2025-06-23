@@ -576,7 +576,7 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
         // are multiple ones). Parse the list of webservers in a deterministic
         // way by iterating over a BTree map rather than the HashMap.
         if airflow.spec.webservers.as_ref().is_some() {
-            let webserver = role_service_name(name, "webserver");
+            let webserver = role_service_name(name, &AirflowRole::Webserver.to_string());
             tracing::debug!("Webserver set [{webserver}]");
             // These settings are new in 3.x and will have no affect with earlier versions.
             env.insert(
