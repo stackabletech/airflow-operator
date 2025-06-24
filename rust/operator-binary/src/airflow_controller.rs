@@ -910,7 +910,7 @@ fn build_server_rolegroup_statefulset(
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
         "none",
         &rolegroup_ref.role,
-        "none",
+        &rolegroup_ref.role_group,
     ))
     .context(LabelBuildSnafu)?;
 
