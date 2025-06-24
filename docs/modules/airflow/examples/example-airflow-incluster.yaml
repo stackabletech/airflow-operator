@@ -11,7 +11,7 @@ spec:
     exposeConfig: false
     credentialsSecret: simple-airflow-credentials
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
     roleGroups:
       default:

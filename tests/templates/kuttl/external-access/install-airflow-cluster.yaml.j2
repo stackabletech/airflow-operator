@@ -32,8 +32,9 @@ spec:
     loadExamples: false
     credentialsSecret: test-airflow-credentials
   webservers:
-    config:
+    roleConfig:
       listenerClass: test-external-stable-$NAMESPACE
+    config:
       resources:
         cpu:
           min: 1000m
@@ -43,14 +44,6 @@ spec:
     roleGroups:
       default:
         replicas: 1
-      external-unstable:
-        replicas: 1
-        config:
-          listenerClass: test-external-unstable-$NAMESPACE
-      cluster-internal:
-        replicas: 1
-        config:
-          listenerClass: test-cluster-internal-$NAMESPACE
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     roleGroups:

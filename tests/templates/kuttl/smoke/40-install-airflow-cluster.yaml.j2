@@ -42,8 +42,9 @@ spec:
     loadExamples: true
     credentialsSecret: test-airflow-credentials
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
+    config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     configOverrides:

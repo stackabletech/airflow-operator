@@ -14,3 +14,7 @@ pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> En
         ..Default::default()
     }
 }
+
+pub fn role_service_name(name: &str, role: &str) -> String {
+    format!("{name}-{role}")
+}

@@ -7,7 +7,7 @@ spec:
     productVersion: 2.10.5
   clusterConfig: {}
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
     envOverrides: &envOverrides
       AIRFLOW__LOGGING__REMOTE_LOGGING: "True"

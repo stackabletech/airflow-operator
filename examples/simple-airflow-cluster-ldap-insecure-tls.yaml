@@ -157,7 +157,7 @@ spec:
       - authenticationClass: airflow-with-ldap-insecure-tls-ldap
         userRegistrationRole: Admin
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
     roleGroups:
       default:

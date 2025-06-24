@@ -23,7 +23,7 @@ use crate::{
         authorization::AirflowAuthorizationResolved,
         v1alpha1,
     },
-    util::env_var_from_secret,
+    util::{env_var_from_secret, role_service_name},
 };
 
 const AIRFLOW_CORE_AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
@@ -575,37 +575,26 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
         // The execution API server URL can be any webserver (if there
         // are multiple ones). Parse the list of webservers in a deterministic
         // way by iterating over a BTree map rather than the HashMap.
-        if let Some(webserver_role) = airflow.spec.webservers.as_ref() {
-            if let Some(rolegroup) = webserver_role
-                .role_groups
-                .iter()
-                .collect::<BTreeMap<_, _>>()
-                .first_entry()
-            {
-                let webserver = format!(
-                    "{name}-webserver-{rolegroup}",
-                    name = name,
-                    rolegroup = rolegroup.key()
-                );
-                tracing::debug!("Webserver set [{webserver}]");
-                // These settings are new in 3.x and will have no affect with earlier versions.
-                env.insert(
-                    "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                    EnvVar {
-                        name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                        value: Some(format!("http://{webserver}:8080/execution/")),
-                        ..Default::default()
-                    },
-                );
-                env.insert(
-                    "AIRFLOW__CORE__BASE_URL".into(),
-                    EnvVar {
-                        name: "AIRFLOW__CORE__BASE_URL".into(),
-                        value: Some(format!("http://{webserver}:8080/")),
-                        ..Default::default()
-                    },
-                );
-            }
+        if airflow.spec.webservers.as_ref().is_some() {
+            let webserver = role_service_name(name, &AirflowRole::Webserver.to_string());
+            tracing::debug!("Webserver set [{webserver}]");
+            // These settings are new in 3.x and will have no affect with earlier versions.
+            env.insert(
+                "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                EnvVar {
+                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/execution/")),
+                    ..Default::default()
+                },
+            );
+            env.insert(
+                "AIRFLOW__CORE__BASE_URL".into(),
+                EnvVar {
+                    name: "AIRFLOW__CORE__BASE_URL".into(),
+                    value: Some(format!("http://{webserver}:8080/")),
+                    ..Default::default()
+                },
+            );
         }
     }
 

@@ -76,8 +76,9 @@ spec:
       - repo: https://github.com/stackabletech/example-dags
         gitFolder: dags
   webservers:
-    config:
+    roleConfig:
       listenerClass: external-unstable
+    config:
       resources:
         cpu:
           min: 1000m
