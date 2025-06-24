@@ -11,6 +11,5 @@ commands:
 {% set airflow_version = test_scenario['values']['airflow'] %}
 {% endif %}
   - script: |
-      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --role-group automatic-log-config --airflow-version "{{ airflow_version }}"
-      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --role-group custom-log-config --airflow-version "{{ airflow_version }}"
-
+      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ airflow_version }}"
+      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ airflow_version }}"
