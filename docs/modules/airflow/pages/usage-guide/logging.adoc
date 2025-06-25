@@ -28,6 +28,8 @@ spec:
             loggers:
               "airflow.processor":
                 level: INFO
+              "airflow.task":
+                level: DEBUG
   schedulers:
     config:
       logging:
