@@ -114,6 +114,11 @@ for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
     # otherwise DAGs cannot be loaded anymore.
     if logger_name != 'airflow.task':
         logger_config['propagate'] = True
+    # The default behavior of airflow is to enforce log level 'INFO' on tasks. (https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#logging-level)
+    # TODO: Make task handler log level configurable through CRDs with default 'INFO'.
+    # e.g. LOGGING_CONFIG['handlers']['task']['level'] = {{task_log_level}}
+    if 'task' in logger_config['handlers']:
+        logger_config['level'] = logging.INFO
 
 LOGGING_CONFIG.setdefault('formatters', {{}})
 LOGGING_CONFIG['formatters']['json'] = {{
@@ -132,10 +137,6 @@ LOGGING_CONFIG['handlers']['file'] = {{
     'maxBytes': 1048576,
     'backupCount': 1,
 }}
-
-# The default behavior of airflow is to enforce log level 'INFO' on tasks. (https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#logging-level)
-# TODO: Make task handler log level configurable through CRDs with default 'INFO'.
-LOGGING_CONFIG['handlers']['task']['level'] = logging.INFO
 
 LOGGING_CONFIG['root'] = {{
     'level': {root_log_level},
