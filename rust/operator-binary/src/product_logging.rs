@@ -114,6 +114,9 @@ for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
     # otherwise DAGs cannot be loaded anymore.
     if logger_name != 'airflow.task':
         logger_config['propagate'] = True
+    # Adopting to airflows logging standards
+    if logger_name == 'airflow.task':
+        logger_config['level'] = logging.INFO
 
 LOGGING_CONFIG.setdefault('formatters', {{}})
 LOGGING_CONFIG['formatters']['json'] = {{
