@@ -3,6 +3,8 @@
 
 The logs can be forwarded to a Vector log aggregator by providing a discovery ConfigMap for the aggregator and by enabling the log agent:
 
+NOTE: airflow.task loglevel is set to `INFO` by default.
+
 [source,yaml]
 ----
 spec:
