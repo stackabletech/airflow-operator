@@ -11,6 +11,7 @@
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - Add support for airflow `2.10.5` ([#625]).
 - Add experimental support for airflow `3.0.1` ([#630]).
+- "airflow.task" logger defaults to log level 'INFO' instead of 'NOTSET' ([#649]).
 
 ### Changed
 
@@ -50,6 +51,7 @@
 [#630]: https://github.com/stackabletech/airflow-operator/pull/630
 [#636]: https://github.com/stackabletech/airflow-operator/pull/636
 [#645]: https://github.com/stackabletech/airflow-operator/pull/645
+[#649]: https://github.com/stackabletech/airflow-operator/pull/649
 
 ## [25.3.0] - 2025-03-21
 
