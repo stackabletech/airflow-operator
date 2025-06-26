@@ -3,7 +3,10 @@
 
 The logs can be forwarded to a Vector log aggregator by providing a discovery ConfigMap for the aggregator and by enabling the log agent:
 
-NOTE: airflow.task log level is set to `INFO` by default.
+NOTE: The `task` handler is responsible for showing the task logs in the UI.
+Unfortunately, the log level of the `task` handler cannot be specified.
+To avoid that all logs are emitted to the UI, the log level of the `airflow.task` logger is set explicitly to `INFO`.
+You can change the log level as shown below.
 
 [source,yaml]
 ----
