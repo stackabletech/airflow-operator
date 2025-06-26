@@ -117,7 +117,7 @@ for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
     # The default behavior of airflow is to enforce log level 'INFO' on tasks. (https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#logging-level)
     # TODO: Make task handler log level configurable through CRDs with default 'INFO'.
     # e.g. LOGGING_CONFIG['handlers']['task']['level'] = {{task_log_level}}
-    if 'task' in logger_config['handlers']:
+    if 'handlers' in logger_config and 'task' in logger_config['handlers']:
         logger_config['level'] = logging.INFO
 
 LOGGING_CONFIG.setdefault('formatters', {{}})
