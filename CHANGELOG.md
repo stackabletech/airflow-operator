@@ -12,6 +12,7 @@
 - Add support for airflow `2.10.5` ([#625]).
 - Add experimental support for airflow `3.0.1` ([#630]).
 - "airflow.task" logger defaults to log level 'INFO' instead of 'NOTSET' ([#649]).
+- Add internal headless service in addition to the metrics service ([#651]).
 
 ### Changed
 
@@ -52,6 +53,7 @@
 [#636]: https://github.com/stackabletech/airflow-operator/pull/636
 [#645]: https://github.com/stackabletech/airflow-operator/pull/645
 [#649]: https://github.com/stackabletech/airflow-operator/pull/649
+[#651]: https://github.com/stackabletech/airflow-operator/pull/651
 
 ## [25.3.0] - 2025-03-21
 
