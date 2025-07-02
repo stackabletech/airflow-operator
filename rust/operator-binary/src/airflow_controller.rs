@@ -41,8 +41,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, Service, ServiceAccount,
-                ServicePort, ServiceSpec, TCPSocketAction,
+                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, ServiceAccount,
+                TCPSocketAction,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -101,6 +101,10 @@ use crate::{
         pdb::add_pdbs,
     },
     product_logging::extend_config_map_with_log_config,
+    service::{
+        build_rolegroup_headless_service, build_rolegroup_metrics_service,
+        stateful_set_service_name,
+    },
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -339,6 +343,9 @@ pub enum Error {
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
     },
+
+    #[snafu(display("failed to configure service"))]
+    ServiceConfiguration { source: crate::service::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -491,12 +498,53 @@ pub async fn reconcile_airflow(
             )
             .context(InvalidGitSyncSpecSnafu)?;
 
-            let rg_service = build_rolegroup_service(airflow, &resolved_product_image, &rolegroup)?;
-            cluster_resources.add(client, rg_service).await.context(
-                ApplyRoleGroupServiceSnafu {
+            let role_group_service_recommended_labels = build_recommended_labels(
+                airflow,
+                AIRFLOW_CONTROLLER_NAME,
+                &resolved_product_image.app_version_label,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            );
+
+            let role_group_service_selector = Labels::role_group_selector(
+                airflow,
+                APP_NAME,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            )
+            .context(LabelBuildSnafu)?;
+
+            // Only apply headless service for something exposing an HTTP port
+            if airflow_role.get_http_port().is_some() {
+                let rg_headless_service = build_rolegroup_headless_service(
+                    airflow,
+                    &rolegroup,
+                    role_group_service_recommended_labels.clone(),
+                    role_group_service_selector.clone().into(),
+                )
+                .context(ServiceConfigurationSnafu)?;
+
+                cluster_resources
+                    .add(client, rg_headless_service)
+                    .await
+                    .context(ApplyRoleGroupServiceSnafu {
+                        rolegroup: rolegroup.clone(),
+                    })?;
+            }
+
+            let rg_metrics_service = build_rolegroup_metrics_service(
+                airflow,
+                &rolegroup,
+                role_group_service_recommended_labels,
+                role_group_service_selector.into(),
+            )
+            .context(ServiceConfigurationSnafu)?;
+            cluster_resources
+                .add(client, rg_metrics_service)
+                .await
+                .context(ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
-                },
-            )?;
+                })?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
@@ -765,53 +813,6 @@ fn build_rolegroup_config_map(
         .with_context(|_| BuildRoleGroupConfigSnafu {
             rolegroup: rolegroup.clone(),
         })
-}
-
-/// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
-///
-/// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
-fn build_rolegroup_service(
-    airflow: &v1alpha1::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
-) -> Result<Service> {
-    let ports = vec![ServicePort {
-        name: Some(METRICS_PORT_NAME.into()),
-        port: METRICS_PORT.into(),
-        protocol: Some("TCP".to_string()),
-        ..Default::default()
-    }];
-
-    let prometheus_label =
-        Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
-
-    let metadata = build_rolegroup_metadata(
-        airflow,
-        &resolved_product_image,
-        &rolegroup,
-        prometheus_label,
-        format!("{name}-metrics", name = rolegroup.object_name()),
-    )?;
-
-    let service_selector_labels =
-        Labels::role_group_selector(airflow, APP_NAME, &rolegroup.role, &rolegroup.role_group)
-            .context(BuildLabelSnafu)?;
-
-    let service_spec = ServiceSpec {
-        // Internal communication does not need to be exposed
-        type_: Some("ClusterIP".to_string()),
-        cluster_ip: Some("None".to_string()),
-        ports: Some(ports),
-        selector: Some(service_selector_labels.into()),
-        publish_not_ready_addresses: Some(true),
-        ..ServiceSpec::default()
-    };
-
-    Ok(Service {
-        metadata,
-        spec: Some(service_spec),
-        status: None,
-    })
 }
 
 fn build_rolegroup_metadata(
@@ -1160,10 +1161,7 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(format!(
-            "{name}-metrics",
-            name = rolegroup_ref.object_name()
-        )),
+        service_name: stateful_set_service_name(airflow_role, rolegroup_ref),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
@@ -1349,7 +1347,6 @@ pub fn error_policy(
         _ => Action::requeue(*Duration::from_secs(10)),
     }
 }
-// I want to add secret volumes right here
 
 fn add_authentication_volumes_and_volume_mounts(
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
