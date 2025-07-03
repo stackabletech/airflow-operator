@@ -123,11 +123,13 @@ pub fn stateful_set_service_name(
 }
 
 /// Returns the metrics rolegroup service name `<cluster>-<role>-<rolegroup>-<METRICS_SERVICE_SUFFIX>`.
+// TODO: Replace by operator.rs functions
 fn rolegroup_metrics_service_name(role_group_ref_object_name: &str) -> String {
     format!("{role_group_ref_object_name}-{METRICS_SERVICE_SUFFIX}")
 }
 
 /// Returns the headless rolegroup service name `<cluster>-<role>-<rolegroup>-<HEADLESS_SERVICE_SUFFIX>`.
+// TODO: Replace by operator.rs functions
 fn rolegroup_headless_service_name(role_group_ref_object_name: &str) -> String {
     format!("{role_group_ref_object_name}-{HEADLESS_SERVICE_SUFFIX}")
 }
