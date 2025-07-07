@@ -514,23 +514,20 @@ pub async fn reconcile_airflow(
             )
             .context(LabelBuildSnafu)?;
 
-            // Only apply headless service for something exposing an HTTP port
-            if airflow_role.get_http_port().is_some() {
-                let rg_headless_service = build_rolegroup_headless_service(
-                    airflow,
-                    &rolegroup,
-                    role_group_service_recommended_labels.clone(),
-                    role_group_service_selector.clone().into(),
-                )
-                .context(ServiceConfigurationSnafu)?;
+            let rg_headless_service = build_rolegroup_headless_service(
+                airflow,
+                &rolegroup,
+                role_group_service_recommended_labels.clone(),
+                role_group_service_selector.clone().into(),
+            )
+            .context(ServiceConfigurationSnafu)?;
 
-                cluster_resources
-                    .add(client, rg_headless_service)
-                    .await
-                    .context(ApplyRoleGroupServiceSnafu {
-                        rolegroup: rolegroup.clone(),
-                    })?;
-            }
+            cluster_resources
+                .add(client, rg_headless_service)
+                .await
+                .context(ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
 
             let rg_metrics_service = build_rolegroup_metrics_service(
                 airflow,
