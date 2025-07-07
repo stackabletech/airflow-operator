@@ -1156,7 +1156,7 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: stateful_set_service_name(airflow_role, rolegroup_ref),
+        service_name: stateful_set_service_name(rolegroup_ref),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
