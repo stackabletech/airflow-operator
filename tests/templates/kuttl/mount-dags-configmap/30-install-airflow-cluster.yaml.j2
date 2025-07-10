@@ -57,6 +57,39 @@ data:
             bash_command='echo "Here is the message: $message"',
             env={'message': '{% raw %}{{ dag_run.conf.get("message") }}{% endraw %}'},
         )
+  dag_factory.py: |
+    from airflow import DAG
+    from airflow.operators.empty import EmptyOperator
+    from datetime import datetime, timedelta
+
+    # Number of DAGs to generate
+    NUM_DAGS = 1200  # Increase for more stress
+    DAG_PREFIX = "stress_dag_"
+
+    default_args = {
+        'owner': 'airflow',
+        'start_date': datetime(2024, 1, 1),
+        'retries': 1,
+        'retry_delay': timedelta(seconds=5),
+    }
+
+    def create_dag(dag_id):
+        with DAG(
+            dag_id=dag_id,
+            default_args=default_args,
+            schedule=None,
+            catchup=False,
+            tags=["stress_test"],
+        ) as dag:
+            start = EmptyOperator(task_id='start')
+            end = EmptyOperator(task_id='end')
+            start >> end
+        return dag
+
+    for i in range(NUM_DAGS):
+        dag_id = f"{DAG_PREFIX}{i:04d}"
+        globals()[dag_id] = create_dag(dag_id)
+
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -84,12 +117,40 @@ spec:
       - name: test-cm-dag
         mountPath: /dags/example_trigger_target_dag.py
         subPath: example_trigger_target_dag.py
+      - name: test-cm-dag
+        mountPath: /dags/dag_factory.py
+        subPath: dag_factory.py
   webservers:
     roleConfig:
       listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: &logging
+          airflow:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+          git-sync:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+          vector:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
     roleGroups:
       default:
         envOverrides:
@@ -100,6 +161,7 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: *logging
     roleGroups:
       default:
         envOverrides:
@@ -118,6 +180,7 @@ spec:
       gracefulShutdownTimeout: 10s
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: *logging
     roleGroups:
       default:
         envOverrides:
