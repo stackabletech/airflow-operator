@@ -8,9 +8,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::crd::{
-    AirflowRole, HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1,
-};
+use crate::crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1};
 
 pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
 pub const HEADLESS_SERVICE_SUFFIX: &str = "headless";
@@ -111,15 +109,11 @@ pub fn build_rolegroup_metrics_service(
 }
 
 pub fn stateful_set_service_name(
-    airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
 ) -> Option<String> {
-    match airflow_role {
-        AirflowRole::Webserver => Some(rolegroup_headless_service_name(
-            &rolegroup_ref.object_name(),
-        )),
-        AirflowRole::Scheduler | AirflowRole::Worker => None,
-    }
+    Some(rolegroup_headless_service_name(
+        &rolegroup_ref.object_name(),
+    ))
 }
 
 /// Returns the metrics rolegroup service name `<cluster>-<role>-<rolegroup>-<METRICS_SERVICE_SUFFIX>`.
