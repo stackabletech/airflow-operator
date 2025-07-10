@@ -27,7 +27,7 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
-    crd::{AirflowCluster, OPERATOR_NAME, v1alpha1},
+    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha1},
 };
 
 mod airflow_controller;
@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
 
     match opts.cmd {
         Command::Crd => {
-            AirflowCluster::merged_crd(AirflowCluster::V1Alpha1)?
+            AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {

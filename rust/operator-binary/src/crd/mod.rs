@@ -165,28 +165,29 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
     }
 }
 
-#[versioned(version(name = "v1alpha1"))]
+#[versioned(
+    version(name = "v1alpha1"),
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        kube_client = "stackable_operator::kube::client",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars",
+        versioned = "stackable_operator::versioned"
+    )
+)]
 pub mod versioned {
-    use crate::crd::v1alpha1::WebserverRoleConfig;
-
     /// An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/).
     ///
     /// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
     /// You can use either the celeryExecutor or the kubernetesExecutor.
-    #[versioned(k8s(
+    #[versioned(crd(
         group = "airflow.stackable.tech",
-        kind = "AirflowCluster",
         plural = "airflowclusters",
         shortname = "airflow",
         status = "AirflowClusterStatus",
         namespaced,
-        crates(
-            kube_core = "stackable_operator::kube::core",
-            k8s_openapi = "stackable_operator::k8s_openapi",
-            schemars = "stackable_operator::schemars"
-        )
     ))]
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -204,7 +205,7 @@ pub mod versioned {
 
         /// The `webserver` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment, WebserverRoleConfig>>,
+        pub webservers: Option<Role<AirflowConfigFragment, v1alpha1::WebserverRoleConfig>>,
 
         /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
