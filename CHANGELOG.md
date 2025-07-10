@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add RBAC rule to Helm template for automatic cluster domain detection ([#xxx]).
+- Add RBAC rule to Helm template for automatic cluster domain detection ([#656]).
 - Added listener support for Airflow ([#604]).
 - Adds new telemetry CLI arguments and environment variables ([#613]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
@@ -17,7 +17,7 @@
 
 ### Changed
 
-- Bump stackable-operator to 0.94.0 and built to 0.8 ([#xxx]).
+- Bump stackable-operator to 0.94.0 and built to 0.8 ([#656]).
 - BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608], [#613]).
   - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `CONSOLE_LOG_LEVEL`.
   - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `FILE_LOG_LEVEL`.
@@ -56,6 +56,7 @@
 [#645]: https://github.com/stackabletech/airflow-operator/pull/645
 [#649]: https://github.com/stackabletech/airflow-operator/pull/649
 [#651]: https://github.com/stackabletech/airflow-operator/pull/651
+[#656]: https://github.com/stackabletech/airflow-operator/pull/656
 
 ## [25.3.0] - 2025-03-21
 
