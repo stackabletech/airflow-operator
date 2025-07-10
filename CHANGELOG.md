@@ -13,6 +13,7 @@
 - Add experimental support for airflow `3.0.1` ([#630]).
 - "airflow.task" logger defaults to log level 'INFO' instead of 'NOTSET' ([#649]).
 - Add internal headless service in addition to the metrics service ([#651]).
+- Add RBAC rule to helm template for automatic cluster domain detection ([#656]).
 
 ### Changed
 
@@ -33,11 +34,21 @@
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
   - This is marked as breaking because tools and policies might exist, which require these fields to be set
 - Changed listener class to be role-only ([#645]).
+- BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#656]).
+  - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
+  - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set. The helm-chart takes care of this.
 
 ### Fixed
 
 - Use `json` file extension for log files ([#607]).
 - Fix a bug where changes to ConfigMaps that are referenced in the AirflowCluster spec didn't trigger a reconciliation ([#600]).
+- Allow uppercase characters in domain names ([#656]).
+
+### Removed
+
+- Remove the `lastUpdateTime` field from the stacklet status ([#656]).
+- Remove role binding to legacy service accounts ([#656]).
 
 [#600]: https://github.com/stackabletech/airflow-operator/pull/600
 [#601]: https://github.com/stackabletech/airflow-operator/pull/601
@@ -54,6 +65,7 @@
 [#645]: https://github.com/stackabletech/airflow-operator/pull/645
 [#649]: https://github.com/stackabletech/airflow-operator/pull/649
 [#651]: https://github.com/stackabletech/airflow-operator/pull/651
+[#656]: https://github.com/stackabletech/airflow-operator/pull/656
 
 ## [25.3.0] - 2025-03-21
 

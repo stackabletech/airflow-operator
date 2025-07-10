@@ -1021,7 +1021,6 @@ fn build_server_rolegroup_statefulset(
             &ListenerReference::ListenerName(listener_group_name),
             &unversioned_recommended_labels,
         )
-        .context(BuildListenerVolumeSnafu)?
         .build_pvc(LISTENER_VOLUME_NAME.to_string())
         .context(BuildListenerVolumeSnafu)?;
         pvcs = Some(vec![pvc]);
