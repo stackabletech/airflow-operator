@@ -90,6 +90,88 @@ data:
         dag_id = f"{DAG_PREFIX}{i:04d}"
         globals()[dag_id] = create_dag(dag_id)
 
+  fork.py: |
+    from __future__ import annotations
+    import pendulum
+    from airflow.providers.cncf.kubernetes.operators.pod import (
+        KubernetesPodOperator,
+    )
+    from airflow.sdk import DAG, task
+
+    @task.branch()
+    def should_run(**kwargs) -> str:
+        """
+        Determine which empty_task should be run based on if the logical date minute is even or odd.
+
+        :param dict kwargs: Context
+        :return: Id of the task to run
+        """
+        print(f"------------- exec dttm = {kwargs['logical_date']} and minute = {kwargs['logical_date'].minute}")
+        if kwargs["logical_date"].minute % 2 == 0:
+            return "branch_task_3"
+        return "branch_task_4"
+
+
+    with DAG(
+        dag_id="branching_test",
+        schedule="*/1 * * * *",
+        start_date=pendulum.datetime(2025, 1, 1, tz="UTC"),
+        catchup=False,
+        default_args={"depends_on_past": True},
+        tags=["example"],
+    ) as dag:
+        cond = should_run()
+
+        task_1 = KubernetesPodOperator(
+                          name=f"branch_task_1",
+                          image="oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev",
+                          cmds=["python"],
+                          arguments=["-V"],
+                          image_pull_policy="IfNotPresent",
+                          task_id="branch_task_1",
+                          do_xcom_push=True
+                      )
+        task_2 = KubernetesPodOperator(
+                          name=f"branch_task_2",
+                          image="oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev",
+                          cmds=["python"],
+                          arguments=["-V"],
+                          image_pull_policy="IfNotPresent",
+                          task_id="branch_task_2",
+                          do_xcom_push=True
+                      )
+        task_3 = KubernetesPodOperator(
+                          name=f"branch_task_3",
+                          image="oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev",
+                          cmds=["python"],
+                          arguments=["-V"],
+                          image_pull_policy="IfNotPresent",
+                          task_id="branch_task_3",
+                          do_xcom_push=True
+                      )
+        task_4 = KubernetesPodOperator(
+                          name=f"branch_task_4",
+                          image="oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev",
+                          cmds=["python"],
+                          arguments=["-V"],
+                          image_pull_policy="IfNotPresent",
+                          task_id="branch_task_4",
+                          do_xcom_push=True
+                      )
+        task_5 = KubernetesPodOperator(
+                          name=f"branch_task_5",
+                          image="oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev",
+                          cmds=["python"],
+                          arguments=["-V"],
+                          image_pull_policy="IfNotPresent",
+                          task_id="branch_task_5",
+                          do_xcom_push=True
+                      )
+
+        task_1 >> task_2 >> cond
+        cond >> [task_3, task_4]
+        task_3 >> task_5
+
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -120,6 +202,9 @@ spec:
       - name: test-cm-dag
         mountPath: /dags/dag_factory.py
         subPath: dag_factory.py
+      - name: test-cm-dag
+        mountPath: /dags/fork.py
+        subPath: fork.py
   webservers:
     roleConfig:
       listenerClass: external-unstable
