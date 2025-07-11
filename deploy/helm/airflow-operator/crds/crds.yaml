@@ -591,6 +591,10 @@ spec:
                           - repo
                         type: object
                       type: array
+                    dbInit:
+                      default: true
+                      description: Whether to migrate/upgrade the database on start-up and add a named user. These operations are idempotent so can be executed by default. Defaults to true.
+                      type: boolean
                     exposeConfig:
                       default: false
                       description: for internal use only - not for production use.

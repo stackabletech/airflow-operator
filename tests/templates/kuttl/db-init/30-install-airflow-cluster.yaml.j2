@@ -1,0 +1,154 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow-db
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+{% if test_scenario['values']['executor'] == 'celery' %}
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+{% endif %}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-cm-dag
+data:
+  dag_factory.py: |
+    from airflow import DAG
+    from airflow.operators.empty import EmptyOperator
+    from datetime import datetime, timedelta
+
+    # Number of DAGs to generate
+    NUM_DAGS = 1200  # Increase for more stress
+    DAG_PREFIX = "stress_dag_"
+
+    default_args = {
+        'owner': 'airflow',
+        'start_date': datetime(2024, 1, 1),
+        'retries': 1,
+        'retry_delay': timedelta(seconds=5),
+    }
+
+    def create_dag(dag_id):
+        with DAG(
+            dag_id=dag_id,
+            default_args=default_args,
+            schedule=None,
+            catchup=False,
+            tags=["stress_test"],
+        ) as dag:
+            start = EmptyOperator(task_id='start')
+            end = EmptyOperator(task_id='end')
+            start >> end
+        return dag
+
+    for i in range(NUM_DAGS):
+        dag_id = f"{DAG_PREFIX}{i:04d}"
+        globals()[dag_id] = create_dag(dag_id)
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+    credentialsSecret: test-airflow-credentials
+    volumes:
+      - name: test-cm-dag
+        configMap:
+          name: test-cm-dag
+    volumeMounts:
+      - name: test-cm-dag
+        mountPath: /dags/dag_factory.py
+        subPath: dag_factory.py
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: &logging
+          airflow:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+          git-sync:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+          vector:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        replicas: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
+  celeryExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: *logging
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        replicas: 2
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+  kubernetesExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+{% endif %}
+  schedulers:
+    config:
+      gracefulShutdownTimeout: 10s
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers: *logging
+    roleGroups:
+      default:
+        envOverrides:
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        replicas: 1

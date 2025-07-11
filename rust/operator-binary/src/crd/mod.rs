@@ -247,6 +247,10 @@ pub mod versioned {
         #[serde(default)]
         pub load_examples: bool,
 
+        /// Whether to migrate/upgrade the database on start-up and add a named user. These operations are idempotent so can be executed by default. Defaults to true.
+        #[serde(default = "default_true")]
+        pub db_init: bool,
+
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
@@ -276,6 +280,10 @@ pub mod versioned {
         #[serde(default = "webserver_default_listener_class")]
         pub listener_class: String,
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for v1alpha1::WebserverRoleConfig {
@@ -543,6 +551,7 @@ impl AirflowRole {
     /// if authentication is enabled.
     pub fn get_commands(
         &self,
+        airflow: &v1alpha1::AirflowCluster,
         auth_config: &AirflowClientAuthenticationDetailsResolved,
         resolved_product_image: &ResolvedProductImage,
     ) -> Vec<String> {
@@ -572,21 +581,27 @@ impl AirflowRole {
                         "airflow api-server &".to_string(),
                     ]);
                 }
-                AirflowRole::Scheduler => command.extend(vec![
-                    "airflow db migrate".to_string(),
-                    "airflow users create \
-                        --username \"$ADMIN_USERNAME\" \
-                        --firstname \"$ADMIN_FIRSTNAME\" \
-                        --lastname \"$ADMIN_LASTNAME\" \
-                        --email \"$ADMIN_EMAIL\" \
-                        --password \"$ADMIN_PASSWORD\" \
-                        --role \"Admin\""
-                        .to_string(),
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow dag-processor &".to_string(),
-                    "airflow scheduler &".to_string(),
-                ]),
+                AirflowRole::Scheduler => {
+                    if airflow.spec.cluster_config.db_init {
+                        command.extend(vec![
+                            "airflow db migrate".to_string(),
+                            "airflow users create \
+                            --username \"$ADMIN_USERNAME\" \
+                            --firstname \"$ADMIN_FIRSTNAME\" \
+                            --lastname \"$ADMIN_LASTNAME\" \
+                            --email \"$ADMIN_EMAIL\" \
+                            --password \"$ADMIN_PASSWORD\" \
+                            --role \"Admin\""
+                                .to_string(),
+                        ])
+                    }
+                    command.extend(vec![
+                        "prepare_signal_handlers".to_string(),
+                        container_debug_command(),
+                        "airflow dag-processor &".to_string(),
+                        "airflow scheduler &".to_string(),
+                    ]);
+                }
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
@@ -977,5 +992,6 @@ mod tests {
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);
         assert!(cluster.spec.cluster_config.expose_config);
+        assert!(cluster.spec.cluster_config.db_init);
     }
 }

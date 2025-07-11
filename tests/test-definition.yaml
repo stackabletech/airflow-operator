@@ -90,6 +90,11 @@ tests:
       - airflow
       - openshift
       - executor
+  - name: db-init
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
 suites:
   - name: nightly
     # Run nightly with the latest airflow
