@@ -20,5 +20,6 @@ commands:
       )
 
       # Log-Endpoint Test Assertion:
-      echo "The HTTP Code should be 403 to indicate the log server is reachable (the internal JWT token is needed for full access): $CURL_RESPONSE" | grep 403
+      echo "The HTTP Code is $CURL_RESPONSE (an internal JWT token is needed for full access)"
+      [ "$CURL_RESPONSE" -eq 403 ]
 {% endif %}
