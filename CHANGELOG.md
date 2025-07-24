@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- getting_started: Add a 120 second timeout before trying to enable the DAG ([#665]).
+
+[#665]: https://github.com/stackabletech/airflow-operator/pull/665
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18
