@@ -122,6 +122,9 @@ enable_dag() {
     -d '{"is_paused": false}'
   # end::enable-dag[]
 }
+SLEEP_SECONDS=120
+echo "Sleeping for $SLEEP_SECONDS seconds to wait for the DAG to be registered"
+sleep "$SLEEP_SECONDS"
 echo "Triggering a DAG run. Enable DAG..."
 enable_dag
 
