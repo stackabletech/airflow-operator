@@ -346,6 +346,11 @@ pub enum Error {
 
     #[snafu(display("failed to configure service"))]
     ServiceConfiguration { source: crate::service::Error },
+
+    #[snafu(display("invalid authorization config"))]
+    InvalidAuthorizationConfig {
+        source: stackable_operator::commons::opa::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -390,7 +395,7 @@ pub async fn reconcile_airflow(
         &airflow.spec.cluster_config.authorization,
     )
     .await
-    .unwrap();
+    .context(InvalidAuthorizationConfigSnafu)?;
 
     let mut roles = HashMap::new();
 
@@ -918,7 +923,7 @@ fn build_server_rolegroup_statefulset(
                 "kubectl.kubernetes.io/default-container",
                 format!("{}", Container::Airflow),
             ))
-            .unwrap(),
+            .expect("static annotation is always valid"),
         )
         .build();
 
