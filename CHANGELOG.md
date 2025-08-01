@@ -7,7 +7,7 @@
 - Don't panic on invalid authorization config. Previously, a missing OPA ConfigMap would crash the operator ([#667]).
 - Fix OPA authorization for Airflow 3. Airflow 3 needs to be configured via env variables, the operator now does this correctly ([#668]).
 
-[#665]: https://github.com/stackabletech/airflow-operator/pull/665
+[#667]: https://github.com/stackabletech/airflow-operator/pull/667
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
 
 ## [25.7.0] - 2025-07-23
