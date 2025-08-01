@@ -308,7 +308,10 @@ mod tests {
 
     use indoc::formatdoc;
     use rstest::rstest;
-    use stackable_operator::crd::authentication::{ldap, oidc};
+    use stackable_operator::{
+        crd::authentication::{ldap, oidc},
+        time::Duration,
+    };
 
     use crate::{
         config::add_airflow_config,
@@ -317,7 +320,7 @@ mod tests {
                 AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
                 FlaskRolesSyncMoment, default_user_registration,
             },
-            authorization::AirflowAuthorizationResolved,
+            authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
         },
     };
 
@@ -525,6 +528,43 @@ mod tests {
               ]
               "}
                 )
+            ]),
+            result
+        );
+    }
+
+    #[test]
+    fn test_opa_config() {
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![],
+            user_registration: true,
+            user_registration_role: "User".to_string(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
+        };
+
+        let authorization_config = AirflowAuthorizationResolved {
+            opa: Some(OpaConfigResolved {
+                connection_string: "http://opa:8081/v1/data/airflow".to_string(),
+                cache_entry_time_to_live: Duration::from_secs(30),
+                cache_max_entries: 1000,
+            }),
+        };
+
+        let mut result = BTreeMap::new();
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
+
+        assert_eq!(
+            BTreeMap::from([
+                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+                ("AUTH_TYPE".into(), "AUTH_DB".into()),
+                ("AUTH_USER_REGISTRATION".into(), "true".into()),
+                ("AUTH_USER_REGISTRATION_ROLE".into(), "User".into())
             ]),
             result
         );
