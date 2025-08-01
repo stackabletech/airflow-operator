@@ -723,8 +723,13 @@ fn build_rolegroup_config_map(
     let mut config: BTreeMap<String, String> = BTreeMap::new();
 
     // this will call default values from AirflowClientAuthenticationDetails
-    config::add_airflow_config(&mut config, authentication_config, authorization_config)
-        .context(ConstructConfigSnafu)?;
+    config::add_airflow_config(
+        &mut config,
+        authentication_config,
+        authorization_config,
+        &resolved_product_image.product_version,
+    )
+    .context(ConstructConfigSnafu)?;
 
     tracing::debug!(
         "Default config for {}: {:?}",

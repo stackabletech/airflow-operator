@@ -27,6 +27,11 @@ use crate::{
 };
 
 const AIRFLOW_CORE_AUTH_MANAGER: &str = "AIRFLOW__CORE__AUTH_MANAGER";
+// Airflow 3 envs
+const AIRFLOW_CORE_AUTH_OPA_REQUEST_URL: &str = "AIRFLOW__CORE__AUTH_OPA_REQUEST_URL";
+const AIRFLOW_CORE_AUTH_OPA_CACHE_TTL_IN_SEC: &str = "AIRFLOW__CORE__AUTH_OPA_CACHE_TTL_IN_SEC";
+const AIRFLOW_CORE_AUTH_OPA_CACHE_MAXSIZE: &str = "AIRFLOW__CORE__AUTH_OPA_CACHE_MAXSIZE";
+
 const AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: &str = "AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS";
 const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
@@ -231,7 +236,10 @@ pub fn build_airflow_statefulset_envs(
         }
         AirflowRole::Webserver => {
             let mut vars = authentication_env_vars(auth_config);
-            vars.extend(authorization_env_vars(authorization_config));
+            vars.extend(authorization_env_vars(
+                authorization_config,
+                &resolved_product_image.product_version,
+            ));
             env.extend(vars.into_iter().map(|var| (var.name.to_owned(), var)));
         }
         _ => {}
@@ -554,15 +562,45 @@ fn authentication_env_vars(
         .collect()
 }
 
-fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -> Vec<EnvVar> {
-    let mut env = vec![];
+/// Constructs the needed authorization env vars for the specific Airflow version.
+///
+/// `AIRFLOW__CORE__AUTH_MANAGER` always needs to be set as env var.
+///
+/// Airflow 2 needs to OPA settings in the `webserver_config.py` such as `AUTH_OPA_REQUEST_URL`.
+/// Airflow 3 needs to OPA settings as env variables such as `AIRFLOW__CORE__AUTH_OPA_REQUEST_URL`.
+fn authorization_env_vars(
+    authorization_config: &AirflowAuthorizationResolved,
+    product_version: &str,
+) -> Vec<EnvVar> {
+    let Some(opa) = &authorization_config.opa else {
+        return vec![];
+    };
 
-    if authorization_config.opa.is_some() {
-        env.push(EnvVar {
-            name: AIRFLOW_CORE_AUTH_MANAGER.into(),
-            value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
-            ..Default::default()
-        });
+    let mut env = vec![EnvVar {
+        name: AIRFLOW_CORE_AUTH_MANAGER.into(),
+        value: Some("opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".to_string()),
+        ..Default::default()
+    }];
+    if product_version.starts_with("2.") {
+        // OPA config needs to go into `webserver_config.py`
+    } else {
+        env.extend([
+            EnvVar {
+                name: AIRFLOW_CORE_AUTH_OPA_REQUEST_URL.into(),
+                value: Some(opa.connection_string.to_owned()),
+                ..Default::default()
+            },
+            EnvVar {
+                name: AIRFLOW_CORE_AUTH_OPA_CACHE_TTL_IN_SEC.into(),
+                value: Some(opa.cache_entry_time_to_live.as_secs().to_string()),
+                ..Default::default()
+            },
+            EnvVar {
+                name: AIRFLOW_CORE_AUTH_OPA_CACHE_MAXSIZE.into(),
+                value: Some(opa.cache_max_entries.to_string()),
+                ..Default::default()
+            },
+        ]);
     }
 
     env
@@ -599,4 +637,74 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
     }
 
     env
+}
+
+#[cfg(test)]
+mod tests {
+
+    use stackable_operator::time::Duration;
+
+    use super::*;
+    use crate::crd::authorization::OpaConfigResolved;
+
+    #[test]
+    fn test_airflow_2_authorization_env_vars() {
+        let authorization_config = get_test_authorization_config();
+        let authorization_env_vars = authorization_env_vars(&authorization_config, "2.10.5");
+        let authorization_env_vars = authorization_env_vars
+            .into_iter()
+            .map(|env| (env.name, env.value.expect("env var value must be present")))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            authorization_env_vars,
+            [(
+                "AIRFLOW__CORE__AUTH_MANAGER".into(),
+                "opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".into()
+            ),]
+        );
+    }
+
+    #[test]
+    fn test_airflow_3_authorization_env_vars() {
+        let authorization_config = get_test_authorization_config();
+        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.0.1");
+        let authorization_env_vars = authorization_env_vars
+            .into_iter()
+            .map(|env| (env.name, env.value.expect("env var value must be present")))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            authorization_env_vars,
+            [
+                (
+                    "AIRFLOW__CORE__AUTH_MANAGER".into(),
+                    "opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".into()
+                ),
+                (
+                    "AIRFLOW__CORE__AUTH_OPA_REQUEST_URL".into(),
+                    "http://opa-server.default.svc.cluster.local:8081/v1/data/airflow".into()
+                ),
+                (
+                    "AIRFLOW__CORE__AUTH_OPA_CACHE_TTL_IN_SEC".into(),
+                    "30".into()
+                ),
+                (
+                    "AIRFLOW__CORE__AUTH_OPA_CACHE_MAXSIZE".into(),
+                    "1000".into()
+                ),
+            ]
+        );
+    }
+
+    fn get_test_authorization_config() -> AirflowAuthorizationResolved {
+        AirflowAuthorizationResolved {
+            opa: Some(OpaConfigResolved {
+                connection_string:
+                    "http://opa-server.default.svc.cluster.local:8081/v1/data/airflow".to_string(),
+                cache_entry_time_to_live: Duration::from_secs(30),
+                cache_max_entries: 1000,
+            }),
+        }
+    }
 }

@@ -7,7 +7,9 @@ metadata:
 apiVersion: opa.stackable.tech/v1alpha1
 kind: OpaCluster
 metadata:
-  name: opa
+  # The OpaCluster is intentionally not only called "opa" to ensure that our custom OPA URL is
+  # used and not some default value of "opa".
+  name: test-opa
 spec:
   image:
 {% if test_scenario['values']['opa-latest'].find(",") > 0 %}
