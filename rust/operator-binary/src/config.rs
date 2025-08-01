@@ -13,7 +13,7 @@ use crate::crd::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
     },
-    authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
+    authorization::AirflowAuthorizationResolved,
 };
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -41,6 +41,7 @@ pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
+    product_version: &str,
 ) -> Result<()> {
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
@@ -51,7 +52,7 @@ pub fn add_airflow_config(
     }
 
     append_authentication_config(config, authentication_config)?;
-    append_authorization_config(config, authorization_config)?;
+    append_authorization_config(config, authorization_config, product_version);
 
     Ok(())
 }
@@ -275,32 +276,30 @@ fn append_oidc_config(
 fn append_authorization_config(
     config: &mut BTreeMap<String, String>,
     authorization_config: &AirflowAuthorizationResolved,
-) -> Result<(), Error> {
-    if let Some(opa_config) = &authorization_config.opa {
-        append_opa_config(config, opa_config)?;
+    product_version: &str,
+) {
+    // See `env_vars::authorization_env_vars` for why we only care about Airflow 2
+    if !product_version.starts_with("2.") {
+        return;
     }
+    let Some(opa_config) = &authorization_config.opa else {
+        return;
+    };
 
-    Ok(())
-}
-
-fn append_opa_config(
-    config: &mut BTreeMap<String, String>,
-    opa_config: &OpaConfigResolved,
-) -> Result<(), Error> {
-    config.insert(
-        AirflowConfigOptions::AuthOpaRequestUrl.to_string(),
-        opa_config.connection_string.to_owned(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthOpaCacheTtlInSec.to_string(),
-        opa_config.cache_entry_time_to_live.as_secs().to_string(),
-    );
-    config.insert(
-        AirflowConfigOptions::AuthOpaCacheMaxsize.to_string(),
-        opa_config.cache_max_entries.to_string(),
-    );
-
-    Ok(())
+    config.extend([
+        (
+            AirflowConfigOptions::AuthOpaRequestUrl.to_string(),
+            opa_config.connection_string.to_owned(),
+        ),
+        (
+            AirflowConfigOptions::AuthOpaCacheTtlInSec.to_string(),
+            opa_config.cache_entry_time_to_live.as_secs().to_string(),
+        ),
+        (
+            AirflowConfigOptions::AuthOpaCacheMaxsize.to_string(),
+            opa_config.cache_max_entries.to_string(),
+        ),
+    ]);
 }
 
 #[cfg(test)]
@@ -325,6 +324,8 @@ mod tests {
         },
     };
 
+    const TEST_AIRFLOW_VERSION: &str = "3.0.1";
+
     #[test]
     fn test_auth_db_config() {
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
@@ -337,7 +338,13 @@ mod tests {
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -382,7 +389,13 @@ mod tests {
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(BTreeMap::from([
             ("AUTH_LDAP_ALLOW_SELF_SIGNED".into(), "false".into()),
@@ -468,7 +481,13 @@ mod tests {
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -532,16 +551,16 @@ mod tests {
         };
 
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config, &authorization_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
-                ("AUTH_OPA_CACHE_MAXSIZE".into(), "1000".into()),
-                ("AUTH_OPA_CACHE_TTL_IN_SEC".into(), "30".into()),
-                (
-                    "AUTH_OPA_REQUEST_URL".into(),
-                    "http://opa:8081/v1/data/airflow".into()
-                ),
                 ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
                 ("AUTH_TYPE".into(), "AUTH_DB".into()),
                 ("AUTH_USER_REGISTRATION".into(), "true".into()),

@@ -128,6 +128,9 @@ pub enum AirflowConfigOptions {
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
     AuthLdapAllowSelfSigned,
+    // OPA configs for Airflow 2
+    // Airflow 3 configs need to be passed via env variables!
+    // See `env_vars::authorization_env_vars` for details
     AuthOpaCacheMaxsize,
     AuthOpaCacheTtlInSec,
     AuthOpaRequestUrl,
