@@ -30,9 +30,9 @@ type: Opaque
 data:
   # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
   # to *only* this repo. Contact github users @razvan or @adwk67 for details.
-  # It is valid for one year and will expire on 12.08.2025.
+  # This token doesn't expire.
   user: c3RhY2thYmxlLWFpcmZsb3c=
-  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSFFPMkpjRlJ1ekxLX0FLTGhqT0xvZ0JQMzZnTENFUFo0RUNETTM2TndjdTJDQUJvVVFueFBiVGhDTTZKQkhJNFFIZVdJb1dECg==
+  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSk1EWlNVQk1RYTdoX0c2OGlhbWtpRkpFV1RMTTF0ajFwbHFTVFNyZ3p3dHZneXI5b2tubGRXaGpVRDZITFRFV0JJcm9yT0dXCg==
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -62,13 +62,18 @@ spec:
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
       - repo: https://github.com/stackable-airflow/dags
-        branch: "main"
-        wait: 20
+{% if test_scenario['values']['executor'] == 'celery' %}
+        # Just setting some values to increase the test coverage (defaults should work just fine)
+        branch: main
+        wait: 5s
+{% endif %}
         credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false
-        gitFolder: "mount-dags-gitsync/dags"
+        # N.B. dags definitions changed from 2.x to 3.x:
+        # this test assumes airflow-latest > 2
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
     volumeMounts:
       - name: test-cm-gitsync
         mountPath: /tmp/test.txt
@@ -77,6 +82,8 @@ spec:
         configMap:
           name: test-cm-gitsync
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

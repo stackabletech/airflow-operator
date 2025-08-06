@@ -18,36 +18,30 @@ then
 fi
 
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
-# tag::helm-add-bitnami-repo[]
-helm repo add bitnami https://charts.bitnami.com/bitnami
-# end::helm-add-bitnami-repo[]
 # tag::helm-add-bitnami-pgs[]
-helm install --wait airflow-postgresql bitnami/postgresql --version {{ versions.postgresql }} \
-    --set auth.username=airflow \
-    --set auth.password=airflow \
-    --set auth.database=airflow
+helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
+  --version {{ versions.postgresql }} \
+  --set auth.database=airflow \
+  --set auth.username=airflow \
+  --set auth.password=airflow \
+  --wait
 # end::helm-add-bitnami-pgs[]
 # tag::helm-add-bitnami-redis[]
-helm install --wait airflow-redis bitnami/redis \
-    --set auth.password=redis \
-    --version {{ versions.redis }} \
-    --set replica.replicaCount=1
+helm install airflow-redis oci://registry-1.docker.io/bitnamicharts/redis \
+  --version {{ versions.redis }} \
+  --set replica.replicaCount=1 \
+  --set auth.password=redis \
+  --wait
 # end::helm-add-bitnami-redis[]
 
 case "$1" in
 "helm")
-echo "Adding '{{ helm.repo_name }}' Helm Chart repository"
-# tag::helm-add-repo[]
-helm repo add {{ helm.repo_name }} {{ helm.repo_url }}
-# end::helm-add-repo[]
-echo "Updating Helm repo"
-helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator {{ helm.repo_name }}/commons-operator --version {{ versions.commons }}
-helm install --wait secret-operator {{ helm.repo_name }}/secret-operator --version {{ versions.secret }}
-helm install --wait listener-operator {{ helm.repo_name }}/listener-operator --version {{ versions.listener }}
-helm install --wait airflow-operator {{ helm.repo_name }}/airflow-operator --version {{ versions.airflow }}
+helm install --wait commons-operator oci://{{ helm.repo_url }}/{{ helm.repo_name }}/commons-operator --version {{ versions.commons }}
+helm install --wait secret-operator oci://{{ helm.repo_url }}/{{ helm.repo_name }}/secret-operator --version {{ versions.secret }}
+helm install --wait listener-operator oci://{{ helm.repo_url }}/{{ helm.repo_name }}/listener-operator --version {{ versions.listener }}
+helm install --wait airflow-operator oci://{{ helm.repo_url }}/{{ helm.repo_name }}/airflow-operator --version {{ versions.airflow }}
 # end::helm-install-operators[]
 ;;
 "stackablectl")
@@ -128,6 +122,9 @@ enable_dag() {
     -d '{"is_paused": false}'
   # end::enable-dag[]
 }
+SLEEP_SECONDS=120
+echo "Sleeping for $SLEEP_SECONDS seconds to wait for the DAG to be registered"
+sleep "$SLEEP_SECONDS"
 echo "Triggering a DAG run. Enable DAG..."
 enable_dag
 

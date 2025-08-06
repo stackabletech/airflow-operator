@@ -23,4 +23,4 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  name: airflow-worker-newrolegroup
+  name: airflow-worker-newrolegroup-metrics

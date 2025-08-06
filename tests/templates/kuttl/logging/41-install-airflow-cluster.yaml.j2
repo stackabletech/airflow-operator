@@ -37,6 +37,8 @@ data:
 
     LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
 
+    REMOTE_TASK_LOG = None
+
     LOGGING_CONFIG['formatters']['json'] = {
         '()': 'airflow.utils.log.json_formatter.JSONFormatter',
         'json_fields': ['asctime', 'levelname', 'message', 'name']
@@ -70,14 +72,19 @@ spec:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
     loadExamples: true
     credentialsSecret: test-airflow-credentials
+    dagsGitSync:
+      - repo: https://github.com/stackabletech/example-dags
+        gitFolder: dags
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       resources:
         cpu:
-          min: 200m
-          max: 1000m
+          min: 1000m
+          max: 2000m
         memory:
-          limit: 1Gi
+          limit: 3Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -86,6 +93,14 @@ spec:
             enableVectorAgent: true
             containers:
               airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              git-sync:
                 console:
                   level: INFO
                 file:
@@ -126,8 +141,10 @@ spec:
     config:
       resources:
         cpu:
-          min: 50m
-          max: 250m
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 3Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -143,6 +160,14 @@ spec:
                 loggers:
                   ROOT:
                     level: DEBUG
+              git-sync:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
               vector:
                 console:
                   level: INFO
@@ -181,6 +206,14 @@ spec:
             loggers:
               ROOT:
                 level: DEBUG
+          git-sync:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
           vector:
             console:
               level: INFO
@@ -196,8 +229,10 @@ spec:
     config:
       resources:
         cpu:
-          min: 100m
-          max: 500m
+          min: 1000m
+          max: 2000m
+        memory:
+          limit: 1Gi
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -206,6 +241,14 @@ spec:
             enableVectorAgent: true
             containers:
               airflow:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              git-sync:
                 console:
                   level: INFO
                 file:

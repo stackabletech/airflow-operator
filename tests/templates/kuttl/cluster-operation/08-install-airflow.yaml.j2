@@ -39,6 +39,8 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

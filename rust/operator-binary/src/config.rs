@@ -1,15 +1,20 @@
+use std::collections::BTreeMap;
+
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_airflow_crd::{
+use stackable_operator::{
+    commons::tls_verification::TlsVerification,
+    crd::authentication::{ldap, oidc},
+};
+
+use crate::crd::{
+    AirflowConfigOptions,
     authentication::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-        FlaskRolesSyncMoment, DEFAULT_OIDC_PROVIDER,
+        DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
     },
-    AirflowConfigOptions,
+    authorization::AirflowAuthorizationResolved,
 };
-use stackable_operator::commons::authentication::{ldap::AuthenticationProvider, oidc};
-use stackable_operator::commons::tls_verification::TlsVerification;
-use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
@@ -23,24 +28,20 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("Failed to create LDAP endpoint url."))]
-    FailedToCreateLdapEndpointUrl {
-        source: stackable_operator::commons::authentication::ldap::Error,
-    },
+    FailedToCreateLdapEndpointUrl { source: ldap::v1alpha1::Error },
 
     #[snafu(display("invalid OIDC endpoint"))]
-    InvalidOidcEndpoint {
-        source: stackable_operator::commons::authentication::oidc::Error,
-    },
+    InvalidOidcEndpoint { source: oidc::v1alpha1::Error },
 
     #[snafu(display("invalid well-known OIDC configuration URL"))]
-    InvalidWellKnownConfigUrl {
-        source: stackable_operator::commons::authentication::oidc::Error,
-    },
+    InvalidWellKnownConfigUrl { source: oidc::v1alpha1::Error },
 }
 
 pub fn add_airflow_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    authorization_config: &AirflowAuthorizationResolved,
+    product_version: &str,
 ) -> Result<()> {
     if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
         config.insert(
@@ -51,6 +52,7 @@ pub fn add_airflow_config(
     }
 
     append_authentication_config(config, authentication_config)?;
+    append_authorization_config(config, authorization_config, product_version);
 
     Ok(())
 }
@@ -109,7 +111,7 @@ fn append_authentication_config(
 
 fn append_ldap_config(
     config: &mut BTreeMap<String, String>,
-    ldap: &AuthenticationProvider,
+    ldap: &ldap::v1alpha1::AuthenticationProvider,
 ) -> Result<()> {
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
@@ -199,8 +201,8 @@ fn append_ldap_config(
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     providers: &[(
-        &oidc::AuthenticationProvider,
-        &oidc::ClientAuthenticationOptions<()>,
+        &oidc::v1alpha1::AuthenticationProvider,
+        &oidc::v1alpha1::ClientAuthenticationOptions<()>,
     )],
 ) -> Result<(), Error> {
     // Debatable: AUTH_OAUTH or AUTH_OID
@@ -214,7 +216,7 @@ fn append_oidc_config(
 
     for (oidc, client_options) in providers {
         let (env_client_id, env_client_secret) =
-            oidc::AuthenticationProvider::client_credentials_env_names(
+            oidc::v1alpha1::AuthenticationProvider::client_credentials_env_names(
                 &client_options.client_credentials_secret_ref,
             );
         let mut scopes = oidc.scopes.clone();
@@ -226,7 +228,7 @@ fn append_oidc_config(
             .unwrap_or(&DEFAULT_OIDC_PROVIDER);
 
         let oauth_providers_config_entry = match oidc_provider {
-            oidc::IdentityProviderHint::Keycloak => {
+            oidc::v1alpha1::IdentityProviderHint::Keycloak => {
                 let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
                 let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
                 api_base_url.push_str("/protocol/");
@@ -271,17 +273,58 @@ fn append_oidc_config(
     Ok(())
 }
 
+fn append_authorization_config(
+    config: &mut BTreeMap<String, String>,
+    authorization_config: &AirflowAuthorizationResolved,
+    product_version: &str,
+) {
+    // See `env_vars::authorization_env_vars` for why we only care about Airflow 2
+    if !product_version.starts_with("2.") {
+        return;
+    }
+    let Some(opa_config) = &authorization_config.opa else {
+        return;
+    };
+
+    config.extend([
+        (
+            AirflowConfigOptions::AuthOpaRequestUrl.to_string(),
+            opa_config.connection_string.to_owned(),
+        ),
+        (
+            AirflowConfigOptions::AuthOpaCacheTtlInSec.to_string(),
+            opa_config.cache_entry_time_to_live.as_secs().to_string(),
+        ),
+        (
+            AirflowConfigOptions::AuthOpaCacheMaxsize.to_string(),
+            opa_config.cache_max_entries.to_string(),
+        ),
+    ]);
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::config::add_airflow_config;
+    use std::collections::BTreeMap;
+
     use indoc::formatdoc;
     use rstest::rstest;
-    use stackable_airflow_crd::authentication::{
-        default_sync_roles_at, default_user_registration, AirflowAuthenticationClassResolved,
-        AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment,
+    use stackable_operator::{
+        crd::authentication::{ldap, oidc},
+        time::Duration,
     };
-    use stackable_operator::commons::authentication::{ldap, oidc};
-    use std::collections::BTreeMap;
+
+    use crate::{
+        config::add_airflow_config,
+        crd::{
+            authentication::{
+                AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+                FlaskRolesSyncMoment, default_user_registration,
+            },
+            authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
+        },
+    };
+
+    const TEST_AIRFLOW_VERSION: &str = "3.0.1";
 
     #[test]
     fn test_auth_db_config() {
@@ -292,8 +335,16 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -323,7 +374,7 @@ mod tests {
                     secretClass: openldap-tls
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(ldap_provider_yaml);
-        let ldap_provider: ldap::AuthenticationProvider =
+        let ldap_provider: ldap::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
@@ -335,8 +386,16 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(BTreeMap::from([
             ("AUTH_LDAP_ALLOW_SELF_SIGNED".into(), "false".into()),
@@ -381,7 +440,7 @@ mod tests {
         "
         );
         let deserializer = serde_yaml::Deserializer::from_str(&oidc_provider_yaml1);
-        let oidc_provider1: oidc::AuthenticationProvider =
+        let oidc_provider1: oidc::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let oidc_provider_yaml2 = r#"
@@ -392,14 +451,14 @@ mod tests {
             provider_hint: Keycloak
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml2);
-        let oidc_provider2: oidc::AuthenticationProvider =
+        let oidc_provider2: oidc::v1alpha1::AuthenticationProvider =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: vec![
                 AirflowAuthenticationClassResolved::Oidc {
                     provider: oidc_provider1,
-                    oidc: oidc::ClientAuthenticationOptions {
+                    oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
                         product_specific_fields: (),
@@ -407,7 +466,7 @@ mod tests {
                 },
                 AirflowAuthenticationClassResolved::Oidc {
                     provider: oidc_provider2,
-                    oidc: oidc::ClientAuthenticationOptions {
+                    oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
                         product_specific_fields: (),
@@ -416,11 +475,19 @@ mod tests {
             ],
             user_registration: default_user_registration(),
             user_registration_role: "Admin".to_string(),
-            sync_roles_at: default_sync_roles_at(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
+        let authorization_config = AirflowAuthorizationResolved { opa: None };
+
         let mut result = BTreeMap::new();
-        add_airflow_config(&mut result, &authentication_config).expect("Ok");
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -461,6 +528,43 @@ mod tests {
               ]
               "}
                 )
+            ]),
+            result
+        );
+    }
+
+    #[test]
+    fn test_opa_config() {
+        let authentication_config = AirflowClientAuthenticationDetailsResolved {
+            authentication_classes_resolved: vec![],
+            user_registration: true,
+            user_registration_role: "User".to_string(),
+            sync_roles_at: FlaskRolesSyncMoment::Registration,
+        };
+
+        let authorization_config = AirflowAuthorizationResolved {
+            opa: Some(OpaConfigResolved {
+                connection_string: "http://opa:8081/v1/data/airflow".to_string(),
+                cache_entry_time_to_live: Duration::from_secs(30),
+                cache_max_entries: 1000,
+            }),
+        };
+
+        let mut result = BTreeMap::new();
+        add_airflow_config(
+            &mut result,
+            &authentication_config,
+            &authorization_config,
+            TEST_AIRFLOW_VERSION,
+        )
+        .expect("Ok");
+
+        assert_eq!(
+            BTreeMap::from([
+                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
+                ("AUTH_TYPE".into(), "AUTH_DB".into()),
+                ("AUTH_USER_REGISTRATION".into(), "true".into()),
+                ("AUTH_USER_REGISTRATION_ROLE".into(), "User".into())
             ]),
             result
         );

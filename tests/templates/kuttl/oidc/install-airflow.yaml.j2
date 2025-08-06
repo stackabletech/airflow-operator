@@ -36,11 +36,11 @@ metadata:
   name: airflow
 spec:
   image:
-{% if test_scenario['values']['airflow'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
 {% else %}
-    productVersion: "{{ test_scenario['values']['airflow'] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
@@ -58,6 +58,8 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

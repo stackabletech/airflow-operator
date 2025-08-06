@@ -1,0 +1,73 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    authorization:
+      opa:
+        configMapName: test-opa
+        package: airflow
+        cache:
+          entryTimeToLive: 5s
+          maxEntries: 10
+    credentialsSecret: airflow-credentials
+    exposeConfig: true
+    loadExamples: true
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    configOverrides:
+      webserver_config.py:
+        WTF_CSRF_ENABLED: "False" # Allow "POST /login/" without CSRF token
+        AUTH_OPA_CACHE_MAXSIZE: "0" # Airflow 2: Disable decision caching for easy debugging
+    envOverrides:
+      AIRFLOW__CORE__AUTH_OPA_CACHE_MAXSIZE: "0" # Airflow 3: Disable decision caching for easy debugging
+    roleGroups:
+      default:
+        replicas: 1
+  kubernetesExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

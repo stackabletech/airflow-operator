@@ -3,28 +3,33 @@ name: pre-commit
 
 on:
   pull_request:
+  merge_group:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN_VERSION: "1.82.0"
+  NIX_PKG_MANAGER_VERSION: "2.30.0"
+  RUST_TOOLCHAIN_VERSION: "nightly-2025-05-26"
   HADOLINT_VERSION: "v2.12.0"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
 
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
+        uses: awalsh128/cache-apt-pkgs-action@5902b33ae29014e6ca012c5d8025d4346556bd40 # v1.4.3
         with:
           packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
           version: ubuntu-latest
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
+          persist-credentials: false
           submodules: recursive
-      - uses: stackabletech/actions/run-pre-commit@5b66858af3597c4ea34f9b33664b8034a1d28427 # v0.3.0
+          fetch-depth: 0
+      - uses: stackabletech/actions/run-pre-commit@9aae2d1c14239021bfa33c041010f6fb7adec815 # v0.8.2
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           rust: ${{ env.RUST_TOOLCHAIN_VERSION }}
           hadolint: ${{ env.HADOLINT_VERSION }}
+          nix: ${{ env.NIX_PKG_MANAGER_VERSION }}
+          nix-github-token: ${{ secrets.GITHUB_TOKEN }}

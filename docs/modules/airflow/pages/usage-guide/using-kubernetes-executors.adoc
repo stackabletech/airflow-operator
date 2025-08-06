@@ -3,6 +3,8 @@
 
 Instead of using the Celery workers you can let Airflow run the tasks using Kubernetes executors, where Pods are created dynamically as needed without jobs being routed through a Redis queue to the workers.
 
+== Kubernetes Executor configuration
+
 To achieve this, swap `spec.celeryExecutors` with `spec.kubernetesExecutors`.
 E.g. you would change the following example
 
@@ -27,4 +29,86 @@ spec:
     config:
       resources:
         # ...
+----
+
+== Logging
+
+Kubernetes Executors and their respective Pods only live as long as the task they are executing.
+Afterwards the Pod is immediately terminated and e.g. console output or logs are gone.
+
+In order to persist task logs, Airflow can be configured to store its https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/kubernetes_executor.html#managing-dags-and-logs[executor logs on disk (PV)] or as described in the following section on S3.
+
+[#s3-connection]
+=== Add S3 connection in Airflow Web UI
+
+In the Airflow Web UI, click on `Admin` -> `Connections` -> `Add a new record` (the plus).
+Then enter your MinIO host and credentials as shown.
+
+image::airflow_edit_s3_connection.png[Airflow connection menu]
+
+The name or connection ID is `minio`, the type is `Amazon Web Services`, the `AWS Access Key ID` and `AWS Secret Access Key` are filled with the S3 credentials.
+The `Extra` field contains the endpoint URL like:
+
+[source,json]
+----
+{
+  "endpoint_url": "http://minio.default.svc.cluster.local:9000"
+}
+----
+
+=== Executor configuration
+
+In order to configure the S3 logging, you need to add the following environment variables to the Airflow cluster definition:
+
+[source,yaml]
+----
+include::example$example-airflow-kubernetes-executor-s3-logging.yaml[]
+----
+
+Now you should be able to fetch and inspect logs in the Airflow Web UI from S3 for each DAG run.
+
+image::airflow_dag_s3_logs.png[Airflow DAG S3 logs]
+
+== Store xComs objects in object storage (e.g. S3)
+
+By default Airflow stores the xCom (cross-communications) objects in the Airflow database (often times PostgreSQL), which can cause the database to run out of disk space (especially if you have high xCom traffic).
+To prevent this, you can configure Airflow to do the xCom exchange via an object store backend (such as S3) and not the database.
+You can read on details in https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html#object-storage-xcom-backend[the official documentation].
+
+[TIP]
+====
+Airflow stores the xCom objects in the Postgres table `xcom` (e.g. `airflow.public.xcom`).
+You can have a look at that table to see what exactly is getting stored.
+
+To e.g. determine the biggest xCom objects you can use
+[source,sql]
+----
+select
+	length(value) as size,
+	dag_run_id,
+	task_id,
+	map_index,
+	key,
+	dag_id,
+	run_id,
+	"timestamp"
+from xcom
+order by length(value) desc limit 20;
+----
+
+*Being careful* you can also clean up the table to save space in the database.
+In our testing, running `VACUUM FULL` was enough for the changes to take effect on the PostgreSQL disk.
+====
+
+=== Add S3 connection in Airflow Web UI
+
+Please add an S3 connection in the Admin WebUI according to <<#s3-connection>>
+
+=== Executor configuration
+
+In order to configure the S3 xCom backend, you need to add the following environment variables to the Airflow cluster definition:
+
+[source,yaml]
+----
+include::example$example-airflow-kubernetes-executor-s3-xcom.yaml[]
 ----

@@ -1,5 +1,5 @@
-# helm install --repo https://repo.stackable.tech/repository/helm-stable/ secret-operator secret-operator
-# helm install --repo https://repo.stackable.tech/repository/helm-stable/ commons-operator commons-operator
+# helm install secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator
+# helm install commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator
 # helm install --repo https://charts.bitnami.com/bitnami --version 12.1.5 --set auth.username=airflow --set auth.password=airflow --set auth.database=airflow airflow-postgresql postgresql
 # helm install --repo https://charts.bitnami.com/bitnami --version 17.3.7 --set auth.password=redis --set replica.replicaCount=1 airflow-redis redis
 # Log in with user01/user01 or user02/user02
@@ -148,7 +148,7 @@ metadata:
   name: airflow-insecure-tls
 spec:
   image:
-    productVersion: 2.9.3
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: true
     exposeConfig: true
@@ -157,6 +157,8 @@ spec:
       - authenticationClass: airflow-with-ldap-insecure-tls-ldap
         userRegistrationRole: Admin
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

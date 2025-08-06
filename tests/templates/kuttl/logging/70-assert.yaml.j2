@@ -1,0 +1,32 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-log-endpoint
+timeout: 240
+commands:
+{% if test_scenario['values']['executor'] == 'celery' %}
+  - script: |
+      set -eu
+
+      # Log-Endpoint Test:
+      # This is executed from the Webserver as JWT keys must be present.
+      # A small server is started on each worker that serves the logs on its
+      # 8793 port for the Webserver: we don't use the token as that is an
+      # internal implementation, but check that the endpoint is reachable,
+      # indicated by a 403.
+      # Rolegroup custom-log-config
+      CURL_RESPONSE_CUSTOM=$(
+          kubectl -n $NAMESPACE exec airflow-webserver-custom-log-config-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-custom-log-config-headless:8793 2>/dev/null || true);echo "$CODE"'
+      )
+
+      # Log-Endpoint Test Assertions:
+      echo "The HTTP Code is $CURL_RESPONSE_CUSTOM (an internal JWT token is needed for full access)"
+
+      # Rolegroup automatic-log-config
+      CURL_RESPONSE_AUTO=$(
+          kubectl -n $NAMESPACE exec airflow-webserver-automatic-log-config-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-automatic-log-config-headless:8793 2>/dev/null || true);echo "$CODE"'
+      )
+      echo "The HTTP Code is $CURL_RESPONSE_AUTO (an internal JWT token is needed for full access)"
+      [ "$CURL_RESPONSE_CUSTOM" -eq 403 ] && [ "$CURL_RESPONSE_AUTO" -eq 403 ]
+{% endif %}

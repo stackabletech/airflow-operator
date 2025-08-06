@@ -455,7 +455,7 @@ spec:
                       items:
                         properties:
                           authenticationClass:
-                            description: Name of the [AuthenticationClass](https://docs.stackable.tech/home/nightly/concepts/authentication) used to authenticate users.
+                            description: Name of the [AuthenticationClass](https://docs.stackable.tech/home/nightly/concepts/authentication) used to authenticate users
                             type: string
                           oidc:
                             description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
@@ -466,7 +466,7 @@ spec:
                                 type: string
                               extraScopes:
                                 default: []
-                                description: An optional list of extra scopes which get merged with the scopes defined in the [`AuthenticationClass`].
+                                description: An optional list of extra scopes which get merged with the scopes defined in the AuthenticationClass
                                 items:
                                   type: string
                                 type: array
@@ -492,6 +492,42 @@ spec:
                           - authenticationClass
                         type: object
                       type: array
+                    authorization:
+                      description: Authorization options. Learn more in the [Airflow authorization usage guide](https://docs.stackable.tech/home/nightly/airflow/usage-guide/security#_authorization).
+                      nullable: true
+                      properties:
+                        opa:
+                          description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
+                          nullable: true
+                          properties:
+                            cache:
+                              default:
+                                entryTimeToLive: 30s
+                                maxEntries: 10000
+                              description: Least Recently Used (LRU) cache with per-entry time-to-live (TTL) value.
+                              properties:
+                                entryTimeToLive:
+                                  default: 30s
+                                  description: Time to live per entry
+                                  type: string
+                                maxEntries:
+                                  default: 10000
+                                  description: Maximum number of entries in the cache; If this threshold is reached then the least recently used item is removed.
+                                  format: uint32
+                                  minimum: 0.0
+                                  type: integer
+                              type: object
+                            configMapName:
+                              description: The [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for the OPA stacklet that should be used for authorization requests.
+                              type: string
+                            package:
+                              description: The name of the Rego package containing the Rego rules for the product.
+                              nullable: true
+                              type: string
+                          required:
+                            - configMapName
+                          type: object
+                      type: object
                     credentialsSecret:
                       description: The name of the Secret object containing the admin user credentials and database connection details. Read the [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps) to find out more.
                       type: string
@@ -501,38 +537,56 @@ spec:
                       items:
                         properties:
                           branch:
-                            description: The branch to clone. Defaults to `main`. Since git-sync v4.x.x this field is mapped to the flag `--ref`.
-                            nullable: true
+                            default: main
+                            description: |-
+                              The branch to clone; defaults to `main`.
+
+                              Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             type: string
                           credentialsSecret:
-                            description: 'The name of the Secret used to access the repository if it is not public. This should include two fields: `user` and `password`. The `password` field can either be an actual password (not recommended) or a GitHub token, as described [here](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual).'
+                            description: |-
+                              The name of the Secret used to access the repository if it is not public.
+
+                              The referenced Secret must include two fields: `user` and `password`. The `password` field can either be an actual password (not recommended) or a GitHub token, as described in the git-sync [documentation].
+
+                              [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
                             nullable: true
                             type: string
                           depth:
-                            description: The depth of syncing i.e. the number of commits to clone; defaults to 1.
-                            format: uint8
+                            default: 1
+                            description: The depth of syncing, i.e. the number of commits to clone; defaults to 1.
+                            format: uint32
                             minimum: 0.0
-                            nullable: true
                             type: integer
                           gitFolder:
-                            description: The location of the DAG folder, relative to the synced repository root.
-                            nullable: true
+                            default: /
+                            description: |-
+                              Location in the Git repository containing the resource; defaults to the root folder.
+
+                              It can optionally start with `/`, however, no trailing slash is recommended. An empty string (``) or slash (`/`) corresponds to the root folder in Git.
                             type: string
                           gitSyncConf:
                             additionalProperties:
                               type: string
-                            description: A map of optional configuration settings that are listed in the [git-sync documentation](https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual). Read the [git sync example](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_example).
-                            nullable: true
+                            default: {}
+                            description: |-
+                              A map of optional configuration settings that are listed in the git-sync [documentation].
+
+                              Also read the git-sync [example] in our documentation. These settings are not verified.
+
+                              [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual [example]: https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_example
                             type: object
                           repo:
                             description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.'
+                            format: uri
                             type: string
                           wait:
-                            description: The synchronization interval in seconds; defaults to 20 seconds. Since git-sync v4.x.x this field is mapped to the flag `--period`.
-                            format: uint16
-                            minimum: 0.0
-                            nullable: true
-                            type: integer
+                            default: 20s
+                            description: |-
+                              The synchronization interval, e.g. `20s` or `5m`; defaults to `20s`.
+
+                              Since git-sync v4.x.x this field is mapped to the flag `--period`.
+                            type: string
                         required:
                           - repo
                         type: object
@@ -541,23 +595,6 @@ spec:
                       default: false
                       description: for internal use only - not for production use.
                       type: boolean
-                    listenerClass:
-                      default: cluster-internal
-                      description: |-
-                        This field controls which type of Service the Operator creates for this AirflowCluster:
-
-                        * cluster-internal: Use a ClusterIP service
-
-                        * external-unstable: Use a NodePort service
-
-                        * external-stable: Use a LoadBalancer service
-
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-                      enum:
-                        - cluster-internal
-                        - external-unstable
-                        - external-stable
-                      type: string
                     loadExamples:
                       default: false
                       description: Whether to load example DAGs or not; defaults to false. The examples are used in the [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
@@ -611,7 +648,7 @@ spec:
                     Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
                   properties:
                     custom:
-                      description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
+                      description: Overwrite the docker image. Specify the full docker image name, e.g. `oci.stackable.tech/sdp/superset:1.4.1-stackable2.1.0`
                       type: string
                     productVersion:
                       description: Version of the product, e.g. `1.4.1`.
@@ -638,7 +675,7 @@ spec:
                       nullable: true
                       type: array
                     repo:
-                      description: Name of the docker repo, e.g. `docker.stackable.tech/stackable`
+                      description: Name of the docker repo, e.g. `oci.stackable.tech/sdp`
                       nullable: true
                       type: string
                     stackableVersion:
@@ -1439,11 +1476,16 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     roleConfig:
                       default:
+                        listenerClass: cluster-internal
                         podDisruptionBudget:
                           enabled: true
                           maxUnavailable: null
                       description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                       properties:
+                        listenerClass:
+                          default: cluster-internal
+                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+                          type: string
                         podDisruptionBudget:
                           default:
                             enabled: true
@@ -1677,11 +1719,6 @@ spec:
                     properties:
                       lastTransitionTime:
                         description: Last time the condition transitioned from one status to another.
-                        format: date-time
-                        nullable: true
-                        type: string
-                      lastUpdateTime:
-                        description: The last time this condition was updated.
                         format: date-time
                         nullable: true
                         type: string

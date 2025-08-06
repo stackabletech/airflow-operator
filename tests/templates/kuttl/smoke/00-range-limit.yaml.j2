@@ -1,0 +1,13 @@
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-request-ratio
+spec:
+  limits:
+  - type: "Container"
+    maxLimitRequestRatio:
+      cpu: 5
+      memory: 1
+{% endif %}

@@ -18,36 +18,30 @@ then
 fi
 
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
-# tag::helm-add-bitnami-repo[]
-helm repo add bitnami https://charts.bitnami.com/bitnami
-# end::helm-add-bitnami-repo[]
 # tag::helm-add-bitnami-pgs[]
-helm install --wait airflow-postgresql bitnami/postgresql --version 12.1.5 \
-    --set auth.username=airflow \
-    --set auth.password=airflow \
-    --set auth.database=airflow
+helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
+  --version 16.5.0 \
+  --set auth.database=airflow \
+  --set auth.username=airflow \
+  --set auth.password=airflow \
+  --wait
 # end::helm-add-bitnami-pgs[]
 # tag::helm-add-bitnami-redis[]
-helm install --wait airflow-redis bitnami/redis \
-    --set auth.password=redis \
-    --version 17.3.7 \
-    --set replica.replicaCount=1
+helm install airflow-redis oci://registry-1.docker.io/bitnamicharts/redis \
+  --version 20.11.3 \
+  --set replica.replicaCount=1 \
+  --set auth.password=redis \
+  --wait
 # end::helm-add-bitnami-redis[]
 
 case "$1" in
 "helm")
-echo "Adding 'stackable-dev' Helm Chart repository"
-# tag::helm-add-repo[]
-helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
-# end::helm-add-repo[]
-echo "Updating Helm repo"
-helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev
-helm install --wait listener-operator stackable-dev/listener-operator --version 0.0.0-dev
-helm install --wait airflow-operator stackable-dev/airflow-operator --version 0.0.0-dev
+helm install --wait commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator --version 0.0.0-dev
+helm install --wait secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator --version 0.0.0-dev
+helm install --wait listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator --version 0.0.0-dev
+helm install --wait airflow-operator oci://oci.stackable.tech/sdp-charts/airflow-operator --version 0.0.0-dev
 # end::helm-install-operators[]
 ;;
 "stackablectl")
@@ -128,6 +122,9 @@ enable_dag() {
     -d '{"is_paused": false}'
   # end::enable-dag[]
 }
+SLEEP_SECONDS=120
+echo "Sleeping for $SLEEP_SECONDS seconds to wait for the DAG to be registered"
+sleep "$SLEEP_SECONDS"
 echo "Triggering a DAG run. Enable DAG..."
 enable_dag
 

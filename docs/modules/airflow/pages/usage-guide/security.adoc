@@ -37,7 +37,7 @@ metadata:
   name: airflow-with-ldap
 spec:
   image:
-    productVersion: 2.10.2
+    productVersion: 2.10.5
   clusterConfig:
     authentication:
       - authenticationClass: ldap    # <1>
@@ -71,7 +71,7 @@ metadata:
   name: airflow-with-oidc
 spec:
   image:
-    productVersion: 2.10.2
+    productVersion: 2.10.5
   clusterConfig:
     authentication:
     - authenticationClass: keycloak                       # <1>
@@ -129,12 +129,18 @@ A minimum client configuration in Keycloak for this example looks like this:
 Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:concepts:authentication.adoc#_oidc[concepts page].
 
 == Authorization
-The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control] to https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
 
-=== Webinterface
+The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control] to the https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
+The AuthManager in the Flask AppBuilder can be configured to fetch the user roles from the authentication backend, e.g. LDAP.
+Instead of using the integrated authorization, the Stackable Data Platform also provides an AuthManager which delegates the authorization requests to an xref:opa:index.adoc[Open Policy Agent (OPA)].
+
+=== Integrated authorization
+
+==== Webinterface
+
 You can view, add to, and assign the roles displayed in the Airflow Webserver UI to existing users.
 
-=== LDAP
+==== LDAP
 
 Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
 All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the AirflowCluster object:
@@ -155,7 +161,7 @@ spec:
 <1> The reference to an AuthenticationClass called `ldap`
 <2> All users are assigned to the `Admin` role
 
-=== OpenID Connect
+==== OpenID Connect
 
 The mechanism for assigning roles to users described in the LDAP section also applies to OpenID Connect.
 Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
@@ -177,3 +183,247 @@ spec:
 ----
 
 <1> All users are assigned to the `Admin` role
+
+=== Open Policy Agent
+
+Authorization with an Open Policy Agent can be enabled with the following cluster configuration:
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-with-opa
+spec:
+  clusterConfig:
+    authorization:
+      opa:
+        configMapName: opa      # <1>
+        package: airflow        # <2>
+        cache:                  # <3>
+          entryTimeToLive: 10s  # <4>
+          maxEntries: 100000    # <5>
+----
+
+<1> The xref:concepts:service_discovery.adoc[service discovery ConfigMap] for the OPA instance containing the URL of the OPA API
+<2> The Rego rule package with the authorization rules
+<3> A cache for authorization requests to the Open Policy Agent to reduce the load on OPA and to bridge restarts of the OPA pods;
+    Defaults are used, if not set explicitly.
+<4> Time to live per cached authorization request;
+    Defaults to 30 seconds;
+    Changes in the Rego rules may not be effective within the given duration.
+<5> Maximum number of cached authorization requests in the cache;
+    Defaults to 10,000 entries;
+    If this limit is reached then the least recently used entry is removed and the metric `airflow_opa_cache_limit_reached` is increased by one.
+    The cache size should probably be increased if this metric is constantly raised.
+
+The Rego rule package defined in the configuration must contain specific rules which are true or false dependent on the input which differs slightly between the rules.
+The following list contains the rule names as well as a specification of the possible input:
+
+* `is_authorized_configuration`
++
+Returns whether the user is authorized to perform a given action on configuration.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",          % <1>
+  "details": {
+    "section": "<name of the section or null>"  % <2>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> `null` if the action is performed on all configuration sections
+* `is_authorized_connection`
++
+Returns whether the user is authorized to perform a given action on a connection.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",             % <1>
+  "details": {
+    "conn_id": "<name of the connection or null>"  % <2>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> `null` if the action is performed on all connections
+* `is_authorized_dag`
++
+Returns whether the user is authorized to perform a given action on a DAG.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",       % <1>
+  "access_entity": "<DAG entity or null>",   % <2>
+  "details": {
+    "dag_id": "<the ID of the DAG or null>"  % <3>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> The kind of DAG information the authorization request is about.
+    If not provided, the authorization request is about the DAG itself.
+    One of "AUDIT_LOG", "CODE", "DEPENDENCIES", "RUN", "SLA_MISS", "TASK", "TASK_INSTANCE", "TASK_RESCHEDULE", "TASK_LOGS", "WARNING" or "XCOM"
+<3> `null` if the action is performed on all DAGs
+* `is_authorized_dataset`
++
+Returns whether the user is authorized to perform a given action on a dataset.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",         % <1>
+  "details": {
+    "uri": "<the URI of the dataset or null>"  % <2>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> `null` if the action is performed on all datasets
+* `is_authorized_pool`
++
+Returns whether the user is authorized to perform a given action on a pool.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",        % <1>
+  "details": {
+    "name": "<the name of the pool or null>"  % <2>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> `null` if the action is performed on all pools
+* `is_authorized_variable`
++
+Returns whether the user is authorized to perform a given action on a variable.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>",          % <1>
+  "details": {
+    "key": "<the key of the variable or null>"  % <2>
+  },
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> One of "GET", "POST", "PUT", "DELETE" or "MENU"
+<2> `key` if the action is performed on all variables
+* `is_authorized_view`
++
+Returns whether the user is authorized to access a read-only state of the installation.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "access_view": "<the variant of the view>",  % <1>
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> The specific read-only view/state the authorization request is about.
+    One of "CLUSTER_ACTIVITY", "DOCS", "IMPORT_ERRORS", "JOBS", "PLUGINS", "PROVIDERS", "TRIGGERS" or "WEBSITE".
+* `is_authorized_custom_view`
++
+Returns whether the user is authorized to perform a given action on a custom view.
++
+A custom view can be a view defined as part of the auth manager.
+This view is then only available when the auth manager is used as part of the environment.
+It can also be a view defined as part of a plugin defined by a user.
++
+[source,json,line-comment=%]
+----
+"input": {
+  "method": "<the method to perform>", % <1>
+  "resource_name": "<the name of the resource>",
+  "user": {
+    "id": "<the user ID in Airflow>",
+    "name": "<the user name>"
+  }
+}
+----
+<1> Usually one of "GET", "POST", "PUT", "DELETE" or "MENU", but the method can also be a string if the action has been defined in a plugin.
+In that case, the action can be anything.
+
+The roles defined in Airflow are not used when the authorization is performed by OPA.
+Therefore, it makes sense to hide the menu entry "List Roles" simply by not allowing access to the custom view "List Roles".
+
+A ConfigMap with the Rego rules could look as follows:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-rules
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+  airflow.rego: |
+
+    # The Rego rule package which must be defined in the cluster
+    # configuration (spec.clusterConfig.authorization.opa.package).
+    package airflow
+
+    import rego.v1
+
+    default is_authorized_configuration := false
+    default is_authorized_connection := false
+    default is_authorized_dag := false
+    default is_authorized_dataset := false
+    default is_authorized_pool := false
+    default is_authorized_variable := false
+    default is_authorized_view := false
+    default is_authorized_custom_view := false
+
+    # Allow everybody to get the DAG runs of example_trigger_target_dag
+    is_authorized_dag if {
+        input.method == "GET"
+        input.access_entity == "RUN"
+        input.details.id == "example_trigger_target_dag"
+    }
+
+    # Allow the administrator to access all custom views but hide the
+    # menu "List Roles" and disallow the access to the Roles resource.
+    is_authorized_custom_view if {
+        input.resource_name != "List Roles"
+        input.resource_name != "Roles"
+
+        input.user.name == "admin"
+    }
+----
+
+The xref:opa:usage-guide/user-info-fetcher.adoc[User Info Fetcher] can be used to fetch the groups in which the user is a member of.
+The Rego rule can then grant access based on the group membership.

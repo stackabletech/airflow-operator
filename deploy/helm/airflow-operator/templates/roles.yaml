@@ -13,6 +13,13 @@ rules:
     verbs:
       - list
       - watch
+  # For automatic cluster domain detection
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+    verbs:
+      - get
   - apiGroups:
       - ""
     resources:
@@ -85,6 +92,17 @@ rules:
     verbs:
       - get
   - apiGroups:
+      - listeners.stackable.tech
+    resources:
+      - listeners
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - create
+      - delete
+  - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters
@@ -113,6 +131,7 @@ rules:
       - events
     verbs:
       - create
+      - patch
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -161,6 +180,7 @@ rules:
       - events
     verbs:
       - create
+      - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   - apiGroups:
       - security.openshift.io

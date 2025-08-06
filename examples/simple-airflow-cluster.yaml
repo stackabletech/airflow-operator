@@ -22,12 +22,14 @@ metadata:
   name: airflow
 spec:
   image:
-    productVersion: 2.9.3
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: true
     exposeConfig: false
     credentialsSecret: simple-airflow-credentials
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

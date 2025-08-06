@@ -11,12 +11,14 @@ spec:
 {% else %}
     productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
 {% endif %}
+    pullPolicy: IfNotPresent
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    listenerClass: external-unstable
     credentialsSecret: airflow-credentials
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

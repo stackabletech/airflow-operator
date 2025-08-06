@@ -5,13 +5,14 @@ metadata:
   name: airflow
 spec:
   image:
-    productVersion: 2.9.3
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    listenerClass: external-unstable
     credentialsSecret: simple-airflow-credentials
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1
@@ -19,13 +20,6 @@ spec:
     roleGroups:
       default:
         replicas: 2
-    config:
-      resources:
-        cpu:
-          min: 400m
-          max: 800m
-        memory:
-          limit: 2Gi
   schedulers:
     roleGroups:
       default:

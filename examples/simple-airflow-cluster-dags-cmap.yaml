@@ -82,7 +82,7 @@ metadata:
   name: airflow-dags-cmap
 spec:
   image:
-    productVersion: 2.9.3
+    productVersion: 2.10.5
   clusterConfig:
     loadExamples: false
     exposeConfig: false
@@ -96,6 +96,8 @@ spec:
         mountPath: /dags/test_airflow_dag.py
         subPath: test_airflow_dag.py
   webservers:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         envOverrides:

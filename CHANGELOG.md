@@ -2,9 +2,122 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Don't panic on invalid authorization config. Previously, a missing OPA ConfigMap would crash the operator ([#667]).
+- Fix OPA authorization for Airflow 3. Airflow 3 needs to be configured via env variables, the operator now does this correctly ([#668]).
+
+[#667]: https://github.com/stackabletech/airflow-operator/pull/667
+[#668]: https://github.com/stackabletech/airflow-operator/pull/668
+
+## [25.7.0] - 2025-07-23
+
+## [25.7.0-rc1] - 2025-07-18
+
+### Added
+
+- Added listener support for Airflow ([#604]).
+- Adds new telemetry CLI arguments and environment variables ([#613]).
+  - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
+  - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
+  - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- Add support for airflow `2.10.5` ([#625]).
+- Add experimental support for airflow `3.0.1` ([#630]).
+- "airflow.task" logger defaults to log level 'INFO' instead of 'NOTSET' ([#649]).
+- Add internal headless service in addition to the metrics service ([#651]).
+- Add RBAC rule to helm template for automatic cluster domain detection ([#656]).
+
+### Changed
+
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#601], [#608], [#613]).
+  - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `CONSOLE_LOG_LEVEL`.
+  - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set by `FILE_LOG_LEVEL`.
+  - The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set
+    by `FILE_LOG_DIRECTORY` (or via `--file-log-directory <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+- BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
+    of having the operator write it to the vector config ([#600]).
+- test: Bump to Vector 0.46.1 ([#620]).
+- test: Bump OPA to `1.4.2` ([#624]).
+- Deprecate airflow `2.10.4` ([#625]).
+- Move the git-sync implementation to operator-rs ([#623]). The functionality should not have changed.
+- BREAKING: Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#636])
+  - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
+  - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
+  - This is marked as breaking because tools and policies might exist, which require these fields to be set
+- Changed listener class to be role-only ([#645]).
+- BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#656]).
+  - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
+  - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set. The helm-chart takes care of this.
+- The operator helm-chart now grants RBAC `patch` permissions on `events.k8s.io/events`,
+  so events can be aggregated (e.g. "error happened 10 times over the last 5 minutes") ([#660]).
+
+### Fixed
+
+- Use `json` file extension for log files ([#607]).
+- Fix a bug where changes to ConfigMaps that are referenced in the AirflowCluster spec didn't trigger a reconciliation ([#600]).
+- Allow uppercase characters in domain names ([#656]).
+
+### Removed
+
+- Remove the `lastUpdateTime` field from the stacklet status ([#656]).
+- Remove role binding to legacy service accounts ([#656]).
+
+[#600]: https://github.com/stackabletech/airflow-operator/pull/600
+[#601]: https://github.com/stackabletech/airflow-operator/pull/601
+[#604]: https://github.com/stackabletech/airflow-operator/pull/604
+[#607]: https://github.com/stackabletech/airflow-operator/pull/607
+[#608]: https://github.com/stackabletech/airflow-operator/pull/608
+[#613]: https://github.com/stackabletech/airflow-operator/pull/613
+[#620]: https://github.com/stackabletech/airflow-operator/pull/620
+[#623]: https://github.com/stackabletech/airflow-operator/pull/623
+[#624]: https://github.com/stackabletech/airflow-operator/pull/624
+[#625]: https://github.com/stackabletech/airflow-operator/pull/625
+[#630]: https://github.com/stackabletech/airflow-operator/pull/630
+[#636]: https://github.com/stackabletech/airflow-operator/pull/636
+[#645]: https://github.com/stackabletech/airflow-operator/pull/645
+[#649]: https://github.com/stackabletech/airflow-operator/pull/649
+[#651]: https://github.com/stackabletech/airflow-operator/pull/651
+[#656]: https://github.com/stackabletech/airflow-operator/pull/656
+[#660]: https://github.com/stackabletech/airflow-operator/pull/660
+
+## [25.3.0] - 2025-03-21
+
 ### Added
 
 - Run a `containerdebug` process in the background of each Airflow container to collect debugging information ([#557]).
+- Aggregate emitted Kubernetes events on the CustomResources ([#571]).
+- Add OPA support ([#573]).
+- Add support for `2.10.4` ([#594]).
+
+### Changed
+
+- Default to OCI for image metadata and product image selection ([#572]).
+- BREAKING: The field `.spec.clusterConfig.dagsGitSync[].wait` changed from `uint8` to our human-readable `Duration` struct.
+  In case you have used `wait: 20` before, you need to change it to `wait: 20s` ([#596]).
+- The field `.spec.clusterConfig.dagsGitSync[].depth` was promoted from `uint8` to `uint32` to allow for more cloning depth.
+  This is a non-breaking change as all previous values are still valid ([#596]).
+
+### Removed
+
+- Remove support for `2.9.2` and `2.10.2` (experimental) ([#594]).
+
+### Fixed
+
+- Fix `git-sync` functionality in case no `gitFolder` is specified.
+  The `gitFolder` field is now non-nullable, but has a default value, resulting in no breaking change ([#596]).
+- Fix configOverrides by applying after defaults ([#597]).
+
+[#557]: https://github.com/stackabletech/airflow-operator/pull/557
+[#571]: https://github.com/stackabletech/airflow-operator/pull/571
+[#572]: https://github.com/stackabletech/airflow-operator/pull/572
+[#573]: https://github.com/stackabletech/airflow-operator/pull/573
+[#594]: https://github.com/stackabletech/airflow-operator/pull/594
+[#596]: https://github.com/stackabletech/airflow-operator/pull/596
+[#597]: https://github.com/stackabletech/airflow-operator/pull/597
+
+## [24.11.1] - 2025-01-09
 
 ### Fixed
 
@@ -15,7 +128,6 @@
 
 [#545]: https://github.com/stackabletech/airflow-operator/pull/545
 [#547]: https://github.com/stackabletech/airflow-operator/pull/547
-[#557]: https://github.com/stackabletech/airflow-operator/pull/557
 
 ## [24.11.0] - 2024-11-18
 

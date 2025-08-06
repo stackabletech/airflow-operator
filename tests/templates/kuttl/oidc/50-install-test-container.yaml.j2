@@ -55,7 +55,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: python
-          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          imagePullPolicy: IfNotPresent
           stdin: true
           tty: true
           resources:
@@ -71,6 +72,17 @@ spec:
           env:
             - name: REQUESTS_CA_BUNDLE
               value: /stackable/tls/ca.crt
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: AIRFLOW_VERSION
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+              value: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+              value: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+
       volumes:
         - name: tls
           csi:
