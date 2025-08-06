@@ -1,11 +1,11 @@
 runners:
   amd64:
-    platform: aks-1.31
+    platform: aks-1.32
     ttl: 6h
     node-groups:
       - name: default
         arch: amd64
-        size: large
+        size: medium
         disk-gb: 100
         nodes: 3
 
@@ -14,4 +14,10 @@ profiles:
     strategy: use-runner
     runner: amd64
     options:
-      parallelism: 2
+      beku-parallelism: 2
+  smoke-latest:
+    strategy: use-runner
+    runner: amd64
+    options:
+      beku-parallelism: 2
+      beku-test-suite: smoke-latest

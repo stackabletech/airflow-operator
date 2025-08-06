@@ -12,6 +12,21 @@ on:
     # At 00:00 on Sunday. See: https://crontab.guru/#0_0_*_*_0
     # - cron: "0 0 * * 0"
   workflow_dispatch:
+    inputs:
+      test-mode:
+        description: Test mode
+        required: true
+        type: choice
+        options:
+          - custom
+          - profile
+      test-mode-input:
+        description: The profile or the runner used
+        required: true
+      test-suite:
+        description: Name of the test-suite. Only used if test-mode is `custom`
+      test:
+        description: Name of the test. Only used of test-mode is `custom`
 
 jobs:
   test:
@@ -20,36 +35,42 @@ jobs:
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
+          persist-credentials: false
           submodules: recursive
 
+      # TODO: Enable the scheduled runs which hard-code what profile to use
       - name: Run Integration Test
         id: test
-        uses: stackabletech/actions/run-integration-test@990f74b08b1c3693fb80814c20c44a97531ebf75 # TODO: Use released version
+        uses: stackabletech/actions/run-integration-test@e667cf50055aa43bd454125499843f20c4ebaf3d # TODO: Use released version
         with:
           replicated-api-token: ${{ secrets.REPLICATED_API_TOKEN }}
-          test-profile: schedule
+          test-mode-input: ${{ inputs.test-mode-input }}
+          test-suite: ${{ inputs.test-suite }}
+          test-mode: ${{ inputs.test-mode }}
+          test: ${{ inputs.test }}
 
-      - name: Send Notification
-        if: ${{ failure() }}
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_INTEGRATION_TEST_TOKEN }}
-        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
-        with:
-          channel-id: "C07UYJYSMSN" # notifications-integration-tests
-          payload: |
-              {
-                "text": "Integration Test *${{ github.repository }}* failed",
-                "attachments": [
-                  {
-                    "pretext": "Started at ${{ steps.test.outputs.start-time }}, failed at ${{ steps.test.outputs.end-time }}",
-                    "color": "#aa0000",
-                    "actions": [
-                      {
-                        "type": "button",
-                        "text": "Go to integration test run",
-                        "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                      }
-                    ]
-                  }
-                ]
-              }
+      # TODO: Comment back in once integration tests itself work. Also add improvements to the notifications.
+      # - name: Send Notification
+      #   if: ${{ failure() }}
+      #   env:
+      #     SLACK_BOT_TOKEN: ${{ secrets.SLACK_INTEGRATION_TEST_TOKEN }}
+      #   uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
+      #   with:
+      #     channel-id: "C07UYJYSMSN" # notifications-integration-tests
+      #     payload: |
+      #         {
+      #           "text": "Integration Test for *${{ github.repository }}* failed",
+      #           "attachments": [
+      #             {
+      #               "pretext": "Started at ${{ steps.test.outputs.start-time }}, failed at ${{ steps.test.outputs.end-time }}",
+      #               "color": "#aa0000",
+      #               "actions": [
+      #                 {
+      #                   "type": "button",
+      #                   "text": "Go to integration test run",
+      #                   "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      #                 }
+      #               ]
+      #             }
+      #           ]
+      #         }
