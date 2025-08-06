@@ -41,7 +41,7 @@ jobs:
       # TODO: Enable the scheduled runs which hard-code what profile to use
       - name: Run Integration Test
         id: test
-        uses: stackabletech/actions/run-integration-test@e667cf50055aa43bd454125499843f20c4ebaf3d # TODO: Use released version
+        uses: stackabletech/actions/run-integration-test@48f987367d0cb42db1248d050faabcdf26218f1e # TODO: Use released version
         with:
           replicated-api-token: ${{ secrets.REPLICATED_API_TOKEN }}
           test-mode-input: ${{ inputs.test-mode-input }}
