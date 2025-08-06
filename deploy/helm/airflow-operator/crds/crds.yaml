@@ -591,6 +591,10 @@ spec:
                           - repo
                         type: object
                       type: array
+                    dbInit:
+                      default: true
+                      description: Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be backwward compatible.
+                      type: boolean
                     exposeConfig:
                       default: false
                       description: for internal use only - not for production use.

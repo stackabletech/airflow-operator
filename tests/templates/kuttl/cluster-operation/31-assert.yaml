@@ -1,0 +1,8 @@
+---
+# For this step we expect the database operation to NOT be logged
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+- script: |
+    kubectl -n $NAMESPACE logs airflow-scheduler-default-0 | grep -q "Database migrating done!" && exit 1 || exit 0
