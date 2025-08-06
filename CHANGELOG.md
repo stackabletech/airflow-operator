@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add a flag to determine if database initialization steps should be executed ([#669]).
+
 ### Fixed
 
 - Don't panic on invalid authorization config. Previously, a missing OPA ConfigMap would crash the operator ([#667]).
@@ -9,6 +13,7 @@
 
 [#667]: https://github.com/stackabletech/airflow-operator/pull/667
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
+[#669]: https://github.com/stackabletech/airflow-operator/pull/669
 
 ## [25.7.0] - 2025-07-23
 
