@@ -1,0 +1,22 @@
+= Database initialization
+:description: Configure Airflow DB start-up.
+
+By default, Airflow will run database initialization routines (checking and/or creating the metadata schema and creating an admin user) on start-up.
+These are idempotent and can be run every time as the overhead is minimal.
+However, if these steps should be skipped, a running Airflow cluster can be patched with a resource like this to deactivate the initialization:
+
+[source,yaml]
+----
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  clusterConfig:
+    dbInit: false  # <1>
+----
+<1> Turn off the initialization routine by setting `dbInit` to `false`
+
+NOTE: The field `dbInit` is `true` by default to be backwards-compatible.
+A fresh Airflow cluster cannot be created with this field set to `false` as this results in missing metadata in the Airflow database.
