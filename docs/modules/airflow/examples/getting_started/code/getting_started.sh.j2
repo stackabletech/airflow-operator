@@ -21,6 +21,10 @@ echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redi
 # tag::helm-add-bitnami-pgs[]
 helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
   --version {{ versions.postgresql }} \
+  --set image.repository=bitnamilegacy/postgresql \
+  --set volumePermissions.image.repository=bitnamilegacy/os-shell \
+  --set metrics.image.repository=bitnamilegacy/postgres-exporter \
+  --set global.security.allowInsecureImages=true \
   --set auth.database=airflow \
   --set auth.username=airflow \
   --set auth.password=airflow \
@@ -29,6 +33,13 @@ helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgre
 # tag::helm-add-bitnami-redis[]
 helm install airflow-redis oci://registry-1.docker.io/bitnamicharts/redis \
   --version {{ versions.redis }} \
+  --set global.security.allowInsecureImages=true \
+  --set image.repository=bitnamilegacy/redis \
+  --set sentinel.image.repository=bitnamilegacy/redis-sentinel \
+  --set metrics.image.repository=bitnamilegacy/redis-exporter \
+  --set volumePermissions.image.repository=bitnamilegacy/os-shell \
+  --set kubectl.image.repository=bitnamilegacy/kubectl \
+  --set sysctl.image.repository=bitnamilegacy/os-shell \
   --set replica.replicaCount=1 \
   --set auth.password=redis \
   --wait
