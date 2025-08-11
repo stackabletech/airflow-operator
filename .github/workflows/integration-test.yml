@@ -46,7 +46,7 @@ jobs:
       # TODO: Enable the scheduled runs which hard-code what profile to use
       - name: Run Integration Test
         id: test
-        uses: stackabletech/actions/run-integration-test@48f987367d0cb42db1248d050faabcdf26218f1e # TODO: Use released version
+        uses: stackabletech/actions/run-integration-test@ad167a759aa0380aab276c0f96382476d62c51c6 # TODO: Use released version
         with:
           replicated-api-token: ${{ secrets.REPLICATED_API_TOKEN }}
           test-mode-input: ${{ inputs.test-mode-input }}
@@ -54,28 +54,35 @@ jobs:
           test-mode: ${{ inputs.test-mode }}
           test: ${{ inputs.test }}
 
-      # TODO: Comment back in once integration tests itself work. Also add improvements to the notifications.
-      # - name: Send Notification
-      #   if: ${{ failure() }}
-      #   env:
-      #     SLACK_BOT_TOKEN: ${{ secrets.SLACK_INTEGRATION_TEST_TOKEN }}
-      #   uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
-      #   with:
-      #     channel-id: "C07UYJYSMSN" # notifications-integration-tests
-      #     payload: |
-      #         {
-      #           "text": "Integration Test for *${{ github.repository }}* failed",
-      #           "attachments": [
-      #             {
-      #               "pretext": "Started at ${{ steps.test.outputs.start-time }}, failed at ${{ steps.test.outputs.end-time }}",
-      #               "color": "#aa0000",
-      #               "actions": [
-      #                 {
-      #                   "type": "button",
-      #                   "text": "Go to integration test run",
-      #                   "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      #                 }
-      #               ]
-      #             }
-      #           ]
-      #         }
+      - name: Send Notification
+        if: ${{ failure() || github.run_attempt > 1 }}
+        uses: stackabletech/actions/send-slack-notification@ad167a759aa0380aab276c0f96382476d62c51c6 # TODO: Use released version
+        with:
+          slack-token: ${{ secrets.SLACK_CONTAINER_IMAGE_TOKEN }}
+          failed-tests: ${{ steps.test.outputs.failed-tests }}
+          test-health: ${{ steps.test.outputs.health }}
+          test-result: ${{ steps.test.conclusion }}
+          channel-id: C07UYJYSMSN # notifications-integration-tests
+          type: integration-test
+        # env:
+        #   SLACK_BOT_TOKEN: ${{ secrets.SLACK_INTEGRATION_TEST_TOKEN }}
+        # uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
+        # with:
+        #   channel-id: "C07UYJYSMSN" # notifications-integration-tests
+        #   payload: |
+        #       {
+        #         "text": "Integration Test for *${{ github.repository }}* failed",
+        #         "attachments": [
+        #           {
+        #             "pretext": "Started at ${{ steps.test.outputs.start-time }}, failed at ${{ steps.test.outputs.end-time }}",
+        #             "color": "#aa0000",
+        #             "actions": [
+        #               {
+        #                 "type": "button",
+        #                 "text": "Go to integration test run",
+        #                 "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        #               }
+        #             ]
+        #           }
+        #         ]
+        #       }
