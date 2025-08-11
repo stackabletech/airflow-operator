@@ -1,5 +1,7 @@
 # helm install secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator
 # helm install commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator
+# helm install listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator
+# helm install airflow-operator oci://oci.stackable.tech/sdp-charts/airflow-operator
 # helm install --repo https://charts.bitnami.com/bitnami --version 12.1.5 --set auth.username=airflow --set auth.password=airflow --set auth.database=airflow  --set image.repository=bitnamilegacy/postgresql --set volumePermissions.image.repository=bitnamilegacy/os-shell --set metrics.image.repository=bitnamilegacy/postgres-exporter --set global.security.allowInsecureImages=true airflow-postgresql postgresql
 # helm install --repo https://charts.bitnami.com/bitnami --version 17.3.7 --set auth.password=redis --set replica.replicaCount=1 --set global.security.allowInsecureImages=true --set image.repository=bitnamilegacy/redis --set sentinel.image.repository=bitnamilegacy/redis-sentinel --set metrics.image.repository=bitnamilegacy/redis-exporter --set volumePermissions.image.repository=bitnamilegacy/os-shell --set kubectl.image.repository=bitnamilegacy/kubectl --set sysctl.image.repository=bitnamilegacy/os-shell airflow-redis redis
 # Log in with user01/user01 or user02/user02
