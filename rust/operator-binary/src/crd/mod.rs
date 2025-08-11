@@ -251,9 +251,11 @@ pub mod versioned {
         #[serde(default)]
         pub load_examples: bool,
 
-        /// Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be backwward compatible.
-        #[serde(default = "default_db_init")]
-        pub db_init: bool,
+        /// Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be (techincally) backwards-compatible but also safe.
+        /// WARNING: setting this to false is *unsupported* as subsequent updates to the Airflow cluster may result in broken behaviour due to inconsistent metadata!
+        /// Do not change the default unless you know what you are doing!
+        #[serde(default)]
+        pub database_initialization: DatabaseInitializationConfig,
 
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
@@ -285,7 +287,23 @@ pub mod versioned {
     }
 }
 
-fn default_db_init() -> bool {
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseInitializationConfig {
+    /// Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be backwward compatible.
+    #[serde(default = "default_db_init")]
+    pub enabled: bool,
+}
+
+impl Default for DatabaseInitializationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_db_init(),
+        }
+    }
+}
+
+pub fn default_db_init() -> bool {
     true
 }
 
@@ -585,7 +603,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.db_init {
+                    if airflow.spec.cluster_config.database_initialization.enabled {
                         tracing::info!("Database initialization...");
                         command.extend(vec![
                             "airflow db migrate".to_string(),
@@ -626,7 +644,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.db_init {
+                    if airflow.spec.cluster_config.database_initialization.enabled {
                         tracing::info!("Database initialization...");
                         command.extend(vec![
                             // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
@@ -1008,6 +1026,6 @@ mod tests {
         assert!(cluster.spec.cluster_config.load_examples);
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
-        assert!(cluster.spec.cluster_config.db_init);
+        assert!(cluster.spec.cluster_config.database_initialization.enabled);
     }
 }
