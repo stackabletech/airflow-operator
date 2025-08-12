@@ -288,7 +288,7 @@ pub mod versioned {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseInitializationConfig {
-    /// Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be (techincally) backwards-compatible but also safe.
+    /// Whether to execute the database initialization routines (a combination of database initialization, upgrade and migration depending on the Airflow version). Defaults to true to be (technically) backwards-compatible but also safe.
     /// WARNING: setting this to false is *unsupported* as subsequent updates to the Airflow cluster may result in broken behaviour due to inconsistent metadata!
     /// Do not change the default unless you know what you are doing!
     #[serde(default = "default_db_init")]
