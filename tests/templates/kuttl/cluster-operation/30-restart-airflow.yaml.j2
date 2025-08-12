@@ -25,6 +25,8 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
     credentialsSecret: test-airflow-credentials
+    databaseInitialization:
+      enabled: false
   webservers:
     roleConfig:
       listenerClass: external-unstable
