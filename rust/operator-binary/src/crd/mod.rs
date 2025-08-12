@@ -604,7 +604,7 @@ impl AirflowRole {
                 }
                 AirflowRole::Scheduler => {
                     if airflow.spec.cluster_config.database_initialization.enabled {
-                        tracing::info!("Database initialization...");
+                        tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             "airflow db migrate".to_string(),
                             "airflow users create \
@@ -645,7 +645,7 @@ impl AirflowRole {
                 }
                 AirflowRole::Scheduler => {
                     if airflow.spec.cluster_config.database_initialization.enabled {
-                        tracing::info!("Database initialization...");
+                        tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                             "airflow db init".to_string(),
