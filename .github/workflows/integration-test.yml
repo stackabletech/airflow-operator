@@ -58,7 +58,7 @@ jobs:
         if: ${{ failure() || github.run_attempt > 1 }}
         uses: stackabletech/actions/send-slack-notification@ad167a759aa0380aab276c0f96382476d62c51c6 # TODO: Use released version
         with:
-          slack-token: ${{ secrets.SLACK_CONTAINER_IMAGE_TOKEN }}
+          slack-token: ${{ secrets.SLACK_INTEGRATION_TEST_TOKEN }}
           failed-tests: ${{ steps.test.outputs.failed-tests }}
           test-health: ${{ steps.test.outputs.health }}
           test-result: ${{ steps.test.conclusion }}
