@@ -310,7 +310,7 @@ mod tests {
     use rstest::rstest;
     use stackable_operator::{
         crd::authentication::{ldap, oidc},
-        time::Duration,
+        shared::time::Duration,
     };
 
     use crate::{

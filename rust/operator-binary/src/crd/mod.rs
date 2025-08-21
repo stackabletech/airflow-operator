@@ -38,8 +38,8 @@ use stackable_operator::{
         RoleGroup, RoleGroupRef,
     },
     schemars::{self, JsonSchema},
+    shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
-    time::Duration,
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
     versioned::versioned,
 };
@@ -1017,8 +1017,11 @@ mod tests {
         let cluster: AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let resolved_airflow_image: ResolvedProductImage =
-            cluster.spec.image.resolve("airflow", "0.0.0-dev");
+        let resolved_airflow_image: ResolvedProductImage = cluster
+            .spec
+            .image
+            .resolve("airflow", "0.0.0-dev")
+            .expect("test: resolved product image is always valid");
 
         assert_eq!("2.10.5", &resolved_airflow_image.product_version);
 

@@ -30,7 +30,10 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::{self, ResolvedProductImage},
+        rbac::build_rbac_resources,
+    },
     config::fragment::ValidationError,
     crd::{
         authentication::{core as auth_core, ldap},
@@ -68,11 +71,11 @@ use stackable_operator::{
     role_utils::{
         CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroupRef,
     },
+    shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
@@ -351,6 +354,11 @@ pub enum Error {
     InvalidAuthorizationConfig {
         source: stackable_operator::commons::opa::Error,
     },
+
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -374,10 +382,11 @@ pub async fn reconcile_airflow(
         .context(InvalidAirflowClusterSnafu)?;
 
     let client = &ctx.client;
-    let resolved_product_image: ResolvedProductImage = airflow
+    let resolved_product_image = airflow
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .context(ResolveProductImageSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
@@ -506,7 +515,7 @@ pub async fn reconcile_airflow(
             let role_group_service_recommended_labels = build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
+                &resolved_product_image.app_version_label_value,
                 &rolegroup.role,
                 &rolegroup.role_group,
             );
@@ -606,7 +615,7 @@ pub async fn reconcile_airflow(
                     build_recommended_labels(
                         airflow,
                         AIRFLOW_CONTROLLER_NAME,
-                        &resolved_product_image.app_version_label,
+                        &resolved_product_image.app_version_label_value,
                         role_name,
                         "none",
                     ),
@@ -792,7 +801,7 @@ fn build_rolegroup_config_map(
                 .with_recommended_labels(build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label,
+                    &resolved_product_image.app_version_label_value,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
@@ -837,7 +846,7 @@ fn build_rolegroup_metadata(
         .with_recommended_labels(build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
+            &resolved_product_image.app_version_label_value,
             &rolegroup.role,
             &rolegroup.role_group,
         ))
@@ -905,7 +914,7 @@ fn build_server_rolegroup_statefulset(
     let recommended_object_labels = build_recommended_labels(
         airflow,
         AIRFLOW_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label,
+        &resolved_product_image.app_version_label_value,
         &rolegroup_ref.role,
         &rolegroup_ref.role_group,
     );
@@ -1219,7 +1228,7 @@ fn build_executor_template_config_map(
         .with_recommended_labels(build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
+            &resolved_product_image.app_version_label_value,
             "executor",
             "executor-template",
         ))
@@ -1326,7 +1335,7 @@ fn build_executor_template_config_map(
                 .with_recommended_labels(build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label,
+                    &resolved_product_image.app_version_label_value,
                     "executor",
                     "executor-template",
                 ))
