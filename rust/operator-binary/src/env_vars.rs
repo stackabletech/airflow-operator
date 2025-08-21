@@ -641,8 +641,7 @@ fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<Str
 
 #[cfg(test)]
 mod tests {
-
-    use stackable_operator::time::Duration;
+    use stackable_operator::shared::time::Duration;
 
     use super::*;
     use crate::crd::authorization::OpaConfigResolved;
