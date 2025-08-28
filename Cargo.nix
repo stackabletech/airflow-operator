@@ -923,9 +923,9 @@ rec {
       };
       "bitflags" = rec {
         crateName = "bitflags";
-        version = "2.9.2";
+        version = "2.9.3";
         edition = "2021";
-        sha256 = "0adahzd1i2kv86k0vzkaxdcw9zjm124x9698yp7qgmiimd2varba";
+        sha256 = "0pgjwsd9qgdmsmwpvg47p9ccrsc26yfjqawbhsi9qds5sg6brvrl";
         authors = [
           "The Rust Project Developers"
         ];
@@ -1017,9 +1017,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.2.33";
+        version = "1.2.34";
         edition = "2018";
-        sha256 = "0pwv1ql0gpvacwdn44643adr0s0q8p575pbp4xz5mfi26a0giq1y";
+        sha256 = "1p5ycww65h7xca03lwdp264qalw8v357rg5h17s7naq3h3m4mg22";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -1124,10 +1124,10 @@ rec {
       };
       "clap" = rec {
         crateName = "clap";
-        version = "4.5.45";
+        version = "4.5.46";
         edition = "2021";
         crateBin = [];
-        sha256 = "0663m85dd0aq1g3mkwz5b8pkjv4f5k2smlz7bagib4iqf15fgh0z";
+        sha256 = "0mvfywfsyyps8wkz7nx75aj1jc715maxis8yr92fbli1kk7lypic";
         dependencies = [
           {
             name = "clap_builder";
@@ -1166,9 +1166,9 @@ rec {
       };
       "clap_builder" = rec {
         crateName = "clap_builder";
-        version = "4.5.44";
+        version = "4.5.46";
         edition = "2021";
-        sha256 = "1a48x3c9q1l7r6wbgy71mq6kfsihpqzxsnbaaamcgwvp88hz9rxk";
+        sha256 = "0hbxwmi3amm9ls0vx3gkz9z55ylj4lpbq0b0d1ghbyzwwsh57jzy";
         dependencies = [
           {
             name = "anstream";
@@ -1571,22 +1571,22 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "suggestions" ];
       };
-      "darling 0.21.2" = rec {
+      "darling 0.21.3" = rec {
         crateName = "darling";
-        version = "0.21.2";
+        version = "0.21.3";
         edition = "2021";
-        sha256 = "0w05fq6kl16avbgkgwxg5c8myj397539gq337r1x1hr2s8yhni08";
+        sha256 = "1h281ah78pz05450r71h3gwm2n24hy8yngbz58g426l4j1q37pww";
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
         ];
         dependencies = [
           {
             name = "darling_core";
-            packageId = "darling_core 0.21.2";
+            packageId = "darling_core 0.21.3";
           }
           {
             name = "darling_macro";
-            packageId = "darling_macro 0.21.2";
+            packageId = "darling_macro 0.21.3";
           }
         ];
         features = {
@@ -1639,11 +1639,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "strsim" "suggestions" ];
       };
-      "darling_core 0.21.2" = rec {
+      "darling_core 0.21.3" = rec {
         crateName = "darling_core";
-        version = "0.21.2";
+        version = "0.21.3";
         edition = "2021";
-        sha256 = "0zmzz0czsc8590n4n6isnii5d8da0gm6hnkinyqlm818ph97jnyj";
+        sha256 = "193ya45qgac0a4siwghk0bl8im8h89p3cald7kw8ag3yrmg1jiqj";
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
         ];
@@ -1707,11 +1707,11 @@ rec {
         ];
 
       };
-      "darling_macro 0.21.2" = rec {
+      "darling_macro 0.21.3" = rec {
         crateName = "darling_macro";
-        version = "0.21.2";
+        version = "0.21.3";
         edition = "2021";
-        sha256 = "0cfmv5ks4fjfr2w23zvhjzkkc300ah1x0qkf6blcic3zxadln5ff";
+        sha256 = "10ac85n4lnx3rmf5rw8lijl2c0sbl6ghcpgfmzh0s26ihbghi0yk";
         procMacro = true;
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
@@ -1719,7 +1719,7 @@ rec {
         dependencies = [
           {
             name = "darling_core";
-            packageId = "darling_core 0.21.2";
+            packageId = "darling_core 0.21.3";
           }
           {
             name = "quote";
@@ -2231,13 +2231,13 @@ rec {
           }
           {
             name = "regex-automata";
-            packageId = "regex-automata 0.4.9";
+            packageId = "regex-automata 0.4.10";
             usesDefaultFeatures = false;
             features = [ "alloc" "syntax" "meta" "nfa" "dfa" "hybrid" ];
           }
           {
             name = "regex-syntax";
-            packageId = "regex-syntax 0.8.5";
+            packageId = "regex-syntax 0.8.6";
             usesDefaultFeatures = false;
           }
         ];
@@ -4183,9 +4183,9 @@ rec {
       };
       "indexmap" = rec {
         crateName = "indexmap";
-        version = "2.10.0";
+        version = "2.11.0";
         edition = "2021";
-        sha256 = "0qd6g26gxzl6dbf132w48fa8rr95glly3jhbk90i29726d9xhk7y";
+        sha256 = "1sb3nmhisf9pdwfcxzqlvx97xifcvlh5g0rqj9j7i7qg8f01jj7j";
         dependencies = [
           {
             name = "equivalent";
@@ -4205,6 +4205,7 @@ rec {
           "quickcheck" = [ "dep:quickcheck" ];
           "rayon" = [ "dep:rayon" ];
           "serde" = [ "dep:serde" ];
+          "sval" = [ "dep:sval" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
@@ -4221,9 +4222,9 @@ rec {
       };
       "io-uring" = rec {
         crateName = "io-uring";
-        version = "0.7.9";
+        version = "0.7.10";
         edition = "2021";
-        sha256 = "1i60fxfbxypfgfmq883kwxgldxcjlnnwjazgjiys3893fvrqfdfr";
+        sha256 = "0yvjyygwdcqjcgw8zp254hvjbm7as1c075dl50spdshas3aa4vq4";
         libName = "io_uring";
         authors = [
           "quininer <quininer@live.com>"
@@ -4370,9 +4371,9 @@ rec {
       };
       "jobserver" = rec {
         crateName = "jobserver";
-        version = "0.1.33";
+        version = "0.1.34";
         edition = "2021";
-        sha256 = "12jkn3cxvfs7jsb6knmh9y2b41lwmrk3vdqywkmssx61jzq65wiq";
+        sha256 = "0cwx0fllqzdycqn4d6nb277qx5qwnmjdxdl0lxkkwssx77j3vyws";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -4594,7 +4595,7 @@ rec {
         dependencies = [
           {
             name = "darling";
-            packageId = "darling 0.21.2";
+            packageId = "darling 0.21.3";
             optional = true;
           }
           {
@@ -6776,9 +6777,9 @@ rec {
       };
       "regex" = rec {
         crateName = "regex";
-        version = "1.11.1";
+        version = "1.11.2";
         edition = "2021";
-        sha256 = "148i41mzbx8bmq32hsj1q4karkzzx5m60qza6gdw4pdc9qdyyi5m";
+        sha256 = "04k9rzxd11hcahpyihlswy6f1zqw7lspirv4imm4h0lcdl8gvmr3";
         authors = [
           "The Rust Project Developers"
           "Andrew Gallant <jamslam@gmail.com>"
@@ -6798,13 +6799,13 @@ rec {
           }
           {
             name = "regex-automata";
-            packageId = "regex-automata 0.4.9";
+            packageId = "regex-automata 0.4.10";
             usesDefaultFeatures = false;
             features = [ "alloc" "syntax" "meta" "nfa-pikevm" ];
           }
           {
             name = "regex-syntax";
-            packageId = "regex-syntax 0.8.5";
+            packageId = "regex-syntax 0.8.6";
             usesDefaultFeatures = false;
           }
         ];
@@ -6857,11 +6858,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "regex-syntax" "std" ];
       };
-      "regex-automata 0.4.9" = rec {
+      "regex-automata 0.4.10" = rec {
         crateName = "regex-automata";
-        version = "0.4.9";
+        version = "0.4.10";
         edition = "2021";
-        sha256 = "02092l8zfh3vkmk47yjc8d631zhhcd49ck2zr133prvd3z38v7l0";
+        sha256 = "1mllcfmgjcl6d52d5k09lwwq9wj5mwxccix4bhmw5spy1gx5i53b";
         libName = "regex_automata";
         authors = [
           "The Rust Project Developers"
@@ -6882,7 +6883,7 @@ rec {
           }
           {
             name = "regex-syntax";
-            packageId = "regex-syntax 0.8.5";
+            packageId = "regex-syntax 0.8.6";
             optional = true;
             usesDefaultFeatures = false;
           }
@@ -6903,7 +6904,7 @@ rec {
           "nfa-thompson" = [ "alloc" ];
           "perf" = [ "perf-inline" "perf-literal" ];
           "perf-literal" = [ "perf-literal-substring" "perf-literal-multisubstring" ];
-          "perf-literal-multisubstring" = [ "std" "dep:aho-corasick" ];
+          "perf-literal-multisubstring" = [ "dep:aho-corasick" ];
           "perf-literal-substring" = [ "aho-corasick?/perf-literal" "dep:memchr" ];
           "std" = [ "regex-syntax?/std" "memchr?/std" "aho-corasick?/std" "alloc" ];
           "syntax" = [ "dep:regex-syntax" "alloc" ];
@@ -6933,11 +6934,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "unicode" "unicode-age" "unicode-bool" "unicode-case" "unicode-gencat" "unicode-perl" "unicode-script" "unicode-segment" ];
       };
-      "regex-syntax 0.8.5" = rec {
+      "regex-syntax 0.8.6" = rec {
         crateName = "regex-syntax";
-        version = "0.8.5";
+        version = "0.8.6";
         edition = "2021";
-        sha256 = "0p41p3hj9ww7blnbwbj9h7rwxzxg0c1hvrdycgys8rxyhqqw859b";
+        sha256 = "00chjpglclfskmc919fj5aq308ffbrmcn7kzbkz92k231xdsmx6a";
         libName = "regex_syntax";
         authors = [
           "The Rust Project Developers"
@@ -8766,7 +8767,7 @@ rec {
         dependencies = [
           {
             name = "darling";
-            packageId = "darling 0.21.2";
+            packageId = "darling 0.21.3";
           }
           {
             name = "proc-macro2";
@@ -9034,7 +9035,7 @@ rec {
           }
           {
             name = "darling";
-            packageId = "darling 0.21.2";
+            packageId = "darling 0.21.3";
           }
           {
             name = "indoc";
@@ -10797,9 +10798,9 @@ rec {
       };
       "url" = rec {
         crateName = "url";
-        version = "2.5.5";
+        version = "2.5.7";
         edition = "2018";
-        sha256 = "0n6rjsz5l47z8lc69rn0nin2qbpzy9gx7awdmqa5svrbnc0id5pc";
+        sha256 = "0nzghdv0kcksyvri0npxbjzyx2ihprks5k590y77bld355m17g08";
         authors = [
           "The rust-url developers"
         ];
@@ -10840,7 +10841,7 @@ rec {
         features = {
           "default" = [ "std" ];
           "serde" = [ "dep:serde" ];
-          "std" = [ "idna/std" "percent-encoding/std" "form_urlencoded/std" ];
+          "std" = [ "idna/std" "percent-encoding/std" "form_urlencoded/std" "serde/std" ];
         };
         resolvedDefaultFeatures = [ "default" "serde" "std" ];
       };
@@ -12919,9 +12920,9 @@ rec {
       };
       "winnow" = rec {
         crateName = "winnow";
-        version = "0.7.12";
+        version = "0.7.13";
         edition = "2021";
-        sha256 = "159y8inpy86xswmr4yig9hxss0v2fssyqy1kk12504n8jbsfpvgk";
+        sha256 = "1krrjc1wj2vx0r57m9nwnlc1zrhga3fq41d8w9hysvvqb5mj7811";
         dependencies = [
           {
             name = "memchr";
