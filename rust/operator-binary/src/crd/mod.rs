@@ -70,7 +70,6 @@ pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 
 pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
-pub const TEMPLATE_CONFIGMAP_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
@@ -377,6 +376,10 @@ impl v1alpha1::AirflowCluster {
 
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         self.spec.cluster_config.volume_mounts.clone()
+    }
+
+    pub fn executor_template_configmap_name(&self) -> String {
+        format!("{}-executor-pod-template", self.name_any())
     }
 
     /// Retrieve and merge resource configs for role and role groups
