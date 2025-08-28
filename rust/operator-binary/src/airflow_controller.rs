@@ -88,8 +88,7 @@ use crate::{
         AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
         ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
-        STACKABLE_LOG_DIR, TEMPLATE_CONFIGMAP_NAME, TEMPLATE_LOCATION, TEMPLATE_NAME,
-        TEMPLATE_VOLUME_NAME,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -1110,7 +1109,7 @@ fn build_server_rolegroup_statefulset(
     if let AirflowExecutor::KubernetesExecutor { .. } = executor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
-                .with_config_map(TEMPLATE_CONFIGMAP_NAME)
+                .with_config_map(airflow.executor_template_configmap_name())
                 .build(),
         )
         .context(AddVolumeSnafu)?;
@@ -1329,7 +1328,7 @@ fn build_executor_template_config_map(
         .metadata(
             ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
-                .name(TEMPLATE_CONFIGMAP_NAME)
+                .name(airflow.executor_template_configmap_name())
                 .ownerreference_from_resource(airflow, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(build_recommended_labels(

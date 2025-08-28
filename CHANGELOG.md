@@ -10,6 +10,9 @@
 
 - Don't panic on invalid authorization config. Previously, a missing OPA ConfigMap would crash the operator ([#667]).
 - Fix OPA authorization for Airflow 3. Airflow 3 needs to be configured via env variables, the operator now does this correctly ([#668]).
+- Allow multiple Airflows in the same namespace to use Kubernetes executors.
+  Previously, the operator would always use the same name for the executor Pod template ConfigMap.
+  In case you had multiple Airflows, the two "fought" over writing to that ConfigMap.
 
 [#667]: https://github.com/stackabletech/airflow-operator/pull/667
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
