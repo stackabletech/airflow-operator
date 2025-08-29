@@ -1168,7 +1168,10 @@ fn build_server_rolegroup_statefulset(
                 AirflowRole::Scheduler => {
                     "OrderedReady" // Scheduler pods should start after another, since part of their startup phase is initializing the database, see crd/src/lib.rs
                 }
-                AirflowRole::Webserver | AirflowRole::Worker => "Parallel",
+                AirflowRole::Webserver
+                | AirflowRole::Worker
+                | AirflowRole::Processor
+                | AirflowRole::Triggerer => "Parallel",
             }
             .to_string(),
         ),

@@ -15,8 +15,8 @@ use stackable_operator::{
 
 use crate::{
     crd::{
-        AirflowConfig, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
-        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -61,7 +61,7 @@ const PYTHONPATH: &str = "PYTHONPATH";
 /// This key is only intended for use during experimental support and will
 /// be replaced with a secret at a later stage. See the issue covering
 /// this at <https://github.com/stackabletech/airflow-operator/issues/639>.
-const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
+//const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -86,57 +86,53 @@ pub fn build_airflow_statefulset_envs(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
+    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
     env.extend(static_envs(git_sync_resources));
-
-    add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
 
-    let secret_prop =
-        env_vars.and_then(|vars| vars.get(AirflowConfig::CREDENTIALS_SECRET_PROPERTY));
+    add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
-    if let Some(secret) = secret_prop {
+    env.insert(
+        AIRFLOW_WEBSERVER_SECRET_KEY.into(),
+        // The secret key is used to run the webserver flask app and also used to authorize
+        // requests to Celery workers when logs are retrieved.
+        env_var_from_secret(
+            AIRFLOW_WEBSERVER_SECRET_KEY,
+            secret,
+            "connections.secretKey",
+        ),
+    );
+    env.insert(
+        AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
+        env_var_from_secret(
+            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        ),
+    );
+
+    // Redis is only needed when celery executors are used
+    // see https://github.com/stackabletech/airflow-operator/issues/424 for details
+    if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
         env.insert(
-            AIRFLOW_WEBSERVER_SECRET_KEY.into(),
-            // The secret key is used to run the webserver flask app and also used to authorize
-            // requests to Celery workers when logs are retrieved.
+            AIRFLOW_CELERY_RESULT_BACKEND.into(),
             env_var_from_secret(
-                AIRFLOW_WEBSERVER_SECRET_KEY,
+                AIRFLOW_CELERY_RESULT_BACKEND,
                 secret,
-                "connections.secretKey",
+                "connections.celeryResultBackend",
             ),
         );
         env.insert(
-            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
+            AIRFLOW_CELERY_BROKER_URL.into(),
             env_var_from_secret(
-                AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
+                AIRFLOW_CELERY_BROKER_URL,
                 secret,
-                "connections.sqlalchemyDatabaseUri",
+                "connections.celeryBrokerUrl",
             ),
         );
-
-        // Redis is only needed when celery executors are used
-        // see https://github.com/stackabletech/airflow-operator/issues/424 for details
-        if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
-            env.insert(
-                AIRFLOW_CELERY_RESULT_BACKEND.into(),
-                env_var_from_secret(
-                    AIRFLOW_CELERY_RESULT_BACKEND,
-                    secret,
-                    "connections.celeryResultBackend",
-                ),
-            );
-            env.insert(
-                AIRFLOW_CELERY_BROKER_URL.into(),
-                env_var_from_secret(
-                    AIRFLOW_CELERY_BROKER_URL,
-                    secret,
-                    "connections.celeryBrokerUrl",
-                ),
-            );
-        }
     }
 
     let dags_folder = get_dags_folder(git_sync_resources);
@@ -454,6 +450,8 @@ fn add_version_specific_env_vars(
     resolved_product_image: &ResolvedProductImage,
     env: &mut BTreeMap<String, EnvVar>,
 ) {
+    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
+
     if resolved_product_image.product_version.starts_with("3.") {
         env.extend(execution_server_env_vars(airflow));
         env.insert(
@@ -483,13 +481,17 @@ fn add_version_specific_env_vars(
         // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
         // later it will be accessed from a secret to avoid cluster restarts
         // being triggered by an operator restart.
+        // env.insert(
+        //     "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+        //     EnvVar {
+        //         name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+        //         value: Some(JWT_KEY.into()),
+        //         ..Default::default()
+        //     },
+        // );
         env.insert(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-            EnvVar {
-                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-                value: Some(JWT_KEY.into()),
-                ..Default::default()
-            },
+            env_var_from_secret("AIRFLOW__API_AUTH__JWT_SECRET", secret, "jwt.key"),
         );
         if airflow_role == &AirflowRole::Webserver {
             // Sometimes a race condition can arise when both scheduler and
@@ -527,6 +529,19 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
+        if airflow.spec.processors.is_some() {
+            // In airflow 2.x the dag-processor can optionally be started as a
+            // standalone process (rather then as a scheduler subprocess),
+            // governed by this env-var
+            env.insert(
+                "AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR".into(),
+                EnvVar {
+                    name: "AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR".into(),
+                    value: Some("True".into()),
+                    ..Default::default()
+                },
+            );
+        }
     }
 }
 

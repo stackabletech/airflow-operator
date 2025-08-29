@@ -217,6 +217,14 @@ pub mod versioned {
 
         #[serde(flatten)]
         pub executor: AirflowExecutor,
+
+        /// The `processor` role runs the DAG processor routine for DAG preparation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub processors: Option<Role<AirflowConfigFragment>>,
+
+        /// The `triggerer` role runs the triggerer process for use with deferrable DAG operators.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub triggerers: Option<Role<AirflowConfigFragment>>,
     }
 
     #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
@@ -343,7 +351,10 @@ impl v1alpha1::AirflowCluster {
     pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
         match role {
             AirflowRole::Webserver => Some(role_service_name(&self.name_any(), &role.to_string())),
-            AirflowRole::Scheduler | AirflowRole::Worker => None,
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::Processor
+            | AirflowRole::Triggerer => None,
         }
     }
 
@@ -357,6 +368,8 @@ impl v1alpha1::AirflowCluster {
                 .to_owned()
                 .map(extract_role_from_webserver_config),
             AirflowRole::Scheduler => self.spec.schedulers.to_owned(),
+            AirflowRole::Processor => self.spec.processors.to_owned(),
+            AirflowRole::Triggerer => self.spec.triggerers.to_owned(),
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
                     Some(config.clone())
@@ -407,6 +420,24 @@ impl v1alpha1::AirflowCluster {
             AirflowRole::Scheduler => {
                 self.spec
                     .schedulers
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Processor => {
+                self.spec
+                    .processors
+                    .as_ref()
+                    .context(UnknownAirflowRoleSnafu {
+                        role: role.to_string(),
+                        roles: AirflowRole::roles(),
+                    })?
+            }
+            AirflowRole::Triggerer => {
+                self.spec
+                    .triggerers
                     .as_ref()
                     .context(UnknownAirflowRoleSnafu {
                         role: role.to_string(),
@@ -561,6 +592,12 @@ pub enum AirflowRole {
 
     #[strum(serialize = "worker")]
     Worker,
+
+    #[strum(serialize = "processor")]
+    Processor,
+
+    #[strum(serialize = "triggerer")]
+    Triggerer,
 }
 
 impl AirflowRole {
@@ -622,10 +659,27 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow dag-processor &".to_string(),
                         "airflow scheduler &".to_string(),
                     ]);
+                    if airflow.spec.processors.is_none() {
+                        // If no processors role has been specified, the
+                        // process needs to be included with the scheduler
+                        // (with 3.x there is no longer the possibility of
+                        // starting it as a subprocess, so it has to be
+                        // explicitly started *somewhere*)
+                        command.extend(vec!["airflow dag-processor &".to_string()]);
+                    }
                 }
+                AirflowRole::Processor => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow dag-processor &".to_string(),
+                ]),
+                AirflowRole::Triggerer => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow triggerer &".to_string(),
+                ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
@@ -668,6 +722,16 @@ impl AirflowRole {
                         "airflow scheduler &".to_string(),
                     ]);
                 }
+                AirflowRole::Processor => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow dag-processor &".to_string(),
+                ]),
+                AirflowRole::Triggerer => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow triggerer &".to_string(),
+                ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
@@ -724,6 +788,8 @@ impl AirflowRole {
             AirflowRole::Webserver => Some(HTTP_PORT),
             AirflowRole::Scheduler => None,
             AirflowRole::Worker => None,
+            AirflowRole::Processor => None,
+            AirflowRole::Triggerer => None,
         }
     }
 
@@ -742,7 +808,7 @@ impl AirflowRole {
                 .webservers
                 .to_owned()
                 .map(|webserver| webserver.role_config.listener_class),
-            Self::Worker | Self::Scheduler => None,
+            Self::Worker | Self::Scheduler | Self::Processor | Self::Triggerer => None,
         }
     }
 }
@@ -878,9 +944,10 @@ impl AirflowConfig {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(match role {
-                AirflowRole::Webserver | AirflowRole::Scheduler => {
-                    DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT
-                }
+                AirflowRole::Webserver
+                | AirflowRole::Scheduler
+                | AirflowRole::Processor
+                | AirflowRole::Triggerer => DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT,
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
@@ -944,6 +1011,26 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
             },
         ),
         AirflowRole::Scheduler => (
+            CpuLimitsFragment {
+                min: Some(Quantity("1".to_owned())),
+                max: Some(Quantity("2".to_owned())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("1Gi".to_owned())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::Processor => (
+            CpuLimitsFragment {
+                min: Some(Quantity("1".to_owned())),
+                max: Some(Quantity("2".to_owned())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("1Gi".to_owned())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::Triggerer => (
             CpuLimitsFragment {
                 min: Some(Quantity("1".to_owned())),
                 max: Some(Quantity("2".to_owned())),
