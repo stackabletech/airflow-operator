@@ -1169,7 +1169,7 @@ fn build_server_rolegroup_statefulset(
                 }
                 AirflowRole::Webserver
                 | AirflowRole::Worker
-                | AirflowRole::Processor
+                | AirflowRole::DagProcessor
                 | AirflowRole::Triggerer => "Parallel",
             }
             .to_string(),

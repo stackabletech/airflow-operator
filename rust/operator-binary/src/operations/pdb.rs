@@ -37,7 +37,7 @@ pub async fn add_pdbs(
     let max_unavailable = pdb.max_unavailable.unwrap_or(match role {
         AirflowRole::Scheduler => max_unavailable_schedulers(),
         AirflowRole::Webserver => max_unavailable_webservers(),
-        AirflowRole::Processor => max_unavailable_processors(),
+        AirflowRole::DagProcessor => max_unavailable_dag_processors(),
         AirflowRole::Triggerer => max_unavailable_triggerers(),
         AirflowRole::Worker => match airflow.spec.executor {
             AirflowExecutor::CeleryExecutor { .. } => max_unavailable_workers(),
@@ -80,7 +80,7 @@ fn max_unavailable_webservers() -> u16 {
     1
 }
 
-fn max_unavailable_processors() -> u16 {
+fn max_unavailable_dag_processors() -> u16 {
     1
 }
 

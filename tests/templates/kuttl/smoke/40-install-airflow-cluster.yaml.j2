@@ -15,7 +15,6 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  jwt.key: thisISaJwTSECRET_1234
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
 {% if test_scenario['values']['executor'] == 'celery' %}
@@ -62,12 +61,6 @@ spec:
           webserver_config.py:
             EXPERIMENTAL_FILE_HEADER: |
               COMMON_HEADER_VAR = "group-value"
-        envOverrides: &envOverrides
-          AIRFLOW_CONN_MINIO_CONN: "aws://minioAccessKey:minioSecretKey@/?endpoint_url=http%3A%2F%2Ftest-minio%3A9000"
-          AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
-          AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: s3://my-bucket/
-          AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
-          AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ""
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
     config:
@@ -76,13 +69,11 @@ spec:
     roleGroups:
       default:
         replicas: 2
-        envOverrides: *envOverrides
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    envOverrides: *envOverrides
 {% endif %}
   schedulers:
     config:
@@ -91,15 +82,13 @@ spec:
     roleGroups:
       default:
         replicas: 1
-        envOverrides: *envOverrides
-  processors:
+  dagProcessors:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         replicas: 1
-        envOverrides: *envOverrides
   triggerers:
     config:
       logging:
@@ -107,4 +96,3 @@ spec:
     roleGroups:
       default:
         replicas: 1
-        envOverrides: *envOverrides

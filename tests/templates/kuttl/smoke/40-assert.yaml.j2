@@ -51,6 +51,30 @@ status:
   readyReplicas: 1
   replicas: 1
 ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-dagprocessor-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-triggerer-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -75,6 +99,24 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: airflow-scheduler
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-dagprocessor
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-triggerer
 status:
   expectedPods: 1
   currentHealthy: 1

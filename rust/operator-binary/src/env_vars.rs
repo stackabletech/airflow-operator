@@ -61,7 +61,7 @@ const PYTHONPATH: &str = "PYTHONPATH";
 /// This key is only intended for use during experimental support and will
 /// be replaced with a secret at a later stage. See the issue covering
 /// this at <https://github.com/stackabletech/airflow-operator/issues/639>.
-//const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
+const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -450,8 +450,6 @@ fn add_version_specific_env_vars(
     resolved_product_image: &ResolvedProductImage,
     env: &mut BTreeMap<String, EnvVar>,
 ) {
-    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
-
     if resolved_product_image.product_version.starts_with("3.") {
         env.extend(execution_server_env_vars(airflow));
         env.insert(
@@ -481,17 +479,13 @@ fn add_version_specific_env_vars(
         // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
         // later it will be accessed from a secret to avoid cluster restarts
         // being triggered by an operator restart.
-        // env.insert(
-        //     "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-        //     EnvVar {
-        //         name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-        //         value: Some(JWT_KEY.into()),
-        //         ..Default::default()
-        //     },
-        // );
         env.insert(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-            env_var_from_secret("AIRFLOW__API_AUTH__JWT_SECRET", secret, "jwt.key"),
+            EnvVar {
+                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
+                value: Some(JWT_KEY.into()),
+                ..Default::default()
+            },
         );
         if airflow_role == &AirflowRole::Webserver {
             // Sometimes a race condition can arise when both scheduler and
@@ -529,10 +523,10 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
-        if airflow.spec.processors.is_some() {
+        if airflow.spec.dag_processors.is_some() {
             // In airflow 2.x the dag-processor can optionally be started as a
             // standalone process (rather then as a scheduler subprocess),
-            // governed by this env-var
+            // accompanied by this env-var being set to True.
             env.insert(
                 "AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR".into(),
                 EnvVar {
