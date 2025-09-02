@@ -239,7 +239,7 @@ jobs:
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
-          image-registry-password: ${{ secrets.harbor-robot-secret }}
+          image-registry-password: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
           image-repository: sdp/${{ steps.name.outputs.OPERATOR_NAME }}
           image-manifest-tag: ${{ steps.build.outputs.image-manifest-tag }}
           source-image-uri: ${{ steps.build.outputs.image-manifest-uri }}
@@ -263,7 +263,7 @@ jobs:
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
-          image-registry-password: ${{ secrets.harbor-robot-secret }}
+          image-registry-password: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
           image-repository: sdp/${{ needs.build-image.outputs.operator-name }}
           image-index-manifest-tag: ${{ needs.build-image.outputs.operator-version }}
 
