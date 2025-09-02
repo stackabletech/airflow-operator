@@ -34,7 +34,6 @@ use stackable_operator::{
         product_image_selection::{self, ResolvedProductImage},
         rbac::build_rbac_resources,
     },
-    config::fragment::ValidationError,
     crd::{
         authentication::{core as auth_core, ldap},
         git_sync, listener,
@@ -122,9 +121,6 @@ pub struct Ctx {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
 
@@ -217,11 +213,6 @@ pub enum Error {
         role: String,
     },
 
-    #[snafu(display("invalid executor name"))]
-    UnidentifiedAirflowExecutor {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::builder::pod::container::Error,
@@ -269,9 +260,6 @@ pub enum Error {
     ApplyExecutorTemplateConfig {
         source: stackable_operator::cluster_resources::Error,
     },
-
-    #[snafu(display("fragment validation failure"))]
-    FragmentValidationFailure { source: ValidationError },
 
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
