@@ -274,6 +274,12 @@ jobs:
       - build-image
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+
       - name: Package, Publish, and Sign Helm Chart
         uses: stackabletech/actions/publish-helm-chart@c89b063ca062b7ccc52cdb300aa221f34d4bf8bc # TODO: Use released version
         with:
