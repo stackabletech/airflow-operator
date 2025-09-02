@@ -275,7 +275,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Package, Publish, and Sign Helm Chart
-        uses: stackabletech/actions/publish-helm-chart@923b9de2c77d2a736035e744c22ab6e5937b4c18 # TODO: Use released version
+        uses: stackabletech/actions/publish-helm-chart@c89b063ca062b7ccc52cdb300aa221f34d4bf8bc # TODO: Use released version
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp+github-action-build
