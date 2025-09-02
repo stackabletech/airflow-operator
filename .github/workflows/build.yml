@@ -109,12 +109,8 @@ jobs:
           command: check ${{ matrix.checks }}
 
   # NOTE (@Techassi): This could instead be done by pre-commit (requires cargo-udeps to be installed)
-  # As long as this is not run by pre-commit, only run it on Rust changes
   cargo-udeps:
-    if: ${{ needs.changed-files.outputs.relevant == 'true' }}
     name: Run cargo-udeps
-    needs:
-      - changed-files
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
