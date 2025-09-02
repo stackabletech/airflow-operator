@@ -17,8 +17,6 @@ use crate::crd::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
     ConfigMapNotFound {
         source: stackable_operator::client::Error,
