@@ -3,40 +3,113 @@
 # DON'T MANUALLY EDIT THIS FILE
 # =============
 ---
-name: Stackable Build Pipeline
+name: Build Operator Artifacts
+
+permissions: {}
 
 on:
   push:
     branches:
       - main
-      - staging
-      - trying
-      - "renovate/**"
     tags:
-      - '[0-9][0-9].[0-9]+.[0-9]+'
       - '[0-9][0-9].[0-9]+.[0-9]+-rc[0-9]+'
-  pull_request:
-  merge_group:
+      - '[0-9][0-9].[0-9]+.[0-9]+'
   schedule:
     # Run every Saturday morning: https://crontab.guru/#15_3_*_*_6
     - cron: '15 3 * * 6'
   workflow_dispatch:
+  pull_request:
+  merge_group:
 
 env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: '0'
-  CARGO_PROFILE_DEV_DEBUG: '0'
-  RUST_TOOLCHAIN_VERSION: "1.87.0"
   RUST_NIGHTLY_TOOLCHAIN_VERSION: "nightly-2025-05-26"
+  NIX_PKG_MANAGER_VERSION: "2.30.0"
+  RUST_TOOLCHAIN_VERSION: "1.87.0"
+  HADOLINT_VERSION: "v2.12.0"
   PYTHON_VERSION: "3.13"
-  RUSTFLAGS: "-D warnings"
-  RUSTDOCFLAGS: "-D warnings"
-  RUST_LOG: "info"
+  CARGO_TERM_COLOR: always
 
 jobs:
-  # Identify unused dependencies
-  run_udeps:
-    name: Run Cargo Udeps
+  changed-files:
+    name: List Changed Files
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      # For pull requests it's not necessary to checkout the code
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - '.github/workflows/build.yaml'
+              - 'rust-toolchain.toml'
+              - '.dockerignore'
+              - 'deploy/**'
+              - 'docker/**'
+              - 'Cargo.*'
+              - 'nix/**'
+              - '**.rs'
+
+  # This job is always run, because we want to catch all potential lints/errors/warnings
+  pre-commit:
+    name: Run pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install host dependencies
+        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
+        with:
+          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
+          version: ubuntu-latest
+
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Run pre-commit
+        uses: stackabletech/actions/run-pre-commit@bdac99602eb834b85fdddf207d68e51d0e8b9380 # v0.9.3
+        with:
+          rust: ${{ env.RUST_NIGHTLY_TOOLCHAIN_VERSION }}
+          nix-github-token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          nix: ${{ env.NIX_PKG_MANAGER_VERSION }}
+          hadolint: ${{ env.HADOLINT_VERSION }}
+
+  # This job is always run to ensure we don't miss any new upstream advisories
+  cargo-deny:
+    name: Run cargo-deny
+    runs-on: ubuntu-latest
+    # Prevent sudden announcement of a new advisory from failing CI
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@f2ba7abc2abebaf185c833c3961145a3c275caad # v2.0.13
+        with:
+          command: check ${{ matrix.checks }}
+
+  # NOTE (@Techassi): This could instead be done by pre-commit (requires cargo-udeps to be installed)
+  # As long as this is not run by pre-commit, only run it on Rust changes
+  cargo-udeps:
+    if: ${{ needs.changed-files.outputs.relevant == 'true' }}
+    name: Run cargo-udeps
+    needs:
+      - changed-files
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
@@ -46,439 +119,188 @@ jobs:
         with:
           packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
           version: ubuntu-latest
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          key: udeps
-          cache-all-crates: "true"
-      - uses: stackabletech/cargo-install-action@cargo-udeps
-      - run: cargo udeps --workspace --all-targets
 
-  # This job evaluates the github environment to determine why this action is running and decides if
-  # Helm charts are published based on this.
-  #
-  # The following scenarios are identified:
-  #    - all pull requests land are published:
-  #        condition: github.event_name == "pull_request"
-  #
-  #    - all tagged releases are published:
-  #         condition: github.event_name == 'push' & github.ref.startswith('refs/tags/')
-  #
-  #    - all pushes to main (i.e. PR-merges) and all scheduled/manual workflow runs on main land are published:
-  #         condition: ( github.event_name == 'push' | github.event_name == 'schedule' | github.event_name == 'workflow_dispatch' ) & github.ref == 'refs/heads/main'
-  #
-  # Any other scenarios (e.g. when a branch is created/pushed) will cause the publish step to be skipped, most commonly this is expected to happen for the
-  # branches that the GitHub merge queue feature uses internally for which the checks need to run, but we do not want artifacts to be published.
-  check_helm_publish:
-    name: Decide if Helm charts are pushed to the helm repository based on action trigger
-    runs-on: ubuntu-latest
-    outputs:
-      skip_helm: ${{ steps.checkhelmpublish.outputs.skip_helm }}
-    steps:
-      - id: checkhelmpublish
-        env:
-          TRIGGER: ${{ github.event_name }}
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          if [[ "$TRIGGER" == "pull_request" ]]; then
-            echo "skip_helm=false" >> "$GITHUB_OUTPUT"
-          elif [[ ( "$TRIGGER" == "push" || "$TRIGGER" == "schedule" || "$TRIGGER" == "workflow_dispatch" ) && "$GITHUB_REF" == "refs/heads/main" ]]; then
-            echo "skip_helm=false" >> "$GITHUB_OUTPUT"
-          elif [[ "$TRIGGER" == "push" && $GITHUB_REF == refs/tags/* ]]; then
-            echo "skip_helm=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Unknown trigger and ref combination encountered, skipping publish step: $TRIGGER $GITHUB_REF"
-            echo "skip_helm=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  run_cargodeny:
-    name: Run Cargo Deny
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        checks:
-          - advisories
-          - bans licenses sources
-
-    # Prevent sudden announcement of a new advisory from failing ci:
-    continue-on-error: ${{ matrix.checks == 'advisories' }}
-
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: EmbarkStudios/cargo-deny-action@f2ba7abc2abebaf185c833c3961145a3c275caad # v2.0.13
-        with:
-          command: check ${{ matrix.checks }}
-
-  run_rustfmt:
-    name: Run Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_NIGHTLY_TOOLCHAIN_VERSION }}
-          components: rustfmt
-      - env:
-          RUST_TOOLCHAIN_VERSION: ${{ env.RUST_NIGHTLY_TOOLCHAIN_VERSION }}
-        run: cargo "+$RUST_TOOLCHAIN_VERSION" fmt --all -- --check
-
-  run_clippy:
-    name: Run Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ubuntu-latest
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-          components: clippy
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          key: clippy
-          cache-all-crates: "true"
-        # TODO (@Techassi): Remove this step (unmaintained action, kinda useless step anyway)
-      - name: Run clippy action to produce annotations
-        uses: giraffate/clippy-action@13b9d32482f25d29ead141b79e7e04e7900281e0 # v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: env.GITHUB_TOKEN != null
-        with:
-          clippy_flags: --all-targets -- -D warnings
-          reporter: 'github-pr-review'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-        # TODO (@Techassi): Remove, done by pre-commit
-      - name: Run clippy manually without annotations
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: env.GITHUB_TOKEN == null
-        run: cargo clippy --color never -q --all-targets -- -D warnings
-
-  # TODO (@Techassi): Can be done by pre-commit
-  run_rustdoc:
-    name: Run RustDoc
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ubuntu-latest
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-          components: rustfmt
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          key: doc
-          cache-all-crates: "true"
-      - run: cargo doc --document-private-items
-
-  # TODO (@Techassi): Remove, done by pre-commit
-  run_tests:
-    name: Run Cargo Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ubuntu-latest
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          key: test
-          cache-all-crates: "true"
-      - run: cargo test
-
-
-  # Similar to check_charts, this tries to render the README, and see if there are unintended changes.
-  # This will save us from merging changes to the wrong file (instead of the templated source), and from
-  # forgetting to render out modifications to the README.
-  check_readme:
-    name: Check if committed README is the one we would render from the available parts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install jinja2-cli
-        run: pip install jinja2-cli==0.8.2
-      - name: Regenerate charts
-        run: make render-readme
-      - name: Check if committed README were up to date
-        run: git diff --exit-code
-      - name: Git Diff showed uncommitted changes
-        if: ${{ failure() }}
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        with:
-          script: |
-            core.setFailed('Committed README are not up to date, please make sure to apply them to the templated partials, and re-commit!')
-
-  # This job cleans up the CRDs and Helm charts, followed by rebuilding them
-  # It then runs a `git diff` and fails the entire workflow, if any difference is encountered.
-  #
-  # Since CRD files are generated during the 'cargo build' process we need to run this once after
-  # removing the CRD files to ensure that the checked in versions match what the code expects.
-  #
-  # The reason for this step is, that developers are expected to check in up-to-date versions of charts
-  # as we'd otherwise have to build these in CI and commit them back to the PR, which
-  # creates all kinds of problems.
-  # This failsafe simply aborts anything that has not had charts rebuilt before pushing.
-  check_charts:
-    name: Check if committed Helm charts are up to date
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ubuntu-latest
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - name: Set up Helm
-        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
-        with:
-          version: v3.16.1
-      - name: Set up cargo
-        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          key: charts
-          cache-all-crates: "true"
-      - name: Regenerate charts
-        run: make regenerate-charts
-      - name: Check if committed charts were up to date
-        run: git diff --exit-code
-      - name: Git Diff showed uncommitted changes
-        if: ${{ failure() }}
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        with:
-          script: |
-            core.setFailed('Committed charts were not up to date, please regenerate and re-commit!')
-
-  tests_passed:
-    name: All tests passed
-    needs:
-      - run_udeps
-      - run_cargodeny
-      - run_clippy
-      - run_rustfmt
-      - run_rustdoc
-      - run_tests
-      - check_charts
-      - check_readme
-    runs-on: ubuntu-latest
-    steps:
-      - name: log
-        run: echo All tests have passed!
-
-  # TODO (@Techassi): Most of these publishing and signing tasks can be done by our own actions.
-  # Make use of them just like we do in docker-images.
-  package_and_publish:
-    name: Package Charts, Build Docker Image and publish them - ${{ matrix.runner }}
-    needs:
-      - tests_passed
-      - check_helm_publish
-    strategy:
-      matrix:
-        runner: ["ubuntu-latest", "ubicloud-standard-8-arm"]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
-    permissions:
-      id-token: write
-    env:
-      OCI_REGISTRY_SDP_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_SDP_USERNAME: "robot$sdp+github-action-build"
-      OCI_REGISTRY_SDP_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_SDP_CHARTS_USERNAME: "robot$sdp-charts+github-action-build"
-    if: needs.check_helm_publish.outputs.skip_helm != 'true'
-    outputs:
-      IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ${{ matrix.runner }}
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: cachix/install-nix-action@fc6e360bedc9ee72d75e701397f0bb30dce77568 # v31.5.2
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
-          components: rustfmt
-        # This step checks if the current run was triggered by a push to a pr (or a pr being created).
-        # If this is the case it changes the version of this project in all Cargo.toml files to include the suffix
-        # "-pr<prnumber>" so that the published artifacts can be linked to this PR.
-      - uses: stackabletech/cargo-install-action@main
-        with:
-          crate: cargo-edit
-          bin: cargo-set-version
-      - name: Update version if PR against main branch
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          PR_VERSION="0.0.0-pr${PR_NUMBER}"
-          cargo set-version --offline --workspace "$PR_VERSION"
-      - name: Update version if PR against non-main branch
-        # For PRs to be merged against a release branch, use the version that has already been set in the calling script.
-        # We can't rely on cargo set-version here as we will break semver rules when changing the version to make it
-        # specific to this PR e.g. 1.2.0 --> 1.2.0-pr678, so set it manually.
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'main' }}
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          MANIFEST_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
-          PR_VERSION="${MANIFEST_VERSION}-pr${PR_NUMBER}"
-          sed -i "s/version = \"${MANIFEST_VERSION}\"/version = \"${PR_VERSION}\"/" Cargo.toml
-
-      # Recreate charts and publish charts and docker image.
-      - name: Install cosign
-        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
-      - name: Install syft
-        uses: anchore/sbom-action/download-syft@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
-      - name: Build Docker image and Helm chart
-        run: |
-          # Installing helm and yq on ubicloud-standard-8-arm only
-          if [ "$(arch)" = "aarch64" ]; then
-            curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-            sudo apt-get -y update
-            sudo apt-get -y install helm
-            sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
-          fi
-
-          make build
-      - name: Publish Docker image and Helm chart
-        if: ${{ !github.event.pull_request.head.repo.fork }}
-        run: |
-          # We want to publish helmcharts only once as they have a common name, while still publishing both images with architecture specific tags
-          if [ "$(uname -m)" = "x86_64" ]; then
-            make publish
-          else
-            make docker-publish
-          fi
-        # Output the name of the published image to the Job output for later use
-      - id: printtag
-        name: Output image name and tag
-        if: ${{ !github.event.pull_request.head.repo.fork }}
-        run: echo "IMAGE_TAG=$(make print-docker-tag)" >> "$GITHUB_OUTPUT"
-
-  create_manifest_list:
-    name: Build and publish manifest list
-    if: ${{ !github.event.pull_request.head.repo.fork }}
-    needs:
-      - package_and_publish
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    env:
-      OCI_REGISTRY_SDP_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_SDP_USERNAME: "robot$sdp+github-action-build"
-      OCI_REGISTRY_SDP_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
-      OCI_REGISTRY_SDP_CHARTS_USERNAME: "robot$sdp-charts+github-action-build"
-    steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           submodules: recursive
-      # This step checks if the current run was triggered by a push to a pr (or a pr being created).
-      # If this is the case it changes the version of this project in all Cargo.toml files to include the suffix
-      # "-pr<prnumber>" so that the published artifacts can be linked to this PR.
-      - uses: stackabletech/cargo-install-action@main
+
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN_VERSION }} toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
-          crate: cargo-edit
-          bin: cargo-set-version
-      - name: Update version if PR against main branch
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          cache-all-crates: "true"
+          key: udeps
+
+      - name: Install cargo-udeps
+        uses: stackabletech/cargo-install-action@8f7dbbcd2ebe22717efc132d0dd61e80841994b9 # cargo-udeps
+
+      - name: Run cargo-udeps
+        run: cargo udeps --workspace --all-targets
+
+  build-image:
+    if: ${{ needs.changed-files.outputs.relevant == 'true' }}
+    name: Build/Publish ${{ matrix.runner.arch }} Image
+    needs:
+      - changed-files
+      - cargo-udeps
+      - pre-commit
+      - cargo-deny
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - {name: "ubuntu-latest", arch: "amd64"}
+          - {name: "ubicloud-standard-8-arm", arch: "arm64"}
+    runs-on: ${{ matrix.runner.name }}
+    outputs:
+      operator-version: ${{ steps.version.outputs.OPERATOR_VERSION }}
+      operator-name: ${{ steps.name.outputs.OPERATOR_NAME }}
+    steps:
+      - name: Install host dependencies
+        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
+        with:
+          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
+          version: ${{ matrix.runner.name }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Extract Operator Name
+        id: name
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          PR_VERSION="0.0.0-pr${PR_NUMBER}"
-          cargo set-version --offline --workspace "$PR_VERSION"
-      - name: Update version if PR against non-main branch
-        # For PRs to be merged against a release branch, use the version that has already been set in the calling script.
-        # We can't rely on cargo set-version here as we will break semver rules when changing the version to make it
-        # specific to this PR e.g. 1.2.0 --> 1.2.0-pr678, so set it manually.
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'main' }}
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_DEBUG: ${{ runner.debug }}
         shell: bash
         run: |
           set -euo pipefail
+          [ -n "$GITHUB_DEBUG" ] && set -x
 
-          MANIFEST_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
-          PR_VERSION="${MANIFEST_VERSION}-pr${PR_NUMBER}"
-          sed -i "s/version = \"${MANIFEST_VERSION}\"/version = \"${PR_VERSION}\"/" Cargo.toml
-      - name: Build manifest list
+          OPERATOR_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 2)
+          echo "OPERATOR_NAME=$OPERATOR_NAME" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Update/Extract Operator Version
+        id: version
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_DEBUG: ${{ runner.debug }}
+        shell: bash
         run: |
-          # Creating manifest list
-          make -e docker-manifest-list-build
-          # Pushing and signing manifest list
-          make -e docker-manifest-list-publish
+          set -euo pipefail
+          [ -n "$GITHUB_DEBUG" ] && set -x
 
-  openshift_preflight:
-    name: Run the OpenShift Preflight check on the published images
-    if: ${{ !github.event.pull_request.head.repo.fork }}
+          CURRENT_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+
+          if [ "$PR_BASE_REF" == 'main' ]; then
+            NEW_VERSION="0.0.0-pr$PR_NUMBER"
+          else
+            NEW_VERSION="$CURRENT_VERSION-pr$PR_NUMBER"
+          fi
+
+          sed -i "s/version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+          echo "OPERATOR_VERSION=$NEW_VERSION" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@fc6e360bedc9ee72d75e701397f0bb30dce77568 # v31.5.2
+
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN_VERSION }} Toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+
+      - name: Build Container Image
+        id: build
+        uses: stackabletech/actions/build-container-image@7ffd8c8c5c0378ebeae80f95e2680510d3d1be4c # TODO: Use released image
+        with:
+          image-name: ${{ steps.name.outputs.OPERATOR_NAME }}
+          image-index-manifest-tag: ${{ steps.version.outputs.OPERATOR_VERSION }}
+          build-arguments: VERSION=${{ steps.version.outputs.OPERATOR_VERSION }}
+          container-file: docker/Dockerfile
+
+      - name: Publish Container Image
+        uses: stackabletech/actions/publish-image@7ffd8c8c5c0378ebeae80f95e2680510d3d1be4c # TODO: Use released image
+        with:
+          image-registry-uri: oci.stackable.tech
+          image-registry-username: robot$sdp+github-action-build
+          image-registry-password: ${{ secrets.harbor-robot-secret }}
+          image-repository: sdp/${{ steps.name.outputs.OPERATOR_NAME }}
+          image-manifest-tag: ${{ steps.build.outputs.image-manifest-tag }}
+          source-image-uri: ${{ steps.build.outputs.image-manifest-uri }}
+
+  publish-index:
+    name: Publish/Sign ${{ needs.build-image.outputs.operator-version }} Index
     needs:
-      - create_manifest_list
-      - package_and_publish
+      - build-image
+    permissions:
+      id-token: write
     runs-on: ubuntu-latest
-    env:
-      IMAGE_TAG: ${{ needs.package_and_publish.outputs.IMAGE_TAG }}
     steps:
-      - name: Install preflight
-        run: |
-          wget https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/1.10.0/preflight-linux-amd64
-          chmod +x preflight-linux-amd64
-      - name: Check container
-        run: |
-          ARCH_FOR_PREFLIGHT="$(arch | sed -e 's#x86_64#amd64#' | sed -e 's#aarch64#arm64#')"
-          ./preflight-linux-amd64 check container "$IMAGE_TAG" --platform "${ARCH_FOR_PREFLIGHT}" > preflight.out
-      - name: "Passed?"
-        run: '[ "$(jq -r .passed < preflight.out)" == true ]'
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Publish and Sign Image Index
+        uses: stackabletech/actions/publish-index-manifest@497f3e3cbfe9b89b1e570351b97d050eebcad5d0 # 0.8.3
+        with:
+          image-registry-uri: oci.stackable.tech
+          image-registry-username: robot$sdp+github-action-build
+          image-registry-password: ${{ secrets.harbor-robot-secret }}
+          image-repository: sdp/${{ needs.build-image.outputs.operator-name }}
+          image-index-manifest-tag: ${{ needs.build-image.outputs.operator-version }}
+
+  package-chart:
+    name: Package/Publish ${{ needs.build-image.outputs.operator-version }} Helm Chart
+    needs:
+      - publish-index
+      - build-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Package, Publish, and Sign Helm Chart
+        uses: stackabletech/actions/publish-helm-chart@923b9de2c77d2a736035e744c22ab6e5937b4c18 # TODO: Use released version
+        with:
+          chart-registry-uri: oci.stackable.tech
+          chart-registry-username: robot$sdp+github-action-build
+          chart-registry-password: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
+          chart-repository: sdp-charts/${{ needs.build-image.outputs.operator-name }}
+          chart-directory: deploy/helm/${{ needs.build-image.outputs.operator-name }}
+          chart-version: ${{ needs.build-image.outputs.operator-version }}
+          app-version: ${{ needs.build-image.outputs.operator-version }}
+
+  openshift-preflight-check:
+    name: Run OpenShift Preflight Check for ${{ needs.build-image.outputs.operator-version }}-${{ matrix.arch }}
+    needs:
+      - package-chart
+      - build-image
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Run OpenShift Preflight Check
+        uses: stackabletech/actions/run-openshift-preflight@50f31550a09fc10b16892a85edfb75b6f2e448d6 # TODO: Use released version
+        with:
+          image-index-uri: oci.stackable.tech/sdp/${{ needs.build-image.outputs.operator-name }}:${{ needs.build-image.outputs.operator-version }}
+          image-architecture: ${{ matrix.arch }}
