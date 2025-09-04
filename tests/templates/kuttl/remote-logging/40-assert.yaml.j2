@@ -1,0 +1,81 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-available-condition
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow --timeout 301s
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-airflow-cluster
+timeout: 1200
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 300
+status:
+  readyReplicas: 2
+  replicas: 2
+{% endif %}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-webserver
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-worker
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+{% endif %}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-scheduler
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
