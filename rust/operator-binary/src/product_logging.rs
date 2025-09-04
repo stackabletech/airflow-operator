@@ -101,15 +101,15 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
             output
         });
 
-    let remote_task_log = if resolved_product_image.product_version.starts_with("3") {
+    let remote_task_log = if resolved_product_image.product_version.starts_with("2") {
+        ""
+    } else {
         "
 # This will cause the relevant RemoteLogIO handler to be initialized
 REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
 log = logging.getLogger(__name__)
 log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
 "
-    } else {
-        ""
     };
 
     format!(
