@@ -101,7 +101,7 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
             output
         });
 
-    let remote_task_log = if resolved_product_image.product_version.starts_with("2") {
+    let remote_task_log = if resolved_product_image.product_version.starts_with("2.") {
         ""
     } else {
         "
