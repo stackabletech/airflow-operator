@@ -12,8 +12,8 @@ Traceback (most recent call last):
 botocore.exceptions.ClientError: An error occurred (411) when calling the PutObject operation: Length Required
 ----
 
-Your S3 store doesn't support the new AWS S3 checksums.
-Ideally you upgrade your S3 store to a more recent version that support the new checksums (if there is any).
+then this is an indication that your S3 store doesn't support the new AWS S3 checksums.
+Ideally you should upgrade your S3 store to a more recent version that supports the new checksums (if there is any).
 If this is not possible, you can work around this by setting the following env vars
 
 [source,yaml]
