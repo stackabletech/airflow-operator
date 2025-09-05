@@ -18,6 +18,7 @@
 *** xref:airflow:usage-guide/operations/pod-placement.adoc[]
 *** xref:airflow:usage-guide/operations/pod-disruptions.adoc[]
 *** xref:airflow:usage-guide/operations/graceful-shutdown.adoc[]
+* xref:nifi:troubleshooting/index.adoc[]
 * xref:airflow:reference/index.adoc[]
 ** xref:airflow:reference/crds.adoc[]
 *** {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/[AirflowCluster {external-link-icon}^]
