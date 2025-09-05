@@ -1,0 +1,27 @@
+= Troubleshooting
+
+== S3 Logging: An error occurred (411) when calling the PutObject operation: Length Required
+
+If Airflow is trying to access S3 (e.g. for remote task logging) and throws the following error
+
+[source,text]
+----
+{s3_task_handler.py:190} ERROR - Could not write logs to s3://***/***-task-logs/dag_id=test/run_id=manual__2025-05-22T08:14:17.917519+00:00/task_id=extract/attempt=1.log
+Traceback (most recent call last):
+[..]
+botocore.exceptions.ClientError: An error occurred (411) when calling the PutObject operation: Length Required
+----
+
+Your S3 store doesn't support the new AWS S3 checksums.
+Ideally you upgrade your S3 store to a more recent version that support the new checksums (if there is any).
+If this is not possible, you can work around this by setting the following env vars
+
+[source,yaml]
+----
+webservers: # Also add to other roles!
+  envOverrides:
+    AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+    AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+----
+
+See e.g. https://github.com/minio/minio/issues/20845[this MinIO issue] for details.
