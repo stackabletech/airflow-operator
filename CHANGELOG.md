@@ -13,11 +13,13 @@
 - Allow multiple Airflows in the same namespace to use Kubernetes executors.
   Previously, the operator would always use the same name for the executor Pod template ConfigMap.
   Thus when deploying multiple Airflow instances in the same namespace, there would be a conflict over the contents of that ConfigMap ([#678]).
+- For versions >= 3 custom logging initializes the RemoteLogIO handler to fix remote logging ([#683]).
 
 [#667]: https://github.com/stackabletech/airflow-operator/pull/667
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
 [#669]: https://github.com/stackabletech/airflow-operator/pull/669
 [#678]: https://github.com/stackabletech/airflow-operator/pull/678
+[#683]: https://github.com/stackabletech/airflow-operator/pull/683
 
 ## [25.7.0] - 2025-07-23
 
