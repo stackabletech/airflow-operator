@@ -3,6 +3,7 @@ use std::fmt::{Display, Write};
 use snafu::Snafu;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
+    commons::product_image_selection::ResolvedProductImage,
     kube::Resource,
     product_logging::{
         self,
@@ -43,6 +44,7 @@ pub fn extend_config_map_with_log_config<C, K>(
     main_container: &C,
     vector_container: &C,
     cm_builder: &mut ConfigMapBuilder,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<()>
 where
     C: Clone + Ord + Display,
@@ -53,7 +55,10 @@ where
     }) = logging.containers.get(main_container)
     {
         let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
-        cm_builder.add_data(LOG_CONFIG_FILE, create_airflow_config(log_config, &log_dir));
+        cm_builder.add_data(
+            LOG_CONFIG_FILE,
+            create_airflow_config(log_config, &log_dir, resolved_product_image),
+        );
     }
 
     let vector_log_config = if let Some(ContainerLogConfig {
@@ -75,7 +80,11 @@ where
     Ok(())
 }
 
-fn create_airflow_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {
+fn create_airflow_config(
+    log_config: &AutomaticContainerLogConfig,
+    log_dir: &str,
+    resolved_product_image: &ResolvedProductImage,
+) -> String {
     let loggers_config = log_config
         .loggers
         .iter()
@@ -92,18 +101,28 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
             output
         });
 
+    let remote_task_log = if resolved_product_image.product_version.starts_with("2.") {
+        ""
+    } else {
+        "
+# This will cause the relevant RemoteLogIO handler to be initialized
+REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
+log = logging.getLogger(__name__)
+log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
+"
+    };
+
     format!(
         "\
 import logging
 import os
 from copy import deepcopy
-from airflow.config_templates.airflow_local_settings import DEFAULT_LOGGING_CONFIG
+from airflow.config_templates import airflow_local_settings
 
 os.makedirs('{log_dir}', exist_ok=True)
 
-LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
-
-REMOTE_TASK_LOG = None
+LOGGING_CONFIG = deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)
+{remote_task_log}
 
 LOGGING_CONFIG.setdefault('loggers', {{}})
 for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():

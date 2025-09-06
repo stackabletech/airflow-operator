@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 480
+commands:
+  - script: kubectl cp -n $NAMESPACE ../../../../templates/kuttl/commons/health.py test-airflow-python-0:/tmp
+    timeout: 240

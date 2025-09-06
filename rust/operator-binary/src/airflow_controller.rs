@@ -806,6 +806,7 @@ fn build_rolegroup_config_map(
         container,
         &Container::Vector,
         &mut cm_builder,
+        resolved_product_image,
     )
     .context(InvalidLoggingConfigSnafu {
         cm_name: rolegroup.object_name(),
