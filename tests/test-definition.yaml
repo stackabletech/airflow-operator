@@ -95,6 +95,11 @@ tests:
       - airflow-latest
       - openshift
       - executor
+  - name: remote-logging
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
 suites:
   - name: nightly
     # Run nightly with the latest airflow
