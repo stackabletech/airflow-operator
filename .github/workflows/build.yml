@@ -281,12 +281,12 @@ jobs:
           submodules: recursive
 
       - name: Package, Publish, and Sign Helm Chart
-        uses: stackabletech/actions/publish-helm-chart@c89b063ca062b7ccc52cdb300aa221f34d4bf8bc # TODO: Use released version
+        uses: stackabletech/actions/publish-helm-chart@0030b0c102b79d50bc25e4eb86810754504487c2 # TODO: Use released version
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp+github-action-build
           chart-registry-password: ${{ secrets.HARBOR_ROBOT_SDP_GITHUB_ACTION_BUILD_SECRET }}
-          chart-repository: sdp-charts/${{ needs.build-image.outputs.operator-name }}
+          chart-repository: sdp-charts
           chart-directory: deploy/helm/${{ needs.build-image.outputs.operator-name }}
           chart-version: ${{ needs.build-image.outputs.operator-version }}
           app-version: ${{ needs.build-image.outputs.operator-version }}
