@@ -38,11 +38,15 @@ NOTE: The admin user is disabled if you use a non-default authentication mechani
 
 == Airflow
 
-An Airflow cluster is made of up three components:
+An Airflow cluster is made of up five components, two of which are optional:
 
 * `webserver`: this provides the main UI for user-interaction
 * `executors`: the CeleryExecutor or KubernetesExecutor nodes over which the job workload is distributed by the scheduler
 * `scheduler`: responsible for triggering jobs and persisting their metadata to the backend database
+* `dagProcessors`: (Optional) responsible for monitoring, parsing and preparing DAGs for processing.
+If this role is not specified then the process will be started as a scheduler subprocess (Airflow 2.x), or as a standalone process in the same container as the scheduler (Airflow 3.x+)
+* `triggerers`: (Optional) DAGs making use of deferrable operators can be used together with one or more triggerer processes to free up worker slots.
+This deferral process is also useful for providing a measure of high availability
 
 Create a file named `airflow.yaml` with the following contents:
 
@@ -92,7 +96,9 @@ airflow-redis-master            1/1     16m
 airflow-redis-replicas          1/1     16m
 airflow-scheduler-default       1/1     11m
 airflow-webserver-default       1/1     11m
-airflow-celery-executor-default 2/2     11m
+airflow-celery-executor-default 1/1     11m
+airflow-dagprocessor-default    1/1     11m
+airflow-triggerer-default       1/1     11m
 ----
 
 When the Airflow cluster has been created and the database is initialized, Airflow can be opened in the
