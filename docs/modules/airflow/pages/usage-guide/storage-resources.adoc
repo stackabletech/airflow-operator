@@ -9,6 +9,7 @@ A minimal HA setup consisting of 2 schedulers, 2 workers, 2 webservers, 2 dag-pr
 * `23200` CPU limit
 * `18432Mi` memory request and limit
 
+This includes auxiliary containers for logging, metrics, and gitsync.
 Corresponding to the values above, the operator uses the following resource defaults:
 
 [source,yaml]
