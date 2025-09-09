@@ -27,7 +27,7 @@ It guides you through installing the operator alongside a PostgreSQL database an
 === Custom resources
 
 The AirflowCluster is the resource for the configuration of the Airflow instance.
-The resource defines five xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker`, `scheduler`, `dagProcessor` and `triggerer` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section).
+The custom resource defines the following xref:concepts:roles-and-role-groups.adoc[roles]: `webserver`, `worker`, `scheduler`, `dagProcessor` and `triggerer` (the `worker` role is embedded within `spec.celeryExecutors`: this is described in the next section).
 The `dagProcessor` and `triggerer` roles are optional.
 The various configuration options are explained in the xref:usage-guide/index.adoc[].
 It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resources.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
