@@ -76,16 +76,12 @@ data:
         tags=["example", "triggerer"],
     ) as dag:
 
-        start = EmptyOperator(task_id="start")
-
         sleep = CoreDeferrableSleepOperator(
             task_id="deferrable_sleep",
             duration=10,
         )
 
-        finish = EmptyOperator(task_id="finish")
-
-        start >> sleep >> finish
+        sleep
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
