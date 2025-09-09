@@ -38,7 +38,7 @@ NOTE: The admin user is disabled if you use a non-default authentication mechani
 
 == Airflow
 
-An Airflow cluster is made of up five components, two of which are optional:
+An Airflow cluster is made up of several components, two of which are optional:
 
 * `webserver`: this provides the main UI for user-interaction
 * `executors`: the CeleryExecutor or KubernetesExecutor nodes over which the job workload is distributed by the scheduler
