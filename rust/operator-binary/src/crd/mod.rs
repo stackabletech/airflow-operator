@@ -404,56 +404,13 @@ impl v1alpha1::AirflowCluster {
         // Initialize the result with all default values as baseline
         let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
 
-        let role = match role {
-            AirflowRole::Webserver => {
-                &extract_role_from_webserver_config(self.spec.webservers.to_owned().context(
-                    UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    },
-                )?)
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::DagProcessor => {
-                self.spec
-                    .dag_processors
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-            AirflowRole::Triggerer => {
-                self.spec
-                    .triggerers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
+        let role_config = role.role_config(self)?;
 
         // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
+        let mut conf_role = role_config.config.config;
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
+        let mut conf_rolegroup = role_config
             .role_groups
             .get(&rolegroup_ref.role_group)
             .map(|rg| rg.config.config.clone())
@@ -813,6 +770,47 @@ impl AirflowRole {
                 .map(|webserver| webserver.role_config.listener_class),
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
         }
+    }
+
+    pub fn role_config(
+        &self,
+        airflow: &v1alpha1::AirflowCluster,
+    ) -> Result<Role<AirflowConfigFragment>, Error> {
+        let role = self.to_string();
+        let roles = AirflowRole::roles();
+
+        let role_config = match self {
+            AirflowRole::Webserver => &extract_role_from_webserver_config(
+                airflow
+                    .spec
+                    .webservers
+                    .to_owned()
+                    .context(UnknownAirflowRoleSnafu { role, roles })?,
+            ),
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &airflow.spec.executor {
+                    config
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
+            AirflowRole::Scheduler => airflow
+                .spec
+                .schedulers
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+            AirflowRole::DagProcessor => airflow
+                .spec
+                .dag_processors
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+            AirflowRole::Triggerer => airflow
+                .spec
+                .triggerers
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+        };
+        Ok(role_config.clone())
     }
 }
 
