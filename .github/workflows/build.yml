@@ -77,7 +77,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run pre-commit
-        uses: stackabletech/actions/run-pre-commit@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released image
+        uses: stackabletech/actions/run-pre-commit@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released image
         with:
           rust: ${{ env.RUST_NIGHTLY_TOOLCHAIN_VERSION }}
           nix-github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -227,7 +227,7 @@ jobs:
 
       - name: Build Container Image
         id: build
-        uses: stackabletech/actions/build-container-image@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released image
+        uses: stackabletech/actions/build-container-image@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released image
         with:
           image-name: ${{ steps.name.outputs.OPERATOR_NAME }}
           image-index-manifest-tag: ${{ steps.version.outputs.OPERATOR_VERSION }}
@@ -235,7 +235,7 @@ jobs:
           container-file: docker/Dockerfile
 
       - name: Publish Container Image
-        uses: stackabletech/actions/publish-image@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released image
+        uses: stackabletech/actions/publish-image@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released image
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
@@ -259,7 +259,7 @@ jobs:
           submodules: recursive
 
       - name: Publish and Sign Image Index
-        uses: stackabletech/actions/publish-image-index-manifest@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released image
+        uses: stackabletech/actions/publish-image-index-manifest@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released image
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
@@ -283,7 +283,7 @@ jobs:
           submodules: recursive
 
       - name: Package, Publish, and Sign Helm Chart
-        uses: stackabletech/actions/publish-helm-chart@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released version
+        uses: stackabletech/actions/publish-helm-chart@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released version
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp-charts+github-action-build
@@ -313,7 +313,7 @@ jobs:
           submodules: recursive
 
       - name: Run OpenShift Preflight Check
-        uses: stackabletech/actions/run-openshift-preflight@efc06eb100e571de1388490573c173d83c102f88 # TODO: Use released version
+        uses: stackabletech/actions/run-openshift-preflight@606050044528ca7349663d7e2c6d5f579ee69e87 # TODO: Use released version
         with:
           image-index-uri: oci.stackable.tech/sdp/${{ needs.build-image.outputs.operator-name }}:${{ needs.build-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
