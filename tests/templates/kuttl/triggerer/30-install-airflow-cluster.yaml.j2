@@ -1,0 +1,143 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+{% if test_scenario['values']['executor'] == 'celery' %}
+  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
+  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+{% endif %}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: triggerer-dag
+data:
+  triggerer_dag.py: |
+    from datetime import datetime, timedelta
+
+    from airflow import DAG
+    from airflow.models.baseoperator import BaseOperator
+    from airflow.triggers.temporal import TimeDeltaTrigger
+    from airflow.utils.context import Context
+    from airflow.operators.empty import EmptyOperator
+
+    # ------------------------------------------------------
+    # Custom deferrable operator - does a simple async sleep
+    # ------------------------------------------------------
+    class CoreDeferrableSleepOperator(BaseOperator):
+        """
+        Sleeps for ``duration`` seconds without occupying a worker.
+        The async hand-off happens via ``self.defer`` + ``TimeDeltaTrigger``.
+        """
+        ui_color = "#ffefeb"
+
+        def __init__(self, *, duration: int, **kwargs):
+            super().__init__(**kwargs)
+            self.duration = duration
+
+        def execute(self, context: Context):
+            """Run on a worker, then hand control to the Triggerer."""
+            # Build the trigger that will fire after `duration` seconds.
+            trigger = TimeDeltaTrigger(timedelta(seconds=self.duration))
+
+            # *** Asynchronous hand-off ***
+            # This tells the scheduler: “pause this task, let the Triggerer watch the timer”.
+            self.defer(trigger=trigger, method_name="execute_complete")
+
+        def execute_complete(self, context: Context, event=None):
+            """Resumes here once the Triggerer fires."""
+            self.log.info("Deferrable sleep of %s seconds finished.", self.duration)
+            return "DONE"
+
+    default_args = {"owner": "stackable", "retries": 0}
+
+    with DAG(
+        dag_id="core_deferrable_sleep_demo",
+        schedule=None,
+        # N.B. this be earlier than the current timestamp!
+        start_date=datetime(2025, 8, 1),
+        catchup=False,
+        default_args=default_args,
+        tags=["example", "triggerer"],
+    ) as dag:
+
+        sleep = CoreDeferrableSleepOperator(
+            task_id="deferrable_sleep",
+            duration=10,
+        )
+
+        sleep
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    credentialsSecret: test-airflow-credentials
+    volumes:
+      - name: triggerer-dag
+        configMap:
+          name: triggerer-dag
+    volumeMounts:
+      - name: triggerer-dag
+        mountPath: /dags/triggerer_dag.py
+        subPath: triggerer_dag.py
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    roleGroups:
+      default:
+        envOverrides: &envOverrides
+          AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+        replicas: 1
+{% if test_scenario['values']['executor'] == 'celery' %}
+  celeryExecutors:
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1
+{% elif test_scenario['values']['executor'] == 'kubernetes' %}
+  kubernetesExecutors:
+    envOverrides: *envOverrides
+{% endif %}
+  schedulers:
+    config:
+      gracefulShutdownTimeout: 10s
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1
+  dagProcessors:
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1
+  triggerers:
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1

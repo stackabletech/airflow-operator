@@ -5,6 +5,7 @@
 ### Added
 
 - Add a flag to determine if database initialization steps should be executed ([#669]).
+- Add new roles for dag-processor and triggerer processes ([#679]).
 
 ### Fixed
 
@@ -19,6 +20,7 @@
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
 [#669]: https://github.com/stackabletech/airflow-operator/pull/669
 [#678]: https://github.com/stackabletech/airflow-operator/pull/678
+[#679]: https://github.com/stackabletech/airflow-operator/pull/679
 [#683]: https://github.com/stackabletech/airflow-operator/pull/683
 
 ## [25.7.0] - 2025-07-23

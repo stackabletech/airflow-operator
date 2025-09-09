@@ -205,17 +205,25 @@ pub mod versioned {
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        /// The `webserver` role provides the main UI for user interaction.
+        /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub webservers: Option<Role<AirflowConfigFragment, v1alpha1::WebserverRoleConfig>>,
 
-        /// The `scheduler` is responsible for triggering jobs and persisting their metadata to the backend database.
+        /// The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub schedulers: Option<Role<AirflowConfigFragment>>,
 
         #[serde(flatten)]
         pub executor: AirflowExecutor,
+
+        /// The `dagProcessors` role runs the DAG processor routine for DAG preparation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub dag_processors: Option<Role<AirflowConfigFragment>>,
+
+        /// The `triggerers` role runs the triggerer process for use with deferrable DAG operators.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub triggerers: Option<Role<AirflowConfigFragment>>,
     }
 
     #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
@@ -342,7 +350,10 @@ impl v1alpha1::AirflowCluster {
     pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
         match role {
             AirflowRole::Webserver => Some(role_service_name(&self.name_any(), &role.to_string())),
-            AirflowRole::Scheduler | AirflowRole::Worker => None,
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::DagProcessor
+            | AirflowRole::Triggerer => None,
         }
     }
 
@@ -356,6 +367,8 @@ impl v1alpha1::AirflowCluster {
                 .to_owned()
                 .map(extract_role_from_webserver_config),
             AirflowRole::Scheduler => self.spec.schedulers.to_owned(),
+            AirflowRole::DagProcessor => self.spec.dag_processors.to_owned(),
+            AirflowRole::Triggerer => self.spec.triggerers.to_owned(),
             AirflowRole::Worker => {
                 if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
                     Some(config.clone())
@@ -391,38 +404,13 @@ impl v1alpha1::AirflowCluster {
         // Initialize the result with all default values as baseline
         let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
 
-        let role = match role {
-            AirflowRole::Webserver => {
-                &extract_role_from_webserver_config(self.spec.webservers.to_owned().context(
-                    UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    },
-                )?)
-            }
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => {
-                self.spec
-                    .schedulers
-                    .as_ref()
-                    .context(UnknownAirflowRoleSnafu {
-                        role: role.to_string(),
-                        roles: AirflowRole::roles(),
-                    })?
-            }
-        };
+        let role_config = role.role_config(self)?;
 
         // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
+        let mut conf_role = role_config.config.config;
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
+        let mut conf_rolegroup = role_config
             .role_groups
             .get(&rolegroup_ref.role_group)
             .map(|rg| rg.config.config.clone())
@@ -564,6 +552,12 @@ pub enum AirflowRole {
 
     #[strum(serialize = "worker")]
     Worker,
+
+    #[strum(serialize = "dagprocessor")]
+    DagProcessor,
+
+    #[strum(serialize = "triggerer")]
+    Triggerer,
 }
 
 impl AirflowRole {
@@ -625,10 +619,27 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow dag-processor &".to_string(),
                         "airflow scheduler &".to_string(),
                     ]);
+                    if airflow.spec.dag_processors.is_none() {
+                        // If no dag_processors role has been specified, the
+                        // process needs to be included with the scheduler
+                        // (with 3.x there is no longer the possibility of
+                        // starting it as a subprocess, so it has to be
+                        // explicitly started *somewhere*)
+                        command.extend(vec!["airflow dag-processor &".to_string()]);
+                    }
                 }
+                AirflowRole::DagProcessor => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow dag-processor &".to_string(),
+                ]),
+                AirflowRole::Triggerer => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow triggerer &".to_string(),
+                ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
@@ -671,6 +682,16 @@ impl AirflowRole {
                         "airflow scheduler &".to_string(),
                     ]);
                 }
+                AirflowRole::DagProcessor => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow dag-processor &".to_string(),
+                ]),
+                AirflowRole::Triggerer => command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                    "airflow triggerer &".to_string(),
+                ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
@@ -727,6 +748,8 @@ impl AirflowRole {
             AirflowRole::Webserver => Some(HTTP_PORT),
             AirflowRole::Scheduler => None,
             AirflowRole::Worker => None,
+            AirflowRole::DagProcessor => None,
+            AirflowRole::Triggerer => None,
         }
     }
 
@@ -745,8 +768,49 @@ impl AirflowRole {
                 .webservers
                 .to_owned()
                 .map(|webserver| webserver.role_config.listener_class),
-            Self::Worker | Self::Scheduler => None,
+            Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
         }
+    }
+
+    pub fn role_config(
+        &self,
+        airflow: &v1alpha1::AirflowCluster,
+    ) -> Result<Role<AirflowConfigFragment>, Error> {
+        let role = self.to_string();
+        let roles = AirflowRole::roles();
+
+        let role_config = match self {
+            AirflowRole::Webserver => &extract_role_from_webserver_config(
+                airflow
+                    .spec
+                    .webservers
+                    .to_owned()
+                    .context(UnknownAirflowRoleSnafu { role, roles })?,
+            ),
+            AirflowRole::Worker => {
+                if let AirflowExecutor::CeleryExecutor { config } = &airflow.spec.executor {
+                    config
+                } else {
+                    return Err(Error::NoRoleForExecutorFailure);
+                }
+            }
+            AirflowRole::Scheduler => airflow
+                .spec
+                .schedulers
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+            AirflowRole::DagProcessor => airflow
+                .spec
+                .dag_processors
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+            AirflowRole::Triggerer => airflow
+                .spec
+                .triggerers
+                .as_ref()
+                .context(UnknownAirflowRoleSnafu { role, roles })?,
+        };
+        Ok(role_config.clone())
     }
 }
 
@@ -881,9 +945,10 @@ impl AirflowConfig {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(match role {
-                AirflowRole::Webserver | AirflowRole::Scheduler => {
-                    DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT
-                }
+                AirflowRole::Webserver
+                | AirflowRole::Scheduler
+                | AirflowRole::DagProcessor
+                | AirflowRole::Triggerer => DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT,
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
@@ -947,6 +1012,26 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
             },
         ),
         AirflowRole::Scheduler => (
+            CpuLimitsFragment {
+                min: Some(Quantity("1".to_owned())),
+                max: Some(Quantity("2".to_owned())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("1Gi".to_owned())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::DagProcessor => (
+            CpuLimitsFragment {
+                min: Some(Quantity("1".to_owned())),
+                max: Some(Quantity("2".to_owned())),
+            },
+            MemoryLimitsFragment {
+                limit: Some(Quantity("1Gi".to_owned())),
+                runtime_limits: NoRuntimeLimitsFragment {},
+            },
+        ),
+        AirflowRole::Triggerer => (
             CpuLimitsFragment {
                 min: Some(Quantity("1".to_owned())),
                 max: Some(Quantity("2".to_owned())),

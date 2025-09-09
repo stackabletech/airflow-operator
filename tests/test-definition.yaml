@@ -90,6 +90,11 @@ tests:
       - airflow
       - openshift
       - executor
+  - name: triggerer
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
   - name: remote-logging
     dimensions:
       - airflow-latest

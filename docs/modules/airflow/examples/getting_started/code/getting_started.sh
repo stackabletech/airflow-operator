@@ -88,6 +88,8 @@ echo "Awaiting Airflow rollout finish ..."
 kubectl rollout status --watch --timeout=5m statefulset/airflow-webserver-default
 kubectl rollout status --watch --timeout=5m statefulset/airflow-worker-default
 kubectl rollout status --watch --timeout=5m statefulset/airflow-scheduler-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-dagprocessor-default
+kubectl rollout status --watch --timeout=5m statefulset/airflow-triggerer-default
 # end::watch-airflow-rollout[]
 
 echo "Starting port-forwarding of port 8080"

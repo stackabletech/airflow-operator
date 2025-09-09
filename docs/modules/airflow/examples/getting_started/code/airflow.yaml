@@ -19,8 +19,16 @@ spec:
   celeryExecutors:
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
   schedulers:
+    roleGroups:
+      default:
+        replicas: 1
+  dagProcessors:
+    roleGroups:
+      default:
+        replicas: 1
+  triggerers:
     roleGroups:
       default:
         replicas: 1

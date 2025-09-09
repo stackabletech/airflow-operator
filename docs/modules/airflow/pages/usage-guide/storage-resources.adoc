@@ -1,14 +1,15 @@
 = Resource Requests
-:description: Find out about minimal HA Airflow requirements for CPU and memory, with defaults for schedulers, Celery executors, webservers using Kubernetes resource limits.
+:description: Find out about minimal HA Airflow requirements for CPU and memory, with defaults for schedulers, Celery executors, webservers, dagProcessors and triggerers using Kubernetes resource limits.
 
 include::home:concepts:stackable_resource_requests.adoc[]
 
-A minimal HA setup consisting of 2 schedulers, 2 workers and 2 webservers has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+A minimal HA setup consisting of 2 schedulers, 2 workers, 2 webservers, 2 dag-processors and 1 triggerer has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
 
-* `8700m` CPU request
-* `17400m` CPU limit
-* `15872Mi` memory request and limit
+* `11600` CPU request
+* `23200` CPU limit
+* `18432Mi` memory request and limit
 
+This includes auxiliary containers for logging, metrics, and gitsync.
 Corresponding to the values above, the operator uses the following resource defaults:
 
 [source,yaml]
@@ -22,6 +23,9 @@ spec:
           max: "2"
         memory:
           limit: 1Gi
+    roleGroups:
+      default:
+        replicas: 2
   celeryExecutors:
     config:
       resources:
@@ -30,6 +34,9 @@ spec:
           max: "2"
         memory:
           limit: 3Gi
+    roleGroups:
+      default:
+        replicas: 2
   webservers:
     config:
       resources:
@@ -38,4 +45,29 @@ spec:
           max: "2"
         memory:
           limit: 3Gi
+    roleGroups:
+      default:
+        replicas: 2
+  dagProcessors:
+    config:
+      resources:
+        cpu:
+          min: "1"
+          max: "2"
+        memory:
+          limit: 1Gi
+    roleGroups:
+      default:
+        replicas: 2
+  triggerers:
+    config:
+      resources:
+        cpu:
+          min: "1"
+          max: "2"
+        memory:
+          limit: 1Gi
+    roleGroups:
+      default:
+        replicas: 1
 ----
