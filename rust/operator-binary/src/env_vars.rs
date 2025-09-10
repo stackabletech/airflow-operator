@@ -102,10 +102,9 @@ pub fn build_airflow_statefulset_envs(
             ENV_INTERNAL_SECRET,
         ),
     );
+    // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
     env.insert(
         "AIRFLOW__API__SECRET_KEY".into(),
-        // The secret key is used to run the webserver flask app and also
-        // used to authorize requests to Celery workers when logs are retrieved.
         env_var_from_secret(
             "AIRFLOW__API__SECRET_KEY",
             &internal_secret_name,
@@ -483,8 +482,7 @@ fn add_version_specific_env_vars(
         // This should be random, but must also be consistent across
         // api-services and replicas/roles for a given
         // cluster, but should also be cluster-specific.
-        // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
-        // it is accessed from a secret to avoid cluster restarts
+        // It is accessed from a secret to avoid cluster restarts
         // being triggered by an operator restart.
         let jwt_secret_name = airflow.shared_jwt_secret_name();
         env.insert(

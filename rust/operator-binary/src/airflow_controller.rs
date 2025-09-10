@@ -494,8 +494,6 @@ pub async fn reconcile_airflow(
     )
     .await?;
 
-    // This secret is created even if spooling is not configured.
-    // Trino currently requires the secret to be exactly 256 bits long.
     create_random_secret(
         airflow.shared_jwt_secret_name().as_ref(),
         ENV_JWT_SECRET,
