@@ -91,12 +91,23 @@ pub fn build_airflow_statefulset_envs(
 
     add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
+    // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY since 3.0.2. Can be removed when 3.0.1 is no longer supported.
     env.insert(
         AIRFLOW_WEBSERVER_SECRET_KEY.into(),
         // The secret key is used to run the webserver flask app and also
         // used to authorize requests to Celery workers when logs are retrieved.
         env_var_from_secret(
             AIRFLOW_WEBSERVER_SECRET_KEY,
+            &internal_secret_name,
+            ENV_INTERNAL_SECRET,
+        ),
+    );
+    env.insert(
+        "AIRFLOW__API__SECRET_KEY".into(),
+        // The secret key is used to run the webserver flask app and also
+        // used to authorize requests to Celery workers when logs are retrieved.
+        env_var_from_secret(
+            "AIRFLOW__API__SECRET_KEY",
             &internal_secret_name,
             ENV_INTERNAL_SECRET,
         ),

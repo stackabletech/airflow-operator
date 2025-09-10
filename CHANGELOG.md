@@ -8,6 +8,10 @@
 - Add new roles for dag-processor and triggerer processes ([#679]).
 - Added a note on webserver workers to the trouble-shooting section ([#685]).
 
+### Changed
+
+- Use internal secrets for secret- and jwt-keys ([#686]).
+
 ### Fixed
 
 - Don't panic on invalid authorization config. Previously, a missing OPA ConfigMap would crash the operator ([#667]).
@@ -24,6 +28,7 @@
 [#679]: https://github.com/stackabletech/airflow-operator/pull/679
 [#683]: https://github.com/stackabletech/airflow-operator/pull/683
 [#685]: https://github.com/stackabletech/airflow-operator/pull/685
+[#686]: https://github.com/stackabletech/airflow-operator/pull/686
 
 ## [25.7.0] - 2025-07-23
 
