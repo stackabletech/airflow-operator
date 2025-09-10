@@ -89,6 +89,18 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+// Used for env-vars: AIRFLOW__WEBSERVER__SECRET_KEY, AIRFLOW__API__SECRET_KEY
+// N.B. AIRFLOW__WEBSERVER__SECRET_KEY is deprecated as of 3.0.2.
+// Secret key used to run the api server. It should be as random as possible.
+// It should be consistent across instances of the webserver. The webserver key
+// is also used to authorize requests to Celery workers when logs are retrieved.
+pub const ENV_INTERNAL_SECRET: &str = "INTERNAL_SECRET";
+// Used for env-var: AIRFLOW__API_AUTH__JWT_SECRET
+// Secret key used to encode and decode JWTs to authenticate to public and
+// private APIs. It should be as random as possible, but consistent across
+// instances of API services.
+pub const ENV_JWT_SECRET: &str = "JWT_SECRET";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
@@ -451,6 +463,14 @@ impl v1alpha1::AirflowCluster {
 
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn shared_internal_secret_name(&self) -> String {
+        format!("{}-internal-secret", &self.name_any())
+    }
+
+    pub fn shared_jwt_secret_name(&self) -> String {
+        format!("{}-jwt-secret", &self.name_any())
     }
 }
 
