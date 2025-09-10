@@ -89,6 +89,10 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+// secret vars
+pub const ENV_INTERNAL_SECRET: &str = "INTERNAL_SECRET";
+pub const ENV_JWT_SECRET: &str = "JWT_SECRET";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
@@ -451,6 +455,14 @@ impl v1alpha1::AirflowCluster {
 
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn shared_internal_secret_name(&self) -> String {
+        format!("{}-internal-secret", &self.name_any())
+    }
+
+    pub fn shared_jwt_secret_name(&self) -> String {
+        format!("{}-jwt-secret", &self.name_any())
     }
 }
 
