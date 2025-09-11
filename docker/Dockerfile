@@ -13,7 +13,7 @@
 
 # We want to automatically use the latest. We also don't tag our images with a version.
 # hadolint ignore=DL3007
-FROM oci.stackable.tech/sdp/ubi9-rust-builder:latest AS builder
+FROM oci.stackable.tech/sandbox/ubi9-rust-builder:latest AS builder
 
 
 # We want to automatically use the latest.
