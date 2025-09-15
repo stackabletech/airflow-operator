@@ -2606,6 +2606,7 @@ name = "stackable-airflow-operator"
 version = "0.0.0-dev"
 dependencies = [
  "anyhow",
+ "base64",
  "built",
  "clap",
  "const_format",
@@ -2613,6 +2614,7 @@ dependencies = [
  "futures 0.3.31",
  "indoc",
  "product-config",
+ "rand",
  "rstest",
  "serde",
  "serde_json",

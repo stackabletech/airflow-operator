@@ -13,10 +13,13 @@ product-config.workspace = true
 stackable-operator.workspace = true
 
 anyhow.workspace = true
+base64.workspace = true
 clap.workspace = true
 const_format.workspace = true
 fnv.workspace = true
 futures.workspace = true
+indoc.workspace = true
+rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
@@ -24,7 +27,6 @@ snafu.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-indoc.workspace = true
 
 [build-dependencies]
 built.workspace = true
