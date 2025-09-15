@@ -15,12 +15,13 @@ use stackable_operator::{
 
 use crate::{
     crd::{
-        AirflowExecutor, AirflowRole, ENV_INTERNAL_SECRET, ENV_JWT_SECRET, ExecutorConfig,
-        LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
+        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET},
         v1alpha1,
     },
     util::{env_var_from_secret, role_service_name},

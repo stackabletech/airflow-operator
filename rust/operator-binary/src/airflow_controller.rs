@@ -29,7 +29,6 @@ use stackable_operator::{
             },
         },
     },
-    client::Client,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::{self, ResolvedProductImage},
@@ -44,7 +43,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, Secret, ServiceAccount,
+                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, ServiceAccount,
                 TCPSocketAction,
             },
         },
@@ -85,16 +84,17 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container,
-        ENV_INTERNAL_SECRET, ENV_JWT_SECRET, ExecutorConfig, ExecutorConfigFragment, HTTP_PORT,
-        HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT,
-        METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
-        TEMPLATE_VOLUME_NAME,
+        AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
+        ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        build_recommended_labels, v1alpha1,
+        build_recommended_labels,
+        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET, create_random_secret},
+        v1alpha1,
     },
     env_vars::{self, build_airflow_template_envs},
     operations::{
@@ -349,18 +349,8 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
-    #[snafu(display("object defines no namespace"))]
-    ObjectHasNoNamespace,
-
-    #[snafu(display("failed to retrieve secret for internal communications"))]
-    FailedToRetrieveInternalSecret {
-        source: stackable_operator::client::Error,
-    },
-
-    #[snafu(display("failed to apply internal secret"))]
-    ApplyInternalSecret {
-        source: stackable_operator::client::Error,
-    },
+    #[snafu(display("failed to create internal secret"))]
+    InvalidInternalSecret { source: crd::internal_secret::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -492,7 +482,8 @@ pub async fn reconcile_airflow(
         airflow,
         client,
     )
-    .await?;
+    .await
+    .context(InvalidInternalSecretSnafu)?;
 
     create_random_secret(
         airflow.shared_jwt_secret_name().as_ref(),
@@ -501,7 +492,8 @@ pub async fn reconcile_airflow(
         airflow,
         client,
     )
-    .await?;
+    .await
+    .context(InvalidInternalSecretSnafu)?;
 
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =
@@ -1447,53 +1439,4 @@ fn add_git_sync_resources(
         .context(AddVolumeMountSnafu)?;
 
     Ok(())
-}
-
-async fn create_random_secret(
-    secret_name: &str,
-    secret_key: &str,
-    secret_byte_size: usize,
-    airflow: &v1alpha1::AirflowCluster,
-    client: &Client,
-) -> Result<()> {
-    let mut internal_secret = BTreeMap::new();
-    internal_secret.insert(secret_key.to_string(), get_random_base64(secret_byte_size));
-
-    let secret = Secret {
-        immutable: Some(true),
-        metadata: ObjectMetaBuilder::new()
-            .name(secret_name)
-            .namespace_opt(airflow.namespace())
-            .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .build(),
-        string_data: Some(internal_secret),
-        ..Secret::default()
-    };
-
-    if client
-        .get_opt::<Secret>(
-            &secret.name_any(),
-            secret
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(FailedToRetrieveInternalSecretSnafu)?
-        .is_none()
-    {
-        client
-            .apply_patch(AIRFLOW_CONTROLLER_NAME, &secret, &secret)
-            .await
-            .context(ApplyInternalSecretSnafu)?;
-    }
-
-    Ok(())
-}
-
-fn get_random_base64(byte_size: usize) -> String {
-    let mut buf: Vec<u8> = vec![0; byte_size];
-    openssl::rand::rand_bytes(&mut buf).unwrap();
-    openssl::base64::encode_block(&buf)
 }
