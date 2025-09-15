@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use base64::{Engine as _, engine::general_purpose};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder, client::Client, k8s_openapi::api::core::v1::Secret,
@@ -54,12 +55,11 @@ pub enum Error {
 pub async fn create_random_secret(
     secret_name: &str,
     secret_key: &str,
-    secret_byte_size: usize,
     airflow: &v1alpha1::AirflowCluster,
     client: &Client,
 ) -> Result<()> {
     let mut internal_secret = BTreeMap::new();
-    internal_secret.insert(secret_key.to_string(), get_random_base64(secret_byte_size));
+    internal_secret.insert(secret_key.to_string(), get_random_base64());
 
     let secret = Secret {
         immutable: Some(true),
@@ -94,8 +94,8 @@ pub async fn create_random_secret(
     Ok(())
 }
 
-fn get_random_base64(byte_size: usize) -> String {
-    let mut buf: Vec<u8> = vec![0; byte_size];
-    openssl::rand::rand_bytes(&mut buf).unwrap();
-    openssl::base64::encode_block(&buf)
+fn get_random_base64() -> String {
+    let serial_number = rand::random::<u64>();
+    let bytes = serial_number.to_le_bytes();
+    general_purpose::STANDARD.encode(bytes)
 }
