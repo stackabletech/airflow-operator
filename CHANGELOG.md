@@ -7,6 +7,7 @@
 - Add a flag to determine if database initialization steps should be executed ([#669]).
 - Add new roles for dag-processor and triggerer processes ([#679]).
 - Added a note on webserver workers to the trouble-shooting section ([#685]).
+- Helm: Allow Pod `priorityClassName` to be configured ([#687]).
 
 ### Fixed
 
@@ -24,6 +25,7 @@
 [#679]: https://github.com/stackabletech/airflow-operator/pull/679
 [#683]: https://github.com/stackabletech/airflow-operator/pull/683
 [#685]: https://github.com/stackabletech/airflow-operator/pull/685
+[#687]: https://github.com/stackabletech/airflow-operator/pull/687
 
 ## [25.7.0] - 2025-07-23
 
