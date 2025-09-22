@@ -60,6 +60,7 @@ use crate::{
 pub mod affinity;
 pub mod authentication;
 pub mod authorization;
+pub mod internal_secret;
 
 pub const APP_NAME: &str = "airflow";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
@@ -451,6 +452,14 @@ impl v1alpha1::AirflowCluster {
 
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn shared_internal_secret_name(&self) -> String {
+        format!("{}-internal-secret", &self.name_any())
+    }
+
+    pub fn shared_jwt_secret_name(&self) -> String {
+        format!("{}-jwt-secret", &self.name_any())
     }
 }
 

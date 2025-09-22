@@ -92,7 +92,9 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        build_recommended_labels, v1alpha1,
+        build_recommended_labels,
+        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET, create_random_secret},
+        v1alpha1,
     },
     env_vars::{self, build_airflow_template_envs},
     operations::{
@@ -346,6 +348,9 @@ pub enum Error {
     ResolveProductImage {
         source: product_image_selection::Error,
     },
+
+    #[snafu(display("failed to create internal secret"))]
+    InvalidInternalSecret { source: crd::internal_secret::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -469,6 +474,26 @@ pub async fn reconcile_airflow(
         )
         .await?;
     }
+
+    create_random_secret(
+        airflow.shared_internal_secret_name().as_ref(),
+        ENV_INTERNAL_SECRET,
+        256,
+        airflow,
+        client,
+    )
+    .await
+    .context(InvalidInternalSecretSnafu)?;
+
+    create_random_secret(
+        airflow.shared_jwt_secret_name().as_ref(),
+        ENV_JWT_SECRET,
+        256,
+        airflow,
+        client,
+    )
+    .await
+    .context(InvalidInternalSecretSnafu)?;
 
     for (role_name, role_config) in validated_role_config.iter() {
         let airflow_role =

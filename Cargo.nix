@@ -6682,7 +6682,7 @@ rec {
           "std_rng" = [ "dep:rand_chacha" ];
           "thread_rng" = [ "std" "std_rng" "os_rng" ];
         };
-        resolvedDefaultFeatures = [ "alloc" "os_rng" "small_rng" "std" "std_rng" "thread_rng" ];
+        resolvedDefaultFeatures = [ "alloc" "default" "os_rng" "small_rng" "std" "std_rng" "thread_rng" ];
       };
       "rand_chacha" = rec {
         crateName = "rand_chacha";
@@ -8452,6 +8452,10 @@ rec {
             packageId = "anyhow";
           }
           {
+            name = "base64";
+            packageId = "base64";
+          }
+          {
             name = "clap";
             packageId = "clap";
           }
@@ -8475,6 +8479,10 @@ rec {
           {
             name = "product-config";
             packageId = "product-config";
+          }
+          {
+            name = "rand";
+            packageId = "rand";
           }
           {
             name = "serde";

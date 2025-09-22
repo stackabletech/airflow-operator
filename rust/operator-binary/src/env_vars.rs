@@ -21,6 +21,7 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
+        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET},
         v1alpha1,
     },
     util::{env_var_from_secret, role_service_name},
@@ -58,11 +59,6 @@ const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
 
-/// This key is only intended for use during experimental support and will
-/// be replaced with a secret at a later stage. See the issue covering
-/// this at <https://github.com/stackabletech/airflow-operator/issues/639>.
-const JWT_KEY: &str = "ThisKeyIsNotIntendedForProduction!";
-
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display(
@@ -87,6 +83,7 @@ pub fn build_airflow_statefulset_envs(
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
+    let internal_secret_name = airflow.shared_internal_secret_name();
 
     env.extend(static_envs(git_sync_resources));
 
@@ -95,14 +92,24 @@ pub fn build_airflow_statefulset_envs(
 
     add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
+    // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY since 3.0.2. Can be removed when 3.0.1 is no longer supported.
     env.insert(
         AIRFLOW_WEBSERVER_SECRET_KEY.into(),
-        // The secret key is used to run the webserver flask app and also used to authorize
-        // requests to Celery workers when logs are retrieved.
+        // The secret key is used to run the webserver flask app and also
+        // used to authorize requests to Celery workers when logs are retrieved.
         env_var_from_secret(
             AIRFLOW_WEBSERVER_SECRET_KEY,
-            secret,
-            "connections.secretKey",
+            &internal_secret_name,
+            ENV_INTERNAL_SECRET,
+        ),
+    );
+    // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
+    env.insert(
+        "AIRFLOW__API__SECRET_KEY".into(),
+        env_var_from_secret(
+            "AIRFLOW__API__SECRET_KEY",
+            &internal_secret_name,
+            ENV_INTERNAL_SECRET,
         ),
     );
     env.insert(
@@ -476,16 +483,16 @@ fn add_version_specific_env_vars(
         // This should be random, but must also be consistent across
         // api-services and replicas/roles for a given
         // cluster, but should also be cluster-specific.
-        // See issue <https://github.com/stackabletech/airflow-operator/issues/639>:
-        // later it will be accessed from a secret to avoid cluster restarts
+        // It is accessed from a secret to avoid cluster restarts
         // being triggered by an operator restart.
+        let jwt_secret_name = airflow.shared_jwt_secret_name();
         env.insert(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-            EnvVar {
-                name: "AIRFLOW__API_AUTH__JWT_SECRET".into(),
-                value: Some(JWT_KEY.into()),
-                ..Default::default()
-            },
+            env_var_from_secret(
+                "AIRFLOW__API_AUTH__JWT_SECRET",
+                &jwt_secret_name,
+                ENV_JWT_SECRET,
+            ),
         );
         if airflow_role == &AirflowRole::Webserver {
             // Sometimes a race condition can arise when both scheduler and
