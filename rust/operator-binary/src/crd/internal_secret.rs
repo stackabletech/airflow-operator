@@ -52,7 +52,7 @@ pub enum Error {
         source: stackable_operator::client::Error,
     },
 
-    #[snafu(display("object defines no namespace"))]
+    #[snafu(display("failed to generate random bytes"))]
     SeedRandomGenerator { source: OsError },
 }
 
