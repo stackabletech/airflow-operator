@@ -478,6 +478,7 @@ pub async fn reconcile_airflow(
     create_random_secret(
         airflow.shared_internal_secret_name().as_ref(),
         ENV_INTERNAL_SECRET,
+        256,
         airflow,
         client,
     )
@@ -487,6 +488,7 @@ pub async fn reconcile_airflow(
     create_random_secret(
         airflow.shared_jwt_secret_name().as_ref(),
         ENV_JWT_SECRET,
+        256,
         airflow,
         client,
     )

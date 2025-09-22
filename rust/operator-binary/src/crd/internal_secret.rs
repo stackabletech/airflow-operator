@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use base64::{Engine as _, engine::general_purpose};
+use rand::{TryRngCore, rand_core::OsError, rngs::OsRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder, client::Client, k8s_openapi::api::core::v1::Secret,
@@ -50,16 +51,20 @@ pub enum Error {
     ApplyInternalSecret {
         source: stackable_operator::client::Error,
     },
+
+    #[snafu(display("object defines no namespace"))]
+    SeedRandomGenerator { source: OsError },
 }
 
 pub async fn create_random_secret(
     secret_name: &str,
     secret_key: &str,
+    secret_byte_size: usize,
     airflow: &v1alpha1::AirflowCluster,
     client: &Client,
 ) -> Result<()> {
     let mut internal_secret = BTreeMap::new();
-    internal_secret.insert(secret_key.to_string(), get_random_base64());
+    internal_secret.insert(secret_key.to_string(), get_random_base64(secret_byte_size)?);
 
     let secret = Secret {
         immutable: Some(true),
@@ -94,8 +99,18 @@ pub async fn create_random_secret(
     Ok(())
 }
 
-fn get_random_base64() -> String {
-    let serial_number = rand::random::<u64>();
-    let bytes = serial_number.to_le_bytes();
-    general_purpose::STANDARD.encode(bytes)
+fn get_random_base64(byte_size: usize) -> Result<String, Error> {
+    let mut buf = vec![0u8; byte_size];
+    // OsRng is a cryptographically secure pseudo-random number generator
+    // (CSPRNG) and also has no possible state to leak and cannot be
+    // improperly seeded. See: https://rust-random.github.io/book/guide-gen.html#cryptographically-secure-pseudo-random-number-generator
+    // and https://github.com/rust-random/rand/blob/master/SECURITY.md#specific-generators
+    // This call explicity returns a Result. An alternative would be to
+    // use let mut rng = StdRng::from_os_rng() and then use fill_bytes
+    // but this may *still* panic if the underlying (OS) mechanism fails
+    // for some reason, so keep the potential panic transparent.
+    OsRng
+        .try_fill_bytes(&mut buf)
+        .context(SeedRandomGeneratorSnafu)?;
+    Ok(general_purpose::STANDARD.encode(buf))
 }
