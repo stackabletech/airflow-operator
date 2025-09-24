@@ -29,16 +29,15 @@ See e.g. https://github.com/minio/minio/issues/20845[this MinIO issue] for detai
 == Setting API Workers
 
 In Airflow the webserver (called the API Server in Airflow 3.x+) can use multiple workers.
-This is determined by the environment variable `+AIRFLOW__API__WORKERS+` and is set by default to `4` in Airflow 2.x and `1` in Airflow 3.x+.
-The reason for this difference is that Airflow uses a backend library to manage child processes and in 3.x+ this library can cause child processes to be killed if a hard-coded startup timeout is exceeded.
-For most cases with Airflow 3.x+ a default of `1` should be sufficient, but if you run into performance issues and would like to add more workers, you can either modulate multiple worker processes at the level of webserver, keeping the default of a single worker per webserver:
+This is determined by the environment variable `+AIRFLOW__API__WORKERS+` and is set by default to `4`.
+For most cases the default should work without problem, but if you run into performance issues and would like to add more workers, you can either modulate multiple worker processes at the level of webserver, keeping the default value for each one:
 
 [source,yaml]
 ----
 webservers:
   roleGroups:
     default:
-      replicas: 2 # add a replica (with a single worker)
+      replicas: 2 # add a replica (with the default number of workers)
 ----
 
 or change the environment variable using `envOverrides`:
@@ -47,7 +46,7 @@ or change the environment variable using `envOverrides`:
 ----
 webservers:
   envOverrides:
-    AIRFLOW__API__WORKERS: 2 # something other than the default of 1
+    AIRFLOW__API__WORKERS: 6 # something other than the default
 ----
 
 TIP: Our strong recommendation is to increase the webserver replicas, with each webserver running a single worker, as this removes the risk of running into timeouts or memory issues.
