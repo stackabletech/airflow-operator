@@ -8,12 +8,14 @@
 - Add new roles for dag-processor and triggerer processes ([#679]).
 - Added a note on webserver workers to the trouble-shooting section ([#685]).
 - Helm: Allow Pod `priorityClassName` to be configured ([#687]).
+- Added airflow `3.0.6` ([#692]).
 
 ### Changed
 
 - Use internal secrets for secret- and jwt-keys ([#686]).
 - Update uvicorn version and revert to default number of API workers ([#690]).
 - Deprecate airflow `2.9.3` ([#691]).
+- Deprecate airflow `2.10.5` ([#692]).
 
 ### Fixed
 
@@ -23,6 +25,10 @@
   Previously, the operator would always use the same name for the executor Pod template ConfigMap.
   Thus when deploying multiple Airflow instances in the same namespace, there would be a conflict over the contents of that ConfigMap ([#678]).
 - For versions >= 3 custom logging initializes the RemoteLogIO handler to fix remote logging ([#683]).
+
+### Removed
+
+- Removed airflow `2.10.4` ([#692]).
 
 [#667]: https://github.com/stackabletech/airflow-operator/pull/667
 [#668]: https://github.com/stackabletech/airflow-operator/pull/668
@@ -35,6 +41,7 @@
 [#687]: https://github.com/stackabletech/airflow-operator/pull/687
 [#690]: https://github.com/stackabletech/airflow-operator/pull/690
 [#691]: https://github.com/stackabletech/airflow-operator/pull/691
+[#692]: https://github.com/stackabletech/airflow-operator/pull/692
 
 ## [25.7.0] - 2025-07-23
 
