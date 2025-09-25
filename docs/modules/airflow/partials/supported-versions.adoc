@@ -5,4 +5,4 @@
 - 3.0.1 (experimental)
 - 2.10.5
 - 2.10.4 (deprecated)
-- 2.9.3 (LTS)
+- 2.9.3 (deprecated)

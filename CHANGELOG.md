@@ -13,6 +13,7 @@
 
 - Use internal secrets for secret- and jwt-keys ([#686]).
 - Update uvicorn version and revert to default number of API workers ([#690]).
+- Deprecate airflow `2.9.3` ([#691]).
 
 ### Fixed
 
@@ -33,6 +34,7 @@
 [#686]: https://github.com/stackabletech/airflow-operator/pull/686
 [#687]: https://github.com/stackabletech/airflow-operator/pull/687
 [#690]: https://github.com/stackabletech/airflow-operator/pull/690
+[#691]: https://github.com/stackabletech/airflow-operator/pull/691
 
 ## [25.7.0] - 2025-07-23
 
