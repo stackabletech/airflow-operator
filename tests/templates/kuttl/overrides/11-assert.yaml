@@ -7,6 +7,8 @@ commands:
   # Test envOverrides
   #
   - script: |
+      set -eu
+
       kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts airflow-celery-webserver-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
@@ -14,6 +16,8 @@ commands:
 
 
   - script: |
+      set -eu
+
       kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts airflow-celery-worker-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "airflow") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
