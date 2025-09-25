@@ -324,7 +324,7 @@ mod tests {
         },
     };
 
-    const TEST_AIRFLOW_VERSION: &str = "3.0.1";
+    const TEST_AIRFLOW_VERSION: &str = "3.0.6";
 
     #[test]
     fn test_auth_db_config() {

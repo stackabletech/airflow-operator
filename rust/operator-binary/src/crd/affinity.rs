@@ -69,7 +69,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.10.5
+            productVersion: 3.0.6
           clusterConfig:
             credentialsSecret: airflow-credentials
           webservers:
@@ -163,7 +163,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 2.10.5
+            productVersion: 3.0.6
           clusterConfig:
             credentialsSecret: airflow-credentials
           webservers:
