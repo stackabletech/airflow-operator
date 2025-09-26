@@ -84,6 +84,8 @@ spec:
           max: 2000m
         memory:
           limit: 3Gi
+    envOverrides:
+      AIRFLOW__API__WORKERS: "1"
     roleGroups:
       automatic-log-config:
         replicas: 1

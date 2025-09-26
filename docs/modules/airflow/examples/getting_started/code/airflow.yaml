@@ -6,6 +6,7 @@ metadata:
 spec:
   image:
     productVersion: 3.0.6
+    pullPolicy: IfNotPresent
   clusterConfig:
     loadExamples: true
     exposeConfig: false
