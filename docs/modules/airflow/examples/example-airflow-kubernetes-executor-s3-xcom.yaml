@@ -1,10 +1,11 @@
+---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:
   name: airflow
 spec:
   image:
-    productVersion: 2.10.5
+    productVersion: 3.0.6
   clusterConfig: {}
   webservers:
     roleConfig:

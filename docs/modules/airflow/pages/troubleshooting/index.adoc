@@ -46,7 +46,7 @@ or change the environment variable using `envOverrides`:
 ----
 webservers:
   envOverrides:
-    AIRFLOW__API__WORKERS: 6 # something other than the default
+    AIRFLOW__API__WORKERS: "6" # something other than the default
 ----
 
 TIP: Our strong recommendation is to increase the webserver replicas, with each webserver running a single worker, as this removes the risk of running into timeouts or memory issues.

@@ -84,6 +84,11 @@ spec:
           max: 2000m
         memory:
           limit: 3Gi
+    envOverrides:
+      # logging tests use two webservers and if two tests should run in
+      # parallel then the CPU usage can be high if the default number of
+      # workers (4) is used
+      AIRFLOW__API__WORKERS: "1"
     roleGroups:
       automatic-log-config:
         replicas: 1
