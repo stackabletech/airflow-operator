@@ -115,7 +115,7 @@ sleep 5
 
 server_health() {
   # tag::server-health[]
-  curl -s -XGET http://localhost:8080/api/v1/health
+  curl -s -XGET http://localhost:8080/api/v2/monitor/health
   # end::server-health[]
 }
 
@@ -130,22 +130,39 @@ fi
 
 enable_dag() {
   # tag::enable-dag[]
-  curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XPATCH http://localhost:8080/api/v1/dags/example_trigger_target_dag \
-    -d '{"is_paused": false}'
+  ACCESS_TOKEN=$(
+    curl -s -XPOST http://localhost:8080/auth/token \
+    -H 'Content-Type: application/json' \
+        -d '{
+        "username": "airflow",
+        "password": "airflow"
+        }' | jq '.access_token' | tr -d '"'
+  )
+  curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
+  -XPATCH http://localhost:8080/api/v2/dags/example_trigger_target_dag \
+  -d '{"is_paused": false}' | jq '.is_paused'
   # end::enable-dag[]
 }
-SLEEP_SECONDS=120
+SLEEP_SECONDS=10
 echo "Sleeping for $SLEEP_SECONDS seconds to wait for the DAG to be registered"
 sleep "$SLEEP_SECONDS"
 echo "Triggering a DAG run. Enable DAG..."
-enable_dag
+paused=$(enable_dag)
+echo "DAG paused: $paused"
 
 run_dag() {
   # tag::run-dag[]
-  curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XPOST http://localhost:8080/api/v1/dags/example_trigger_target_dag/dagRuns \
-    -d '{}' | jq -r '.dag_run_id'
+  ACCESS_TOKEN=$(
+    curl -s -XPOST http://localhost:8080/auth/token \
+    -H 'Content-Type: application/json' \
+        -d '{
+        "username": "airflow",
+        "password": "airflow"
+        }' | jq '.access_token' | tr -d '"'
+  )
+  curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
+  -XPOST http://localhost:8080/api/v2/dags/example_trigger_target_dag/dagRuns \
+    -d '{"logical_date": null,"conf": {"message": "Hello World"}}' | jq -r '.dag_run_id'
   # end::run-dag[]
 }
 
@@ -153,8 +170,16 @@ dag_id=$(run_dag)
 
 request_dag_status() {
   # tag::check-dag[]
-  curl -s --user airflow:airflow -H 'Content-Type:application/json' \
-    -XGET http://localhost:8080/api/v1/dags/example_trigger_target_dag/dagRuns/"$dag_id" | jq -r '.state'
+  ACCESS_TOKEN=$(
+    curl -s -XPOST http://localhost:8080/auth/token \
+    -H 'Content-Type: application/json' \
+        -d '{
+        "username": "airflow",
+        "password": "airflow"
+        }' | jq '.access_token' | tr -d '"'
+  )
+  curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type:application/json' \
+    -XGET http://localhost:8080/api/v2/dags/example_trigger_target_dag/dagRuns/"$dag_id" | jq -r '.state'
   # end::check-dag[]
 }
 
@@ -168,8 +193,8 @@ done
 
 echo "Checking DAG result ..."
 if [ "$dag_state" == "success" ]; then
-  echo "DAG run successful for ID: " "$dag_id"
+  echo "DAG run successful for ID: $dag_id"
 else
-  echo "The DAG was not successful. State: " "$dag_state"
+  echo "The DAG was not successful. State: $dag_state"
   exit 1
 fi
