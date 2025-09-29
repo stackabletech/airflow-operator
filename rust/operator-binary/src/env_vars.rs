@@ -479,7 +479,7 @@ fn add_version_specific_env_vars(
             },
         );
         // As of 3.x a JWT key is required.
-        // See https://airflow.apache.org/docs/apache-airflow/3.0.1/configurations-ref.html#jwt-secret
+        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#jwt-secret
         // This should be random, but must also be consistent across
         // api-services and replicas/roles for a given
         // cluster, but should also be cluster-specific.
@@ -672,7 +672,7 @@ mod tests {
     #[test]
     fn test_airflow_3_authorization_env_vars() {
         let authorization_config = get_test_authorization_config();
-        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.0.1");
+        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.0.6");
         let authorization_env_vars = authorization_env_vars
             .into_iter()
             .map(|env| (env.name, env.value.expect("env var value must be present")))
