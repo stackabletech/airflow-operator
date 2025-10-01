@@ -93,7 +93,10 @@ use crate::{
         },
         authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
-        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET, create_random_secret},
+        internal_secret::{
+            FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
+            create_random_secret,
+        },
         v1alpha1,
     },
     env_vars::{self, build_airflow_template_envs},
@@ -476,8 +479,8 @@ pub async fn reconcile_airflow(
     }
 
     create_random_secret(
-        airflow.shared_internal_secret_name().as_ref(),
-        ENV_INTERNAL_SECRET,
+        &airflow.shared_internal_secret_secret_name(),
+        INTERNAL_SECRET_SECRET_KEY,
         256,
         airflow,
         client,
@@ -486,9 +489,23 @@ pub async fn reconcile_airflow(
     .context(InvalidInternalSecretSnafu)?;
 
     create_random_secret(
-        airflow.shared_jwt_secret_name().as_ref(),
-        ENV_JWT_SECRET,
+        &airflow.shared_jwt_secret_secret_name(),
+        JWT_SECRET_SECRET_KEY,
         256,
+        airflow,
+        client,
+    )
+    .await
+    .context(InvalidInternalSecretSnafu)?;
+
+    create_random_secret(
+        &airflow.shared_fernet_key_secret_name(),
+        FERNET_KEY_SECRET_KEY,
+        // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
+        // does not document how long the fernet key should be, but recommends using
+        // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+        // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
+        32,
         airflow,
         client,
     )

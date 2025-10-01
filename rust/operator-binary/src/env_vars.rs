@@ -21,7 +21,9 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        internal_secret::{ENV_INTERNAL_SECRET, ENV_JWT_SECRET},
+        internal_secret::{
+            FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
+        },
         v1alpha1,
     },
     util::{env_var_from_secret, role_service_name},
@@ -83,7 +85,7 @@ pub fn build_airflow_statefulset_envs(
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
-    let internal_secret_name = airflow.shared_internal_secret_name();
+    let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
     env.extend(static_envs(git_sync_resources));
 
@@ -100,7 +102,7 @@ pub fn build_airflow_statefulset_envs(
         env_var_from_secret(
             AIRFLOW_WEBSERVER_SECRET_KEY,
             &internal_secret_name,
-            ENV_INTERNAL_SECRET,
+            INTERNAL_SECRET_SECRET_KEY,
         ),
     );
     // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
@@ -109,9 +111,19 @@ pub fn build_airflow_statefulset_envs(
         env_var_from_secret(
             "AIRFLOW__API__SECRET_KEY",
             &internal_secret_name,
-            ENV_INTERNAL_SECRET,
+            INTERNAL_SECRET_SECRET_KEY,
         ),
     );
+
+    env.insert(
+        "AIRFLOW__CORE__FERNET_KEY".into(),
+        env_var_from_secret(
+            "AIRFLOW__CORE__FERNET_KEY",
+            &airflow.shared_fernet_key_secret_name(),
+            FERNET_KEY_SECRET_KEY,
+        ),
+    );
+
     env.insert(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         env_var_from_secret(
@@ -485,13 +497,12 @@ fn add_version_specific_env_vars(
         // cluster, but should also be cluster-specific.
         // It is accessed from a secret to avoid cluster restarts
         // being triggered by an operator restart.
-        let jwt_secret_name = airflow.shared_jwt_secret_name();
         env.insert(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
             env_var_from_secret(
                 "AIRFLOW__API_AUTH__JWT_SECRET",
-                &jwt_secret_name,
-                ENV_JWT_SECRET,
+                &airflow.shared_jwt_secret_secret_name(),
+                JWT_SECRET_SECRET_KEY,
             ),
         );
         if airflow_role == &AirflowRole::Webserver {
