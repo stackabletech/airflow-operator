@@ -454,12 +454,16 @@ impl v1alpha1::AirflowCluster {
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
 
-    pub fn shared_internal_secret_name(&self) -> String {
+    pub fn shared_internal_secret_secret_name(&self) -> String {
         format!("{}-internal-secret", &self.name_any())
     }
 
-    pub fn shared_jwt_secret_name(&self) -> String {
+    pub fn shared_jwt_secret_secret_name(&self) -> String {
         format!("{}-jwt-secret", &self.name_any())
+    }
+
+    pub fn shared_fernet_key_secret_name(&self) -> String {
+        format!("{}-fernet-key", &self.name_any())
     }
 }
 
