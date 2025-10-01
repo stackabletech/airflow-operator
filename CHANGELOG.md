@@ -26,7 +26,7 @@
   Thus when deploying multiple Airflow instances in the same namespace, there would be a conflict over the contents of that ConfigMap ([#678]).
 - For versions >= 3 custom logging initializes the RemoteLogIO handler to fix remote logging ([#683]).
 - Prevent Airflow connections from breaking in combination with Airflow 3.
-  This was achieved by setting the `AIRFLOW__CORE__FERNET_KEY` env var ([#XXX]).
+  This was achieved by setting the `AIRFLOW__CORE__FERNET_KEY` env var ([#695]).
 
 ### Removed
 
@@ -44,7 +44,7 @@
 [#690]: https://github.com/stackabletech/airflow-operator/pull/690
 [#691]: https://github.com/stackabletech/airflow-operator/pull/691
 [#692]: https://github.com/stackabletech/airflow-operator/pull/692
-[#XXX]: https://github.com/stackabletech/airflow-operator/pull/XXX
+[#695]: https://github.com/stackabletech/airflow-operator/pull/695
 
 ## [25.7.0] - 2025-07-23
 
