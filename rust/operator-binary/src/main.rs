@@ -7,14 +7,27 @@ use std::sync::Arc;
 use clap::Parser;
 use futures::{FutureExt, StreamExt};
 use stackable_operator::{
-    cli::{Command, RunArguments}, crd::authentication::core as auth_core, eos::EndOfSupportChecker, k8s_openapi::api::{
+    YamlSchema,
+    cli::{Command, RunArguments},
+    crd::authentication::core as auth_core,
+    eos::EndOfSupportChecker,
+    k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service},
-    }, kube::{
-        core::DeserializeGuard, runtime::{
-            events::{Recorder, Reporter}, reflector::ObjectRef, watcher, Controller
-        }, ResourceExt
-    }, logging::controller::report_controller_reconciled, shared::yaml::SerializeOptions, telemetry::Tracing, YamlSchema
+    },
+    kube::{
+        ResourceExt,
+        core::DeserializeGuard,
+        runtime::{
+            Controller,
+            events::{Recorder, Reporter},
+            reflector::ObjectRef,
+            watcher,
+        },
+    },
+    logging::controller::report_controller_reconciled,
+    shared::yaml::SerializeOptions,
+    telemetry::Tracing,
 };
 
 use crate::{
@@ -63,7 +76,8 @@ async fn main() -> anyhow::Result<()> {
             // - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
             // - The file log level was set by `AIRFLOW_OPERATOR_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
             // - The file log directory was set by `AIRFLOW_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
-            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, common.telemetry).init()?;
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, common.telemetry).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
