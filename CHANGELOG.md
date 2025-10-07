@@ -9,6 +9,10 @@
 - Added a note on webserver workers to the trouble-shooting section ([#685]).
 - Helm: Allow Pod `priorityClassName` to be configured ([#687]).
 - Added airflow `3.0.6` ([#692]).
+- Add end-of-support checker ([#696]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 
 ### Changed
 
@@ -45,6 +49,7 @@
 [#691]: https://github.com/stackabletech/airflow-operator/pull/691
 [#692]: https://github.com/stackabletech/airflow-operator/pull/692
 [#695]: https://github.com/stackabletech/airflow-operator/pull/695
+[#696]: https://github.com/stackabletech/airflow-operator/pull/696
 
 ## [25.7.0] - 2025-07-23
 
