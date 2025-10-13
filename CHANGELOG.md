@@ -13,6 +13,7 @@
   - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
   - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
   - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
+- Add `prometheus.io/path|port|scheme` annotations to metrics service ([#698]).
 
 ### Changed
 
@@ -50,6 +51,7 @@
 [#692]: https://github.com/stackabletech/airflow-operator/pull/692
 [#695]: https://github.com/stackabletech/airflow-operator/pull/695
 [#696]: https://github.com/stackabletech/airflow-operator/pull/696
+[#698]: https://github.com/stackabletech/airflow-operator/pull/698
 
 ## [25.7.0] - 2025-07-23
 
