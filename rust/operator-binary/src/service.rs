@@ -4,7 +4,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
-    kvp::{Annotations, Label, Labels, ObjectLabels},
+    kvp::{Annotations, Labels, ObjectLabels},
     role_utils::RoleGroupRef,
 };
 
