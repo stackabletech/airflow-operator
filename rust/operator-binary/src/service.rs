@@ -157,7 +157,7 @@ fn prometheus_labels() -> Labels {
 fn prometheus_annotations() -> Annotations {
     Annotations::try_from([
         ("prometheus.io/path".to_owned(), "/metrics".to_owned()),
-        ("prometheus.io/port".to_owned(), HTTP_PORT.to_string()),
+        ("prometheus.io/port".to_owned(), METRICS_PORT.to_string()),
         ("prometheus.io/scheme".to_owned(), "http".to_owned()),
         ("prometheus.io/scrape".to_owned(), "true".to_owned()),
     ])
