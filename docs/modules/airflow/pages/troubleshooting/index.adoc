@@ -143,3 +143,5 @@ When a custom DAG folder (e.g. `/dags`) is defined with `envOverrides` and some 
       AIRFLOW__CORE__DAGS_FOLDER: "/dags"
       PYTHONPATH: "/stackable/app/log_config:/dags"
 ----
+
+NOTE: Generally speaking it is https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#configuration-reference[recommended] by Airflow to have the same config everywhere across all components.
