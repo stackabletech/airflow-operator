@@ -17,6 +17,7 @@
 
 ### Changed
 
+- Bump stackable-operator to `0.100.1` ([#703]).
 - Use internal secrets for secret- and jwt-keys ([#686]).
 - Update uvicorn version and revert to default number of API workers ([#690]).
 - Deprecate airflow `2.9.3` ([#691]).
@@ -52,6 +53,7 @@
 [#695]: https://github.com/stackabletech/airflow-operator/pull/695
 [#696]: https://github.com/stackabletech/airflow-operator/pull/696
 [#698]: https://github.com/stackabletech/airflow-operator/pull/698
+[#703]: https://github.com/stackabletech/airflow-operator/pull/703
 
 ## [25.7.0] - 2025-07-23
 
