@@ -50,3 +50,98 @@ webservers:
 ----
 
 TIP: Our strong recommendation is to increase the webserver replicas, with each webserver running a single worker, as this removes the risk of running into timeouts or memory issues.
+
+== Checking DAG syntax (Upgrading to Airflow 3.x+)
+
+DAG files that ran under Airflow 2.x may need to be adjusted to be compatible with Airflow 3.x+.
+The https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html#installing-and-using-ruff[documentation] shows how this can be done with the Python `ruff` tool.
+For example, the following DAG was compatible with Airflow 2.x:
+
+[source,python]
+----
+import pendulum
+from airflow import DAG
+from airflow.decorators import task
+from airflow.operators.bash import BashOperator
+
+@task(task_id="run_this")
+def run_this_func(dag_run=None):
+    """
+    Print the payload "message" passed to the DagRun conf attribute.
+
+    :param dag_run: The DagRun object
+    :type dag_run: DagRun
+    """
+    print(f"Remotely received value of {dag_run.conf.get('message')} for key=message")
+
+with DAG(
+    dag_id="example_trigger_target_dag",
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    catchup=False,
+    schedule_interval=None,
+    tags=['example'],
+) as dag:
+    run_this = run_this_func()
+
+    bash_task = BashOperator(
+        task_id="bash_task",
+        bash_command='echo "Here is the message: $message"',
+        env={'message': '{% raw %}{{ dag_run.conf.get("message") }}{% endraw %}'},
+    )
+----
+
+Assume this DAG lies in the `dags` folder in the current directory.
+Testing this with `ruff` indicates one incompatability with Airflow 3.x and one deprecated operator:
+
+[source,bash]
+----
+$ ruff check dags/ --select AIR3 --preview
+dags/dag.py:6:2: AIR311 `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  |
+4 | from airflow.operators.bash import BashOperator
+5 |
+6 | @task(task_id="run_this")
+  |  ^^^^ AIR311
+7 | def run_this_func(dag_run=None):
+8 |     """
+  |
+  = help: Use `airflow.sdk.task` instead
+
+dags/dag.py:20:5: AIR301 [*] `schedule_interval` is removed in Airflow 3.0
+   |
+18 |     start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+19 |     catchup=False,
+20 |     schedule_interval=None,
+   |     ^^^^^^^^^^^^^^^^^ AIR301
+21 |     tags=['example'],
+22 | ) as dag:
+   |
+   = help: Use `schedule` instead
+
+dags/dag.py:25:17: AIR312 `airflow.operators.bash.BashOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+23 |     run_this = run_this_func()
+24 |
+25 |     bash_task = BashOperator(
+   |                 ^^^^^^^^^^^^ AIR312
+26 |         task_id="bash_task",
+27 |         bash_command='echo "Here is the message: $message"',
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.bash.BashOperator` instead.
+
+Found 3 errors.
+[*] 1 fixable with the `--fix` option.
+----
+
+== PYTHONPATH with custom DAGs folder using python modules
+
+When a custom DAG folder (e.g. `/dags`) is defined with `envOverrides` and some DAGs contain a python module structure, then the variable `PYTHONPATH` should be explicitly defined to contain both this folder and the log config location that is set by the operator. This setting is done automatically by the operator when the default DAGs folder or gitsync are used, but is not done when this is set by the user directly.
+
+[source,yaml]
+----
+    envOverrides: &envOverrides
+      AIRFLOW__CORE__DAGS_FOLDER: "/dags"
+      PYTHONPATH: "/stackable/app/log_config:/dags"
+----
+
+NOTE: Generally speaking it is https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#configuration-reference[recommended] by Airflow to have the same config everywhere across all components.
