@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [25.11.0] - 2025-11-07
+
+## [25.11.0-rc1] - 2025-11-06
+
 ### Added
 
 - Add a flag to determine if database initialization steps should be executed ([#669]).
