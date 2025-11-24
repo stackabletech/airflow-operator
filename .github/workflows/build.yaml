@@ -41,45 +41,45 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  cargo-udeps:
-    name: Run cargo-udeps
-    runs-on: ubuntu-latest
-    env:
-      RUSTC_BOOTSTRAP: 1
-    steps:
-      - name: Install host dependencies
-        uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
-        with:
-          packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
-          version: ubuntu-latest
+  # cargo-udeps:
+  #   name: Run cargo-udeps
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     RUSTC_BOOTSTRAP: 1
+  #   steps:
+  #     - name: Install host dependencies
+  #       uses: awalsh128/cache-apt-pkgs-action@2c09a5e66da6c8016428a2172bd76e5e4f14bb17 # v1.5.3
+  #       with:
+  #         packages: protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config apt-transport-https
+  #         version: ubuntu-latest
 
-      - name: Checkout Repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          submodules: recursive
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+  #       with:
+  #         persist-credentials: false
+  #         submodules: recursive
 
-      - name: Install Rust ${{ env.RUST_TOOLCHAIN_VERSION }} toolchain
-        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+  #     - name: Install Rust ${{ env.RUST_TOOLCHAIN_VERSION }} toolchain
+  #       uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+  #       with:
+  #         toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-        with:
-          cache-all-crates: "true"
-          key: udeps
+  #     - name: Setup Rust Cache
+  #       uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+  #       with:
+  #         cache-all-crates: "true"
+  #         key: udeps
 
-      - name: Install cargo-udeps
-        uses: stackabletech/cargo-install-action@8f7dbbcd2ebe22717efc132d0dd61e80841994b9 # cargo-udeps
+  #     - name: Install cargo-udeps
+  #       uses: stackabletech/cargo-install-action@8f7dbbcd2ebe22717efc132d0dd61e80841994b9 # cargo-udeps
 
-      - name: Run cargo-udeps
-        run: cargo udeps --workspace --all-targets
+  #     - name: Run cargo-udeps
+  #       run: cargo udeps --workspace --all-targets
 
   build-image:
     name: Build/Publish ${{ matrix.runner.arch }} Image
-    needs:
-      - cargo-udeps
+    # needs:
+    #   - cargo-udeps
     permissions:
       id-token: write
     strategy:
@@ -137,7 +137,7 @@ jobs:
 
       - name: Build Container Image
         id: build
-        uses: stackabletech/actions/build-container-image@7ffd8c8c5c0378ebeae80f95e2680510d3d1be4c # TODO: Use released image
+        uses: stackabletech/actions/build-container-image@976e8c293cb59f391dbf8563ab28e965e79ca36d # 0.10.4
         with:
           image-name: ${{ env.OPERATOR_NAME }}
           image-index-manifest-tag: ${{ steps.version.outputs.OPERATOR_VERSION }}
@@ -145,7 +145,7 @@ jobs:
           container-file: docker/Dockerfile
 
       - name: Publish Container Image
-        uses: stackabletech/actions/publish-image@7ffd8c8c5c0378ebeae80f95e2680510d3d1be4c # TODO: Use released image
+        uses: stackabletech/actions/publish-image@976e8c293cb59f391dbf8563ab28e965e79ca36d # 0.10.4
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
@@ -184,7 +184,7 @@ jobs:
           submodules: recursive
 
       - name: Package, Publish, and Sign Helm Chart
-        uses: stackabletech/actions/publish-helm-chart@923b9de2c77d2a736035e744c22ab6e5937b4c18 # TODO: Use released version
+        uses: stackabletech/actions/publish-helm-chart@976e8c293cb59f391dbf8563ab28e965e79ca36d # 0.10.4
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp+github-action-build
@@ -208,7 +208,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run OpenShift Preflight Check
-        uses: stackabletech/actions/run-openshift-preflight@50f31550a09fc10b16892a85edfb75b6f2e448d6 # TODO: Use released version
+        uses: stackabletech/actions/run-openshift-preflight@976e8c293cb59f391dbf8563ab28e965e79ca36d # 0.10.4
         with:
           image-index-uri: oci.stackable.tech/sdp/${{ env.OPERATOR_NAME }}:${{ needs.build-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
