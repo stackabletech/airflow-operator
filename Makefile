@@ -23,6 +23,10 @@ render-readme:
 render-docs:
 	scripts/docs_templating.sh
 
+## Docker related targets
+docker-build:
+	docker build --force-rm --build-arg VERSION=${VERSION} -t "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-${ARCH}" -f docker/Dockerfile .
+
 ## Chart related targets
 compile-chart: version crds config
 
@@ -56,7 +60,7 @@ regenerate-charts: chart-clean compile-chart
 regenerate-nix:
 	nix run --extra-experimental-features "nix-command flakes" -f . regenerateNixLockfiles
 
-build: regenerate-charts regenerate-nix helm-package docker-build
+build: regenerate-charts regenerate-nix docker-build
 
 publish: docker-publish helm-publish
 
