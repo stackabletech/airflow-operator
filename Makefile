@@ -17,11 +17,9 @@ OCI_REGISTRY_PROJECT_IMAGES := sdp
 
 SHELL=/usr/bin/env bash -euo pipefail
 
-# used in build.yml
 render-readme:
 	scripts/render_readme.sh
 
-# run by developer when changing doc templates like getting_started
 render-docs:
 	scripts/docs_templating.sh
 
