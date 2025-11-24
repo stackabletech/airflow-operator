@@ -62,8 +62,6 @@ regenerate-nix:
 
 build: regenerate-charts regenerate-nix docker-build
 
-publish: docker-publish helm-publish
-
 check-nix:
 	@which nix || (echo "Error: 'nix' is not installed. Please install it to proceed."; exit 1)
 
