@@ -23,16 +23,21 @@ HELM_CHART_ARTIFACT := target/helm/${OPERATOR_NAME}-${VERSION}.tgz
 
 SHELL=/usr/bin/env bash -euo pipefail
 
+# used in build.yml
 render-readme:
 	scripts/render_readme.sh
 
+# run by developer when changing doc templates like getting_started
 render-docs:
 	scripts/docs_templating.sh
 
 ## Docker related targets
+# called by the "docker" target
 docker-build:
 	docker build --force-rm --build-arg VERSION=${VERSION} -t "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-${ARCH}" -f docker/Dockerfile .
 
+# called by the "docker" target
+# called by build.yml
 docker-publish:
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
@@ -61,9 +66,11 @@ docker-publish:
 	cosign attest -y --predicate sbom.merged.json --type cyclonedx "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}@$$REPO_DIGEST_OF_IMAGE"
 
 # This assumes "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-amd64 and "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-arm64 are built and pushed
+# called by build.yml - TODO use the reusable action
 docker-manifest-list-build:
 	docker manifest create "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}" --amend "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-amd64" --amend "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-arm64"
 
+# called by build.yml - TODO use the reusable action
 docker-manifest-list-publish:
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
@@ -75,11 +82,17 @@ docker-manifest-list-publish:
 	cosign sign -y "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}@$$DIGEST_HARBOR"
 
 # TODO remove if not used/needed
+# Remove this, covered by CI
 docker: docker-build docker-publish
 
+# used in build.yml
+# Not needed
 print-docker-tag:
 	@echo "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}"
 
+# used by publish
+# used in build.yml
+# Not needed
 helm-publish:
 	# Push to Harbor
 	# We need to use "value" here to prevent the variable from being recursively expanded by make (username contains a dollar sign, since it's a Harbor bot)
@@ -97,6 +110,7 @@ helm-publish:
 	# Uses the keyless signing flow with Github Actions as identity provider\
 	cosign sign -y "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}/${HELM_CHART_NAME}@$$REPO_DIGEST_OF_ARTIFACT"
 
+# TODO: make a reusable action for this
 helm-package:
 	mkdir -p target/helm && helm package --destination target/helm deploy/helm/${OPERATOR_NAME}
 
@@ -117,6 +131,7 @@ config:
 		cp -r deploy/config-spec/* "deploy/helm/${OPERATOR_NAME}/configs";\
 	fi
 
+# Maxi uses this occasionally
 crds:
 	mkdir -p deploy/helm/"${OPERATOR_NAME}"/crds
 	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > "deploy/helm/${OPERATOR_NAME}/crds/crds.yaml"
