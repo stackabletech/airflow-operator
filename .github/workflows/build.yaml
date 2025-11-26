@@ -168,7 +168,7 @@ jobs:
           persist-credentials: false
 
       - name: Publish and Sign Image Index
-        uses: stackabletech/actions/publish-index-manifest@29bea1b451c0c2e994bd495969286f95bf49ed6a # TODO: Use released action
+        uses: stackabletech/actions/publish-image-index-manifest@29bea1b451c0c2e994bd495969286f95bf49ed6a # TODO: Use released action
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
