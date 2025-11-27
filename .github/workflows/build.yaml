@@ -223,6 +223,21 @@ jobs:
           image-index-uri: oci.stackable.tech/sdp/${{ env.OPERATOR_NAME }}:${{ needs.build-container-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
 
+
+  # This job is a required check in GitHub Settings for this repository.
+  # It saves us having to list many required jobs, or work around dynamically
+  # named jobs (since there is no concept of required settings).
+  finished:
+    # WARNING: Do not change the name unless you will also be changing the
+    # Required Checks (in branch protections) in GitHub settings.
+    name: Finished Build and Publish
+    needs:
+      - openshift-preflight-check
+      - publish-helm-chart
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "We are done here"
+
   notify:
     name: Failure Notification
     needs:
