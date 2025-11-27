@@ -226,7 +226,6 @@ jobs:
           image-index-uri: oci.stackable.tech/sdp/${{ env.OPERATOR_NAME }}:${{ needs.build-container-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
 
-
   # This job is a required check in GitHub Settings for this repository.
   # It saves us having to list many required jobs, or work around dynamically
   # named jobs (since there is no concept of required settings).
