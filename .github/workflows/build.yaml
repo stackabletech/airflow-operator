@@ -75,8 +75,6 @@ jobs:
 
   build-container-image:
     name: Build/Publish ${{ matrix.runner.arch }} Image
-    needs:
-      - cargo-udeps
     permissions:
       id-token: write
     strategy:
@@ -232,6 +230,7 @@ jobs:
     # Required Checks (in branch protections) in GitHub settings.
     name: Finished Build and Publish
     needs:
+      - cargo-udeps
       - openshift-preflight-check
       - publish-helm-chart
     runs-on: ubuntu-latest
