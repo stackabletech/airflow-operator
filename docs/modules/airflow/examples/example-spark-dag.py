@@ -29,7 +29,7 @@ from stackable.spark_kubernetes_operator import SparkKubernetesOperator
 
 with DAG(  # <4>
     dag_id="sparkapp_dag",
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2022, 1, 1),
     catchup=False,
     dagrun_timeout=timedelta(minutes=60),
