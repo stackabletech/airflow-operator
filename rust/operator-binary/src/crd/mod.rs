@@ -20,6 +20,7 @@ use stackable_operator::{
         merge::Merge,
     },
     crd::git_sync,
+    deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
@@ -197,6 +198,9 @@ pub mod versioned {
     pub struct AirflowClusterSpec {
         // no doc string - See ProductImage struct
         pub image: ProductImage,
+
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for authentication, git sync, service exposition and volumes, among other things.

@@ -680,6 +680,7 @@ spec:
                               The referenced Secret must include two fields: `user` and `password`.
                               The `password` field can either be an actual password (not recommended) or a GitHub token,
                               as described in the git-sync [documentation].
+                              This cannot be provided if `ssh_secret` is also provided.
 
                               [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
                             nullable: true
@@ -711,8 +712,18 @@ spec:
                               [example]: https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_example
                             type: object
                           repo:
-                            description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator`.'
+                            description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                             format: uri
+                            type: string
+                          sshSecret:
+                            description: |-
+                              The name of the Secret used for SSH access to the repository.
+
+                              The referenced Secret must include two fields: `key` and `knownHosts`.
+                              This cannot be provided if `credentials_secret` is also provided.
+
+                              [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
+                            nullable: true
                             type: string
                           wait:
                             default: 20s
@@ -1602,6 +1613,20 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                   type: object
+                objectOverrides:
+                  default: []
+                  description: |-
+                    A list of generic Kubernetes objects, which are merged into the objects that the operator
+                    creates.
+
+                    List entries are arbitrary YAML objects, which need to be valid Kubernetes objects.
+
+                    Read the [Object overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#object-overrides)
+                    for more information.
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  type: array
                 schedulers:
                   description: |-
                     The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.

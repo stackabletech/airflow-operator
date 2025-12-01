@@ -3,6 +3,33 @@ kind: TestStep
 metadata:
   name: install-airflow
 timeout: 480
+{% if test_scenario['values']['access'] == 'ssh' %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-sync-ssh
+type: Opaque
+data:
+  # This is a combination of a private key and known hosts (github.com) for the owner of the repo (stackable-airflow/dags).
+  # Contact github users @razvan or @adwk67 for details.
+  key: LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTnphQzFyWlhrdGRqRUFBQUFBQkc1dmJtVUFBQUFFYm05dVpRQUFBQUFBQUFBQkFBQUFNd0FBQUF0emMyZ3RaVwpReU5UVXhPUUFBQUNBRFdmd0hlaHhaQXdqcEk0OXN0eEM2SmJNWVJLODEvRVdueFh2NnV4aUhLUUFBQUpCSUEzTWJTQU56Ckd3QUFBQXR6YzJndFpXUXlOVFV4T1FBQUFDQURXZndIZWh4WkF3anBJNDlzdHhDNkpiTVlSSzgxL0VXbnhYdjZ1eGlIS1EKQUFBRUFRcVZSOW9hNi91MzZTeC9DSFRxbExMa3A2dmVnc2dha3d1RHRJNFdJcHRnTlovQWQ2SEZrRENPa2pqMnkzRUxvbApzeGhFcnpYOFJhZkZlL3E3R0ljcEFBQUFEV2RwZEMxemVXNWpMWFJsYzNRPQotLS0tLUVORCBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0K
+  knownHosts: Z2l0aHViLmNvbSBzc2gtcnNhIEFBQUFCM056YUMxeWMyRUFBQUFEQVFBQkFBQUJnUUNqN25kTnhRb3dnY1FuanNoY0xycVBFaWlwaG50K1ZUVHZEUDZtSEJMOWoxYU5Va1k0VWUxZ3Z3bkdMVmxPaEdlWXJuWmFNZ1JLNitQS0NVWGFEYkM3cXRiVzhnSWtoTDdhR0NzT3IvQzU2U0pNeS9CQ1pmeGQxbld6QU94U0RQZ1ZzbWVyT0JZZk5xbHRWOS9oV0NxQnl3SU5JUis1ZElnNkpUSjcycGNFcEVqY1lnWGtFMllFRlhWMUpIbnNLZ2JMV05saFNjcWIyVW15UmtReXl0Ukx0TCszOFRHeGt4Q2ZsbU8rNVo4Q1NTTlk3R2lkak1JWjdRNHpNakEybjFuR3JsVERrendEQ3N3K3dxRlBHUUExNzljbmZHV09XUlZydWoxNno2WHl2eHZqSndiejB3UVo3NVhLNXRLU2I3Rk55ZUlFczRUVDRqaytTNGRoUGVBVUM1eStiRFlpcllnTTRHQzd1RW56dG5aeWFWV1E3QjM4MUFLNFFkcnd0NTFacUV4S2JRcFRVTm4rRWpxb1R3dnFOajRrcXg1UVVDSTBUaFMvWWtPeEpDWG1QVVdaYmhqcENnNTZpKzJhQjZDbUsySkdobjU3SzVtajBNTmRCWEE0L1dud0g2WG9QV0p6SzVOeXUyekIzbkFacCtTNWhwUXMrcDF2TjEvd3Nqaz0KZ2l0aHViLmNvbSBlY2RzYS1zaGEyLW5pc3RwMjU2IEFBQUFFMlZqWkhOaExYTm9ZVEl0Ym1semRIQXlOVFlBQUFBSWJtbHpkSEF5TlRZQUFBQkJCRW1LU0VOalFFZXpPbXhrWk15N29wS2d3RkI5bmt0NVlScllNak51RzVOODd1UmdnNkNMcmJvNXdBZFQveTZ2MG1LVjBVMncwV1oyWUIvKytUcG9ja2c9CmdpdGh1Yi5jb20gc3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSU9NcXFua1Z6cm0wU2RHNlVPb3FLTHNhYmdINUM5b2tXaTBkaDJsOUdLSmwK
+{% endif %}
+{% if test_scenario['values']['access'] == 'https' %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials
+type: Opaque
+data:
+  # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
+  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
+  # This token doesn't expire.
+  user: c3RhY2thYmxlLWFpcmZsb3c=
+  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSk1EWlNVQk1RYTdoX0c2OGlhbWtpRkpFV1RMTTF0ajFwbHFTVFNyZ3p3dHZneXI5b2tubGRXaGpVRDZITFRFV0JJcm9yT0dXCg==
+{% endif %}
 ---
 apiVersion: v1
 kind: Secret
@@ -20,18 +47,6 @@ stringData:
   connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
   connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 {% endif %}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: git-credentials
-type: Opaque
-data:
-  # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
-  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
-  # This token doesn't expire.
-  user: c3RhY2thYmxlLWFpcmZsb3c=
-  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSk1EWlNVQk1RYTdoX0c2OGlhbWtpRkpFV1RMTTF0ajFwbHFTVFNyZ3p3dHZneXI5b2tubGRXaGpVRDZITFRFV0JJcm9yT0dXCg==
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -60,13 +75,19 @@ spec:
 {% endif %}
     credentialsSecret: test-airflow-credentials
     dagsGitSync:
+{% if test_scenario['values']['access'] == 'ssh' %}
+      - repo: ssh://git@github.com/stackable-airflow/dags.git
+        sshSecret: git-sync-ssh
+{% endif %}
+{% if test_scenario['values']['access'] == 'https' %}
       - repo: https://github.com/stackable-airflow/dags
+        credentialsSecret: git-credentials
+{% endif %}
 {% if test_scenario['values']['executor'] == 'celery' %}
         # Just setting some values to increase the test coverage (defaults should work just fine)
         branch: main
         wait: 5s
 {% endif %}
-        credentialsSecret: git-credentials
         gitSyncConf:
           # supply some config to check that safe.directory is correctly set
           --git-config: http.sslVerify:false

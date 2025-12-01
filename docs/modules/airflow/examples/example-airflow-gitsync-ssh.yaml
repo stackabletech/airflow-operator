@@ -1,0 +1,19 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+...
+    dagsGitSync:
+      - repo: ssh://git@github.com/stackable-airflow/dags.git # <1>
+        sshSecret: git-sync-ssh # <2>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-sync-ssh # <2>
+type: Opaque
+data:
+  key: LS0tL...
+  knownHosts: Z2l0a...
