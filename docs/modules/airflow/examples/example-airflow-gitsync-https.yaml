@@ -24,3 +24,12 @@ spec:
           --git-config: http.sslCAInfo:/tmp/ca-cert/ca.crt # <11>
   webservers:
     ...
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials # <8>
+type: Opaque
+data:
+  user: c3Rh...
+  password: Z2l0a...

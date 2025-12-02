@@ -436,6 +436,7 @@ pub async fn reconcile_airflow(
         AIRFLOW_CONTROLLER_NAME,
         &airflow.object_ref(&()),
         ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
+        airflow.spec.object_overrides.clone(),
     )
     .context(CreateClusterResourcesSnafu)?;
 
@@ -1451,6 +1452,8 @@ fn add_git_sync_resources(
         }
     }
     pb.add_volumes(git_sync_resources.git_content_volumes.to_owned())
+        .context(AddVolumeSnafu)?;
+    pb.add_volumes(git_sync_resources.git_ssh_volumes.to_owned())
         .context(AddVolumeSnafu)?;
     cb.add_volume_mounts(git_sync_resources.git_content_volume_mounts.to_owned())
         .context(AddVolumeMountSnafu)?;
