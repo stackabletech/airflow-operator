@@ -4,10 +4,12 @@ kind: AirflowCluster
 metadata:
   name: airflow
 spec:
-...
+  clusterConfig:
     dagsGitSync:
       - repo: ssh://git@github.com/stackable-airflow/dags.git # <1>
         sshSecret: git-sync-ssh # <2>
+...
+
 ---
 apiVersion: v1
 kind: Secret
