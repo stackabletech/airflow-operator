@@ -31,6 +31,52 @@ spec:
         # ...
 ----
 
+== Task startup latency
+
+While it has many benefits to spawn a dedicated Pod for every task, this introduces some latency.
+The shorter the actual task runs, the higher the effect of this latency get's on the overall DAG runtime.
+
+If your tasks don't do computational expensive things (e.g. only submit a query to a Trino cluster), you can schedule them to run locally (on the scheduler) and not spawn a Pod to reduce the DAG runtime.
+
+To achieve this enable the `LocalExecutor` in your Airflow stacklet with
+
+[source,yaml]
+----
+spec:
+  webservers:
+    envOverrides: &envOverrides
+      # We default our tasks to KubernetesExecutor, however, tasks can opt in to using the LocalExecutor
+      # See https://docs.stackable.tech/home/stable/airflow/usage-guide/using-kubernetes-executors/
+      AIRFLOW__CORE__EXECUTOR: KubernetesExecutor,LocalExecutor
+  schedulers:
+    envOverrides: *envOverrides
+  kubernetesExecutors:
+    envOverrides: *envOverrides
+----
+
+Afterwards tasks can opt-in to the `LocalExecutor` using
+
+[source,python]
+----
+@task(executor="LocalExecutor")
+def hello_world():
+    print("hello world!")
+----
+
+As an alternative if *all* tasks of your DAG should run locally, you can also configure this on a DAG level (tasks can still explicitly use `KubernetesExecutor`):
+
+[source,python]
+----
+with DAG(
+    dag_id="hello_worlds",
+    default_args={"executor": "LocalExecutor"},  # Applies to all tasks in the Dag
+) as dag:
+----
+
+See the https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/executor/index.html#using-multiple-executors-concurrently[official Airflow documentation] for details.
+
+TIP: You might need to increase the scheduler resources, as it now runs more stuff.
+
 == Logging
 
 Kubernetes Executors and their respective Pods only live as long as the task they are executing.
