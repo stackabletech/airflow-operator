@@ -115,11 +115,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -142,6 +143,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -161,6 +163,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -382,11 +385,12 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Log configuration provided in a ConfigMap
+                                          description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -409,6 +413,7 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -428,6 +433,7 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
+                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -667,34 +673,18 @@ spec:
 
                               Since git-sync v4.x.x this field is mapped to the flag `--ref`.
                             type: string
-                          credentials:
-                            anyOf:
-                              - required:
-                                  - basicAuthSecretName
-                              - required:
-                                  - sshPrivateKeySecretName
-                            description: An optional secret used for git access.
+                          credentialsSecret:
+                            description: |-
+                              The name of the Secret used to access the repository if it is not public.
+
+                              The referenced Secret must include two fields: `user` and `password`.
+                              The `password` field can either be an actual password (not recommended) or a GitHub token,
+                              as described in the git-sync [documentation].
+                              This cannot be provided if `ssh_secret` is also provided.
+
+                              [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
                             nullable: true
-                            properties:
-                              basicAuthSecretName:
-                                description: |-
-                                  The name of the Secret used to access the repository via Basic Authentication if it is not public.
-
-                                  The referenced Secret must include two fields: `user` and `password`.
-                                  The `password` field can either be an actual password (not recommended) or a GitHub token,
-                                  as described in the git-sync [documentation].
-
-                                  [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
-                                type: string
-                              sshPrivateKeySecretName:
-                                description: |-
-                                  The name of the Secret used for SSH access to the repository.
-
-                                  The referenced Secret must include two fields: `key` and `knownHosts`.
-
-                                  [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
-                                type: string
-                            type: object
+                            type: string
                           depth:
                             default: 1
                             description: The depth of syncing, i.e. the number of commits to clone; defaults to 1.
@@ -724,6 +714,16 @@ spec:
                           repo:
                             description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                             format: uri
+                            type: string
+                          sshSecret:
+                            description: |-
+                              The name of the Secret used for SSH access to the repository.
+
+                              The referenced Secret must include two fields: `key` and `knownHosts`.
+                              This cannot be provided if `credentials_secret` is also provided.
+
+                              [documentation]: https://github.com/kubernetes/git-sync/tree/v4.2.4?tab=readme-ov-file#manual
+                            nullable: true
                             type: string
                           wait:
                             default: 20s
@@ -890,11 +890,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -917,6 +918,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -936,6 +938,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -1157,11 +1160,12 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Log configuration provided in a ConfigMap
+                                          description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -1184,6 +1188,7 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -1203,6 +1208,7 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
+                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -1452,11 +1458,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1479,6 +1486,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -1498,6 +1506,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -1698,11 +1707,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1725,6 +1735,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -1744,6 +1755,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -1965,11 +1977,12 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Log configuration provided in a ConfigMap
+                                          description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -1992,6 +2005,7 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -2011,6 +2025,7 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
+                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -2205,11 +2220,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2232,6 +2248,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -2251,6 +2268,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -2472,11 +2490,12 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Log configuration provided in a ConfigMap
+                                          description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2499,6 +2518,7 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -2518,6 +2538,7 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
+                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -2712,11 +2733,12 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Log configuration provided in a ConfigMap
+                                    description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2739,6 +2761,7 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
+                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -2758,6 +2781,7 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
+                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -2984,11 +3008,12 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Log configuration provided in a ConfigMap
+                                          description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3011,6 +3036,7 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
+                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -3030,6 +3056,7 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
+                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
