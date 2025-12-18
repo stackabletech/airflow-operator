@@ -9,6 +9,8 @@ Fully supported for production usage:
 
 * PostgreSQL: 12, 13, 14, 15, 16
 
+NOTE: while Airflow also supports MySQL and bundles a provider for its use, SDP does not support it due to additional internal dependencies.
+
 The Celery exectutor also requires:
 
 * Redis (any stable version)
