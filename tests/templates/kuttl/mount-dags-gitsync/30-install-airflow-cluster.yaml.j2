@@ -77,11 +77,13 @@ spec:
     dagsGitSync:
 {% if test_scenario['values']['access'] == 'ssh' %}
       - repo: ssh://git@github.com/stackable-airflow/dags.git
-        sshSecret: git-sync-ssh
+        credentials:
+          sshPrivateKeySecretName: git-sync-ssh
 {% endif %}
 {% if test_scenario['values']['access'] == 'https' %}
       - repo: https://github.com/stackable-airflow/dags
-        credentialsSecret: git-credentials
+        credentials:
+          basicAuthSecretName: git-credentials
 {% endif %}
 {% if test_scenario['values']['executor'] == 'celery' %}
         # Just setting some values to increase the test coverage (defaults should work just fine)

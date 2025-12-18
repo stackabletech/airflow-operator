@@ -80,7 +80,5 @@ include::example$example-airflow-gitsync-ssh.yaml[]
     This should include two fields: `key` and `knownHosts`, both of which can contain multiple entries.
 <2> The secret referenced above.
 
-IMPORTANT: Gitsync will not allow both `credentialsSecret` and `sshSecret` to be declared and the operator will throw an exception if this is attempted.
-
 NOTE: git-sync can be used with DAGs that make use of Python modules, as Python is configured to use the git-sync target folder as the "root" location when looking for referenced files.
 See the xref:usage-guide/applying-custom-resources.adoc[] example for more details.
