@@ -4188,8 +4188,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         libName = "k8s_version";
         authors = [
@@ -4220,7 +4220,12 @@ rec {
         crateName = "kube";
         version = "2.0.1";
         edition = "2024";
-        sha256 = "0kh1m9w0nhd3fai4pcshl7z5rx0s83zvcxa51v12ql26d85vprs8";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/kube-rs";
+          rev = "26543e85dc7daaf82d8f7dbd902b26775798879e";
+          sha256 = "1a7bcl0w1jg71jc4iml0vjp8dpzy71mhxl012grxcy2xp5i6xvgf";
+        };
         authors = [
           "clux <sszynrae@gmail.com>"
           "Natalie Klestrup Röijezon <nat@nullable.se>"
@@ -4293,7 +4298,12 @@ rec {
         crateName = "kube-client";
         version = "2.0.1";
         edition = "2024";
-        sha256 = "0dksaqk698bciyda6k8ss9lr92bqyb3pygddzna54asd31xdb1s9";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/kube-rs";
+          rev = "26543e85dc7daaf82d8f7dbd902b26775798879e";
+          sha256 = "1a7bcl0w1jg71jc4iml0vjp8dpzy71mhxl012grxcy2xp5i6xvgf";
+        };
         libName = "kube_client";
         authors = [
           "clux <sszynrae@gmail.com>"
@@ -4526,7 +4536,12 @@ rec {
         crateName = "kube-core";
         version = "2.0.1";
         edition = "2024";
-        sha256 = "0wzfc1q78s5a3k1gfa6i8xjd9gmssbnw0f1mdsh23dvv1rvvnjwi";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/kube-rs";
+          rev = "26543e85dc7daaf82d8f7dbd902b26775798879e";
+          sha256 = "1a7bcl0w1jg71jc4iml0vjp8dpzy71mhxl012grxcy2xp5i6xvgf";
+        };
         libName = "kube_core";
         authors = [
           "clux <sszynrae@gmail.com>"
@@ -4608,7 +4623,12 @@ rec {
         crateName = "kube-derive";
         version = "2.0.1";
         edition = "2024";
-        sha256 = "1ljhw6xmrj1v8ni144bpxrifwzbrrn0qnl5kd8m7fdz15cjyiph3";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/kube-rs";
+          rev = "26543e85dc7daaf82d8f7dbd902b26775798879e";
+          sha256 = "1a7bcl0w1jg71jc4iml0vjp8dpzy71mhxl012grxcy2xp5i6xvgf";
+        };
         procMacro = true;
         libName = "kube_derive";
         authors = [
@@ -4657,7 +4677,12 @@ rec {
         crateName = "kube-runtime";
         version = "2.0.1";
         edition = "2024";
-        sha256 = "1zg34fih2r72y9sr58gmgyjizbkl6jv0nc0hmf4wrib2npj4vska";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/kube-rs";
+          rev = "26543e85dc7daaf82d8f7dbd902b26775798879e";
+          sha256 = "1a7bcl0w1jg71jc4iml0vjp8dpzy71mhxl012grxcy2xp5i6xvgf";
+        };
         libName = "kube_runtime";
         authors = [
           "clux <sszynrae@gmail.com>"
@@ -8094,8 +8119,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         libName = "stackable_operator";
         authors = [
@@ -8263,8 +8288,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -8298,8 +8323,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         libName = "stackable_shared";
         authors = [
@@ -8380,8 +8405,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -8490,8 +8515,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         libName = "stackable_versioned";
         authors = [
@@ -8534,8 +8559,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "3ab7a5f9aeb594a3bceb3220f970bccb7aac4c1a";
-          sha256 = "1nm3w9pqn36s4hjhbprj284crxs4sq9srfqpn6fypjh2s8d0qx0g";
+          rev = "ec980f4862a9f2c4529cc1058056c53440268ac9";
+          sha256 = "09rljv23m8rgi8142wa62md2vxm1b2d7rafj8ml6p2ndc02c79m8";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
