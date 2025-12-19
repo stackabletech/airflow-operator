@@ -224,7 +224,7 @@ pub enum Error {
     },
 
     #[snafu(display("invalid git-sync specification"))]
-    InvalidGitSyncSpec { source: git_sync::v1alpha1::Error },
+    InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -530,7 +530,7 @@ pub async fn reconcile_airflow(
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+            let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &resolved_product_image,
                 &env_vars_from_rolegroup_config(rolegroup_config),
@@ -717,7 +717,7 @@ async fn build_executor_template(
             rolegroup: rolegroup.clone(),
         })?;
 
-    let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+    let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
         resolved_product_image,
         &env_vars_from(&common_config.env_overrides),
@@ -934,7 +934,7 @@ fn build_server_rolegroup_statefulset(
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
@@ -1255,7 +1255,7 @@ fn build_executor_template_config_map(
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
     rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
@@ -1437,7 +1437,7 @@ fn add_authentication_volumes_and_volume_mounts(
 fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     add_sidecar_containers: bool,
     add_init_containers: bool,
 ) -> Result<()> {

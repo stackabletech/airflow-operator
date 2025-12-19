@@ -252,7 +252,7 @@ pub mod versioned {
         /// Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
-        pub dags_git_sync: Vec<git_sync::v1alpha1::GitSync>,
+        pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
 
         /// for internal use only - not for production use.
         #[serde(default)]
