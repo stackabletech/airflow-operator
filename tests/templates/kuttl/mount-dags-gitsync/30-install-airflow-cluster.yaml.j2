@@ -56,7 +56,7 @@ data:
   test.txt: |
     some test text here
 ---
-apiVersion: airflow.stackable.tech/v1alpha1
+apiVersion: airflow.stackable.tech/v1alpha2
 kind: AirflowCluster
 metadata:
   name: airflow
@@ -82,9 +82,8 @@ spec:
 {% endif %}
 {% if test_scenario['values']['access'] == 'https' %}
       - repo: https://github.com/stackable-airflow/dags
-        credentialsSecret: git-credentials
-        #credentials:
-        #  basicAuthSecretName: git-credentials
+        credentials:
+          basicAuthSecretName: git-credentials
 {% endif %}
 {% if test_scenario['values']['executor'] == 'celery' %}
         # Just setting some values to increase the test coverage (defaults should work just fine)
