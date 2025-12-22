@@ -24,6 +24,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
+        {{- if .Values.maintenance.customResourceDefinitions.maintain }}
+        webhook.stackable.tech/conversion: enabled
+        {{- end }}
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.image.pullSecrets }}
