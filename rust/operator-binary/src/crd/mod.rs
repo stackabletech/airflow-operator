@@ -206,7 +206,7 @@ pub mod versioned {
 
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
-        pub cluster_config: v1alpha2::AirflowClusterConfig,
+        pub cluster_config: AirflowClusterConfig,
 
         // no doc string - See ClusterOperation struct
         #[serde(default)]
