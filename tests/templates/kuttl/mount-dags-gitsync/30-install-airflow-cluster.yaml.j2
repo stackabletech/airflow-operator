@@ -82,8 +82,9 @@ spec:
 {% endif %}
 {% if test_scenario['values']['access'] == 'https' %}
       - repo: https://github.com/stackable-airflow/dags
-        credentials:
-          basicAuthSecretName: git-credentials
+        credentialsSecret: git-credentials
+        #credentials:
+        #  basicAuthSecretName: git-credentials
 {% endif %}
 {% if test_scenario['values']['executor'] == 'celery' %}
         # Just setting some values to increase the test coverage (defaults should work just fine)

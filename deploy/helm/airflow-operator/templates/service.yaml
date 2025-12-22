@@ -1,4 +1,4 @@
-
+{{- if .Values.maintenance.customResourceDefinitions.maintain }}
 ---
 apiVersion: v1
 kind: Service
@@ -11,9 +11,11 @@ metadata:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
   selector:
+    webhook.stackable.tech/conversion: enabled
     {{- include "operator.selectorLabels" . | nindent 6 }}
   ports:
     - name: conversion-webhook
       protocol: TCP
       port: 8443
       targetPort: 8443
+{{- end }}

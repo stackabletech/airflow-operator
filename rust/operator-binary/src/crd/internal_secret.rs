@@ -9,7 +9,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::{airflow_controller::AIRFLOW_CONTROLLER_NAME, crd::v1alpha1};
+use crate::{airflow_controller::AIRFLOW_CONTROLLER_NAME, crd::v1alpha2};
 
 // Used for env-vars: AIRFLOW__WEBSERVER__SECRET_KEY, AIRFLOW__API__SECRET_KEY
 // N.B. AIRFLOW__WEBSERVER__SECRET_KEY is deprecated as of 3.0.2.
@@ -63,7 +63,7 @@ pub async fn create_random_secret(
     secret_name: &str,
     secret_key: &str,
     secret_byte_size: usize,
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     client: &Client,
 ) -> Result<()> {
     let mut internal_secret = BTreeMap::new();
