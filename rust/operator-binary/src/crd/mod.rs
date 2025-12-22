@@ -19,7 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    crd::git_sync::{self, credentials_secret_to_basic_auth, credentials_to_secret},
+    crd::git_sync::{self},
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -53,7 +53,7 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
             AirflowClientAuthenticationDetailsResolved,
         },
-        v1alpha1::WebserverRoleConfig,
+        v1alpha2::WebserverRoleConfig,
     },
     util::role_service_name,
 };
@@ -214,7 +214,7 @@ pub mod versioned {
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment, v1alpha1::WebserverRoleConfig>>,
+        pub webservers: Option<Role<AirflowConfigFragment, v1alpha2::WebserverRoleConfig>>,
 
         /// The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
@@ -254,12 +254,10 @@ pub mod versioned {
         /// Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
-        #[versioned(changed(
-            since = "v1alpha2",
-            from_type = "Vec<git_sync::v1alpha1::GitSync>",
-            upgrade_with = gitsync_v1_to_v2,
-            downgrade_with = gitsync_v2_to_v1
-        ))]
+        #[versioned(
+            changed(since = "v1alpha2", from_type = "Vec<git_sync::v1alpha1::GitSync>"),
+            hint(vec)
+        )]
         pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
 
         /// for internal use only - not for production use.
@@ -305,40 +303,6 @@ pub mod versioned {
     }
 }
 
-pub fn gitsync_v1_to_v2(
-    input: Vec<git_sync::v1alpha1::GitSync>,
-) -> Vec<git_sync::v1alpha2::GitSync> {
-    input
-        .iter()
-        .map(|g| git_sync::v1alpha2::GitSync {
-            credentials: credentials_secret_to_basic_auth(g.credentials_secret.clone()),
-            repo: g.repo.clone(),
-            branch: g.branch.clone(),
-            git_folder: g.git_folder.clone(),
-            depth: g.depth,
-            wait: g.wait,
-            git_sync_conf: g.git_sync_conf.clone(),
-        })
-        .collect()
-}
-
-pub fn gitsync_v2_to_v1(
-    input: Vec<git_sync::v1alpha2::GitSync>,
-) -> Vec<git_sync::v1alpha1::GitSync> {
-    input
-        .iter()
-        .map(|g| git_sync::v1alpha1::GitSync {
-            credentials_secret: credentials_to_secret(g.credentials.clone()),
-            repo: g.repo.clone(),
-            branch: g.branch.clone(),
-            git_folder: g.git_folder.clone(),
-            depth: g.depth,
-            wait: g.wait,
-            git_sync_conf: g.git_sync_conf.clone(),
-        })
-        .collect()
-}
-
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseInitializationConfig {
@@ -361,9 +325,9 @@ pub fn default_db_init() -> bool {
     true
 }
 
-impl Default for v1alpha1::WebserverRoleConfig {
+impl Default for v1alpha2::WebserverRoleConfig {
     fn default() -> Self {
-        v1alpha1::WebserverRoleConfig {
+        v1alpha2::WebserverRoleConfig {
             listener_class: webserver_default_listener_class(),
             common: Default::default(),
         }
