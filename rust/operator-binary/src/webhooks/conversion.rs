@@ -3,11 +3,10 @@ use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     kube::{Client, core::crd::MergeError},
     webhook::{
-        maintainer::CustomResourceDefinitionMaintainer,
-        servers::{ConversionWebhookError, ConversionWebhookServer},
+        WebhookServer, WebhookServerError, WebhookServerOptions,
+        webhooks::{ConversionWebhook, ConversionWebhookOptions},
     },
 };
-use tokio::sync::oneshot;
 
 use crate::crd::{AirflowCluster, AirflowClusterVersion, FIELD_MANAGER};
 
@@ -19,35 +18,35 @@ pub enum Error {
     MergeCrd { source: MergeError },
 
     #[snafu(display("failed to create conversion webhook server"))]
-    CreateConversionWebhook { source: ConversionWebhookError },
+    CreateWebhook { source: WebhookServerError },
 }
 
-/// Creates and returns a [`ConversionWebhookServer`] and a [`CustomResourceDefinitionMaintainer`].
-pub async fn create_webhook_and_maintainer<'a>(
-    operator_environment: &'a OperatorEnvironmentOptions,
+/// Creates and returns a [`WebhookServer`].
+pub async fn create_webhook_server(
+    operator_environment: &OperatorEnvironmentOptions,
     disable_crd_maintenance: bool,
     client: Client,
-) -> Result<
-    (
-        ConversionWebhookServer,
-        CustomResourceDefinitionMaintainer<'a>,
-        oneshot::Receiver<()>,
-    ),
-    Error,
-> {
-    let crds_and_handlers = [(
+) -> Result<WebhookServer, Error> {
+    let crds_and_handlers = vec![(
         AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2).context(MergeCrdSnafu)?,
-        AirflowCluster::try_convert as fn(_) -> _,
+        AirflowCluster::try_convert,
     )];
 
-    ConversionWebhookServer::with_maintainer(
-        crds_and_handlers,
-        &operator_environment.operator_service_name,
-        &operator_environment.operator_namespace,
-        FIELD_MANAGER,
+    let conversion_webhook_options = ConversionWebhookOptions {
         disable_crd_maintenance,
-        client,
-    )
-    .await
-    .context(CreateConversionWebhookSnafu)
+        field_manager: FIELD_MANAGER.to_owned(),
+    };
+
+    let (conversion_webhook, _initial_reconcile_rx) =
+        ConversionWebhook::new(crds_and_handlers, client, conversion_webhook_options);
+
+    let webhook_server_options = WebhookServerOptions {
+        socket_addr: WebhookServer::DEFAULT_SOCKET_ADDRESS,
+        webhook_namespace: operator_environment.operator_namespace.to_owned(),
+        webhook_service_name: operator_environment.operator_service_name.to_owned(),
+    };
+
+    WebhookServer::new(vec![Box::new(conversion_webhook)], webhook_server_options)
+        .await
+        .context(CreateWebhookSnafu)
 }

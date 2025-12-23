@@ -34,7 +34,7 @@ use stackable_operator::{
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
     crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha2},
-    webhooks::conversion::create_webhook_and_maintainer,
+    webhooks::conversion::create_webhook_server,
 };
 
 mod airflow_controller;
@@ -187,28 +187,18 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .map(anyhow::Ok);
 
-            let (conversion_webhook, crd_maintainer, _initial_reconcile_rx) =
-                create_webhook_and_maintainer(
-                    &operator_environment,
-                    maintenance.disable_crd_maintenance,
-                    client.as_kube_client(),
-                )
-                .await?;
+            let webhook_server = create_webhook_server(
+                &operator_environment,
+                maintenance.disable_crd_maintenance,
+                client.as_kube_client(),
+            )
+            .await?;
 
-            let conversion_webhook = conversion_webhook
+            let webhook_server = webhook_server
                 .run()
-                .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
+                .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
-            let crd_maintainer = crd_maintainer
-                .run()
-                .map_err(|err| anyhow!(err).context("failed to run CRD maintainer"));
-
-            futures::try_join!(
-                airflow_controller,
-                conversion_webhook,
-                crd_maintainer,
-                eos_checker
-            )?;
+            futures::try_join!(airflow_controller, webhook_server, eos_checker)?;
         }
     }
 

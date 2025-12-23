@@ -28,7 +28,7 @@ pub async fn add_pdbs(
     airflow: &v1alpha2::AirflowCluster,
     role: &AirflowRole,
     client: &Client,
-    cluster_resources: &mut ClusterResources,
+    cluster_resources: &mut ClusterResources<'_>,
 ) -> Result<(), Error> {
     if !pdb.enabled {
         return Ok(());
