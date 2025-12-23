@@ -16,7 +16,8 @@ spec:
         gitFolder: "tests/templates/kuttl/mount-dags-gitsync/dags" # <5>
         depth: 10 # <6>
         wait: 20s # <7>
-        credentialsSecret: git-credentials # <8>
+        credentials:
+          basicAuthSecretName: git-credentials # <8>
         gitSyncConf: # <9>
           --rev: HEAD # <10>
           # --rev: git-sync-tag # N.B. tag must be covered by "depth" (the number of commits to clone)
@@ -24,3 +25,12 @@ spec:
           --git-config: http.sslCAInfo:/tmp/ca-cert/ca.crt # <11>
   webservers:
     ...
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials # <8>
+type: Opaque
+data:
+  user: c3Rh...
+  password: Z2l0a...

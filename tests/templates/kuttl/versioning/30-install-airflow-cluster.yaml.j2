@@ -1,0 +1,89 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+timeout: 480
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-credentials
+type: Opaque
+data:
+  # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
+  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
+  # This token doesn't expire.
+  user: c3RhY2thYmxlLWFpcmZsb3c=
+  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSk1EWlNVQk1RYTdoX0c2OGlhbWtpRkpFV1RMTTF0ajFwbHFTVFNyZ3p3dHZneXI5b2tubGRXaGpVRDZITFRFV0JJcm9yT0dXCg==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-airflow-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+    credentialsSecret: test-airflow-credentials
+    dagsGitSync:
+      - repo: https://github.com/stackable-airflow/dags
+        # v1alpha1 field which should be converted to an enum
+        # N.B. only works for the existing v1 field
+        credentialsSecret: git-credentials
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        envOverrides: &envOverrides
+          AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: '{"conn_type": "kubernetes", "extra": {"extra__kubernetes__in_cluster": true}}'
+        replicas: 1
+  kubernetesExecutors:
+    envOverrides: *envOverrides
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+  schedulers:
+    config:
+      gracefulShutdownTimeout: 10s
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1
+  dagProcessors:
+    config:
+      gracefulShutdownTimeout: 10s
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        envOverrides: *envOverrides
+        replicas: 1

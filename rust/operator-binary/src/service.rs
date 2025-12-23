@@ -8,7 +8,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1};
+use crate::crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha2};
 
 pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
 pub const HEADLESS_SERVICE_SUFFIX: &str = "headless";
@@ -34,9 +34,9 @@ pub enum Error {
 /// The rolegroup headless [`Service`] is a service that allows direct access to the instances of a certain rolegroup
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_rolegroup_headless_service(
-    airflow: &v1alpha1::AirflowCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    object_labels: ObjectLabels<v1alpha1::AirflowCluster>,
+    airflow: &v1alpha2::AirflowCluster,
+    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     selector: BTreeMap<String, String>,
 ) -> Result<Service, Error> {
     let ports = headless_service_ports();
@@ -71,9 +71,9 @@ pub fn build_rolegroup_headless_service(
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
 pub fn build_rolegroup_metrics_service(
-    airflow: &v1alpha1::AirflowCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    object_labels: ObjectLabels<v1alpha1::AirflowCluster>,
+    airflow: &v1alpha2::AirflowCluster,
+    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     selector: BTreeMap<String, String>,
 ) -> Result<Service, Error> {
     let ports = metrics_service_ports();
@@ -107,7 +107,7 @@ pub fn build_rolegroup_metrics_service(
 }
 
 pub fn stateful_set_service_name(
-    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
 ) -> Option<String> {
     Some(rolegroup_headless_service_name(
         &rolegroup_ref.object_name(),

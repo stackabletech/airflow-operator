@@ -1,6 +1,6 @@
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, shared::time::Duration};
 
-use crate::crd::{AirflowAuthorization, AirflowOpaConfig, v1alpha1};
+use crate::crd::{AirflowAuthorization, AirflowOpaConfig, v1alpha2};
 
 pub struct AirflowAuthorizationResolved {
     pub opa: Option<OpaConfigResolved>,
@@ -9,7 +9,7 @@ pub struct AirflowAuthorizationResolved {
 impl AirflowAuthorizationResolved {
     pub async fn from_authorization_config(
         client: &Client,
-        airflow: &v1alpha1::AirflowCluster,
+        airflow: &v1alpha2::AirflowCluster,
         authorization: &Option<AirflowAuthorization>,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         let opa = if let Some(AirflowAuthorization {
@@ -33,7 +33,7 @@ pub struct OpaConfigResolved {
 impl OpaConfigResolved {
     pub async fn from_opa_config(
         client: &Client,
-        airflow: &v1alpha1::AirflowCluster,
+        airflow: &v1alpha2::AirflowCluster,
         airflow_opa_config: &AirflowOpaConfig,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         let connection_string = airflow_opa_config
