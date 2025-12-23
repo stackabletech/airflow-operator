@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Re-set `API_WORKERS` default to 1 for Airflow 3.x and update/correct docs to reflect this  ([#727]).
+
+[#727]: https://github.com/stackabletech/airflow-operator/pull/727
+
 ## [25.11.0] - 2025-11-07
 
 ## [25.11.0-rc1] - 2025-11-06
