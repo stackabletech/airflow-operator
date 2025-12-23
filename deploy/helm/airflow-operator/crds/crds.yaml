@@ -97,6 +97,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -115,12 +116,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -143,7 +143,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -163,7 +162,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -202,16 +200,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -223,8 +219,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -367,6 +362,7 @@ spec:
                                         - required:
                                             - custom
                                         - {}
+                                        - {}
                                       description: Log configuration of the container
                                       properties:
                                         console:
@@ -385,12 +381,11 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -413,7 +408,6 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -433,7 +427,6 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
-                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -472,16 +465,14 @@ spec:
                                           Equivalent to the `limit` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       min:
                                         description: |-
                                           The minimal amount of CPU cores that Pods need to run.
                                           Equivalent to the `request` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                     type: object
                                   memory:
                                     properties:
@@ -493,8 +484,7 @@ spec:
                                           You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                           For example, the following represent roughly the same value:
                                           `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       runtimeLimits:
                                         description: Additional options that can be specified.
                                         type: object
@@ -861,6 +851,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -879,12 +870,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -907,7 +897,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -927,7 +916,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -966,16 +954,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -987,8 +973,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -1131,6 +1116,7 @@ spec:
                                         - required:
                                             - custom
                                         - {}
+                                        - {}
                                       description: Log configuration of the container
                                       properties:
                                         console:
@@ -1149,12 +1135,11 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -1177,7 +1162,6 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -1197,7 +1181,6 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
-                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -1236,16 +1219,14 @@ spec:
                                           Equivalent to the `limit` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       min:
                                         description: |-
                                           The minimal amount of CPU cores that Pods need to run.
                                           Equivalent to the `request` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                     type: object
                                   memory:
                                     properties:
@@ -1257,8 +1238,7 @@ spec:
                                           You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                           For example, the following represent roughly the same value:
                                           `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       runtimeLimits:
                                         description: Additional options that can be specified.
                                         type: object
@@ -1429,6 +1409,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -1447,12 +1428,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1475,7 +1455,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -1495,7 +1474,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -1534,16 +1512,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -1555,8 +1531,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -1602,6 +1577,20 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                   type: object
+                objectOverrides:
+                  default: []
+                  description: |-
+                    A list of generic Kubernetes objects, which are merged into the objects that the operator
+                    creates.
+
+                    List entries are arbitrary YAML objects, which need to be valid Kubernetes objects.
+
+                    Read the [Object overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#object-overrides)
+                    for more information.
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  type: array
                 schedulers:
                   description: |-
                     The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
@@ -1664,6 +1653,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -1682,12 +1672,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1710,7 +1699,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -1730,7 +1718,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -1769,16 +1756,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -1790,8 +1775,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -1934,6 +1918,7 @@ spec:
                                         - required:
                                             - custom
                                         - {}
+                                        - {}
                                       description: Log configuration of the container
                                       properties:
                                         console:
@@ -1952,12 +1937,11 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -1980,7 +1964,6 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -2000,7 +1983,6 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
-                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -2039,16 +2021,14 @@ spec:
                                           Equivalent to the `limit` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       min:
                                         description: |-
                                           The minimal amount of CPU cores that Pods need to run.
                                           Equivalent to the `request` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                     type: object
                                   memory:
                                     properties:
@@ -2060,8 +2040,7 @@ spec:
                                           You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                           For example, the following represent roughly the same value:
                                           `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       runtimeLimits:
                                         description: Additional options that can be specified.
                                         type: object
@@ -2177,6 +2156,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -2195,12 +2175,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2223,7 +2202,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -2243,7 +2221,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -2282,16 +2259,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -2303,8 +2278,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -2447,6 +2421,7 @@ spec:
                                         - required:
                                             - custom
                                         - {}
+                                        - {}
                                       description: Log configuration of the container
                                       properties:
                                         console:
@@ -2465,12 +2440,11 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2493,7 +2467,6 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -2513,7 +2486,6 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
-                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -2552,16 +2524,14 @@ spec:
                                           Equivalent to the `limit` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       min:
                                         description: |-
                                           The minimal amount of CPU cores that Pods need to run.
                                           Equivalent to the `request` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                     type: object
                                   memory:
                                     properties:
@@ -2573,8 +2543,7 @@ spec:
                                           You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                           For example, the following represent roughly the same value:
                                           `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       runtimeLimits:
                                         description: Additional options that can be specified.
                                         type: object
@@ -2690,6 +2659,7 @@ spec:
                                   - required:
                                       - custom
                                   - {}
+                                  - {}
                                 description: Log configuration of the container
                                 properties:
                                   console:
@@ -2708,12 +2678,11 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2736,7 +2705,6 @@ spec:
                                           - ERROR
                                           - FATAL
                                           - NONE
-                                          - null
                                         nullable: true
                                         type: string
                                     type: object
@@ -2756,7 +2724,6 @@ spec:
                                             - ERROR
                                             - FATAL
                                             - NONE
-                                            - null
                                           nullable: true
                                           type: string
                                       type: object
@@ -2795,16 +2762,14 @@ spec:
                                     Equivalent to the `limit` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 min:
                                   description: |-
                                     The minimal amount of CPU cores that Pods need to run.
                                     Equivalent to the `request` for Pod resource configuration.
                                     Cores are specified either as a decimal point number or as milli units.
                                     For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                               type: object
                             memory:
                               properties:
@@ -2816,8 +2781,7 @@ spec:
                                     You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                     For example, the following represent roughly the same value:
                                     `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                  nullable: true
-                                  type: string
+                                  x-kubernetes-int-or-string: true
                                 runtimeLimits:
                                   description: Additional options that can be specified.
                                   type: object
@@ -2965,6 +2929,7 @@ spec:
                                         - required:
                                             - custom
                                         - {}
+                                        - {}
                                       description: Log configuration of the container
                                       properties:
                                         console:
@@ -2983,12 +2948,11 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3011,7 +2975,6 @@ spec:
                                                 - ERROR
                                                 - FATAL
                                                 - NONE
-                                                - null
                                               nullable: true
                                               type: string
                                           type: object
@@ -3031,7 +2994,6 @@ spec:
                                                   - ERROR
                                                   - FATAL
                                                   - NONE
-                                                  - null
                                                 nullable: true
                                                 type: string
                                             type: object
@@ -3070,16 +3032,14 @@ spec:
                                           Equivalent to the `limit` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       min:
                                         description: |-
                                           The minimal amount of CPU cores that Pods need to run.
                                           Equivalent to the `request` for Pod resource configuration.
                                           Cores are specified either as a decimal point number or as milli units.
                                           For example:`1.5` will be 1.5 cores, also written as `1500m`.
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                     type: object
                                   memory:
                                     properties:
@@ -3091,8 +3051,7 @@ spec:
                                           You can also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
                                           For example, the following represent roughly the same value:
                                           `128974848, 129e6, 129M,  128974848000m, 123Mi`
-                                        nullable: true
-                                        type: string
+                                        x-kubernetes-int-or-string: true
                                       runtimeLimits:
                                         description: Additional options that can be specified.
                                         type: object

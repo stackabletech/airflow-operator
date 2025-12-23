@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support objectOverrides using `.spec.objectOverrides`.
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
+
+[#726]: https://github.com/stackabletech/airflow-operator/pull/726
+
 ## [25.11.0] - 2025-11-07
 
 ## [25.11.0-rc1] - 2025-11-06
