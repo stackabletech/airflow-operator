@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
 - Re-set `API_WORKERS` default to 1 for Airflow 3.x and update/correct docs to reflect this  ([#727]).
 
