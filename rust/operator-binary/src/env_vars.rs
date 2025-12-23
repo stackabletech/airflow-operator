@@ -505,9 +505,10 @@ fn add_version_specific_env_vars(
                 JWT_SECRET_SECRET_KEY,
             ),
         );
-        // The airflow default for this is 4, but we document a recommended
-        // value of 1 with the option of either increasing it via overrides
-        // or of adding webserver instances.
+        // The Airflow default for this is 4.
+        // However, with the default resources this could cause problems,
+        // as the Pod went to 100% CPU usage and didn't get healthy
+        // quick enough, resulting in a crashloop.
         env.insert(
             "AIRFLOW__API__WORKERS".into(),
             EnvVar {
