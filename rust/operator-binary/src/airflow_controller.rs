@@ -436,6 +436,7 @@ pub async fn reconcile_airflow(
         AIRFLOW_CONTROLLER_NAME,
         &airflow.object_ref(&()),
         ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
+        &airflow.spec.object_overrides,
     )
     .context(CreateClusterResourcesSnafu)?;
 
@@ -686,7 +687,7 @@ async fn build_executor_template(
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    cluster_resources: &mut ClusterResources,
+    cluster_resources: &mut ClusterResources<'_>,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
 ) -> Result<(), Error> {

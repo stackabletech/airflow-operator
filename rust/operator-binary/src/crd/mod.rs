@@ -20,6 +20,7 @@ use stackable_operator::{
         merge::Merge,
     },
     crd::git_sync,
+    deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
         apimachinery::pkg::api::resource::Quantity,
@@ -205,6 +206,9 @@ pub mod versioned {
         // no doc string - See ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
+
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
