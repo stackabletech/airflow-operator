@@ -19,7 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    crd::git_sync::{self},
+    crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -201,9 +201,6 @@ pub mod versioned {
         // no doc string - See ProductImage struct
         pub image: ProductImage,
 
-        #[serde(default)]
-        pub object_overrides: ObjectOverrides,
-
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
         pub cluster_config: AirflowClusterConfig,
@@ -211,6 +208,9 @@ pub mod versioned {
         // no doc string - See ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
+
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]

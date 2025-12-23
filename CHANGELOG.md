@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add operator versioning ([#725]).
+  - GitSync considered for v1alpha1 and v1alpha2
+- Support objectOverrides using `.spec.objectOverrides`.
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
+
+[#725]: https://github.com/stackabletech/airflow-operator/pull/725
+[#726]: https://github.com/stackabletech/airflow-operator/pull/726
+
 ## [25.11.0] - 2025-11-07
 
 ## [25.11.0-rc1] - 2025-11-06
