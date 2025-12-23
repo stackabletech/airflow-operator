@@ -1367,7 +1367,7 @@ dependencies = [
 [[package]]
 name = "k8s-version"
 version = "0.1.3"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "darling 0.23.0",
  "regex",
@@ -2506,7 +2506,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.101.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "chrono",
  "clap",
@@ -2544,7 +2544,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -2555,7 +2555,7 @@ dependencies = [
 [[package]]
 name = "stackable-shared"
 version = "0.0.3"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "chrono",
  "k8s-openapi",
@@ -2572,7 +2572,7 @@ dependencies = [
 [[package]]
 name = "stackable-telemetry"
 version = "0.6.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "axum",
  "clap",
@@ -2596,7 +2596,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned"
 version = "0.8.3"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "schemars",
  "serde",
@@ -2609,7 +2609,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned-macros"
 version = "0.8.3"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fobject-overrides-by-reference#9f4d9fe373ad277feaf86d0781e0483e6d495dd3"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.101.1#bac8ff44653d477deda650fbd5f690af042df6c2"
 dependencies = [
  "convert_case",
  "darling 0.23.0",
