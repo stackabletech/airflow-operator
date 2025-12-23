@@ -505,6 +505,17 @@ fn add_version_specific_env_vars(
                 JWT_SECRET_SECRET_KEY,
             ),
         );
+        // The airflow default for this is 4, but we document a recommended
+        // value of 1 with the option of either increasing it via overrides
+        // or of adding webserver instances.
+        env.insert(
+            "AIRFLOW__API__WORKERS".into(),
+            EnvVar {
+                name: "AIRFLOW__API__WORKERS".into(),
+                value: Some("1".into()),
+                ..Default::default()
+            },
+        );
         if airflow_role == &AirflowRole::Webserver {
             // Sometimes a race condition can arise when both scheduler and
             // api-server are updating the DB, which adds overhead (conflicts
