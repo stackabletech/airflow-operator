@@ -105,6 +105,10 @@ tests:
       - airflow-latest
       - openshift
       - executor
+  - name: versioning
+    dimensions:
+      - airflow-latest
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow
