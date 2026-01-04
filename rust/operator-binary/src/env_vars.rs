@@ -288,23 +288,12 @@ pub fn build_airflow_statefulset_envs(
 }
 
 pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> Vec<String> {
-    // let git_sync_count = git_sync_resources.git_content_folders.len();
-    // if git_sync_count > 1 {
-    // tracing::warn!(
-    // "There are {git_sync_count} git-sync entries: Only the first one will be considered.",
-    // );
-    // }
     let mut git_folders = Vec::<String>::new();
     // If DAG provisioning via git-sync is not configured, set a default value
     // so that PYTHONPATH can refer to it. N.B. nested variables need to be
     // resolved, so that /stackable/airflow is used instead of $AIRFLOW_HOME.
     // see https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-    // git_sync_resources
-    // .git_content_folders_as_string()
-    // .first()
-    // .cloned()
-    // .unwrap_or("/stackable/airflow/dags".to_string())
-    // TODO: Might need check weather path is correct.
+
     for folder in git_sync_resources.git_content_folders_as_string() {
         git_folders.push(folder)
     }
