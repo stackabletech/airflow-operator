@@ -15,8 +15,8 @@ use stackable_operator::{
 
 use crate::{
     crd::{
-        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AIRFLOW_DAGS_FOLDER, AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -154,12 +154,11 @@ pub fn build_airflow_statefulset_envs(
         );
     }
 
-    let dags_folder = get_dags_folder(git_sync_resources);
     env.insert(
         AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
             name: AIRFLOW_CORE_DAGS_FOLDER.into(),
-            value: Some(dags_folder),
+            value: Some(AIRFLOW_DAGS_FOLDER.to_owned()),
             ..Default::default()
         },
     );
@@ -288,23 +287,28 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> String {
-    let git_sync_count = git_sync_resources.git_content_folders.len();
-    if git_sync_count > 1 {
-        tracing::warn!(
-            "There are {git_sync_count} git-sync entries: Only the first one will be considered.",
-        );
-    }
-
+pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> Vec<String> {
+    // let git_sync_count = git_sync_resources.git_content_folders.len();
+    // if git_sync_count > 1 {
+    // tracing::warn!(
+    // "There are {git_sync_count} git-sync entries: Only the first one will be considered.",
+    // );
+    // }
+    let mut git_folders = Vec::<String>::new();
     // If DAG provisioning via git-sync is not configured, set a default value
     // so that PYTHONPATH can refer to it. N.B. nested variables need to be
     // resolved, so that /stackable/airflow is used instead of $AIRFLOW_HOME.
     // see https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
-    git_sync_resources
-        .git_content_folders_as_string()
-        .first()
-        .cloned()
-        .unwrap_or("/stackable/airflow/dags".to_string())
+    // git_sync_resources
+    // .git_content_folders_as_string()
+    // .first()
+    // .cloned()
+    // .unwrap_or("/stackable/airflow/dags".to_string())
+    // TODO: Might need check weather path is correct.
+    for folder in git_sync_resources.git_content_folders_as_string() {
+        git_folders.push(folder)
+    }
+    git_folders
 }
 
 // This set of environment variables is a standard set that is not dependent on any
@@ -314,7 +318,17 @@ fn static_envs(
 ) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    let dags_folder = get_dags_folder(git_sync_resources);
+    let dags_folders = get_dags_folder(git_sync_resources);
+    let mut dag_python_path = String::new();
+
+    // TODO: Might be there is a better solution to this
+    for (i, dags_folder) in dags_folders.iter().enumerate() {
+        dag_python_path.push_str(dags_folder);
+        // Can't append ":" if it's last entry
+        if i != (dags_folders.len() - 1) {
+            dag_python_path.push_str(":");
+        }
+    }
 
     env.insert(
         PYTHONPATH.into(),
@@ -323,7 +337,7 @@ fn static_envs(
             // dependencies can be found: this must be the actual path and not a variable.
             // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
             name: PYTHONPATH.into(),
-            value: Some(format!("{LOG_CONFIG_DIR}:{dags_folder}")),
+            value: Some(format!("{LOG_CONFIG_DIR}:{dag_python_path}")),
             ..Default::default()
         },
     );
@@ -407,12 +421,11 @@ pub fn build_airflow_template_envs(
 
     // the config map also requires the dag-folder location as this will be passed on
     // to the pods started by airflow.
-    let dags_folder = get_dags_folder(git_sync_resources);
     env.insert(
         AIRFLOW_CORE_DAGS_FOLDER.into(),
         EnvVar {
             name: AIRFLOW_CORE_DAGS_FOLDER.into(),
-            value: Some(dags_folder),
+            value: Some(AIRFLOW_DAGS_FOLDER.to_owned()),
             ..Default::default()
         },
     );

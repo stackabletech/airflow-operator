@@ -70,6 +70,7 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
+pub const AIRFLOW_DAGS_FOLDER: &str = "/stackable/app/allDAGs";
 
 pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
 pub const TEMPLATE_LOCATION: &str = "/templates";
@@ -594,10 +595,18 @@ impl AirflowRole {
             format!(
                 "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
             ),
+            format!("mkdir {AIRFLOW_DAGS_FOLDER}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
+
+        for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
+            command.push(
+                format!("ln -s /stackable/app/git-{i}/current /stackable/app/allDAGs/current-{i}")
+                    .to_string(),
+            )
+        }
 
         if resolved_product_image.product_version.starts_with("3.") {
             // Start-up commands have changed in 3.x.
