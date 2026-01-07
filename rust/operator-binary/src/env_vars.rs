@@ -315,7 +315,7 @@ fn static_envs(
         dag_python_path.push_str(dags_folder);
         // Can't append ":" if it's last entry
         if i != (dags_folders.len() - 1) {
-            dag_python_path.push_str(":");
+            dag_python_path.push(':');
         }
     }
 
