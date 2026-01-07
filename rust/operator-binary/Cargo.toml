@@ -28,6 +28,9 @@ strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+# Needed to pin the version in the root Cargo.toml
+k8s-openapi.workspace = true
+
 [build-dependencies]
 built.workspace = true
 
