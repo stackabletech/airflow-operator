@@ -4682,10 +4682,10 @@ rec {
       };
       "k8s-openapi" = rec {
         crateName = "k8s-openapi";
-        version = "0.26.1";
+        version = "0.26.0";
         edition = "2021";
-        links = "k8s-openapi-0.26.1";
-        sha256 = "0aw8k7djlqxdbpc21qd7ir3rgx0hpsrf5mx03p2wsdyh3pkfbn86";
+        links = "k8s-openapi-0.26.0";
+        sha256 = "14m6i7g6w8lh1rnc19f2c31cvf2ia2vzmggsmzn5p4ba6bahcgyi";
         libName = "k8s_openapi";
         authors = [
           "Arnav Singh <me@arnavion.dev>"
@@ -4727,7 +4727,7 @@ rec {
           "latest" = [ "v1_34" ];
           "schemars" = [ "dep:schemars" ];
         };
-        resolvedDefaultFeatures = [ "schemars" "v1_34" ];
+        resolvedDefaultFeatures = [ "default" "schemars" "std" "v1_34" ];
       };
       "k8s-version" = rec {
         crateName = "k8s-version";
@@ -9356,6 +9356,10 @@ rec {
           {
             name = "indoc";
             packageId = "indoc";
+          }
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
           }
           {
             name = "product-config";
