@@ -55,10 +55,17 @@ headers = {
 response = requests.patch(
     f"{rest_url}/dags/{dag_id}", headers=headers, json={"is_paused": False}
 )
+if response.status_code != 200:
+    logging.error("DAG run could not be activated")
+    sys.exit(1)
+
 # trigger DAG
 response = requests.post(
     f"{rest_url}/dags/{dag_id}/dagRuns", headers=headers, json=dag_data
 )
+if response.status_code != 200:
+    logging.error("DAG run could not be triggered")
+    sys.exit(1)
 
 # Wait for the metrics to be consumed by the statsd-exporter
 time.sleep(5)
@@ -68,8 +75,6 @@ iterations = 9
 loop = 0
 while True:
     try:
-        logging.info(f"Response code: {response.status_code}")
-        assert response.status_code == 200, "DAG run could not be triggered."
         # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
         # (disable line-break flake checks)
         if (assert_metric("scheduler", "airflow_scheduler_heartbeat")) and (

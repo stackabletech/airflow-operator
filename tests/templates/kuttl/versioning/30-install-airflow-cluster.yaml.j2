@@ -53,6 +53,7 @@ spec:
         # N.B. only works for the existing v1 field
         credentialsSecret: git-credentials
         gitFolder: "mount-dags-gitsync/dags_airflow3"
+        wait: 5s
   webservers:
     roleConfig:
       listenerClass: external-unstable
