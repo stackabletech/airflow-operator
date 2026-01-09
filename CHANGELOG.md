@@ -7,12 +7,17 @@
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
 
+### Changed
+
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
+
 ### Fixed
 
 - Default `API_WORKERS` to 1 (instead of letting Airflow default to 4) to prevent crashloop and update/correct docs to reflect this  ([#727]).
 
 [#726]: https://github.com/stackabletech/airflow-operator/pull/726
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
+[#733]: https://github.com/stackabletech/airflow-operator/pull/733
 
 ## [25.11.0] - 2025-11-07
 
