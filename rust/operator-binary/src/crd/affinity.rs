@@ -55,7 +55,7 @@ mod tests {
         role_utils::RoleGroupRef,
     };
 
-    use crate::crd::{AirflowExecutor, AirflowRole, v1alpha1};
+    use crate::crd::{AirflowExecutor, AirflowRole, v1alpha2};
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -63,7 +63,7 @@ mod tests {
     #[case(AirflowRole::Webserver)]
     fn test_affinity_defaults(#[case] role: AirflowRole) {
         let cluster = "
-        apiVersion: airflow.stackable.tech/v1alpha1
+        apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
         metadata:
           name: airflow
@@ -87,7 +87,7 @@ mod tests {
         ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: v1alpha1::AirflowCluster =
+        let airflow: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let rolegroup_ref = RoleGroupRef {
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_executor_affinity_defaults() {
         let cluster = "
-        apiVersion: airflow.stackable.tech/v1alpha1
+        apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
         metadata:
           name: airflow
@@ -178,7 +178,7 @@ mod tests {
           ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: v1alpha1::AirflowCluster =
+        let airflow: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {

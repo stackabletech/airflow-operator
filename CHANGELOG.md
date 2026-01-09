@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add operator versioning ([#725]).
+  - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
 
@@ -15,6 +17,7 @@
 
 - Default `API_WORKERS` to 1 (instead of letting Airflow default to 4) to prevent crashloop and update/correct docs to reflect this  ([#727]).
 
+[#725]: https://github.com/stackabletech/airflow-operator/pull/725
 [#726]: https://github.com/stackabletech/airflow-operator/pull/726
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
 [#733]: https://github.com/stackabletech/airflow-operator/pull/733
