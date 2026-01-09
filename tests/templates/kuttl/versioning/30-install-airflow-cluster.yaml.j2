@@ -79,12 +79,3 @@ spec:
       default:
         envOverrides: *envOverrides
         replicas: 1
-  dagProcessors:
-    config:
-      gracefulShutdownTimeout: 10s
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        envOverrides: *envOverrides
-        replicas: 1
