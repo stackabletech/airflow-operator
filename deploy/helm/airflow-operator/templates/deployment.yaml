@@ -4,9 +4,6 @@ kind: Deployment
 metadata:
   name: {{ include "operator.fullname" . }}-deployment
   labels:
-    {{- if .Values.maintenance.customResourceDefinitions.maintain }}
-    webhook.stackable.tech/conversion: enabled
-    {{- end }}
     {{- include "operator.labels" . | nindent 4 }}
 spec:
   replicas: 1

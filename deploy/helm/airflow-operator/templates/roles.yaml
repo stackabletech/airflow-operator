@@ -117,9 +117,6 @@ rules:
       - list
       - patch
       - watch
-      {{- if .Values.maintenance.customResourceDefinitions.maintain }}
-      - create
-      {{- end }}
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
