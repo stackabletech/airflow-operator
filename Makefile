@@ -32,7 +32,6 @@ compile-chart: version crds config
 
 chart-clean:
 	rm -rf "deploy/helm/${OPERATOR_NAME}/configs"
-	rm -rf "deploy/helm/${OPERATOR_NAME}/crds"
 
 version:
 	cat "deploy/helm/${OPERATOR_NAME}/Chart.yaml" | yq ".version = \"${VERSION}\" | .appVersion = \"${VERSION}\"" > "deploy/helm/${OPERATOR_NAME}/Chart.yaml.new"
@@ -44,9 +43,11 @@ config:
 		cp -r deploy/config-spec/* "deploy/helm/${OPERATOR_NAME}/configs";\
 	fi
 
+## N.B. diverges from templating for operators that have CRD-versioning
+## implemented. @adwk67: Do *not* let this be overridden with templating!
 crds:
-	mkdir -p deploy/helm/"${OPERATOR_NAME}"/crds
-	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > "deploy/helm/${OPERATOR_NAME}/crds/crds.yaml"
+	mkdir -p extra
+	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd > extra/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
