@@ -519,6 +519,36 @@ pub async fn reconcile_airflow(
                 role: role_name.to_string(),
             })?;
 
+        if let Some(GenericRoleConfig {
+            pod_disruption_budget: pdb,
+        }) = airflow.role_config(&airflow_role)
+        {
+            add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
+                .await
+                .context(FailedToCreatePdbSnafu)?;
+        }
+
+        if let Some(listener_class) = airflow_role.listener_class_name(airflow) {
+            if let Some(listener_group_name) = airflow.group_listener_name(&airflow_role) {
+                let rg_group_listener = build_group_listener(
+                    airflow,
+                    build_recommended_labels(
+                        airflow,
+                        AIRFLOW_CONTROLLER_NAME,
+                        &resolved_product_image.app_version_label_value,
+                        role_name,
+                        "none",
+                    ),
+                    listener_class.to_string(),
+                    listener_group_name,
+                )?;
+                cluster_resources
+                    .add(client, rg_group_listener)
+                    .await
+                    .context(ApplyGroupListenerSnafu)?;
+            }
+        }
+
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = RoleGroupRef {
                 cluster: ObjectRef::from_obj(airflow),
@@ -587,6 +617,26 @@ pub async fn reconcile_airflow(
                     rolegroup: rolegroup.clone(),
                 })?;
 
+            let rg_configmap = build_rolegroup_config_map(
+                airflow,
+                &resolved_product_image,
+                &rolegroup,
+                rolegroup_config,
+                &authentication_config,
+                &authorization_config,
+                &merged_airflow_config.logging,
+                &Container::Airflow,
+            )?;
+            cluster_resources
+                .add(client, rg_configmap)
+                .await
+                .with_context(|_| ApplyRoleGroupConfigSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+
+            // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
+            // to prevent unnecessary Pod restarts.
+            // See https://github.com/stackabletech/commons-operator/issues/111 for details.
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
                 &resolved_product_image,
@@ -609,54 +659,6 @@ pub async fn reconcile_airflow(
                         rolegroup: rolegroup.clone(),
                     })?,
             );
-
-            let rg_configmap = build_rolegroup_config_map(
-                airflow,
-                &resolved_product_image,
-                &rolegroup,
-                rolegroup_config,
-                &authentication_config,
-                &authorization_config,
-                &merged_airflow_config.logging,
-                &Container::Airflow,
-            )?;
-            cluster_resources
-                .add(client, rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-        }
-
-        let role_config = airflow.role_config(&airflow_role);
-        if let Some(GenericRoleConfig {
-            pod_disruption_budget: pdb,
-        }) = role_config
-        {
-            add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
-                .await
-                .context(FailedToCreatePdbSnafu)?;
-        }
-
-        if let Some(listener_class) = airflow_role.listener_class_name(airflow) {
-            if let Some(listener_group_name) = airflow.group_listener_name(&airflow_role) {
-                let rg_group_listener = build_group_listener(
-                    airflow,
-                    build_recommended_labels(
-                        airflow,
-                        AIRFLOW_CONTROLLER_NAME,
-                        &resolved_product_image.app_version_label_value,
-                        role_name,
-                        "none",
-                    ),
-                    listener_class.to_string(),
-                    listener_group_name,
-                )?;
-                cluster_resources
-                    .add(client, rg_group_listener)
-                    .await
-                    .context(ApplyGroupListenerSnafu)?;
-            }
         }
     }
 
