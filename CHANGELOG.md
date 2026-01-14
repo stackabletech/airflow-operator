@@ -16,11 +16,14 @@
 ### Fixed
 
 - Default `API_WORKERS` to 1 (instead of letting Airflow default to 4) to prevent crashloop and update/correct docs to reflect this  ([#727]).
+- Prevent unnecessary Pod restarts when initially creating an AirflowCluster.
+  This is achieved by applying the StatefulSet after all ConfigMaps and Secrets that it mounts ([#734]).
 
 [#725]: https://github.com/stackabletech/airflow-operator/pull/725
 [#726]: https://github.com/stackabletech/airflow-operator/pull/726
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
 [#733]: https://github.com/stackabletech/airflow-operator/pull/733
+[#734]: https://github.com/stackabletech/airflow-operator/pull/734
 
 ## [25.11.0] - 2025-11-07
 
