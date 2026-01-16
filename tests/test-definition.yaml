@@ -20,7 +20,7 @@ dimensions:
       # - 3.0.6,oci.stackable.tech/sandbox/airflow:3.0.6-stackable0.0.0-dev
   - name: opa-latest
     values:
-      - 1.8.0
+      - 1.12.2
   - name: ldap-authentication
     values:
       - no-tls

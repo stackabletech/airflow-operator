@@ -18,6 +18,8 @@ kind: StatefulSet
 metadata:
   name: airflow-webserver-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -32,6 +34,8 @@ kind: StatefulSet
 metadata:
   name: airflow-worker-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -46,6 +50,8 @@ kind: StatefulSet
 metadata:
   name: airflow-scheduler-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -59,6 +65,8 @@ kind: StatefulSet
 metadata:
   name: airflow-dagprocessor-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -72,6 +80,8 @@ kind: StatefulSet
 metadata:
   name: airflow-triggerer-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
