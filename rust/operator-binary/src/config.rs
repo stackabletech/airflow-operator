@@ -18,7 +18,7 @@ use crate::crd::{
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
-    "from flask_appbuilder.const import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    "from flask_appbuilder.const import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)",
     "basedir = os.path.abspath(os.path.dirname(__file__))",
     "WTF_CSRF_ENABLED = True",
 ];
@@ -205,7 +205,6 @@ fn append_oidc_config(
         &oidc::v1alpha1::ClientAuthenticationOptions<()>,
     )],
 ) -> Result<(), Error> {
-    // Debatable: AUTH_OAUTH or AUTH_OID
     // Additionally can be set via config
     config.insert(
         AirflowConfigOptions::AuthType.to_string(),
