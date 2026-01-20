@@ -21,6 +21,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
+        {{- if .Values.maintenance.customResourceDefinitions.maintain }}
+        webhook.stackable.tech/conversion: enabled
+        {{- end }}
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.image.pullSecrets }}
@@ -79,6 +82,7 @@ spec:
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
             {{- include "telemetry.envVars" . | nindent 12 }}
+            {{- include "maintenance.envVars" . | nindent 12 }}
       volumes:
         - name: config-spec
           configMap:

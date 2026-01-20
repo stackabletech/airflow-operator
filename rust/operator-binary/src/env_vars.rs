@@ -24,7 +24,7 @@ use crate::{
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
-        v1alpha1,
+        v1alpha2,
     },
     util::{env_var_from_secret, role_service_name},
 };
@@ -74,13 +74,13 @@ pub enum Error {
 /// used which is defined in [`build_airflow_template_envs`]).
 #[allow(clippy::too_many_arguments)]
 pub fn build_airflow_statefulset_envs(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
@@ -288,7 +288,7 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> String {
+pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha2::GitSyncResources) -> String {
     let git_sync_count = git_sync_resources.git_content_folders.len();
     if git_sync_count > 1 {
         tracing::warn!(
@@ -310,7 +310,7 @@ pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
 fn static_envs(
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -369,10 +369,10 @@ fn static_envs(
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
@@ -464,7 +464,7 @@ pub fn build_airflow_template_envs(
 }
 
 fn add_version_specific_env_vars(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
     resolved_product_image: &ResolvedProductImage,
     env: &mut BTreeMap<String, EnvVar>,
@@ -634,7 +634,7 @@ fn authorization_env_vars(
     env
 }
 
-fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn execution_server_env_vars(airflow: &v1alpha2::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     if let Some(name) = airflow.metadata.name.as_ref() {

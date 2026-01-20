@@ -1,4 +1,4 @@
-//! Ensures that `Pod`s are configured and running for each [`v1alpha1::AirflowCluster`]
+//! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
@@ -97,7 +97,7 @@ use crate::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
             create_random_secret,
         },
-        v1alpha1,
+        v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
     operations::{
@@ -137,19 +137,19 @@ pub enum Error {
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
     #[snafu(display("invalid product config"))]
@@ -200,13 +200,13 @@ pub enum Error {
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
-        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::builder::configmap::Error,
-        rolegroup: RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
@@ -224,7 +224,7 @@ pub enum Error {
     },
 
     #[snafu(display("invalid git-sync specification"))]
-    InvalidGitSyncSpec { source: git_sync::v1alpha1::Error },
+    InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -365,7 +365,7 @@ impl ReconcilerError for Error {
 }
 
 pub async fn reconcile_airflow(
-    airflow: Arc<DeserializeGuard<v1alpha1::AirflowCluster>>,
+    airflow: Arc<DeserializeGuard<v1alpha2::AirflowCluster>>,
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconcile");
@@ -560,7 +560,7 @@ pub async fn reconcile_airflow(
                 .merged_config(&airflow_role, &rolegroup)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+            let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &resolved_product_image,
                 &env_vars_from_rolegroup_config(rolegroup_config),
@@ -684,7 +684,7 @@ pub async fn reconcile_airflow(
 
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
@@ -719,7 +719,7 @@ async fn build_executor_template(
             rolegroup: rolegroup.clone(),
         })?;
 
-    let git_sync_resources = git_sync::v1alpha1::GitSyncResources::new(
+    let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
         resolved_product_image,
         &env_vars_from(&common_config.env_overrides),
@@ -752,9 +752,9 @@ async fn build_executor_template(
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -865,9 +865,9 @@ fn build_rolegroup_config_map(
 }
 
 fn build_rolegroup_metadata(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &&ResolvedProductImage,
-    rolegroup: &&RoleGroupRef<v1alpha1::AirflowCluster>,
+    rolegroup: &&RoleGroupRef<v1alpha2::AirflowCluster>,
     prometheus_label: Label,
     name: String,
 ) -> Result<ObjectMeta, Error> {
@@ -890,8 +890,8 @@ fn build_rolegroup_metadata(
 }
 
 pub fn build_group_listener(
-    airflow: &v1alpha1::AirflowCluster,
-    object_labels: ObjectLabels<v1alpha1::AirflowCluster>,
+    airflow: &v1alpha2::AirflowCluster,
+    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     listener_class: String,
     listener_group_name: String,
 ) -> Result<listener::v1alpha1::Listener> {
@@ -926,17 +926,17 @@ fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     airflow_role: &AirflowRole,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
@@ -1249,15 +1249,15 @@ fn build_logging_container(
 
 #[allow(clippy::too_many_arguments)]
 fn build_executor_template_config_map(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
@@ -1388,7 +1388,7 @@ fn build_executor_template_config_map(
 }
 
 pub fn error_policy(
-    _obj: Arc<DeserializeGuard<v1alpha1::AirflowCluster>>,
+    _obj: Arc<DeserializeGuard<v1alpha2::AirflowCluster>>,
     error: &Error,
     _ctx: Arc<Ctx>,
 ) -> Action {
@@ -1439,7 +1439,7 @@ fn add_authentication_volumes_and_volume_mounts(
 fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
+    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     add_sidecar_containers: bool,
     add_init_containers: bool,
 ) -> Result<()> {
@@ -1454,6 +1454,8 @@ fn add_git_sync_resources(
         }
     }
     pb.add_volumes(git_sync_resources.git_content_volumes.to_owned())
+        .context(AddVolumeSnafu)?;
+    pb.add_volumes(git_sync_resources.git_ssh_volumes.to_owned())
         .context(AddVolumeSnafu)?;
     cb.add_volume_mounts(git_sync_resources.git_content_volume_mounts.to_owned())
         .context(AddVolumeMountSnafu)?;

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add operator versioning ([#725]).
+  - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
 
@@ -17,6 +19,7 @@
 - Prevent unnecessary Pod restarts when initially creating an AirflowCluster.
   This is achieved by applying the StatefulSet after all ConfigMaps and Secrets that it mounts ([#734]).
 
+[#725]: https://github.com/stackabletech/airflow-operator/pull/725
 [#726]: https://github.com/stackabletech/airflow-operator/pull/726
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
 [#733]: https://github.com/stackabletech/airflow-operator/pull/733
