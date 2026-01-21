@@ -32,6 +32,10 @@ dimensions:
     values:
       - celery
       - kubernetes
+  - name: access
+    values:
+      - https
+      - ssh
 tests:
   - name: smoke
     dimensions:
@@ -48,6 +52,7 @@ tests:
       - airflow-latest
       - openshift
       - executor
+      - access
   - name: ldap
     dimensions:
       - airflow-latest
@@ -99,6 +104,10 @@ tests:
       - airflow-latest
       - openshift
       - executor
+  - name: versioning
+    dimensions:
+      - airflow-latest
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow
