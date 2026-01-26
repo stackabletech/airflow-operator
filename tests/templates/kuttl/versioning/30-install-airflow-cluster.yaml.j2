@@ -64,6 +64,7 @@ spec:
       default:
         envOverrides: &envOverrides
           AIRFLOW_CONN_KUBERNETES_IN_CLUSTER: '{"conn_type": "kubernetes", "extra": {"extra__kubernetes__in_cluster": true}}'
+          SOME_TEST_CONCAT: 'this is my admin password: $ADMIN_PASSWORD'
         replicas: 1
   kubernetesExecutors:
     envOverrides: *envOverrides
