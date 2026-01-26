@@ -19,7 +19,7 @@ commands:
       # has to be declared.
       # See https://github.com/apache/airflow/pull/52581.
       CURL_RESPONSE=$(
-          kubectl -n $NAMESPACE exec airflow-webserver-default-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-default-headless:8793/log/log 2>/dev/null || true);echo "$CODE"'
+          kubectl -n $NAMESPACE exec airflow-webserver-default-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-default-headless:8793/log 2>/dev/null || true);echo "$CODE"'
       )
 
       # Log-Endpoint Test Assertion:
