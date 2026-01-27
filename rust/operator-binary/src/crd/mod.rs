@@ -595,7 +595,8 @@ impl AirflowRole {
             format!(
                 "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
             ),
-            format!("mkdir {AIRFLOW_DAGS_FOLDER}"),
+            // Adding cm as dags within the same AIRFLOW_DAGS_FOLDER leads to problems, thus checking if exists
+            format!("[ ! -d \"{AIRFLOW_DAGS_FOLDER}\" ] && mkdir {AIRFLOW_DAGS_FOLDER}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
