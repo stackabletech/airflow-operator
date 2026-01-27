@@ -72,6 +72,11 @@ mod tests {
             productVersion: 3.0.6
           clusterConfig:
             credentialsSecret: airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:
@@ -166,6 +171,11 @@ mod tests {
             productVersion: 3.0.6
           clusterConfig:
             credentialsSecret: airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:

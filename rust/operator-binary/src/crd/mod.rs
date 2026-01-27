@@ -47,6 +47,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    connections::database::DbType,
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -249,6 +250,10 @@ pub mod versioned {
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
         pub credentials_secret: String,
+
+        /// Connection information needed to construct a connection for the
+        /// mandatory backend metadata database.
+        pub metadata_database: DbType,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
         /// Learn more in the
@@ -1112,6 +1117,11 @@ mod tests {
             loadExamples: true
             exposeConfig: true
             credentialsSecret: simple-airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:

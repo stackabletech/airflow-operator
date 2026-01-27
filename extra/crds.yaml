@@ -759,6 +759,66 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: |-
+                      Connection information needed to construct a connection for the
+                      mandatory backend metadata database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                      redis:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          host:
+                            type: string
+                          port:
+                            default: 6379
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -783,6 +843,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -3930,6 +3991,66 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: |-
+                      Connection information needed to construct a connection for the
+                      mandatory backend metadata database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                      redis:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          host:
+                            type: string
+                          port:
+                            default: 6379
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -3954,6 +4075,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
