@@ -145,3 +145,19 @@ When a custom DAG folder (e.g. `/dags`) is defined with `envOverrides` and some 
 ----
 
 NOTE: Generally speaking it is https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#configuration-reference[recommended] by Airflow to have the same config everywhere across all components.
+
+== GitSync race condition
+
+Sometimes a race condition can arise when the long-running Python process started by the Airflow dag-processor caches python submodules before the gitsync fetch is complete. This is indeterminate but can be avoided by adding the following lines to the top of each DAG file that references submodules:
+
+[source,python]
+----
+import importlib
+import site
+
+# invalidate cache due to race condition when using dag-processor
+importlib.reload(site)
+importlib.invalidate_caches()
+----
+
+This will add some overhead that should be minimal in comparison to parsing the DAG as a whole.
