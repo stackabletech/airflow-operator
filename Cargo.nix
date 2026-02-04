@@ -3107,9 +3107,9 @@ rec {
       };
       "git2" = rec {
         crateName = "git2";
-        version = "0.20.3";
+        version = "0.20.4";
         edition = "2018";
-        sha256 = "131hmxb2iq9328wrwqgw56fcd0z3dwxnn3hzl6nwsa97yvi3fary";
+        sha256 = "0azykjpk3j6s354z23jkyq3r3pbmlw9ha1zsxkw5cnnpi1h2b23v";
         authors = [
           "Josh Triplett <josh@joshtriplett.org>"
           "Alex Crichton <alex@alexcrichton.com>"
