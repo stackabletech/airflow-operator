@@ -8,16 +8,8 @@ use stackable_operator::schemars::{self, JsonSchema};
 pub enum DbType {
     #[serde(rename = "postgresql")]
     Postgresql(PostgresqlDb),
-    #[serde(rename = "redis")]
-    Redis(RedisDb),
     #[serde(rename = "generic")]
     Generic(GenericDb),
-}
-
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GenericDb {
-    pub uri_secret: String,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -34,25 +26,21 @@ pub struct PostgresqlDb {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RedisDb {
-    pub host: String,
-    #[serde(default = "default_redis_port")]
-    pub port: u16,
-    pub credentials_secret: String,
+pub struct GenericDb {
+    pub uri_secret: String,
 }
 
 impl DbType {
-    pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
+    pub fn credentials_secret(&self) -> String {
         match self {
-            DbType::Postgresql(db) => db.connection_string(username_env, password_env),
-            DbType::Redis(db) => db.connection_string(username_env, password_env),
-            DbType::Generic(db) => db.connection_string(),
+            DbType::Postgresql(db) => db.credentials_secret.to_owned(),
+            DbType::Generic(db) => db.uri_secret.to_owned(),
         }
     }
 }
 
 impl PostgresqlDb {
-    pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
+    fn connection_string(&self, prefix: &str, username_env: &str, password_env: &str) -> String {
         let params = if self.parameters.is_empty() {
             String::new()
         } else {
@@ -65,24 +53,17 @@ impl PostgresqlDb {
         };
 
         format!(
-            "postgresql+psycopg2://${{env:{}}}:${{env:{}}}@{}:{}/{}{}",
-            username_env, password_env, self.host, self.port, self.database_name, params
+            "{}://${}:${}@{}:{}/{}{}",
+            prefix, username_env, password_env, self.host, self.port, self.database_name, params
         )
     }
-}
 
-impl RedisDb {
-    pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
-        format!(
-            "redis://${{env:{}}}:${{env:{}}}@{}:{}/0",
-            username_env, password_env, self.host, self.port
-        )
+    pub fn connection_string_alchemy(&self, username_env: &str, password_env: &str) -> String {
+        self.connection_string("postgresql+psycopg2", username_env, password_env)
     }
-}
 
-impl GenericDb {
-    pub fn connection_string(&self) -> String {
-        format!("${{secret:{}}}", self.uri_secret)
+    pub fn connection_string_celery(&self, username_env: &str, password_env: &str) -> String {
+        self.connection_string("db+postgresql", username_env, password_env)
     }
 }
 
@@ -90,46 +71,25 @@ fn default_postgres_port() -> u16 {
     5432
 }
 
-fn default_redis_port() -> u16 {
-    6379
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::connections::database::{
-        DbType, PostgresqlDb, RedisDb, default_postgres_port, default_redis_port,
-    };
+    use crate::connections::database::{PostgresqlDb, default_postgres_port};
 
     #[test]
-    fn test_postgresql_connection() {
-        let db_type = DbType::Postgresql(PostgresqlDb {
+    fn test_postgresql_alchemy() {
+        let db_type = PostgresqlDb {
             host: "airflow-postgresql".to_string(),
             database_name: "airflow".to_string(),
             credentials_secret: "airflow-credentials".to_string(),
             port: default_postgres_port(),
             parameters: BTreeMap::new(),
-        });
-        let connection_string = db_type.connection_string("ADMIN_USERNAME", "ADMIN_PASSWORD");
+        };
+        let connection_string = db_type.connection_string_alchemy("DB_USERNAME", "DB_PASSWORD");
 
         assert_eq!(
-            "postgresql+psycopg2://${env:ADMIN_USERNAME}:${env:ADMIN_PASSWORD}@airflow-postgresql:5432/airflow",
-            connection_string
-        );
-    }
-
-    #[test]
-    fn test_redis_connection() {
-        let db_type = DbType::Redis(RedisDb {
-            host: "airflow-postgresql".to_string(),
-            credentials_secret: "airflow-credentials".to_string(),
-            port: default_redis_port(),
-        });
-        let connection_string = db_type.connection_string("ADMIN_USERNAME", "ADMIN_PASSWORD");
-
-        assert_eq!(
-            "redis://${env:ADMIN_USERNAME}:${env:ADMIN_PASSWORD}@airflow-postgresql:6379/0",
+            "postgresql+psycopg2://$DB_USERNAME:$DB_PASSWORD@airflow-postgresql:5432/airflow",
             connection_string
         );
     }

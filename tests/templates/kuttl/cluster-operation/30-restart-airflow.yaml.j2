@@ -24,7 +24,12 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    credentialsSecret: test-airflow-credentials
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
     databaseInitialization:
       enabled: false
   webservers:
@@ -37,6 +42,15 @@ spec:
       default:
         replicas: 1
   celeryExecutors:
+    celeryResultBackend:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
+    celeryBrokerUrl:
+      redis:
+        host: airflow-redis-master
+        credentialsSecret: redis-credentials
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

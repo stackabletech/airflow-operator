@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: airflow-credentials
+  name: admin-user-credentials
 type: Opaque
 stringData:
   adminUser.username: airflow
@@ -10,9 +10,22 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-credentials
+stringData:
+  username: airflow
+  password: airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+stringData:
+  username: ""
+  password: redis
 ---
 apiVersion: v1
 kind: Secret
@@ -25,9 +38,6 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -45,7 +55,12 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    credentialsSecret: airflow-credentials
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -60,6 +75,15 @@ spec:
           COMMON_VAR: group-value # overrides role value
           GROUP_VAR: group-value # only defined here at group level
   celeryExecutors:
+    celeryResultBackend:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
+    celeryBrokerUrl:
+      redis:
+        host: airflow-redis-master
+        credentialsSecret: redis-credentials
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level

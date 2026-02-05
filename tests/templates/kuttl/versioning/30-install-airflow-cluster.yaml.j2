@@ -19,7 +19,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-airflow-credentials
+  name: admin-user-credentials
 type: Opaque
 stringData:
   adminUser.username: airflow
@@ -27,7 +27,22 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-credentials
+stringData:
+  username: airflow
+  password: airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+stringData:
+  username: ""
+  password: redis
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -46,7 +61,12 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    credentialsSecret: test-airflow-credentials
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
     dagsGitSync:
       - repo: https://github.com/stackable-airflow/dags
         # v1alpha1 field which should be converted to an enum

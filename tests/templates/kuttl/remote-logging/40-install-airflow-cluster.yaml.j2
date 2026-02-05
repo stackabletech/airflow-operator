@@ -7,7 +7,7 @@ timeout: 480
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-airflow-credentials
+  name: admin-user-credentials
 type: Opaque
 stringData:
   adminUser.username: airflow
@@ -15,11 +15,22 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
-{% if test_scenario['values']['executor'] == 'celery' %}
-  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
-{% endif %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-credentials
+stringData:
+  username: airflow
+  password: airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+stringData:
+  username: ""
+  password: redis
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
@@ -36,7 +47,12 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     loadExamples: true
-    credentialsSecret: test-airflow-credentials
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -50,6 +66,15 @@ spec:
           AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
+    celeryResultBackend:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
+    celeryBrokerUrl:
+      redis:
+        host: airflow-redis-master
+        credentialsSecret: redis-credentials
     roleGroups:
       default:
         replicas: 2

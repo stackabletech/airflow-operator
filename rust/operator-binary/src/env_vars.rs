@@ -14,6 +14,9 @@ use stackable_operator::{
 };
 
 use crate::{
+    connection::{
+        add_celery_backend_credentials, add_celery_broker_credentials, add_metadata_credentials,
+    },
     crd::{
         AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         TEMPLATE_LOCATION, TEMPLATE_NAME,
@@ -40,12 +43,9 @@ const AIRFLOW_METRICS_STATSD_ON: &str = "AIRFLOW__METRICS__STATSD_ON";
 const AIRFLOW_METRICS_STATSD_HOST: &str = "AIRFLOW__METRICS__STATSD_HOST";
 const AIRFLOW_METRICS_STATSD_PORT: &str = "AIRFLOW__METRICS__STATSD_PORT";
 const AIRFLOW_WEBSERVER_SECRET_KEY: &str = "AIRFLOW__WEBSERVER__SECRET_KEY";
-const AIRFLOW_CELERY_RESULT_BACKEND: &str = "AIRFLOW__CELERY__RESULT_BACKEND";
-const AIRFLOW_CELERY_BROKER_URL: &str = "AIRFLOW__CELERY__BROKER_URL";
 const AIRFLOW_CORE_DAGS_FOLDER: &str = "AIRFLOW__CORE__DAGS_FOLDER";
 const AIRFLOW_CORE_LOAD_EXAMPLES: &str = "AIRFLOW__CORE__LOAD_EXAMPLES";
 const AIRFLOW_API_AUTH_BACKENDS: &str = "AIRFLOW__API__AUTH_BACKENDS";
-const AIRFLOW_DATABASE_SQL_ALCHEMY_CONN: &str = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN";
 
 const AIRFLOW_WEBSERVER_EXPOSE_CONFIG: &str = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG";
 const AIRFLOW_CORE_EXECUTOR: &str = "AIRFLOW__CORE__EXECUTOR";
@@ -84,7 +84,6 @@ pub fn build_airflow_statefulset_envs(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
     let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
     env.extend(static_envs(git_sync_resources));
@@ -94,7 +93,8 @@ pub fn build_airflow_statefulset_envs(
 
     add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
-    // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY since 3.0.2. Can be removed when 3.0.1 is no longer supported.
+    // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY
+    // since 3.0.2. Can be removed when 3.0.1 is no longer supported.
     env.insert(
         AIRFLOW_WEBSERVER_SECRET_KEY.into(),
         // The secret key is used to run the webserver flask app and also
@@ -124,34 +124,18 @@ pub fn build_airflow_statefulset_envs(
         ),
     );
 
-    env.insert(
-        AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-        env_var_from_secret(
-            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        ),
-    );
+    add_metadata_credentials(airflow, &mut env);
 
     // Redis is only needed when celery executors are used
     // see https://github.com/stackabletech/airflow-operator/issues/424 for details
-    if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
-        env.insert(
-            AIRFLOW_CELERY_RESULT_BACKEND.into(),
-            env_var_from_secret(
-                AIRFLOW_CELERY_RESULT_BACKEND,
-                secret,
-                "connections.celeryResultBackend",
-            ),
-        );
-        env.insert(
-            AIRFLOW_CELERY_BROKER_URL.into(),
-            env_var_from_secret(
-                AIRFLOW_CELERY_BROKER_URL,
-                secret,
-                "connections.celeryBrokerUrl",
-            ),
-        );
+    if let AirflowExecutor::CeleryExecutor {
+        celery_result_backend,
+        celery_broker_url,
+        ..
+    } = executor
+    {
+        add_celery_backend_credentials(celery_result_backend, &mut env);
+        add_celery_broker_credentials(celery_broker_url, &mut env);
     }
 
     let dags_folder = get_dags_folder(git_sync_resources);
@@ -376,16 +360,8 @@ pub fn build_airflow_template_envs(
     resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
-    env.insert(
-        AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-        env_var_from_secret(
-            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        ),
-    );
+    add_metadata_credentials(airflow, &mut env);
 
     env.insert(
         AIRFLOW_CORE_EXECUTOR.into(),

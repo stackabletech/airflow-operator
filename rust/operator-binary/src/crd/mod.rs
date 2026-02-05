@@ -47,7 +47,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    connections::database::DbType,
+    connections::{database::DbType, queue::QueueType},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -386,7 +386,7 @@ impl v1alpha2::AirflowCluster {
             AirflowRole::DagProcessor => self.spec.dag_processors.to_owned(),
             AirflowRole::Triggerer => self.spec.triggerers.to_owned(),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config, .. } = &self.spec.executor {
                     Some(config.clone())
                 } else {
                     None
@@ -816,7 +816,7 @@ impl AirflowRole {
                     .context(UnknownAirflowRoleSnafu { role, roles })?,
             ),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &airflow.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config, .. } = &airflow.spec.executor {
                     config
                 } else {
                     return Err(Error::NoRoleForExecutorFailure);
@@ -847,6 +847,7 @@ fn container_debug_command() -> String {
 }
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum AirflowExecutor {
     /// The celery executor.
     /// Deployed with an explicit number of replicas.
@@ -854,6 +855,12 @@ pub enum AirflowExecutor {
     CeleryExecutor {
         #[serde(flatten)]
         config: Role<AirflowConfigFragment>,
+        /// Connection information for the celery backend database.
+        #[serde(rename = "celeryResultBackend")]
+        celery_result_backend: DbType,
+        /// Connection information for the celery broker queue.
+        #[serde(rename = "celeryBrokerUrl")]
+        celery_broker_url: QueueType,
     },
 
     /// With the Kuberentes executor, executor Pods are created on demand.
