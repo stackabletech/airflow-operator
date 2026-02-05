@@ -9,14 +9,14 @@ dimensions:
     values:
       - 2.9.3
       - 3.0.6
-      - 3.1.5
+      - 3.1.6
       # To use a custom image, add a comma and the full name after the product version
-      # - 3.1.5,oci.stackable.tech/sandbox/airflow:3.1.5-stackable0.0.0-dev
+      # - x.x.x,oci.stackable.tech/sandbox/airflow:x.x.x-stackable0.0.0-dev
   - name: airflow-latest
     values:
-      - 3.1.5
+      - 3.1.6
       # To use a custom image, add a comma and the full name after the product version
-      # - 3.1.5,oci.stackable.tech/sandbox/airflow:3.1.5-stackable0.0.0-dev
+      # - x.x.x,oci.stackable.tech/sandbox/airflow:x.x.x-stackable0.0.0-dev
   - name: opa-latest
     values:
       - 1.12.2
