@@ -245,7 +245,7 @@ pub mod versioned {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorization: Option<AirflowAuthorization>,
 
-        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// The name of the Secret object containing the admin user credentials.
         /// Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.

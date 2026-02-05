@@ -721,7 +721,7 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
+                      The name of the Secret object containing the admin user credentials.
                       Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
@@ -4033,7 +4033,7 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
+                      The name of the Secret object containing the admin user credentials.
                       Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
