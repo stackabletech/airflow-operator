@@ -1119,7 +1119,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.5
+            productVersion: 3.1.6
           clusterConfig:
             loadExamples: true
             exposeConfig: true
@@ -1151,7 +1151,7 @@ mod tests {
             .resolve("airflow", "0.0.0-dev")
             .expect("test: resolved product image is always valid");
 
-        assert_eq!("3.1.5", &resolved_airflow_image.product_version);
+        assert_eq!("3.1.6", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);
