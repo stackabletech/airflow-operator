@@ -12,6 +12,7 @@
 
 ### Changed
 
+- Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#741]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
 
 ### Fixed
@@ -25,6 +26,7 @@
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
 [#733]: https://github.com/stackabletech/airflow-operator/pull/733
 [#734]: https://github.com/stackabletech/airflow-operator/pull/734
+[#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
 
 ## [25.11.0] - 2025-11-07
