@@ -14,6 +14,10 @@
 
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#741]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
+- BREAKING: Replace Airflow credentials-secret with database/broker connections ([#743]).
+  - Existing secret is retained for the admin user alone.
+  - Database/broker connections can be defined either using structs or as a generic connection string (see ADR 29).
+  - Removed standalone examples folder (not affecting the documentation).
 
 ### Fixed
 
@@ -28,6 +32,7 @@
 [#734]: https://github.com/stackabletech/airflow-operator/pull/734
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
+[#743]: https://github.com/stackabletech/airflow-operator/pull/743
 
 ## [25.11.0] - 2025-11-07
 
