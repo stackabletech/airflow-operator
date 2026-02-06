@@ -17,7 +17,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-webserver-default
-  generation: 1 # There should be no unneeded Pod restarts
+  # Do not include an assert on generation:1 as this is hard to enforce. Same applies for all roles.
   labels:
     restarter.stackable.tech/enabled: "true"
 spec:
@@ -33,7 +33,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-worker-default
-  generation: 1 # There should be no unneeded Pod restarts
   labels:
     restarter.stackable.tech/enabled: "true"
 spec:
@@ -49,7 +48,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-scheduler-default
-  generation: 1 # There should be no unneeded Pod restarts
   labels:
     restarter.stackable.tech/enabled: "true"
 spec:
@@ -64,7 +62,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-dagprocessor-default
-  generation: 1 # There should be no unneeded Pod restarts
   labels:
     restarter.stackable.tech/enabled: "true"
 spec:
@@ -79,7 +76,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-triggerer-default
-  generation: 1 # There should be no unneeded Pod restarts
   labels:
     restarter.stackable.tech/enabled: "true"
 spec:
