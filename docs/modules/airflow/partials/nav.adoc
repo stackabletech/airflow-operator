@@ -4,6 +4,7 @@
 * xref:airflow:required-external-components.adoc[]
 * xref:airflow:usage-guide/index.adoc[]
 ** xref:airflow:usage-guide/db-init.adoc[]
+** xref:airflow:usage-guide/db-connect.adoc[]
 ** xref:airflow:usage-guide/mounting-dags.adoc[]
 ** xref:airflow:usage-guide/applying-custom-resources.adoc[]
 ** xref:airflow:usage-guide/listenerclass.adoc[]
