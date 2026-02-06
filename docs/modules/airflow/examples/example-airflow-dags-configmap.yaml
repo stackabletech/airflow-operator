@@ -7,9 +7,12 @@ spec:
   image:
     productVersion: 3.1.6
   clusterConfig:
-    loadExamples: false
-    exposeConfig: false
-    credentialsSecret: simple-airflow-credentials
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials
     volumes:
       - name: cm-dag # <3>
         configMap:
@@ -23,18 +26,8 @@ spec:
       listenerClass: external-unstable
     roleGroups:
       default:
-        envOverrides:
+        envOverrides: &envOverrides
           AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
         replicas: 1
   celeryExecutors:
-    roleGroups:
-      default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        replicas: 2
-  schedulers:
-    roleGroups:
-      default:
-        envOverrides:
-          AIRFLOW__CORE__DAGS_FOLDER: "/dags" # <8>
-        replicas: 1
+    ...

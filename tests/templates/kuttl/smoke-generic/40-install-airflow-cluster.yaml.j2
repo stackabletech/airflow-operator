@@ -1,0 +1,71 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+timeout: 480
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+    loadExamples: true
+    credentialsSecret: admin-user-credentials
+    metadataDatabase:
+      generic:
+        uriSecret: postgresql-metadata
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  celeryExecutors:
+    celeryResultBackend:
+      generic:
+        uriSecret: postgresql-celery
+    celeryBrokerUrl:
+      generic:
+        uriSecret: redis-celery
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  dagProcessors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  triggerers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

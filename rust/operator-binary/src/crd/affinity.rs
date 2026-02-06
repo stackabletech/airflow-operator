@@ -72,11 +72,25 @@ mod tests {
             productVersion: 3.1.6
           clusterConfig:
             credentialsSecret: airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:
                 replicas: 1
           celeryExecutors:
+            celeryResultBackend:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
+            celeryBrokerUrl:
+              redis:
+                host: airflow-redis-master
+                credentialsSecret: redis-credentials
             roleGroups:
               default:
                 replicas: 2
@@ -166,6 +180,11 @@ mod tests {
             productVersion: 3.1.6
           clusterConfig:
             credentialsSecret: airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:

@@ -10,9 +10,10 @@ With the external dependencies required by Airflow (Postgresql and Redis) instal
 
 Supported versions for PostgreSQL and Redis can be found in the https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites[Airflow documentation].
 
-== Secret with Airflow credentials
+== Airflow secrets
 
-Create a Secret with the necessary credentials, this entails database connection credentials as well as an admin account for Airflow itself.
+Secrets are required for the mandatory metadata database connection and the airflow admin user.
+When using the celery executor it is also required to provide information for the celery database and broker.
 Create a file called `airflow-credentials.yaml`:
 
 [source,yaml]
@@ -23,13 +24,12 @@ And apply it:
 [source,bash]
 include::example$getting_started/code/getting_started.sh[tag=apply-airflow-credentials]
 
-`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing the Airflow metadata.
+`postgresql-credentials` contains credentials for the SQL database storing the Airflow metadata.
+In this example we will use the same database for both the Airflow job metadata as well as the Celery broker metadata.
 
-`connections.celeryResultBackend` must contain the connection string to the SQL database storing the job metadata (the example above uses the same PostgreSQL database for both).
+`redis-credentials` contains credentials for the the Redis instance used for queuing the jobs submitted to the airflow executor(s).
 
-`connections.celeryBrokerUrl` must contain the connection string to the Redis instance used for queuing the jobs submitted to the airflow executor(s).
-
-The `adminUser` fields are used to create an admin user.
+`admin-user-credentials`: the `adminUser` fields are used to create an admin user.
 
 NOTE: The admin user is disabled if you use a non-default authentication mechanism like LDAP.
 
@@ -61,19 +61,24 @@ include::example$getting_started/code/getting_started.sh[tag=install-airflow]
 Where:
 
 * `metadata.name` contains the name of the Airflow cluster.
+* `spec.clusterConfig.metadataDatabase` specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
 * the product version of the Docker image provided by Stackable must be set in `spec.image.productVersion`.
 * `spec.celeryExecutors`: deploy executors managed by Airflow's Celery engine.
 Alternatively you can use `kuberenetesExectors` that use Airflow's Kubernetes engine for executor management.
 For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
+* `spec.celeryExecutors.celeryResultBackend`: specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
+* `spec.celeryExecutors.celeryBrokerUrl`: specifies one of the supported queue/broker types (in this case, `redis`) along with references to the host and the secret containing the connection credentials.
 * the `spec.clusterConfig.loadExamples` key is optional and defaults to `false`.
 It is set to `true` here as the example DAGs are used when verifying the installation.
 * the `spec.clusterConfig.exposeConfig` key is optional and defaults to `false`. It is set to `true` only as an aid to verify the configuration and should never be used as such in anything other than test or demo clusters.
-* the previously created secret must be referenced in `spec.clusterConfig.credentialsSecret`.
+* the secret containing the admin user infomration must be referenced in `spec.clusterConfig.credentialsSecret`.
 
 NOTE: The version you need to specify for `spec.image.productVersion` is the desired version of Apache Airflow.
 You can optionally specify the `spec.image.stackableVersion` to a certain release like `23.11.0` but it is recommended to leave it out and use the default provided by the operator.
 Check our https://oci.stackable.tech/[image registry,window=_blank] for a list of available versions. Information on how to browse the registry can be found xref:contributor:project-overview.adoc#docker-images[here,window=_blank].
 It should generally be safe to simply use the latest version that is available.
+
+NOTE: Refer to xref:usage-guide/db-connect.adoc[] for more information about database/broker connections.
 
 This creates the actual Airflow cluster.
 

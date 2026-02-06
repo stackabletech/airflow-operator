@@ -1,0 +1,130 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-available-condition
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow --timeout 301s
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-airflow-cluster
+timeout: 1200
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-default
+  # Do not include an assert on generation:1 as this is hard to enforce. Same applies for all roles.
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 300
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-default
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-dagprocessor-default
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-triggerer-default
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-webserver
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-worker
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-scheduler
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-dagprocessor
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-triggerer
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1

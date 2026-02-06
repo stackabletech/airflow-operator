@@ -40,6 +40,8 @@ use crate::{
 
 mod airflow_controller;
 mod config;
+mod connection;
+mod connections;
 mod controller_commons;
 mod crd;
 mod env_vars;

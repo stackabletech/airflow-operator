@@ -39,6 +39,78 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBrokerUrl:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          host:
+                            type: string
+                          port:
+                            default: 6379
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -542,6 +614,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBrokerUrl
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -647,7 +721,7 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
+                      The name of the Secret object containing the admin user credentials.
                       Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
@@ -759,6 +833,48 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: |-
+                      Connection information needed to construct a connection for the
+                      mandatory backend metadata database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -783,6 +899,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -3234,6 +3351,78 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBrokerUrl:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          host:
+                            type: string
+                          port:
+                            default: 6379
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -3737,6 +3926,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBrokerUrl
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -3842,7 +4033,7 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
+                      The name of the Secret object containing the admin user credentials.
                       Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
@@ -3930,6 +4121,48 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: |-
+                      Connection information needed to construct a connection for the
+                      mandatory backend metadata database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        properties:
+                          uriSecret:
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        properties:
+                          credentialsSecret:
+                            type: string
+                          databaseName:
+                            type: string
+                          host:
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            type: object
+                          port:
+                            default: 5432
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - databaseName
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -3954,6 +4187,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:

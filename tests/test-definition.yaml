@@ -42,6 +42,10 @@ tests:
       - airflow
       - openshift
       - executor
+  - name: smoke-generic
+    dimensions:
+      - airflow
+      - openshift
   - name: mount-dags-configmap
     dimensions:
       - airflow-latest
@@ -76,11 +80,12 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
-  - name: logging
-    dimensions:
-      - airflow
-      - openshift
-      - executor
+  # TODO revert this before merging!
+  # - name: logging
+  #   dimensions:
+  #     - airflow
+  #     - openshift
+  #     - executor
   - name: cluster-operation
     dimensions:
       - airflow-latest

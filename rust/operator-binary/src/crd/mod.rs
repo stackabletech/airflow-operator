@@ -47,6 +47,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    connections::{database::DbType, queue::QueueType},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -244,11 +245,15 @@ pub mod versioned {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorization: Option<AirflowAuthorization>,
 
-        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// The name of the Secret object containing the admin user credentials.
         /// Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
         pub credentials_secret: String,
+
+        /// Connection information needed to construct a connection for the
+        /// mandatory backend metadata database.
+        pub metadata_database: DbType,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
         /// Learn more in the
@@ -381,7 +386,7 @@ impl v1alpha2::AirflowCluster {
             AirflowRole::DagProcessor => self.spec.dag_processors.to_owned(),
             AirflowRole::Triggerer => self.spec.triggerers.to_owned(),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config, .. } = &self.spec.executor {
                     Some(config.clone())
                 } else {
                     None
@@ -811,7 +816,7 @@ impl AirflowRole {
                     .context(UnknownAirflowRoleSnafu { role, roles })?,
             ),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &airflow.spec.executor {
+                if let AirflowExecutor::CeleryExecutor { config, .. } = &airflow.spec.executor {
                     config
                 } else {
                     return Err(Error::NoRoleForExecutorFailure);
@@ -842,6 +847,7 @@ fn container_debug_command() -> String {
 }
 
 #[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum AirflowExecutor {
     /// The celery executor.
     /// Deployed with an explicit number of replicas.
@@ -849,6 +855,12 @@ pub enum AirflowExecutor {
     CeleryExecutor {
         #[serde(flatten)]
         config: Role<AirflowConfigFragment>,
+        /// Connection information for the celery backend database.
+        #[serde(rename = "celeryResultBackend")]
+        celery_result_backend: DbType,
+        /// Connection information for the celery broker queue.
+        #[serde(rename = "celeryBrokerUrl")]
+        celery_broker_url: QueueType,
     },
 
     /// With the Kuberentes executor, executor Pods are created on demand.
@@ -1112,6 +1124,11 @@ mod tests {
             loadExamples: true
             exposeConfig: true
             credentialsSecret: simple-airflow-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                databaseName: airflow
+                credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
               default:

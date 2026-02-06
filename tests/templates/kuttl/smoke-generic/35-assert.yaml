@@ -1,0 +1,24 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user-credentials
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-metadata
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-celery
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-celery

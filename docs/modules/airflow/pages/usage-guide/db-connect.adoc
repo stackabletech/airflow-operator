@@ -1,0 +1,78 @@
+= Database connections
+:description: Configure Airflow Database connectivity.
+
+Airflow requires a metadata database for storing e.g. DAG, task and Job data.
+The actual connection string is provided by the operator so that the user does not need to remember the exact structure.
+The same database can be accessed using different drivers: this is also handled by the operator, since the context is known (e.g. job metadata vs. queued job metadata) when parsing the resource file.
+
+== Typed connections
+
+[source,yaml]
+----
+---
+spec:
+  clusterConfig:
+    metadataDatabase:
+      postgresql: # <1>
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials # <2>
+----
+<1> A reference to one of the supported database backends (e.g. `postgresql`).
+<2> A reference to a secret which must contain the two fields `username` and `password`.
+
+The queue/broker metadata and URL is only needed when running the celery executor.
+The `celeryResultBackend` definition uses the same structure as `metadataDatabase` shown above.
+The `celeryBrokerUrl` definition is similar but does not require a `databaseName`.
+
+[source,yaml]
+----
+---
+spec:
+  celeryExecutors:
+    celeryResultBackend:
+      postgresql: # <1>
+        host: airflow-postgresql
+        databaseName: airflow
+        credentialsSecret: postgresql-credentials # <2>
+    celeryBrokerUrl:
+      redis: # <3>
+        host: airflow-redis-master
+        credentialsSecret: redis-credentials # <2>
+----
+<1> A reference to one of the supported database backends (e.g. `postgresql`).
+<2> A reference to a secret which must contain the two fields `username` and `password`.
+<3> A reference to one of the supported queue brokers (e.g. `redis`).
+
+== Generic connections
+
+Alternatively, these connections can also be defined in full in a referenced secret:
+
+[source,yaml]
+----
+---
+spec:
+  clusterConfig:
+    metadataDatabase:
+      generic:
+        uriSecret: postgresql-metadata # <1>
+----
+
+[source,yaml]
+----
+---
+spec:
+  celeryResultBackend:
+      generic:
+        uriSecret: postgresql-celery # <2>
+    celeryBrokerUrl:
+      generic:
+        uriSecret: redis-celery # <3>
+----
+
+<1> A reference to a secret which must contain the single fields `uri` e.g.
+`uri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow`
+<2> A reference to a secret which must contain the single fields `uri` e.g.
+`uri: db+postgresql://airflow:airflow@airflow-postgresql/airflow`
+<3> A reference to a secret which must contain the single fields `uri` e.g.
+`uri: redis://:redis@airflow-redis-master:6379/0`
