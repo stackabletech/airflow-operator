@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
@@ -248,6 +248,7 @@ pub mod versioned {
         /// Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
+        #[serde(deserialize_with = "non_empty_string")]
         pub credentials_secret: String,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
@@ -301,6 +302,18 @@ pub mod versioned {
         #[serde(default = "webserver_default_listener_class")]
         pub listener_class: String,
     }
+}
+
+fn non_empty_string<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    String::deserialize(deserializer).and_then(|s| {
+        if s.trim().is_empty() {
+            Err(serde::de::Error::custom(
+                "Field cannot be empty or whitespace",
+            ))
+        } else {
+            Ok(s)
+        }
+    })
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -1094,6 +1107,7 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
     use crate::v1alpha2::AirflowCluster;
@@ -1141,5 +1155,59 @@ mod tests {
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
         assert!(cluster.spec.cluster_config.database_initialization.enabled);
+    }
+
+    #[rstest]
+    #[case("mySecret", true)]
+    #[case("", false)]
+    #[case("   ", false)]
+    fn test_cluster_config_defaults(#[case] secret: &str, #[case] should_succeed: bool) {
+        let cluster = format!(
+            r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            credentialsSecret: "{}"
+          webservers:
+            roleGroups:
+              default:
+                replicas: 1
+          celeryExecutors:
+            roleGroups:
+              default:
+                replicas: 1
+          schedulers:
+            roleGroups:
+              default:
+                replicas: 1
+          "#,
+            secret
+        );
+
+        let deserializer = serde_yaml::Deserializer::from_str(&cluster);
+        let result: Result<AirflowCluster, _> =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer);
+
+        if should_succeed {
+            let cluster = result.expect("Should parse valid input");
+            let resolved_airflow_image: ResolvedProductImage = cluster
+                .spec
+                .image
+                .resolve("airflow", "0.0.0-dev")
+                .expect("test: resolved product image is always valid");
+
+            assert_eq!("3.1.6", &resolved_airflow_image.product_version);
+            assert_eq!("CeleryExecutor", cluster.spec.executor.to_string());
+            // defaults to true
+            assert!(cluster.spec.cluster_config.database_initialization.enabled);
+            assert_eq!(secret, cluster.spec.cluster_config.credentials_secret);
+        } else {
+            assert!(result.is_err(), "Should fail for input: '{}'", secret);
+        }
     }
 }
