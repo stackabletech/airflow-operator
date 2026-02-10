@@ -25,6 +25,8 @@ pub struct Redis {
     #[serde(default = "default_redis_port")]
     pub port: u16,
     pub credentials_secret: String,
+    #[serde(default = "default_redis_db")]
+    pub database_id: u16,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -45,9 +47,10 @@ impl QueueType {
 impl Redis {
     pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
         format!(
-            "redis://${username_env}:${password_env}@{host}:{port}/0",
+            "redis://${username_env}:${password_env}@{host}:{port}/{id}",
             host = self.host,
-            port = self.port
+            port = self.port,
+            id = self.database_id,
         )
     }
 }
@@ -56,9 +59,13 @@ fn default_redis_port() -> u16 {
     6379
 }
 
+fn default_redis_db() -> u16 {
+    0
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::connections::queue::{Redis, default_redis_port};
+    use crate::connections::queue::{Redis, default_redis_db, default_redis_port};
 
     #[test]
     fn test_redis_queue() {
@@ -66,6 +73,7 @@ mod tests {
             host: "airflow-postgresql".to_string(),
             credentials_secret: "airflow-credentials".to_string(),
             port: default_redis_port(),
+            database_id: default_redis_db(),
         };
         let connection_string = queue_type.connection_string("QUEUE_USERNAME", "QUEUE_PASSWORD");
 

@@ -58,6 +58,12 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
+                          databaseId:
+                            default: 0
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
                           host:
                             type: string
                           port:
@@ -3370,6 +3376,12 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
+                          databaseId:
+                            default: 0
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
                           host:
                             type: string
                           port:
