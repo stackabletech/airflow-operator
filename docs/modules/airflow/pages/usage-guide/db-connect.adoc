@@ -9,7 +9,6 @@ The same database can be accessed using different drivers: this is also handled 
 
 [source,yaml]
 ----
----
 spec:
   clusterConfig:
     metadataDatabase:
