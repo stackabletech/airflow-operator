@@ -47,8 +47,9 @@ impl QueueType {
 impl RedisQueue {
     pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
         format!(
-            "redis://${}:${}@{}:{}/0",
-            username_env, password_env, self.host, self.port
+            "redis://${username_env}:${password_env}@{host}:{port}/0",
+            host = self.host,
+            port = self.port
         )
     }
 }
