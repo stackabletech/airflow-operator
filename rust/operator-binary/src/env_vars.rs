@@ -1,10 +1,6 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    path::PathBuf,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use product_config::types::PropertyNameKind;
-use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
@@ -58,14 +54,6 @@ const ADMIN_PASSWORD: &str = "ADMIN_PASSWORD";
 const ADMIN_EMAIL: &str = "ADMIN_EMAIL";
 
 const PYTHONPATH: &str = "PYTHONPATH";
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display(
-        "failed to construct Git DAG folder - Is the git folder a valid path?: {dag_folder:?}"
-    ))]
-    ConstructGitDagFolder { dag_folder: PathBuf },
-}
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
