@@ -68,14 +68,16 @@ impl PostgresqlDb {
             let param_str: Vec<String> = self
                 .parameters
                 .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
+                .map(|(k, v)| format!("{k}={v}"))
                 .collect();
             format!("?{}", param_str.join("&"))
         };
 
         format!(
-            "{}://${}:${}@{}:{}/{}{}",
-            prefix, username_env, password_env, self.host, self.port, self.database_name, params
+            "{prefix}://${username_env}:${password_env}@{host}:{port}/{database_name}{params}",
+            host = self.host,
+            port = self.port,
+            database_name = self.database_name
         )
     }
 
