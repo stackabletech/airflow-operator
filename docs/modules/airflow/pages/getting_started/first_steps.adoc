@@ -12,7 +12,7 @@ Supported versions for PostgreSQL and Redis can be found in the https://airflow.
 
 == Airflow secrets
 
-Secrets are required for the mandatory metadata database connection and the airflow admin user.
+Secrets are required for the mandatory metadata database connection and the Airflow admin user.
 When using the celery executor it is also required to provide information for the celery database and broker.
 Create a file called `airflow-credentials.yaml`:
 
@@ -27,9 +27,9 @@ include::example$getting_started/code/getting_started.sh[tag=apply-airflow-crede
 `airflow-postgresql-credentials` contains credentials for the SQL database storing the Airflow metadata.
 In this example we will use the same database for both the Airflow job metadata as well as the Celery broker metadata.
 
-`airflow-redis-credentials` contains credentials for the the Redis instance used for queuing the jobs submitted to the airflow executor(s).
+`airflow-redis-credentials` contains credentials for the the Redis instance used for queuing the jobs submitted to the Airflow executor(s).
 
-`airflow-admin-user-credentials`: the `adminUser` fields are used to create an admin user.
+`airflow-admin-user-credentials`: the `adminUser.*` fields are used to create the initial admin user.
 
 NOTE: The admin user is disabled if you use a non-default authentication mechanism like LDAP.
 
