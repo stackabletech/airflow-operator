@@ -27,7 +27,7 @@ spec:
       postgresql:
         host: airflow-postgresql
         databaseName: airflow
-        credentialsSecret: postgresql-credentials
+        credentialsSecret: airflow-postgresql-credentials
     celeryBrokerUrl:
       redis:
         host: airflow-redis-master
