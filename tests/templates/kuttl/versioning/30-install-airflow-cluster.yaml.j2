@@ -36,14 +36,6 @@ stringData:
   username: airflow
   password: airflow
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: redis-credentials
-stringData:
-  username: ""
-  password: redis
----
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
 metadata:

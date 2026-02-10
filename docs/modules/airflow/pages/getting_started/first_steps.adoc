@@ -24,12 +24,12 @@ And apply it:
 [source,bash]
 include::example$getting_started/code/getting_started.sh[tag=apply-airflow-credentials]
 
-`postgresql-credentials` contains credentials for the SQL database storing the Airflow metadata.
+`airflow-postgresql-credentials` contains credentials for the SQL database storing the Airflow metadata.
 In this example we will use the same database for both the Airflow job metadata as well as the Celery broker metadata.
 
-`redis-credentials` contains credentials for the the Redis instance used for queuing the jobs submitted to the airflow executor(s).
+`airflow-redis-credentials` contains credentials for the the Redis instance used for queuing the jobs submitted to the airflow executor(s).
 
-`admin-user-credentials`: the `adminUser` fields are used to create an admin user.
+`airflow-admin-user-credentials`: the `adminUser` fields are used to create an admin user.
 
 NOTE: The admin user is disabled if you use a non-default authentication mechanism like LDAP.
 
