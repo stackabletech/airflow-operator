@@ -14,9 +14,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    connection::{
-        add_celery_backend_credentials, add_celery_broker_credentials, add_metadata_credentials,
-    },
+    connection::{celery_backend_credentials, celery_broker_credentials, metadata_credentials},
     crd::{
         AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         TEMPLATE_LOCATION, TEMPLATE_NAME,
@@ -124,7 +122,7 @@ pub fn build_airflow_statefulset_envs(
         ),
     );
 
-    add_metadata_credentials(airflow, &mut env);
+    env.append(&mut metadata_credentials(airflow));
 
     // Redis is only needed when celery executors are used
     // see https://github.com/stackabletech/airflow-operator/issues/424 for details
@@ -134,8 +132,8 @@ pub fn build_airflow_statefulset_envs(
         ..
     } = executor
     {
-        add_celery_backend_credentials(celery_result_backend, &mut env);
-        add_celery_broker_credentials(celery_broker_url, &mut env);
+        env.append(&mut celery_backend_credentials(celery_result_backend));
+        env.append(&mut celery_broker_credentials(celery_broker_url));
     }
 
     let dags_folder = get_dags_folder(git_sync_resources);
@@ -361,7 +359,7 @@ pub fn build_airflow_template_envs(
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    add_metadata_credentials(airflow, &mut env);
+    env.append(&mut metadata_credentials(airflow));
 
     env.insert(
         AIRFLOW_CORE_EXECUTOR.into(),
