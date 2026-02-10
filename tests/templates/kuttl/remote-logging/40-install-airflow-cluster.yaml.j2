@@ -23,6 +23,7 @@ metadata:
 stringData:
   username: airflow
   password: airflow
+{% if test_scenario['values']['executor'] == 'celery' %}
 ---
 apiVersion: v1
 kind: Secret
@@ -31,6 +32,7 @@ metadata:
 stringData:
   username: ""
   password: redis
+{% endif %}
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
 kind: AirflowCluster
