@@ -14,15 +14,13 @@ use stackable_operator::schemars::{self, JsonSchema};
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum QueueType {
-    #[serde(rename = "redis")]
-    Redis(RedisQueue),
-    #[serde(rename = "generic")]
-    Generic(GenericQueue),
+    Redis(Redis),
+    Generic(Generic),
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RedisQueue {
+pub struct Redis {
     pub host: String,
     #[serde(default = "default_redis_port")]
     pub port: u16,
@@ -31,7 +29,7 @@ pub struct RedisQueue {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GenericQueue {
+pub struct Generic {
     pub uri_secret: String,
 }
 
@@ -44,7 +42,7 @@ impl QueueType {
     }
 }
 
-impl RedisQueue {
+impl Redis {
     pub fn connection_string(&self, username_env: &str, password_env: &str) -> String {
         format!(
             "redis://${username_env}:${password_env}@{host}:{port}/0",
@@ -60,11 +58,11 @@ fn default_redis_port() -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use crate::connections::queue::{RedisQueue, default_redis_port};
+    use crate::connections::queue::{Redis, default_redis_port};
 
     #[test]
     fn test_redis_queue() {
-        let queue_type = RedisQueue {
+        let queue_type = Redis {
             host: "airflow-postgresql".to_string(),
             credentials_secret: "airflow-credentials".to_string(),
             port: default_redis_port(),

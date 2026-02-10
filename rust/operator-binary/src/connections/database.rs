@@ -16,15 +16,13 @@ use stackable_operator::schemars::{self, JsonSchema};
 #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DbType {
-    #[serde(rename = "postgresql")]
-    Postgresql(PostgresqlDb),
-    #[serde(rename = "generic")]
-    Generic(GenericDb),
+    Postgresql(Postgresql),
+    Generic(Generic),
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PostgresqlDb {
+pub struct Postgresql {
     pub host: String,
     #[serde(default = "default_postgres_port")]
     pub port: u16,
@@ -36,7 +34,7 @@ pub struct PostgresqlDb {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GenericDb {
+pub struct Generic {
     pub uri_secret: String,
 }
 
@@ -49,7 +47,7 @@ impl DbType {
     }
 }
 
-impl PostgresqlDb {
+impl Postgresql {
     // At this point the necessary secrets have been added to the product
     // statefulset (as env-vars). If a product has been started via a shell,
     // then any embedded environment variables will be resolved (i.e. variable
@@ -98,11 +96,11 @@ fn default_postgres_port() -> u16 {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::connections::database::{PostgresqlDb, default_postgres_port};
+    use crate::connections::database::{Postgresql, default_postgres_port};
 
     #[test]
     fn test_postgresql_alchemy() {
-        let db_type = PostgresqlDb {
+        let db_type = Postgresql {
             host: "airflow-postgresql".to_string(),
             database_name: "airflow".to_string(),
             credentials_secret: "airflow-credentials".to_string(),
