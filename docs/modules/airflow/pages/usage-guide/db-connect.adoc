@@ -3,7 +3,7 @@
 
 Airflow requires a metadata database for storing e.g. DAG, task and job data.
 The actual connection string is provided by the operator so that the user does not need to remember the exact structure.
-The same database can be accessed using different drivers: this is also handled by the operator, since the context is known (e.g. job metadata vs. queued job metadata) when parsing the resource file.
+The same database can be accessed using different drivers (e.g. job metadata vs. queued job metadata).
 
 == Typed connections
 
