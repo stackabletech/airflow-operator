@@ -31,7 +31,7 @@ spec:
     celeryBrokerUrl:
       redis:
         host: airflow-redis-master
-        credentialsSecret: redis-credentials
+        credentialsSecret: airflow-redis-credentials
     roleGroups:
       default:
         replicas: 1
