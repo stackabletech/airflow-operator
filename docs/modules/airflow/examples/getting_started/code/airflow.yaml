@@ -15,7 +15,7 @@ spec:
       postgresql:
         host: airflow-postgresql
         databaseName: airflow
-        credentialsSecret: postgresql-credentials
+        credentialsSecret: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
