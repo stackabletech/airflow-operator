@@ -321,9 +321,6 @@ pub enum Error {
         source: error_boundary::InvalidObject,
     },
 
-    #[snafu(display("failed to build Statefulset environmental variables"))]
-    BuildStatefulsetEnvVars { source: env_vars::Error },
-
     #[snafu(display("failed to build Labels"))]
     LabelBuild {
         source: stackable_operator::kvp::LabelError,
@@ -1011,19 +1008,16 @@ fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    airflow_container.add_env_vars(
-        env_vars::build_airflow_statefulset_envs(
-            airflow,
-            airflow_role,
-            rolegroup_config,
-            executor,
-            authentication_config,
-            authorization_config,
-            git_sync_resources,
-            resolved_product_image,
-        )
-        .context(BuildStatefulsetEnvVarsSnafu)?,
-    );
+    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
+        airflow,
+        airflow_role,
+        rolegroup_config,
+        executor,
+        authentication_config,
+        authorization_config,
+        git_sync_resources,
+        resolved_product_image,
+    ));
 
     let volume_mounts = airflow.volume_mounts();
     airflow_container

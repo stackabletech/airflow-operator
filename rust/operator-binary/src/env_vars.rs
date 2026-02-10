@@ -80,7 +80,7 @@ pub fn build_airflow_statefulset_envs(
     authorization_config: &AirflowAuthorizationResolved,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
-) -> Result<Vec<EnvVar>, Error> {
+) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
@@ -267,7 +267,7 @@ pub fn build_airflow_statefulset_envs(
     );
 
     tracing::debug!("Env-var set [{:?}]", env);
-    Ok(transform_map_to_vec(env))
+    transform_map_to_vec(env)
 }
 
 pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha2::GitSyncResources) -> String {
