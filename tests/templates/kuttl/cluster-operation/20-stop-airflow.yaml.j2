@@ -28,7 +28,7 @@ spec:
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials
   webservers:
     roleConfig:
@@ -43,7 +43,7 @@ spec:
     celeryResultBackend:
       postgresql:
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials
     celeryBrokerUrl:
       redis:

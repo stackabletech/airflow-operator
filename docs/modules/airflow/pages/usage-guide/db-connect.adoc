@@ -14,7 +14,7 @@ spec:
     metadataDatabase:
       postgresql: # <1>
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials # <2>
 ----
 <1> A reference to one of the supported database backends (e.g. `postgresql`).
@@ -32,7 +32,7 @@ spec:
     celeryResultBackend:
       postgresql: # <1>
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials # <2>
     celeryBrokerUrl:
       redis: # <3>

@@ -75,7 +75,7 @@ mod tests {
             metadataDatabase:
               postgresql:
                 host: airflow-postgresql
-                databaseName: airflow
+                database: airflow
                 credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
@@ -85,7 +85,7 @@ mod tests {
             celeryResultBackend:
               postgresql:
                 host: airflow-postgresql
-                databaseName: airflow
+                database: airflow
                 credentialsSecret: postgresql-credentials
             celeryBrokerUrl:
               redis:
@@ -183,7 +183,7 @@ mod tests {
             metadataDatabase:
               postgresql:
                 host: airflow-postgresql
-                databaseName: airflow
+                database: airflow
                 credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:

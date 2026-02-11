@@ -96,7 +96,7 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
-                          databaseName:
+                          database:
                             type: string
                           host:
                             type: string
@@ -113,7 +113,7 @@ spec:
                             type: integer
                         required:
                         - credentialsSecret
-                        - databaseName
+                        - database
                         - host
                         type: object
                     type: object
@@ -860,7 +860,7 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
-                          databaseName:
+                          database:
                             type: string
                           host:
                             type: string
@@ -877,7 +877,7 @@ spec:
                             type: integer
                         required:
                         - credentialsSecret
-                        - databaseName
+                        - database
                         - host
                         type: object
                     type: object
@@ -3414,7 +3414,7 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
-                          databaseName:
+                          database:
                             type: string
                           host:
                             type: string
@@ -3431,7 +3431,7 @@ spec:
                             type: integer
                         required:
                         - credentialsSecret
-                        - databaseName
+                        - database
                         - host
                         type: object
                     type: object
@@ -4154,7 +4154,7 @@ spec:
                         properties:
                           credentialsSecret:
                             type: string
-                          databaseName:
+                          database:
                             type: string
                           host:
                             type: string
@@ -4171,7 +4171,7 @@ spec:
                             type: integer
                         required:
                         - credentialsSecret
-                        - databaseName
+                        - database
                         - host
                         type: object
                     type: object

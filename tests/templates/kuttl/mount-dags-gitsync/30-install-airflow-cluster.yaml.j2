@@ -90,7 +90,7 @@ spec:
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials
     dagsGitSync:
 {% if test_scenario['values']['access'] == 'ssh' %}
@@ -137,7 +137,7 @@ spec:
     celeryResultBackend:
       postgresql:
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials
     celeryBrokerUrl:
       redis:

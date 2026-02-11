@@ -69,7 +69,7 @@ commands:
           metadataDatabase:
             postgresql:
               host: airflow-postgresql
-              databaseName: airflow
+              database: airflow
               credentialsSecret: postgresql-credentials
           authentication:
             - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
@@ -95,7 +95,7 @@ commands:
           celeryResultBackend:
             postgresql:
               host: airflow-postgresql
-              databaseName: airflow
+              database: airflow
               credentialsSecret: postgresql-credentials
           celeryBrokerUrl:
             redis:

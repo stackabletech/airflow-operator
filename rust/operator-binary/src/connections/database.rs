@@ -26,7 +26,7 @@ pub struct Postgresql {
     pub host: String,
     #[serde(default = "default_postgres_port")]
     pub port: u16,
-    pub database_name: String,
+    pub database: String,
     pub credentials_secret: String,
     #[serde(default)]
     pub parameters: BTreeMap<String, String>,
@@ -75,7 +75,7 @@ impl Postgresql {
             "{prefix}://${username_env}:${password_env}@{host}:{port}/{database_name}{params}",
             host = self.host,
             port = self.port,
-            database_name = self.database_name
+            database_name = self.database
         )
     }
 
@@ -102,7 +102,7 @@ mod tests {
     fn test_postgresql_alchemy() {
         let db_type = Postgresql {
             host: "airflow-postgresql".to_string(),
-            database_name: "airflow".to_string(),
+            database: "airflow".to_string(),
             credentials_secret: "airflow-credentials".to_string(),
             port: default_postgres_port(),
             parameters: BTreeMap::new(),

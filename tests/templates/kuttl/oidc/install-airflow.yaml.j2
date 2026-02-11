@@ -63,7 +63,7 @@ spec:
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
-        databaseName: airflow
+        database: airflow
         credentialsSecret: postgresql-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery

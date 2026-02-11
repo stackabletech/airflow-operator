@@ -1127,7 +1127,7 @@ mod tests {
             metadataDatabase:
               postgresql:
                 host: airflow-postgresql
-                databaseName: airflow
+                database: airflow
                 credentialsSecret: postgresql-credentials
           webservers:
             roleGroups:
