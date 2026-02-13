@@ -42,7 +42,7 @@ However the workaround will result in
       └── dag_id=...
 ----
 
-The `Azure Blob Storage Connection` will offer the optional field `Host` which should have the a value looking like
+The `Azure Blob Storage Connection` will offer the optional field `Host` which should have a value looking like this:
 [source,text]
 ----
 https://<storage-account-name>.blob.core.windows.net
