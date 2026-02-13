@@ -99,7 +99,7 @@ use crate::{
         },
         v1alpha1,
     },
-    env_vars::{self, build_airflow_template_envs},
+    env_vars::{self, build_airflow_statefulset_envs, build_airflow_template_envs},
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -1317,6 +1317,50 @@ fn build_executor_template_config_map(
         true,
     )?;
 
+    let mut dags_init_container =
+        ContainerBuilder::new("dags-init").context(InvalidContainerNameSnafu)?;
+    let mut dags_args = vec!["mkdir -p /stackable/app/allDAGs".to_string()];
+    for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
+        dags_args.push(
+            format!("ln -s /stackable/app/git-{i}/current /stackable/app/allDAGs/current-{i}")
+                .to_string(),
+        );
+    }
+    dags_init_container
+        .image_from_product_image(resolved_product_image)
+        .args(dags_args)
+        .add_env_vars(build_airflow_template_envs(
+            airflow,
+            env_overrides,
+            merged_executor_config,
+            git_sync_resources,
+            resolved_product_image,
+        ))
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        // .resources(ResourceRequirements {
+        // ..Default::default()
+        // })
+        .add_volume_mounts(git_sync_resources.git_content_volume_mounts.clone())
+        .context(AddVolumeMountSnafu)?
+        .add_volume_mount(
+            "all_dags_volume".to_string(),
+            "/stackable/app/allDAGs".to_owned(),
+        )
+        .context(AddVolumeMountSnafu)?;
+
+    pb.add_init_container(dags_init_container.build());
+    pb.add_volume(
+        VolumeBuilder::new("all_dags_volume".to_string())
+            //.with_empty_dir(Some("all_dags_volume".to_string()), None)
+            .build(),
+    )
+    .context(AddVolumeSnafu)?;
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes().clone())
         .context(AddVolumeSnafu)?;

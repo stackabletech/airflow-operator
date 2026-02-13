@@ -596,7 +596,7 @@ impl AirflowRole {
                 "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
             ),
             // Adding cm as dags within the same AIRFLOW_DAGS_FOLDER leads to problems, thus checking if exists
-            format!("[ ! -d \"{AIRFLOW_DAGS_FOLDER}\" ] && mkdir {AIRFLOW_DAGS_FOLDER}"),
+            format!("mkdir -p {AIRFLOW_DAGS_FOLDER}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
@@ -667,6 +667,7 @@ impl AirflowRole {
                     container_debug_command(),
                     "airflow triggerer &".to_string(),
                 ]),
+                // This essentially doesn't work for KubernetesExecutor
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
