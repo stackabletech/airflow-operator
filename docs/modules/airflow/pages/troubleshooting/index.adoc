@@ -1,6 +1,6 @@
 = Troubleshooting
 
-== Azure Blob Storage Logging: 
+== Azure Blob Storage Logging:
 
 Azure's `ADLS` can be used to store task logs Airflow.
 
