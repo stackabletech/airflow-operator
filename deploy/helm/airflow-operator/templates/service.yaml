@@ -1,3 +1,4 @@
+
 ---
 apiVersion: v1
 kind: Service
@@ -10,10 +11,7 @@ metadata:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- if .Values.maintenance.customResourceDefinitions.maintain }}
-    webhook.stackable.tech/conversion: enabled
-    {{- end }}
-    {{- include "operator.selectorLabels" . | nindent 4 }}
+    {{- include "operator.selectorLabels" . | nindent 6 }}
   ports:
     - name: conversion-webhook
       protocol: TCP
