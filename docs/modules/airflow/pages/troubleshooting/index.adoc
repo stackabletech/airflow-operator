@@ -1,5 +1,53 @@
 = Troubleshooting
 
+== Azure Blob Storage Logging
+
+Azure's `ADLS` can be used to store Airflow task logs.
+
+Assume a regular storage container in Azures ADLS backend: this can be accessed with either the `adls[s]` or `wasb` connector using the https://airflow.apache.org/docs/apache-airflow-providers-microsoft-azure/stable/connections/adls_v2.html[Azure Data Lake Storage Gen2 Connection] or the https://airflow.apache.org/docs/apache-airflow-providers-microsoft-azure/stable/connections/wasb.html[Microsoft Azure Blob Storage Connection] respectively.
+
+If `ADLS` is used as a task log backend it must be accessed via `wasb` and thus the configuration in the environment should look like:
+[source,yaml]
+----
+  webservers:
+    envOverrides: &logging_overrides
+      AIRFLOW__AZURE_REMOTE_LOGGING__REMOTE_WASB_LOG_CONTAINER: "<container-name>" #<1>
+      AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: "wasb-<folder-name>" #<2>
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
+      AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: "<connection-name>" #<3>
+  triggerers:
+    envOverrides: *logging_overrides
+  kubernetesExecutors:
+    envOverrides: *logging_overrides
+  schedulers:
+    envOverrides: *logging_overrides
+----
+<1> This env var is only used for wasb connections.
+<2> Note that the <container-name> is *not* referenced.
+<3> This connection can be defined in the AirflowUI or declared as an environment variable.
+
+Due to this open https://github.com/apache/airflow/issues/58946[issue] with Airflow, it's recommended to use `wasb-<folder-name>` rather then `wasb://<folder-name>` as using the latter option would assume the target location looks like this:
+[source,text]
+----
+<container-name>
+  └── wasb:/
+      └── tasklogs/
+          └── dag_id=...
+----
+However the workaround will result in
+[source,text]
+----
+<container-name>
+  └── wasb-tasklogs/
+      └── dag_id=...
+----
+
+The `Azure Blob Storage Connection` will offer the optional field `Host` which should have a value looking like this:
+[source,text]
+----
+https://<storage-account-name>.blob.core.windows.net
+----
+
 == S3 Logging: An error occurred (411) when calling the PutObject operation: Length Required
 
 If Airflow is trying to access S3 (e.g. for remote task logging) and throws the following error
