@@ -32,6 +32,7 @@ compile-chart: version crds config
 
 chart-clean:
 	rm -rf "deploy/helm/${OPERATOR_NAME}/configs"
+	rm -rf "deploy/helm/${OPERATOR_NAME}/crds"
 
 version:
 	cat "deploy/helm/${OPERATOR_NAME}/Chart.yaml" | yq ".version = \"${VERSION}\" | .appVersion = \"${VERSION}\"" > "deploy/helm/${OPERATOR_NAME}/Chart.yaml.new"
@@ -43,8 +44,8 @@ config:
 		cp -r deploy/config-spec/* "deploy/helm/${OPERATOR_NAME}/configs";\
 	fi
 
-## N.B. diverges from templating for operators that have CRD-versioning
-## implemented. @adwk67: Do *not* let this be overridden with templating!
+# We generate a crds.yaml, so that the effect of code changes are visible.
+# The operator will take care of the CRD rollout itself.
 crds:
 	mkdir -p extra
 	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd > extra/crds.yaml
