@@ -30,8 +30,6 @@ helm_values = settings.get('helm_values', None)
 
 helm_override_image_repository = 'image.repository=' + registry + '/' + operator_name
 
-# N.B. diverges from templating for operators that have CRD-versioning
-# implemented. @adwk67: Do *not* let this be overridden with templating!
 k8s_yaml(helm(
    'deploy/helm/' + operator_name,
    name=operator_name,
@@ -40,4 +38,4 @@ k8s_yaml(helm(
       helm_override_image_repository,
    ],
    values=helm_values,
-) )
+))
