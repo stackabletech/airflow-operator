@@ -48,7 +48,7 @@ commands:
                       -nodes -keyout ca-wrong.key -out ca-wrong.crt \
                       -subj "/CN=wrong-git-ca"
 
-                    kubectl create secret generic git-ca-cert-wrong \
+                    kubectl create secret generic git-wrong-ca-cert \
                       --from-file=ca.crt=ca-wrong.crt
             securityContext:
               runAsUser: 1000
