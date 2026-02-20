@@ -108,6 +108,10 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
+  - name: ca-cert
+    dimensions:
+      - airflow-latest
+      - openshift
 suites:
   - name: nightly
     # Run nightly with the latest airflow
