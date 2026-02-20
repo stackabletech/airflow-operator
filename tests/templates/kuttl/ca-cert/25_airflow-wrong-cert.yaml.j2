@@ -23,7 +23,7 @@ spec:
           basicAuthSecretName: git-credentials
         gitFolder: "mount-dags-gitsync/dags_airflow3"
         wait: 5s
-        caCertSecretName: git-ca-cert
+        caCertSecretName: git-ca-cert-wrong
   webservers:
     roleConfig:
       listenerClass: external-unstable

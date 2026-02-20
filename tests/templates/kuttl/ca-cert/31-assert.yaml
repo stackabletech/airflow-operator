@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |
+      kubectl logs -n "$NAMESPACE" airflow-dagprocessor-default-0 -c git-sync-0 2>/dev/null \
+        | grep -q "updated successfully" && echo "git-sync: repo updated successfully via CA-cert-authenticated proxy"
