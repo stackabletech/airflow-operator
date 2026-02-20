@@ -7,18 +7,6 @@ timeout: 480
 apiVersion: v1
 kind: Secret
 metadata:
-  name: git-credentials
-type: Opaque
-data:
-  # This is a fine-grained access token for the owner of the repo (stackable-airflow/dags) which has read only access
-  # to *only* this repo. Contact github users @razvan or @adwk67 for details.
-  # This token doesn't expire.
-  user: c3RhY2thYmxlLWFpcmZsb3c=
-  password: Z2l0aHViX3BhdF8xMUJLUURCRVkwSk1EWlNVQk1RYTdoX0c2OGlhbWtpRkpFV1RMTTF0ajFwbHFTVFNyZ3p3dHZneXI5b2tubGRXaGpVRDZITFRFV0JJcm9yT0dXCg==
----
-apiVersion: v1
-kind: Secret
-metadata:
   name: test-airflow-credentials
 type: Opaque
 stringData:
