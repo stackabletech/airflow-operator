@@ -26,13 +26,13 @@ commands:
                     set -euo pipefail
 
                     # Create the correct cert
-                    openssl req -x509 -newkey rsa:4096 -days 3650 \
+                    openssl req -x509 -newkey rsa:4096 \
                       -nodes -keyout ca.key -out ca.crt -subj "/CN=test-git-ca"
 
                     openssl req -newkey rsa:4096 -nodes -keyout \
                       server.key -out server.csr -subj "/CN=git-proxy"
 
-                    openssl x509 -req -days 3650 -in server.csr -CA ca.crt \
+                    openssl x509 -req -in server.csr -CA ca.crt \
                       -CAkey ca.key -set_serial 1 -out server.crt \
                       -extfile <(printf "subjectAltName=DNS:git-proxy,DNS:git-proxy.$NAMESPACE.svc.cluster.local")
 
@@ -43,8 +43,8 @@ commands:
                     kubectl create secret generic git-ca-cert \
                       --from-file=ca.crt=ca.crt
 
-                    # Create an incorrect cert which should cause the gitsync container to exit.
-                    openssl req -x509 -newkey rsa:4096 -days 3650 \
+                    # Create an incorrect cert which should cause the gitsync container to exit
+                    openssl req -x509 -newkey rsa:4096 \
                       -nodes -keyout ca-wrong.key -out ca-wrong.crt \
                       -subj "/CN=wrong-git-ca"
 
