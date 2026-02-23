@@ -6,14 +6,5 @@ metadata:
 timeout: 480
 commands:
   - script: |
+      kubectl delete airflowcluster airflow-wrong-cert -n $NAMESPACE --wait=false
       envsubst < 30_airflow-cluster.yaml | kubectl apply -n $NAMESPACE -f -
-
-      # Wait for all StatefulSet volumes to reference the correct git-ca-cert.
-      for STS in airflow-dagprocessor-default airflow-scheduler-default airflow-webserver-default; do
-        until kubectl get statefulset "$STS" \
-          -n $NAMESPACE \
-          -o jsonpath='{.spec.template.spec.volumes[*].secret.secretName}' \
-          2>/dev/null | grep -q "git-ca-cert"; do
-          sleep 2
-        done
-      done

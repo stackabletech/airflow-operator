@@ -7,7 +7,7 @@ commands:
       # this is to avoid excessive looping while the git-sync pod starts
       sleep 10
 
-      POD="airflow-dagprocessor-default-0"
+      POD="airflow-wrong-cert-dagprocessor-default-0"
       CONTAINER="git-sync-0"
 
       kubectl logs -n "$NAMESPACE" "$POD" -c "$CONTAINER" 2>/dev/null \

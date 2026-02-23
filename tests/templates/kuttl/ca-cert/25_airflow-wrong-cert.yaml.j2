@@ -2,7 +2,7 @@
 apiVersion: airflow.stackable.tech/v1alpha2
 kind: AirflowCluster
 metadata:
-  name: airflow
+  name: airflow-wrong-cert
 spec:
   image:
 {% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
