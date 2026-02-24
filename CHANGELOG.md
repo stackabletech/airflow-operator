@@ -9,6 +9,7 @@
   - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
+- Support for passing CAs to GitSync ([#750]).
 
 ### Changed
 
@@ -28,6 +29,7 @@
 [#734]: https://github.com/stackabletech/airflow-operator/pull/734
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
+[#750]: https://github.com/stackabletech/airflow-operator/pull/750
 
 ## [25.11.0] - 2025-11-07
 
