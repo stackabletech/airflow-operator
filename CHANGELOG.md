@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add git-sync support for multiple repositories ([#729]).
 - Add support for airflow 3.1.6 ([#742]).
 - Add operator versioning ([#725]).
   - GitSync considered for v1alpha1 and v1alpha2
@@ -21,6 +22,7 @@
 - Prevent unnecessary Pod restarts when initially creating an AirflowCluster.
   This is achieved by applying the StatefulSet after all ConfigMaps and Secrets that it mounts ([#734]).
 
+[#729]: https://github.com/stackabletech/airflow-operator/pull/729
 [#725]: https://github.com/stackabletech/airflow-operator/pull/725
 [#726]: https://github.com/stackabletech/airflow-operator/pull/726
 [#727]: https://github.com/stackabletech/airflow-operator/pull/727
