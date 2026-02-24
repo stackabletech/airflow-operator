@@ -83,9 +83,9 @@ use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        self, AIRFLOW_CONFIG_FILENAME, AIRFLOW_DAGS_FOLDER, APP_NAME, AirflowClusterStatus,
+        AirflowConfig, AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container,
+        ExecutorConfig, ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
         STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
@@ -113,6 +113,7 @@ use crate::{
     },
 };
 
+pub const AIRFLOW_DAGS_INIT_VOLUME: &str = "all-dags-volume";
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
@@ -1323,7 +1324,7 @@ fn build_executor_template_config_map(
     let mut cp_commands = Vec::<String>::new();
     for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
         cp_commands.push(
-            format!("cp -r /stackable/app/git-{i}/current/ /stackable/app/allDAGs/current-{i}")
+            format!("cp -r /stackable/app/git-{i}/current/ {AIRFLOW_DAGS_FOLDER}/current-{i}")
                 .to_string(),
         );
     }
@@ -1347,20 +1348,20 @@ fn build_executor_template_config_map(
         .add_volume_mounts(git_sync_resources.git_content_volume_mounts.clone())
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(
-            "all-dags-volume".to_string(),
-            "/stackable/app/allDAGs".to_owned(),
+            AIRFLOW_DAGS_INIT_VOLUME.to_owned(),
+            AIRFLOW_DAGS_FOLDER.to_owned(),
         )
         .context(AddVolumeMountSnafu)?;
 
     airflow_container
         .add_volume_mount(
-            "all-dags-volume".to_string(),
-            "/stackable/app/allDAGs".to_owned(),
+            AIRFLOW_DAGS_INIT_VOLUME.to_owned(),
+            AIRFLOW_DAGS_FOLDER.to_owned(),
         )
         .context(AddVolumeMountSnafu)?;
 
     pb.add_init_container(dags_init_container.build());
-    pb.add_volume(VolumeBuilder::new("all-dags-volume".to_string()).build())
+    pb.add_volume(VolumeBuilder::new(AIRFLOW_DAGS_INIT_VOLUME.to_owned()).build())
         .context(AddVolumeSnafu)?;
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes().clone())
