@@ -6,10 +6,8 @@ use std::{
 use product_config::types::PropertyNameKind;
 use snafu::Snafu;
 use stackable_operator::{
-    commons::product_image_selection::ResolvedProductImage,
-    crd::{authentication::oidc, git_sync},
-    k8s_openapi::api::core::v1::EnvVar,
-    kube::ResourceExt,
+    commons::product_image_selection::ResolvedProductImage, crd::authentication::oidc,
+    k8s_openapi::api::core::v1::EnvVar, kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
 };
 
@@ -80,14 +78,13 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let secret = airflow.spec.cluster_config.credentials_secret.as_str();
     let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
-    env.extend(static_envs(git_sync_resources));
+    env.extend(static_envs(airflow));
 
     // environment variables
     let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
@@ -287,37 +284,18 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-pub fn get_dags_folder(git_sync_resources: &git_sync::v1alpha1::GitSyncResources) -> Vec<String> {
-    // If DAG provisioning via git-sync is not configured, set a default value
-    // so that PYTHONPATH can refer to it. N.B. nested variables need to be
-    // resolved, so that /stackable/airflow is used instead of $AIRFLOW_HOME.
-    // see https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder
+fn construct_python_path(airflow: &v1alpha1::AirflowCluster) -> String {
+    let mut python_path = format!("{LOG_CONFIG_DIR}:");
+    let symlinks = airflow.create_python_path_links();
+    python_path.push_str(symlinks.join(":").as_str());
 
-    if git_sync_resources.git_content_folders_as_string().len() < 1 {
-        return vec![AIRFLOW_DAGS_FOLDER.to_string()];
-    } else {
-        git_sync_resources.git_content_folders_as_string()
-    }
+    python_path
 }
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
-) -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-
-    let dags_folders = get_dags_folder(git_sync_resources);
-    let mut dag_python_path = String::new();
-
-    // TODO: Might be there is a better solution to this
-    for (i, dags_folder) in dags_folders.iter().enumerate() {
-        dag_python_path.push_str(dags_folder);
-        // Can't append ":" if it's last entry
-        if i != (dags_folders.len() - 1) {
-            dag_python_path.push(':');
-        }
-    }
 
     env.insert(
         PYTHONPATH.into(),
@@ -326,7 +304,7 @@ fn static_envs(
             // dependencies can be found: this must be the actual path and not a variable.
             // Also include the airflow site-packages by default (for airflow and kubernetes classes etc.)
             name: PYTHONPATH.into(),
-            value: Some(format!("{LOG_CONFIG_DIR}:{dag_python_path}")),
+            value: Some(construct_python_path(airflow)),
             ..Default::default()
         },
     );
@@ -375,7 +353,6 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha1::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-    git_sync_resources: &git_sync::v1alpha1::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
@@ -419,7 +396,7 @@ pub fn build_airflow_template_envs(
         },
     );
 
-    env.extend(static_envs(git_sync_resources));
+    env.extend(static_envs(airflow));
 
     add_version_specific_env_vars(
         airflow,

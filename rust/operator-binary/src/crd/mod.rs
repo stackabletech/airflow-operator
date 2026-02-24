@@ -434,6 +434,23 @@ impl v1alpha1::AirflowCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 
+    pub fn create_gitsync_links(&self) -> Vec<String> {
+        let mut symlinks = Vec::<String>::new();
+        for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
+            symlinks.push(format!("/stackable/app/allDAGs/current-{i}").to_string())
+        }
+        symlinks
+    }
+
+    pub fn create_python_path_links(&self) -> Vec<String> {
+        let mut python_path = Vec::<String>::new();
+        for (i, git_sync) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
+            let folder = &git_sync.git_folder.display();
+            python_path.push(format!("/stackable/app/allDAGs/current-{i}/{folder}").to_string())
+        }
+        python_path
+    }
+
     /// Retrieve and merge resource configs for the executor template
     pub fn merged_executor_config(
         &self,
@@ -602,11 +619,11 @@ impl AirflowRole {
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
 
+        let symlinks = airflow.create_gitsync_links();
+
         for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            command.push(
-                format!("ln -s /stackable/app/git-{i}/current /stackable/app/allDAGs/current-{i}")
-                    .to_string(),
-            )
+            command
+                .push(format!("ln -s /stackable/app/git-{i}/current {:?}", symlinks[i]).to_string())
         }
 
         if resolved_product_image.product_version.starts_with("3.") {

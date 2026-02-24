@@ -99,7 +99,7 @@ use crate::{
         },
         v1alpha1,
     },
-    env_vars::{self, build_airflow_statefulset_envs, build_airflow_template_envs},
+    env_vars::{self, build_airflow_template_envs},
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -1017,7 +1017,6 @@ fn build_server_rolegroup_statefulset(
             executor,
             authentication_config,
             authorization_config,
-            git_sync_resources,
             resolved_product_image,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
@@ -1297,7 +1296,6 @@ fn build_executor_template_config_map(
             airflow,
             env_overrides,
             merged_executor_config,
-            git_sync_resources,
             resolved_product_image,
         ))
         .add_volume_mounts(airflow.volume_mounts())
@@ -1319,13 +1317,15 @@ fn build_executor_template_config_map(
 
     let mut dags_init_container =
         ContainerBuilder::new("dags-init").context(InvalidContainerNameSnafu)?;
-    let mut dags_args = vec!["mkdir -p /stackable/app/allDAGs".to_string()];
+    let mut dags_args = Vec::<String>::new();
+    let mut cp_commands = Vec::<String>::new();
     for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
-        dags_args.push(
-            format!("ln -s /stackable/app/git-{i}/current /stackable/app/allDAGs/current-{i}")
+        cp_commands.push(
+            format!("cp -r /stackable/app/git-{i}/current/ /stackable/app/allDAGs/current-{i}")
                 .to_string(),
         );
     }
+    dags_args.push(cp_commands.join(" && "));
     dags_init_container
         .image_from_product_image(resolved_product_image)
         .args(dags_args)
@@ -1333,7 +1333,6 @@ fn build_executor_template_config_map(
             airflow,
             env_overrides,
             merged_executor_config,
-            git_sync_resources,
             resolved_product_image,
         ))
         .command(vec![
@@ -1343,24 +1342,24 @@ fn build_executor_template_config_map(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        // .resources(ResourceRequirements {
-        // ..Default::default()
-        // })
         .add_volume_mounts(git_sync_resources.git_content_volume_mounts.clone())
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(
-            "all_dags_volume".to_string(),
+            "all-dags-volume".to_string(),
+            "/stackable/app/allDAGs".to_owned(),
+        )
+        .context(AddVolumeMountSnafu)?;
+
+    airflow_container
+        .add_volume_mount(
+            "all-dags-volume".to_string(),
             "/stackable/app/allDAGs".to_owned(),
         )
         .context(AddVolumeMountSnafu)?;
 
     pb.add_init_container(dags_init_container.build());
-    pb.add_volume(
-        VolumeBuilder::new("all_dags_volume".to_string())
-            //.with_empty_dir(Some("all_dags_volume".to_string()), None)
-            .build(),
-    )
-    .context(AddVolumeSnafu)?;
+    pb.add_volume(VolumeBuilder::new("all-dags-volume".to_string()).build())
+        .context(AddVolumeSnafu)?;
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes().clone())
         .context(AddVolumeSnafu)?;
