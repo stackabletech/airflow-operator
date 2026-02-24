@@ -284,7 +284,7 @@ pub fn build_airflow_statefulset_envs(
     Ok(transform_map_to_vec(env))
 }
 
-fn construct_python_path(airflow: &v1alpha1::AirflowCluster) -> String {
+fn construct_python_path(airflow: &v1alpha2::AirflowCluster) -> String {
     let mut python_path = format!("{LOG_CONFIG_DIR}:");
     let symlinks = airflow.create_python_path_links();
     python_path.push_str(symlinks.join(":").as_str());
@@ -294,7 +294,7 @@ fn construct_python_path(airflow: &v1alpha1::AirflowCluster) -> String {
 
 // This set of environment variables is a standard set that is not dependent on any
 // conditional logic and should be applied to the statefulset or the executor template config map.
-fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn static_envs(airflow: &v1alpha2::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     env.insert(
