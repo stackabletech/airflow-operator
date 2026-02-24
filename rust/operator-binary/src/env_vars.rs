@@ -22,7 +22,7 @@ use crate::{
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
-        v1alpha1,
+        v1alpha2,
     },
     util::{env_var_from_secret, role_service_name},
 };
@@ -72,7 +72,7 @@ pub enum Error {
 /// used which is defined in [`build_airflow_template_envs`]).
 #[allow(clippy::too_many_arguments)]
 pub fn build_airflow_statefulset_envs(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     executor: &AirflowExecutor,
@@ -350,7 +350,7 @@ fn static_envs(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
     resolved_product_image: &ResolvedProductImage,
@@ -443,7 +443,7 @@ pub fn build_airflow_template_envs(
 }
 
 fn add_version_specific_env_vars(
-    airflow: &v1alpha1::AirflowCluster,
+    airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
     resolved_product_image: &ResolvedProductImage,
     env: &mut BTreeMap<String, EnvVar>,
@@ -613,7 +613,7 @@ fn authorization_env_vars(
     env
 }
 
-fn execution_server_env_vars(airflow: &v1alpha1::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn execution_server_env_vars(airflow: &v1alpha2::AirflowCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
     if let Some(name) = airflow.metadata.name.as_ref() {

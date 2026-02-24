@@ -15,8 +15,11 @@ commands:
       # 8793 port for the Webserver: we don't use the token as that is an
       # internal implementation, but check that the endpoint is reachable,
       # indicated by a 403.
+      # N.B. this behaviour is stricter in 3.1.0, whereby the "/log" suffix
+      # has to be declared.
+      # See https://github.com/apache/airflow/pull/52581.
       CURL_RESPONSE=$(
-          kubectl -n $NAMESPACE exec airflow-webserver-default-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-default-headless:8793 2>/dev/null || true);echo "$CODE"'
+          kubectl -n $NAMESPACE exec airflow-webserver-default-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-default-headless:8793/log 2>/dev/null || true);echo "$CODE"'
       )
 
       # Log-Endpoint Test Assertion:

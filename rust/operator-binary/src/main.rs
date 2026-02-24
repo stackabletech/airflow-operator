@@ -4,8 +4,9 @@
 
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use clap::Parser;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
@@ -28,11 +29,13 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
+    utils::signal::SignalWatcher,
 };
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
-    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha1},
+    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha2},
+    webhooks::conversion::create_webhook_server,
 };
 
 mod airflow_controller;
@@ -44,6 +47,7 @@ mod operations;
 mod product_logging;
 mod service;
 mod util;
+mod webhooks;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -62,13 +66,13 @@ async fn main() -> anyhow::Result<()> {
 
     match opts.cmd {
         Command::Crd => {
-            AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha1)?
+            AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(RunArguments {
             product_config,
             watch_namespace,
-            operator_environment: _,
+            operator_environment,
             maintenance,
             common,
         }) => {
@@ -89,9 +93,13 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            // Watches for the SIGTERM signal and sends a signal to all receivers, which gracefully
+            // shuts down all concurrent tasks below (EoS checker, controller, webhook server).
+            let sigterm_watcher = SignalWatcher::sigterm()?;
+
             let eos_checker =
                 EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
-                    .run()
+                    .run(sigterm_watcher.handle())
                     .map(anyhow::Ok);
 
             let product_config = product_config.load(&[
@@ -114,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
             ));
 
             let airflow_controller = Controller::new(
-                watch_namespace.get_api::<DeserializeGuard<v1alpha1::AirflowCluster>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<v1alpha2::AirflowCluster>>(&client),
                 watcher::Config::default(),
             );
 
@@ -129,7 +137,6 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<StatefulSet>(&client),
                     watcher::Config::default(),
                 )
-                .shutdown_on_signal()
                 .watches(
                     client
                         .get_api::<DeserializeGuard<auth_core::v1alpha1::AuthenticationClass>>(&()),
@@ -139,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(
-                                move |airflow: &Arc<DeserializeGuard<v1alpha1::AirflowCluster>>| {
+                                move |airflow: &Arc<DeserializeGuard<v1alpha2::AirflowCluster>>| {
                                     references_authentication_class(airflow, &authentication_class)
                                 },
                             )
@@ -157,6 +164,7 @@ async fn main() -> anyhow::Result<()> {
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
+                .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
                     airflow_controller::reconcile_airflow,
                     airflow_controller::error_policy,
@@ -184,7 +192,18 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .map(anyhow::Ok);
 
-            futures::try_join!(airflow_controller, eos_checker)?;
+            let webhook_server = create_webhook_server(
+                &operator_environment,
+                maintenance.disable_crd_maintenance,
+                client.as_kube_client(),
+            )
+            .await?;
+
+            let webhook_server = webhook_server
+                .run(sigterm_watcher.handle())
+                .map_err(|err| anyhow!(err).context("failed to run webhook server"));
+
+            futures::try_join!(airflow_controller, webhook_server, eos_checker)?;
         }
     }
 
@@ -192,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
+    airflow: &DeserializeGuard<v1alpha2::AirflowCluster>,
     authentication_class: &DeserializeGuard<auth_core::v1alpha1::AuthenticationClass>,
 ) -> bool {
     let Ok(airflow) = &airflow.0 else {
@@ -209,7 +228,7 @@ fn references_authentication_class(
 }
 
 fn references_config_map(
-    airflow: &DeserializeGuard<v1alpha1::AirflowCluster>,
+    airflow: &DeserializeGuard<v1alpha2::AirflowCluster>,
     config_map: &DeserializeGuard<ConfigMap>,
 ) -> bool {
     let Ok(airflow) = &airflow.0 else {

@@ -53,7 +53,7 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
             AirflowClientAuthenticationDetailsResolved,
         },
-        v1alpha1::WebserverRoleConfig,
+        v1alpha2::WebserverRoleConfig,
     },
     util::role_service_name,
 };
@@ -64,6 +64,7 @@ pub mod authorization;
 pub mod internal_secret;
 
 pub const APP_NAME: &str = "airflow";
+pub const FIELD_MANAGER: &str = "airflow-operator";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
@@ -172,6 +173,7 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
 
 #[versioned(
     version(name = "v1alpha1"),
+    version(name = "v1alpha2"),
     crates(
         kube_core = "stackable_operator::kube::core",
         kube_client = "stackable_operator::kube::client",
@@ -202,7 +204,7 @@ pub mod versioned {
 
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for authentication, git sync, service exposition and volumes, among other things.
-        pub cluster_config: v1alpha1::AirflowClusterConfig,
+        pub cluster_config: AirflowClusterConfig,
 
         // no doc string - See ClusterOperation struct
         #[serde(default)]
@@ -213,7 +215,7 @@ pub mod versioned {
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment, v1alpha1::WebserverRoleConfig>>,
+        pub webservers: Option<Role<AirflowConfigFragment, v1alpha2::WebserverRoleConfig>>,
 
         /// The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
@@ -253,7 +255,11 @@ pub mod versioned {
         /// Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
-        pub dags_git_sync: Vec<git_sync::v1alpha1::GitSync>,
+        #[versioned(
+            changed(since = "v1alpha2", from_type = "Vec<git_sync::v1alpha1::GitSync>"),
+            hint(vec)
+        )]
+        pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
 
         /// for internal use only - not for production use.
         #[serde(default)]
@@ -320,9 +326,9 @@ pub fn default_db_init() -> bool {
     true
 }
 
-impl Default for v1alpha1::WebserverRoleConfig {
+impl Default for v1alpha2::WebserverRoleConfig {
     fn default() -> Self {
-        v1alpha1::WebserverRoleConfig {
+        v1alpha2::WebserverRoleConfig {
             listener_class: webserver_default_listener_class(),
             common: Default::default(),
         }
@@ -340,7 +346,7 @@ pub struct AirflowClusterStatus {
     pub conditions: Vec<ClusterCondition>,
 }
 
-impl HasStatusCondition for v1alpha1::AirflowCluster {
+impl HasStatusCondition for v1alpha2::AirflowCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
             Some(status) => status.conditions.clone(),
@@ -349,7 +355,7 @@ impl HasStatusCondition for v1alpha1::AirflowCluster {
     }
 }
 
-impl v1alpha1::AirflowCluster {
+impl v1alpha2::AirflowCluster {
     /// The name of the group-listener provided for a specific role.
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
@@ -405,7 +411,7 @@ impl v1alpha1::AirflowCluster {
     pub fn merged_config(
         &self,
         role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::AirflowCluster>,
+        rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     ) -> Result<AirflowConfig, Error> {
         // Initialize the result with all default values as baseline
         let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
@@ -604,7 +610,7 @@ impl AirflowRole {
     /// if authentication is enabled.
     pub fn get_commands(
         &self,
-        airflow: &v1alpha1::AirflowCluster,
+        airflow: &v1alpha2::AirflowCluster,
         auth_config: &AirflowClientAuthenticationDetailsResolved,
         resolved_product_image: &ResolvedProductImage,
     ) -> Vec<String> {
@@ -806,7 +812,7 @@ impl AirflowRole {
         roles
     }
 
-    pub fn listener_class_name(&self, airflow: &v1alpha1::AirflowCluster) -> Option<String> {
+    pub fn listener_class_name(&self, airflow: &v1alpha2::AirflowCluster) -> Option<String> {
         match self {
             Self::Webserver => airflow
                 .spec
@@ -819,7 +825,7 @@ impl AirflowRole {
 
     pub fn role_config(
         &self,
-        airflow: &v1alpha1::AirflowCluster,
+        airflow: &v1alpha2::AirflowCluster,
     ) -> Result<Role<AirflowConfigFragment>, Error> {
         let role = self.to_string();
         let roles = AirflowRole::roles();
@@ -1001,7 +1007,7 @@ impl AirflowConfig {
 }
 
 impl Configuration for AirflowConfigFragment {
-    type Configurable = v1alpha1::AirflowCluster;
+    type Configurable = v1alpha2::AirflowCluster;
 
     fn compute_env(
         &self,
@@ -1118,18 +1124,18 @@ pub fn build_recommended_labels<'a, T>(
 mod tests {
     use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 
-    use crate::v1alpha1::AirflowCluster;
+    use crate::v1alpha2::AirflowCluster;
 
     #[test]
     fn test_cluster_config() {
         let cluster = "
-        apiVersion: airflow.stackable.tech/v1alpha1
+        apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
         metadata:
           name: airflow
         spec:
           image:
-            productVersion: 3.0.6
+            productVersion: 3.1.6
           clusterConfig:
             loadExamples: true
             exposeConfig: true
@@ -1156,7 +1162,7 @@ mod tests {
             .resolve("airflow", "0.0.0-dev")
             .expect("test: resolved product image is always valid");
 
-        assert_eq!("3.0.6", &resolved_airflow_image.product_version);
+        assert_eq!("3.1.6", &resolved_airflow_image.product_version);
 
         assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
         assert!(cluster.spec.cluster_config.load_examples);
