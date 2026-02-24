@@ -42,7 +42,7 @@ For multiple DAGs, it is easier to expose them via `gitsync`, as shown below.
 
 == Via `git-sync`
 
-{git-sync}[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. {git-sync}[git-sync] folders will be provided at `/stackable/apps/allDAGs/current-i`, with i in {0,1,..,n-1}.
+{git-sync}[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes. {git-sync}[git-sync] folders will be provided at `/stackable/app/allDAGs/current-i`, with i in {0,1,..,n-1}.
 The Stackable Airflow images already ship with git-sync included, and the operator takes care of calling the tool and mounting volumes, so that only the repository and synchronization details are required:
 
 .git-sync usage example: https
@@ -85,4 +85,6 @@ See the xref:usage-guide/applying-custom-resources.adoc[] example for more detai
 
 === Multiple repositories via git-sync
 
-If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above. Those repositories get consolidated beneath `stackable/apps/allDAGs/current-i`, where `i` is the position in the list ranging from (0,1,..,n-1).
+If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above. Those repositories get consolidated beneath `stackable/app/allDAGs/current-i`, where `i` is the position in the list ranging from (0,1,..,n-1).
+
+NOTE: Using DAG's from ConfigMaps will need you to either use celeryExecutors and mount them under `/stackable/app/allDAGs/<name>` or use kubernetesExecutor and mount them somewhere else and change the PYTHONPATH as well as the `AIRFLOW\__CORE__DAGS_FOLDER` accordingly.
