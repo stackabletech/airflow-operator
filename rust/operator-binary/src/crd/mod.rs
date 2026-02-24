@@ -443,7 +443,7 @@ impl v1alpha2::AirflowCluster {
     pub fn create_gitsync_links(&self) -> Vec<String> {
         let mut symlinks = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            symlinks.push(format!("/stackable/app/allDAGs/current-{i}").to_string())
+            symlinks.push(format!("{AIRFLOW_DAGS_FOLDER}/current-{i}").to_string())
         }
         symlinks
     }
@@ -452,7 +452,7 @@ impl v1alpha2::AirflowCluster {
         let mut python_path = Vec::<String>::new();
         for (i, git_sync) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
             let folder = &git_sync.git_folder.display();
-            python_path.push(format!("/stackable/app/allDAGs/current-{i}/{folder}").to_string())
+            python_path.push(format!("{AIRFLOW_DAGS_FOLDER}/current-{i}/{folder}").to_string())
         }
         python_path
     }
