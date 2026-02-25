@@ -461,6 +461,7 @@ impl v1alpha2::AirflowCluster {
                     .to_string(),
             );
         }
+        // init-container seems to only accept one command line.
         vec![cp_commands.join(" && ")]
     }
 
