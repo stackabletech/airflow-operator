@@ -1319,7 +1319,7 @@ fn build_executor_template_config_map(
     )?;
 
     /*
-    Multi-gitsync requires a init-container which copies contents from
+    Multi-gitsync requires an init-container which copies contents from
     gitsync volumes into one empty volume to be mounted into
     the airflow image.
     */
