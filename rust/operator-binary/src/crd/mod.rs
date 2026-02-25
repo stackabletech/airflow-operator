@@ -440,7 +440,7 @@ impl v1alpha2::AirflowCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 
-    // Softlink from each single folder git-{i} into {AIRFLOW_DAGS_FOLDER}/
+    // Softlink from each single folder git-{i} into {AIRFLOW_DAGS_FOLDER}/.
     pub fn get_multi_gitsync_commands(&self) -> Vec<String> {
         let mut symlinks = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
@@ -452,7 +452,7 @@ impl v1alpha2::AirflowCluster {
         symlinks
     }
 
-    // kubernetesExecuter needs copy since it needs init-container
+    // kubernetesExecuter needs copy since it needs init-container.
     pub fn get_kubernetes_executer_multi_gitsync_commands(&self) -> Vec<String> {
         let mut cp_commands = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
@@ -465,7 +465,7 @@ impl v1alpha2::AirflowCluster {
         vec![cp_commands.join(" && ")]
     }
 
-    // PYTHONPATH contains folder-name provided in CRD
+    // PYTHONPATH contains folder-name provided in CRD.
     pub fn get_gitsync_absolute_paths(&self) -> Vec<String> {
         let mut python_path = Vec::<String>::new();
         for (i, git_sync) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
@@ -636,7 +636,7 @@ impl AirflowRole {
             format!(
                 "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
             ),
-            // Adding cm as dags within the same AIRFLOW_DAGS_FOLDER leads to problems, thus checking if exists
+            // Adding cm as dags within the same AIRFLOW_DAGS_FOLDER may lead to problems, thus checking if exists.
             format!("mkdir -p {AIRFLOW_DAGS_FOLDER}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),

@@ -1328,12 +1328,6 @@ fn build_executor_template_config_map(
     dags_init_container
         .image_from_product_image(resolved_product_image)
         .args(airflow.get_kubernetes_executer_multi_gitsync_commands())
-        .add_env_vars(build_airflow_template_envs(
-            airflow,
-            env_overrides,
-            merged_executor_config,
-            resolved_product_image,
-        ))
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
