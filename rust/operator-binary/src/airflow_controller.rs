@@ -1324,7 +1324,7 @@ fn build_executor_template_config_map(
     the airflow image.
     */
     let mut dags_init_container =
-        ContainerBuilder::new("multi-gitsync-init").context(InvalidContainerNameSnafu)?;
+        ContainerBuilder::new("multi-git-sync-init").context(InvalidContainerNameSnafu)?;
     dags_init_container
         .image_from_product_image(resolved_product_image)
         .args(airflow.get_kubernetes_executer_multi_gitsync_commands())
