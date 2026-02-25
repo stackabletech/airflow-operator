@@ -1318,20 +1318,16 @@ fn build_executor_template_config_map(
         true,
     )?;
 
+    /*
+    Multi-gitsync requires a init-container which copies contents from
+    gitsync volumes into one empty volume to be mounted into
+    the airflow image.
+    */
     let mut dags_init_container =
-        ContainerBuilder::new("dags-init").context(InvalidContainerNameSnafu)?;
-    let mut dags_args = Vec::<String>::new();
-    let mut cp_commands = Vec::<String>::new();
-    for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
-        cp_commands.push(
-            format!("cp -r /stackable/app/git-{i}/current/ {AIRFLOW_DAGS_FOLDER}/current-{i}")
-                .to_string(),
-        );
-    }
-    dags_args.push(cp_commands.join(" && "));
+        ContainerBuilder::new("multi-gitsync-init").context(InvalidContainerNameSnafu)?;
     dags_init_container
         .image_from_product_image(resolved_product_image)
-        .args(dags_args)
+        .args(airflow.get_kubernetes_executer_multi_gitsync_commands())
         .add_env_vars(build_airflow_template_envs(
             airflow,
             env_overrides,

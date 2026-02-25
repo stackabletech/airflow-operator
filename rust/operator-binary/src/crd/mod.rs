@@ -440,15 +440,32 @@ impl v1alpha2::AirflowCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 
-    pub fn create_gitsync_links(&self) -> Vec<String> {
+    // Softlink from each single folder git-{i} into {AIRFLOW_DAGS_FOLDER}/
+    pub fn get_multi_gitsync_commands(&self) -> Vec<String> {
         let mut symlinks = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            symlinks.push(format!("{AIRFLOW_DAGS_FOLDER}/current-{i}").to_string())
+            symlinks.push(
+                format!("ln -s /stackable/app/git-{i}/current {AIRFLOW_DAGS_FOLDER}/current-{i}")
+                    .to_string(),
+            )
         }
         symlinks
     }
 
-    pub fn create_python_path_links(&self) -> Vec<String> {
+    // kubernetesExecuter needs copy since it needs init-container
+    pub fn get_kubernetes_executer_multi_gitsync_commands(&self) -> Vec<String> {
+        let mut cp_commands = Vec::<String>::new();
+        for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
+            cp_commands.push(
+                format!("cp -r /stackable/app/git-{i}/current/ {AIRFLOW_DAGS_FOLDER}/current-{i}")
+                    .to_string(),
+            );
+        }
+        vec![cp_commands.join(" && ")]
+    }
+
+    // PYTHONPATH contains folder-name provided in CRD
+    pub fn get_gitsync_absolute_paths(&self) -> Vec<String> {
         let mut python_path = Vec::<String>::new();
         for (i, git_sync) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
             let folder = &git_sync.git_folder.display();
@@ -624,13 +641,7 @@ impl AirflowRole {
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
-
-        let symlinks = airflow.create_gitsync_links();
-
-        for (i, _) in airflow.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            command
-                .push(format!("ln -s /stackable/app/git-{i}/current {:?}", symlinks[i]).to_string())
-        }
+        command.extend(airflow.get_multi_gitsync_commands());
 
         if resolved_product_image.product_version.starts_with("3.") {
             // Start-up commands have changed in 3.x.
