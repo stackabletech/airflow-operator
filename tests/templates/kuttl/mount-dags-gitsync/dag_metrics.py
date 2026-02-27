@@ -77,16 +77,25 @@ loop = 0
 while True:
     try:
         logging.info(f"Response code: {response.status_code}")
-        assert response_0.status_code == 200, f"DAG from git-sync 0 run could not be triggered because of status code: {response_0.status_code}"
-        assert response_1.status_code == 200, f"DAG from git-sync 1 run could not be triggered. {response_1.status_code}"
+        assert response_0.status_code == 200, (
+            f"DAG from git-sync 0 run could not be triggered because of status code: {response_0.status_code}"
+        )
+        assert response_1.status_code == 200, (
+            f"DAG from git-sync 1 run could not be triggered. {response_1.status_code}"
+        )
         # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
         # (disable line-break flake checks)
-        if (assert_metric("scheduler", "airflow_scheduler_heartbeat")) and (
-            assert_metric(
-                "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_0_count"
-            )) and (
-            assert_metric(
-                "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_1_count"
+        if (
+            (assert_metric("scheduler", "airflow_scheduler_heartbeat"))
+            and (
+                assert_metric(
+                    "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_0_count"
+                )
+            )
+            and (
+                assert_metric(
+                    "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_1_count"
+                )
             )
         ):  # noqa: W503, W504
             break
