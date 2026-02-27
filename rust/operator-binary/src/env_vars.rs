@@ -286,9 +286,13 @@ pub fn build_airflow_statefulset_envs(
 
 // contains absolute path to git-sync folder and log config.
 fn construct_python_path(airflow: &v1alpha2::AirflowCluster) -> String {
-    let mut python_path = format!("{LOG_CONFIG_DIR}:");
+    let mut python_path = format!("{LOG_CONFIG_DIR}");
     let symlinks = airflow.get_gitsync_absolute_paths();
-    python_path.push_str(symlinks.join(":").as_str());
+    // append `:` only of there are git-sync entries.
+    if !symlinks.is_empty() {
+        python_path.push_str(":");
+        python_path.push_str(symlinks.join(":").as_str());
+    }
 
     python_path
 }
