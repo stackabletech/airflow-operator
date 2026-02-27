@@ -85,7 +85,7 @@ See the xref:usage-guide/applying-custom-resources.adoc[] example for more detai
 
 === Multiple repositories via git-sync
 
-If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above. 
+If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above.
 
 The default mount-path for git-sync resources is `/stackable/app/allDAGs/current-{i}` where i corresponds to:
 
