@@ -85,6 +85,21 @@ See the xref:usage-guide/applying-custom-resources.adoc[] example for more detai
 
 === Multiple repositories via git-sync
 
-If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above. Those repositories get consolidated beneath `stackable/app/allDAGs/current-i`, where `i` is the position in the list ranging from (0,1,..,n-1).
+If you want to access multiple branches of a repository or load dags from multiple repositories, you can extend the list shown above. 
+
+The default mount-path for git-sync resources is `/stackable/app/allDAGs/current-{i}` where i corresponds to:
+
+[source,yaml]
+----
+    dagsGitSync:
+      - repo: ssh://git@github.com/stackable-airflow/dags.git # <-- current-0
+        branch: test/git-sync-0
+        credentials:
+          sshPrivateKeySecretName: git-sync-ssh
+      - repo: ssh://git@github.com/stackable-airflow/dags.git # <-- current-1
+        branch: test/git-sync-1
+        credentials:
+          sshPrivateKeySecretName: git-sync-ssh
+----
 
 NOTE: Using DAG's from ConfigMaps will need you to either use celeryExecutors and mount them under `/stackable/app/allDAGs/<name>` or use kubernetesExecutor and mount them somewhere else and change the PYTHONPATH as well as the `AIRFLOW\__CORE__DAGS_FOLDER` accordingly.
