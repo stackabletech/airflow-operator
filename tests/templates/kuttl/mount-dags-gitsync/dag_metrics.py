@@ -81,7 +81,7 @@ while True:
             f"DAG from git-sync 0 run could not be triggered because of status code: {response_0.status_code}"
         )
         assert response_1.status_code == 200, (
-            f"DAG from git-sync 1 run could not be triggered. {response_1.status_code}"
+            f"DAG from git-sync 1 run could not be triggered because of status code: {response_1.status_code}"
         )
         # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
         # (disable line-break flake checks)
