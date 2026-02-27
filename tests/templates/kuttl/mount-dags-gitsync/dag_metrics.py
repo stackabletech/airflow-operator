@@ -21,7 +21,8 @@ now = datetime.now(timezone.utc)
 ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
 # Trigger a DAG run to create metrics
-dag_id = "sparkapp_dag"
+dag_id_0 = "sparkapp_dag_0"
+dag_id_1 = "sparkapp_dag_1"
 dag_data = {"logical_date": f"{ts}"}
 
 print(f"DAG-Data: {dag_data}")
@@ -51,13 +52,20 @@ headers = {
     "Content-Type": "application/json",
 }
 
+# Two DAGs from two different repos/branches will need to be triggered and activated
 # activate DAG
-response = requests.patch(
-    f"{rest_url}/dags/{dag_id}", headers=headers, json={"is_paused": False}
+response_0 = requests.patch(
+    f"{rest_url}/dags/{dag_id_0}", headers=headers, json={"is_paused": False}
+)
+response_1 = requests.patch(
+    f"{rest_url}/dags/{dag_id_1}", headers=headers, json={"is_paused": False}
 )
 # trigger DAG
-response = requests.post(
-    f"{rest_url}/dags/{dag_id}/dagRuns", headers=headers, json=dag_data
+response_0 = requests.post(
+    f"{rest_url}/dags/{dag_id_0}/dagRuns", headers=headers, json=dag_data
+)
+response_1 = requests.post(
+    f"{rest_url}/dags/{dag_id_1}/dagRuns", headers=headers, json=dag_data
 )
 
 # Wait for the metrics to be consumed by the statsd-exporter
@@ -69,12 +77,16 @@ loop = 0
 while True:
     try:
         logging.info(f"Response code: {response.status_code}")
-        assert response.status_code == 200, "DAG run could not be triggered."
+        assert response_0.status_code == 200, f"DAG from git-sync 0 run could not be triggered because of status code: {response_0.status_code}"
+        assert response_1.status_code == 200, f"DAG from git-sync 1 run could not be triggered. {response_1.status_code}"
         # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
         # (disable line-break flake checks)
         if (assert_metric("scheduler", "airflow_scheduler_heartbeat")) and (
             assert_metric(
-                "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_count"
+                "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_0_count"
+            )) and (
+            assert_metric(
+                "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_1_count"
             )
         ):  # noqa: W503, W504
             break
