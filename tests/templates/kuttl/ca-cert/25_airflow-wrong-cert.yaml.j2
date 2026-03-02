@@ -1,4 +1,14 @@
 ---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: git-wrong-ca-cert
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
 apiVersion: airflow.stackable.tech/v1alpha2
 kind: AirflowCluster
 metadata:
@@ -23,7 +33,11 @@ spec:
           basicAuthSecretName: git-credentials
         gitFolder: "mount-dags-gitsync/dags_airflow3"
         wait: 5s
-        caCertSecretName: git-wrong-ca-cert
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-wrong-ca-cert
   webservers:
     roleConfig:
       listenerClass: external-unstable
