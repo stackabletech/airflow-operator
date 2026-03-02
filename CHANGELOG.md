@@ -4,15 +4,16 @@
 
 ### Added
 
+- Support for passing CAs to GitSync ([#750]).
 - Add support for airflow 3.1.6 ([#742]).
 - Add operator versioning ([#725]).
   - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#726]).
-- Support for passing CAs to GitSync ([#750]).
 
 ### Changed
 
+- Bump stackable-operator to 0.106.2, strum to 0.28, and rand to 0.10 ([#752]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#741]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
 
@@ -30,6 +31,7 @@
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
 [#750]: https://github.com/stackabletech/airflow-operator/pull/750
+[#752]: https://github.com/stackabletech/airflow-operator/pull/752
 
 ## [25.11.0] - 2025-11-07
 
