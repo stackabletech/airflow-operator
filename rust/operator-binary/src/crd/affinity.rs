@@ -179,7 +179,7 @@ mod tests {
           image:
             productVersion: 3.1.6
           clusterConfig:
-            credentialsSecret: airflow-credentials
+            credentialsSecret: airflow-admin-credentials
             metadataDatabase:
               postgresql:
                 host: airflow-postgresql

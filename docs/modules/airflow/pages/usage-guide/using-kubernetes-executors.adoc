@@ -12,6 +12,7 @@ E.g. you would change the following example
 ----
 spec:
   celeryExecutors:
+    ...
     roleGroups:
       default:
         replicas: 2
