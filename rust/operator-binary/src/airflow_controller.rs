@@ -1374,6 +1374,8 @@ fn build_executor_template_config_map(
         true,
     )?;
 
+    metadata_database_connection_details.add_to_container(&mut airflow_container);
+
     pb.add_container(airflow_container.build());
     pb.add_volumes(airflow.volumes().clone())
         .context(AddVolumeSnafu)?;
