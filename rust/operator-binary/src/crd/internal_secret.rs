@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use base64::{Engine as _, engine::general_purpose};
-use rand::{TryRngCore, rand_core::OsError, rngs::OsRng};
+use rand::{
+    TryRng,
+    rngs::{SysError, SysRng},
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder, client::Client, k8s_openapi::api::core::v1::Secret,
@@ -56,7 +59,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to generate random bytes"))]
-    SeedRandomGenerator { source: OsError },
+    SeedRandomGenerator { source: SysError },
 }
 
 pub async fn create_random_secret(
@@ -112,7 +115,7 @@ fn get_random_base64(byte_size: usize) -> Result<String, Error> {
     // use let mut rng = StdRng::from_os_rng() and then use fill_bytes
     // but this may *still* panic if the underlying (OS) mechanism fails
     // for some reason, so keep the potential panic transparent.
-    OsRng
+    SysRng
         .try_fill_bytes(&mut buf)
         .context(SeedRandomGeneratorSnafu)?;
     Ok(general_purpose::STANDARD.encode(buf))

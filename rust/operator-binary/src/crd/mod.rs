@@ -529,30 +529,6 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AirflowCredentials {
-    pub admin_user: AdminUserCredentials,
-    pub connections: Connections,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AdminUserCredentials {
-    pub username: String,
-    pub firstname: String,
-    pub lastname: String,
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Connections {
-    pub secret_key: String,
-    pub sqlalchemy_database_uri: String,
-}
-
 #[derive(
     Clone,
     Debug,
