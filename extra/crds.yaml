@@ -39,6 +39,99 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBroker:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          databaseId:
+                            default: 0
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                          host:
+                            description: TODO docs
+                            type: string
+                          port:
+                            default: 6379
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          database:
+                            description: TODO docs
+                            type: string
+                          host:
+                            description: TODO docs
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: TODO docs
+                            type: object
+                          port:
+                            default: 5432
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -1030,6 +1123,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBroker
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -1135,16 +1230,14 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
-                      Read the
+                      The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
                     type: string
                   dagsGitSync:
                     default: []
                     description: |-
-                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-                      Learn more in the
+                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
                       [mounting DAGs documentation](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_via_git_sync).
                     items:
                       properties:
@@ -1239,7 +1332,7 @@ spec:
                     type: object
                   exposeConfig:
                     default: false
-                    description: for internal use only - not for production use.
+                    description: For internal use only - not for production use.
                     type: boolean
                   loadExamples:
                     default: false
@@ -1247,6 +1340,54 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: TODO docs
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          database:
+                            description: TODO docs
+                            type: string
+                          host:
+                            description: TODO docs
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: TODO docs
+                            type: object
+                          port:
+                            default: 5432
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -1271,6 +1412,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -2354,7 +2496,7 @@ spec:
                     type: string
                 type: object
               kubernetesExecutors:
-                description: With the Kuberentes executor, executor Pods are created on demand.
+                description: With the Kubernetes executor, executor Pods are created on demand.
                 properties:
                   cliOverrides:
                     additionalProperties:
@@ -5918,6 +6060,99 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBroker:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          databaseId:
+                            default: 0
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                          host:
+                            description: TODO docs
+                            type: string
+                          port:
+                            default: 6379
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          database:
+                            description: TODO docs
+                            type: string
+                          host:
+                            description: TODO docs
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: TODO docs
+                            type: object
+                          port:
+                            default: 5432
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -6909,6 +7144,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBroker
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -7014,16 +7251,14 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
-                      Read the
+                      The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
                     type: string
                   dagsGitSync:
                     default: []
                     description: |-
-                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-                      Learn more in the
+                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
                       [mounting DAGs documentation](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_via_git_sync).
                     items:
                       properties:
@@ -7094,7 +7329,7 @@ spec:
                     type: object
                   exposeConfig:
                     default: false
-                    description: for internal use only - not for production use.
+                    description: For internal use only - not for production use.
                     type: boolean
                   loadExamples:
                     default: false
@@ -7102,6 +7337,54 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: TODO docs
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: TODO docs
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: TODO docs
+                        properties:
+                          credentialsSecret:
+                            description: TODO docs
+                            type: string
+                          database:
+                            description: TODO docs
+                            type: string
+                          host:
+                            description: TODO docs
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: TODO docs
+                            type: object
+                          port:
+                            default: 5432
+                            description: TODO docs
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -7126,6 +7409,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -8209,7 +8493,7 @@ spec:
                     type: string
                 type: object
               kubernetesExecutors:
-                description: With the Kuberentes executor, executor Pods are created on demand.
+                description: With the Kubernetes executor, executor Pods are created on demand.
                 properties:
                   cliOverrides:
                     additionalProperties:

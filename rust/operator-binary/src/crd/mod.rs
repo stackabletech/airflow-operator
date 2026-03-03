@@ -53,6 +53,9 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
             AirflowClientAuthenticationDetailsResolved,
         },
+        databases::{
+            CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
+        },
         v1alpha2::WebserverRoleConfig,
     },
     util::role_service_name,
@@ -61,6 +64,7 @@ use crate::{
 pub mod affinity;
 pub mod authentication;
 pub mod authorization;
+pub mod databases;
 pub mod internal_secret;
 
 pub const APP_NAME: &str = "airflow";
@@ -244,14 +248,15 @@ pub mod versioned {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorization: Option<AirflowAuthorization>,
 
-        /// The name of the Secret object containing the admin user credentials and database connection details.
-        /// Read the
+        /// TODO docs
+        pub metadata_database: MetadataDatabaseConnection,
+
+        /// The name of the Secret object containing the admin user credentials. Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
         pub credentials_secret: String,
 
-        /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-        /// Learn more in the
+        /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
         #[versioned(
@@ -260,7 +265,7 @@ pub mod versioned {
         )]
         pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
 
-        /// for internal use only - not for production use.
+        /// For internal use only - not for production use.
         #[serde(default)]
         pub expose_config: bool,
 
@@ -381,8 +386,8 @@ impl v1alpha2::AirflowCluster {
             AirflowRole::DagProcessor => self.spec.dag_processors.to_owned(),
             AirflowRole::Triggerer => self.spec.triggerers.to_owned(),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &self.spec.executor {
-                    Some(config.clone())
+                if let AirflowExecutor::CeleryExecutors { config, .. } = &self.spec.executor {
+                    Some(*config.clone())
                 } else {
                     None
                 }
@@ -525,6 +530,7 @@ pub struct AirflowAuthorization {
 pub struct AirflowOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
+
     #[serde(default)]
     pub cache: UserInformationCache,
 }
@@ -787,7 +793,7 @@ impl AirflowRole {
                     .context(UnknownAirflowRoleSnafu { role, roles })?,
             ),
             AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutor { config } = &airflow.spec.executor {
+                if let AirflowExecutor::CeleryExecutors { config, .. } = &airflow.spec.executor {
                     config
                 } else {
                     return Err(Error::NoRoleForExecutorFailure);
@@ -817,23 +823,39 @@ fn container_debug_command() -> String {
     format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
 }
 
-#[derive(Clone, Debug, Deserialize, Display, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum AirflowExecutor {
     /// The celery executor.
     /// Deployed with an explicit number of replicas.
-    #[serde(rename = "celeryExecutors")]
-    CeleryExecutor {
+    #[serde(rename_all = "camelCase")]
+    CeleryExecutors {
         #[serde(flatten)]
-        config: Role<AirflowConfigFragment>,
+        config: Box<Role<AirflowConfigFragment>>,
+
+        /// Connection information for the celery backend database.
+        celery_result_backend: CeleryResultBackendConnection,
+
+        /// Connection information for the celery broker queue.
+        celery_broker: CeleryBrokerConnection,
     },
 
-    /// With the Kuberentes executor, executor Pods are created on demand.
-    #[serde(rename = "kubernetesExecutors")]
-    KubernetesExecutor {
+    /// With the Kubernetes executor, executor Pods are created on demand.
+    KubernetesExecutors {
         #[serde(flatten)]
         common_configuration:
-            CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
+            Box<CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>>,
     },
+}
+
+impl AirflowExecutor {
+    /// Name of the executor as expected to be passed via `AIRFLOW__CORE__EXECUTOR`
+    pub fn as_airflow_core_executor(&self) -> &'static str {
+        match self {
+            AirflowExecutor::CeleryExecutors { .. } => "CeleryExecutor",
+            AirflowExecutor::KubernetesExecutors { .. } => "KubernetesExecutor",
+        }
+    }
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1112,7 +1134,7 @@ mod tests {
 
         assert_eq!("3.1.6", &resolved_airflow_image.product_version);
 
-        assert_eq!("KubernetesExecutor", cluster.spec.executor.to_string());
+        assert_eq!("KubernetesExecutor", cluster.spec.executor.as_airflow_core_executor());
         assert!(cluster.spec.cluster_config.load_examples);
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true

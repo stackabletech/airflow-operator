@@ -38,6 +38,13 @@ use stackable_operator::{
         authentication::{core as auth_core, ldap},
         git_sync, listener,
     },
+    databases::{
+        TemplatingMechanism,
+        drivers::{
+            celery::CeleryDatabaseConnectionDetails,
+            sqlalchemy::SQLAlchemyDatabaseConnectionDetails,
+        },
+    },
     k8s_openapi::{
         self, DeepMerge,
         api::{
@@ -400,6 +407,34 @@ pub async fn reconcile_airflow(
     )
     .await
     .context(InvalidAuthorizationConfigSnafu)?;
+    // We don't have a config file, but do everything via env substitution
+
+    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+    let metadata_database_connection_details = airflow
+        .spec
+        .cluster_config
+        .metadata_database
+        .as_sqlalchemy_database_connection()
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+    let celery_database_connection_details = match &airflow.spec.executor {
+        AirflowExecutor::CeleryExecutors {
+            celery_result_backend,
+            celery_broker,
+            ..
+        } => {
+            let celery_result_backend = celery_result_backend
+                .as_celery_database_connection()
+                .celery_connection_details_with_templating(
+                    "CELERY_RESULT_BACKEND",
+                    &templating_mechanism,
+                );
+            let celery_broker = celery_broker
+                .as_celery_database_connection()
+                .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
+            Some((celery_result_backend, celery_broker))
+        }
+        _ => None,
+    };
 
     let mut roles = HashMap::new();
 
@@ -462,13 +497,14 @@ pub async fn reconcile_airflow(
 
     // if the kubernetes executor is specified, in place of a worker role that will be in the role
     // collection there will be a pod template created to be used for pod provisioning
-    if let AirflowExecutor::KubernetesExecutor {
+    if let AirflowExecutor::KubernetesExecutors {
         common_configuration,
     } = &airflow_executor
     {
         build_executor_template(
             airflow,
             common_configuration,
+            &metadata_database_connection_details,
             &resolved_product_image,
             &authentication_config,
             &authorization_config,
@@ -645,6 +681,8 @@ pub async fn reconcile_airflow(
                 rolegroup_config,
                 &authentication_config,
                 &authorization_config,
+                &metadata_database_connection_details,
+                &celery_database_connection_details,
                 &rbac_sa,
                 &merged_airflow_config,
                 airflow_executor,
@@ -686,6 +724,7 @@ pub async fn reconcile_airflow(
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
+    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -735,6 +774,7 @@ async fn build_executor_template(
         airflow,
         resolved_product_image,
         authentication_config,
+        metadata_database_connection_details,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
         &common_config.env_overrides,
@@ -933,6 +973,11 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
+    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    celery_database_connection_details: &Option<(
+        CeleryDatabaseConnectionDetails,
+        CeleryDatabaseConnectionDetails,
+    )>,
     service_account: &ServiceAccount,
     merged_airflow_config: &AirflowConfig,
     executor: &AirflowExecutor,
@@ -1019,6 +1064,8 @@ fn build_server_rolegroup_statefulset(
             executor,
             authentication_config,
             authorization_config,
+            metadata_database_connection_details,
+            celery_database_connection_details,
             git_sync_resources,
             resolved_product_image,
         )
@@ -1039,7 +1086,7 @@ fn build_server_rolegroup_statefulset(
         .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?;
 
-    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         airflow_container
             .add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
             .context(AddVolumeMountSnafu)?;
@@ -1087,7 +1134,7 @@ fn build_server_rolegroup_statefulset(
     // and registered. This will result in ModuleNotFoundError errors. This can be avoided
     // by running a one-off git-sync process in an init-container so that all DAG
     // dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
-    let use_git_sync_init_containers = matches!(executor, AirflowExecutor::CeleryExecutor { .. });
+    let use_git_sync_init_containers = matches!(executor, AirflowExecutor::CeleryExecutors { .. });
     add_git_sync_resources(
         &mut pb,
         &mut airflow_container,
@@ -1095,6 +1142,12 @@ fn build_server_rolegroup_statefulset(
         true,
         use_git_sync_init_containers,
     )?;
+
+    metadata_database_connection_details.add_to_container(&mut airflow_container);
+    if let Some((celery_result_backend, celery_broker)) = celery_database_connection_details {
+        celery_result_backend.add_to_container(&mut airflow_container);
+        celery_broker.add_to_container(&mut airflow_container);
+    }
 
     pb.add_container(airflow_container.build());
 
@@ -1140,7 +1193,7 @@ fn build_server_rolegroup_statefulset(
     ))
     .context(AddVolumeSnafu)?;
 
-    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
                 .with_config_map(airflow.executor_template_configmap_name())
@@ -1252,6 +1305,7 @@ fn build_executor_template_config_map(
     airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
@@ -1299,6 +1353,7 @@ fn build_executor_template_config_map(
             airflow,
             env_overrides,
             merged_executor_config,
+            metadata_database_connection_details,
             git_sync_resources,
             resolved_product_image,
         ))

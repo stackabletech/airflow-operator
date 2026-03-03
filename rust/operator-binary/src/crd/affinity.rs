@@ -235,8 +235,8 @@ mod tests {
         };
 
         let executor_config = match &airflow.spec.executor {
-            AirflowExecutor::CeleryExecutor { .. } => unreachable!(),
-            AirflowExecutor::KubernetesExecutor {
+            AirflowExecutor::CeleryExecutors { .. } => unreachable!(),
+            AirflowExecutor::KubernetesExecutors {
                 common_configuration,
             } => &common_configuration.config,
         };
