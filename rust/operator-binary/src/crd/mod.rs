@@ -1109,7 +1109,12 @@ mod tests {
           clusterConfig:
             loadExamples: true
             exposeConfig: true
-            credentialsSecret: simple-airflow-credentials
+            credentialsSecret: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecret: airflow-postgresql-credentials
           webservers:
             roleGroups:
               default:
