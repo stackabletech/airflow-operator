@@ -6,10 +6,10 @@ commands:
 
 {% if test_scenario['values']['executor'] == 'kubernetes' %}
   # check that the executor template configmap contains mounts and envs
-  # will expect 6 (2 from from the volume declaration + mounts to four containers, base and gitsync-0, gitsync-1 and multi-gitsync)
-  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "test-cm-gitsync" | wc -l | grep 6
-  # will expect 4 (four containers, base, gitsync-0, gitsync-1 and multi-gitsync)
-  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "AIRFLOW_TEST_VAR" | wc -l | grep 4
+  # will expect 5 (2 from from the volume declaration + mounts to four containers, base and gitsync-0 and gitsync-1)
+  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "test-cm-gitsync" | wc -l | grep 5
+  # will expect 3 (four containers, base, gitsync-0 and gitsync-1)
+  - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "AIRFLOW_TEST_VAR" | wc -l | grep 3
   # will expect 2 (two container, gitsync-0, gitsync-1)
 {% if test_scenario['values']['access'] == 'https' %}
   - script: kubectl -n $NAMESPACE get cm airflow-executor-pod-template -o json | jq -r '.data."airflow_executor_pod_template.yaml"'  | grep "GITSYNC_USERNAME" | wc -l | grep 2
@@ -17,8 +17,8 @@ commands:
 {% endif %}
 {% else %}
   # check that the statefulset contains mounts and envs
-  # will expect 6 (2 from the volume declaration + mounts to 5 containers, base and 2 gitsyncs plus configmap restarter)
-  - script: kubectl -n $NAMESPACE get sts airflow-worker-default -o json | grep "test-cm-gitsync" | wc -l | grep 7
+  # will expect 8 (2 from the volume declaration + mounts to 5 containers, base and 2 gitsyncs plus configmap restarter)
+  - script: kubectl -n $NAMESPACE get sts airflow-worker-default -o json | grep "test-cm-gitsync" | wc -l | grep 8
   # will expect 5 (three containers, base, gitsyinc-0 and gitsync-1, and two initContainer gitsync-0 and gitsync-1)
   - script: kubectl -n $NAMESPACE get sts airflow-worker-default -o json | grep "AIRFLOW_TEST_VAR" | wc -l | grep 5
   # will expect 4 (two container, gitsync-0, gitsync-1, and two initContainer gitsync-0 and gitsync-1)
