@@ -60,21 +60,27 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the Redis server.
                             type: string
                           databaseId:
                             default: 0
-                            description: TODO docs
+                            description: |-
+                              Numeric index of the Redis logical database to use. Defaults to `0`.
+
+                              Redis supports multiple logical databases within a single instance, identified by an
+                              integer index. Database `0` is the default.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
                             type: integer
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the Redis server.
                             type: string
                           port:
                             default: 6379
-                            description: TODO docs
+                            description: Port the Redis server is listening on. Defaults to `6379`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
@@ -105,23 +111,28 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
                             type: string
                           database:
-                            description: TODO docs
+                            description: Name of the database (schema) to connect to.
                             type: string
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the PostgreSQL server.
                             type: string
                           parameters:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: TODO docs
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
                             type: object
                           port:
                             default: 5432
-                            description: TODO docs
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
@@ -1361,23 +1372,28 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
                             type: string
                           database:
-                            description: TODO docs
+                            description: Name of the database (schema) to connect to.
                             type: string
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the PostgreSQL server.
                             type: string
                           parameters:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: TODO docs
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
                             type: object
                           port:
                             default: 5432
-                            description: TODO docs
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
@@ -6081,21 +6097,27 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the Redis server.
                             type: string
                           databaseId:
                             default: 0
-                            description: TODO docs
+                            description: |-
+                              Numeric index of the Redis logical database to use. Defaults to `0`.
+
+                              Redis supports multiple logical databases within a single instance, identified by an
+                              integer index. Database `0` is the default.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
                             type: integer
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the Redis server.
                             type: string
                           port:
                             default: 6379
-                            description: TODO docs
+                            description: Port the Redis server is listening on. Defaults to `6379`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
@@ -6126,23 +6148,28 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
                             type: string
                           database:
-                            description: TODO docs
+                            description: Name of the database (schema) to connect to.
                             type: string
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the PostgreSQL server.
                             type: string
                           parameters:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: TODO docs
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
                             type: object
                           port:
                             default: 5432
-                            description: TODO docs
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
@@ -7358,23 +7385,28 @@ spec:
                         description: TODO docs
                         properties:
                           credentialsSecret:
-                            description: TODO docs
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
                             type: string
                           database:
-                            description: TODO docs
+                            description: Name of the database (schema) to connect to.
                             type: string
                           host:
-                            description: TODO docs
+                            description: Hostname or IP address of the PostgreSQL server.
                             type: string
                           parameters:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: TODO docs
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
                             type: object
                           port:
                             default: 5432
-                            description: TODO docs
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
                             format: uint16
                             maximum: 65535.0
                             minimum: 0.0
