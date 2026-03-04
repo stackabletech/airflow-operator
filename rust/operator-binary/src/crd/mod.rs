@@ -1139,7 +1139,10 @@ mod tests {
 
         assert_eq!("3.1.6", &resolved_airflow_image.product_version);
 
-        assert_eq!("KubernetesExecutor", cluster.spec.executor.as_airflow_core_executor());
+        assert_eq!(
+            "KubernetesExecutor",
+            cluster.spec.executor.as_airflow_core_executor()
+        );
         assert!(cluster.spec.cluster_config.load_examples);
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
