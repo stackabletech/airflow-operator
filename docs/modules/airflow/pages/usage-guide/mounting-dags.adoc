@@ -73,7 +73,7 @@ include::example$example-airflow-gitsync-https.yaml[]
     The associated secret must have a key named `ca.crt` whose value is the PEM-encoded certificate bundle.
     If this field is set to `webPki: {}` or is omitted altogether, then no changes will be made to the gitsync command and it will default to presenting no certificate to the backend.
     Omitting this field is non-breaking behaviour and as such it does *not* set `http.sslverify` to `false` as disabling security checks should be a last resort and not something activated by default.
-    This can still be achieved by passing `--git-config: http.sslverify=false` explicitly.
+    This can still be achieved explicitly: either by setting `tls: null` or by passing `--git-config: http.sslverify=false`.
 
 .git-sync usage example: ssh
 [source,yaml]
