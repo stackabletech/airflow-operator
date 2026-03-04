@@ -248,7 +248,7 @@ pub mod versioned {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorization: Option<AirflowAuthorization>,
 
-        /// TODO docs
+        /// Configure the database where Airflow stores all it's internal metadata
         pub metadata_database: MetadataDatabaseConnection,
 
         /// The name of the Secret object containing the admin user credentials. Read the

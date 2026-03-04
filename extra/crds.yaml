@@ -48,7 +48,13 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -57,7 +63,10 @@ spec:
                         - uriSecret
                         type: object
                       redis:
-                        description: TODO docs
+                        description: |-
+                          Connection settings for a [Redis](https://redis.io/) instance.
+
+                          Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
                         properties:
                           credentialsSecret:
                             description: |-
@@ -99,7 +108,13 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -108,7 +123,7 @@ spec:
                         - uriSecret
                         type: object
                       postgresql:
-                        description: TODO docs
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
                           credentialsSecret:
                             description: |-
@@ -1352,7 +1367,7 @@ spec:
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
                   metadataDatabase:
-                    description: TODO docs
+                    description: Configure the database where Airflow stores all it's internal metadata
                     oneOf:
                     - required:
                       - postgresql
@@ -1360,7 +1375,12 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -1369,7 +1389,7 @@ spec:
                         - uriSecret
                         type: object
                       postgresql:
-                        description: TODO docs
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
                           credentialsSecret:
                             description: |-
@@ -6085,7 +6105,13 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -6094,7 +6120,10 @@ spec:
                         - uriSecret
                         type: object
                       redis:
-                        description: TODO docs
+                        description: |-
+                          Connection settings for a [Redis](https://redis.io/) instance.
+
+                          Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
                         properties:
                           credentialsSecret:
                             description: |-
@@ -6136,7 +6165,13 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -6145,7 +6180,7 @@ spec:
                         - uriSecret
                         type: object
                       postgresql:
-                        description: TODO docs
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
                           credentialsSecret:
                             description: |-
@@ -7365,7 +7400,7 @@ spec:
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
                   metadataDatabase:
-                    description: TODO docs
+                    description: Configure the database where Airflow stores all it's internal metadata
                     oneOf:
                     - required:
                       - postgresql
@@ -7373,7 +7408,12 @@ spec:
                       - generic
                     properties:
                       generic:
-                        description: TODO docs
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
                         properties:
                           uriSecret:
                             description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
@@ -7382,7 +7422,7 @@ spec:
                         - uriSecret
                         type: object
                       postgresql:
-                        description: TODO docs
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
                           credentialsSecret:
                             description: |-

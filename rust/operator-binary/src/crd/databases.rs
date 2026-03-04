@@ -13,10 +13,10 @@ use stackable_operator::{
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MetadataDatabaseConnection {
-    /// TODO docs
+    // Docs are on the struct
     Postgresql(PostgresqlConnection),
 
-    /// TODO docs
+    // Docs are on the struct
     Generic(GenericSQLAlchemyDatabaseConnection),
 }
 
@@ -32,10 +32,10 @@ impl MetadataDatabaseConnection {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CeleryResultBackendConnection {
-    /// TODO docs
+    // Docs are on the struct
     Postgresql(PostgresqlConnection),
 
-    /// TODO docs
+    // Docs are on the struct
     Generic(GenericCeleryDatabaseConnection),
 }
 
@@ -51,10 +51,10 @@ impl CeleryResultBackendConnection {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CeleryBrokerConnection {
-    /// TODO docs
+    // Docs are on the struct
     Redis(RedisConnection),
 
-    /// TODO docs
+    // Docs are on the struct
     Generic(GenericCeleryDatabaseConnection),
 }
 
