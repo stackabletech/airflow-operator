@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.106.2, strum to 0.28, and rand to 0.10 ([#752]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#741]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
 
@@ -30,6 +31,7 @@
 [#734]: https://github.com/stackabletech/airflow-operator/pull/734
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
+[#752]: https://github.com/stackabletech/airflow-operator/pull/752
 
 ## [25.11.0] - 2025-11-07
 
