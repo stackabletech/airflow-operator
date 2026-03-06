@@ -444,10 +444,8 @@ impl v1alpha2::AirflowCluster {
     pub fn get_multi_gitsync_commands(&self) -> Vec<String> {
         let mut symlinks = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            symlinks.push(
-                format!("ln -s /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/")
-                    .to_string(),
-            )
+            symlinks
+                .push(format!("ln -s /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/").to_string())
         }
         symlinks
     }
@@ -457,10 +455,8 @@ impl v1alpha2::AirflowCluster {
     pub fn get_kubernetes_executer_multi_gitsync_commands(&self) -> Vec<String> {
         let mut cp_commands = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
-            cp_commands.push(
-                format!("cp -r /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/")
-                    .to_string(),
-            );
+            cp_commands
+                .push(format!("cp -r /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/").to_string());
         }
         // init-container seems to only accept one command line.
         vec![cp_commands.join(" && ")]
