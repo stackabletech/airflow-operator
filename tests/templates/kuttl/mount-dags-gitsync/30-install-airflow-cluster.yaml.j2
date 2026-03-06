@@ -80,6 +80,7 @@ spec:
         branch: test/git-sync-0
         credentials:
           sshPrivateKeySecretName: git-sync-ssh
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
       - repo: ssh://git@github.com/stackable-airflow/dags.git
         branch: test/git-sync-1
         credentials:
@@ -90,6 +91,7 @@ spec:
         branch: test/git-sync-0
         credentials:
           basicAuthSecretName: git-credentials
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
       - repo: https://github.com/stackable-airflow/dags
         branch: test/git-sync-1
         credentials:

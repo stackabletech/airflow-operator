@@ -445,7 +445,7 @@ impl v1alpha2::AirflowCluster {
         let mut symlinks = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
             symlinks.push(
-                format!("ln -s /stackable/app/git-{i}/current {AIRFLOW_DAGS_FOLDER}/current-{i}")
+                format!("ln -s /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/")
                     .to_string(),
             )
         }
@@ -458,7 +458,7 @@ impl v1alpha2::AirflowCluster {
         let mut cp_commands = Vec::<String>::new();
         for (i, _) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
             cp_commands.push(
-                format!("cp -r /stackable/app/git-{i}/current/ {AIRFLOW_DAGS_FOLDER}/current-{i}")
+                format!("cp -r /stackable/app/git-{i} {AIRFLOW_DAGS_FOLDER}/")
                     .to_string(),
             );
         }
@@ -471,7 +471,7 @@ impl v1alpha2::AirflowCluster {
         let mut python_path = Vec::<String>::new();
         for (i, git_sync) in self.spec.cluster_config.dags_git_sync.iter().enumerate() {
             let folder = &git_sync.git_folder.display();
-            python_path.push(format!("{AIRFLOW_DAGS_FOLDER}/current-{i}/{folder}").to_string())
+            python_path.push(format!("{AIRFLOW_DAGS_FOLDER}/git-{i}/current/{folder}").to_string())
         }
         python_path
     }
