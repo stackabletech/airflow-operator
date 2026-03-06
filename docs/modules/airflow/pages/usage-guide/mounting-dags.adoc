@@ -102,4 +102,4 @@ The default mount-path for git-sync resources is `/stackable/app/allDAGs/current
           sshPrivateKeySecretName: git-sync-ssh
 ----
 
-NOTE: Using DAG's from ConfigMaps will need you to either use celeryExecutors and mount them under `/stackable/app/allDAGs/<name>` or use kubernetesExecutor and mount them somewhere else and change the PYTHONPATH as well as the `AIRFLOW\__CORE__DAGS_FOLDER` accordingly.
+NOTE: Using DAGs from ConfigMaps will require you to either use celeryExecutors and mount them under `/stackable/app/allDAGs/<name>` or use the kubernetesExecutor and mount them somewhere else, changing the PYTHONPATH (if using submodules) and `AIRFLOW\__CORE__DAGS_FOLDER` accordingly.
