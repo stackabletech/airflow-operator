@@ -85,6 +85,20 @@ fn create_airflow_config(
     log_dir: &str,
     resolved_product_image: &ResolvedProductImage,
 ) -> String {
+    if resolved_product_image.product_version.starts_with("2.")
+        || resolved_product_image.product_version.starts_with("3.0.")
+    {
+        create_airflow_stdlib_config(log_config, log_dir, resolved_product_image)
+    } else {
+        create_airflow_structlog_config(log_config, log_dir)
+    }
+}
+
+fn create_airflow_stdlib_config(
+    log_config: &AutomaticContainerLogConfig,
+    log_dir: &str,
+    resolved_product_image: &ResolvedProductImage,
+) -> String {
     let loggers_config = log_config
         .loggers
         .iter()
@@ -174,5 +188,92 @@ LOGGING_CONFIG['root'] = {{
             .and_then(|file| file.level)
             .unwrap_or_default()
             .to_python_expression(),
+    )
+}
+
+fn create_airflow_structlog_config(
+    log_config: &AutomaticContainerLogConfig,
+    log_dir: &str,
+) -> String {
+    let loggers_config = log_config
+        .loggers
+        .iter()
+        .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
+        .fold(String::new(), |mut output, (name, config)| {
+            let _ = writeln!(
+                output,
+                "
+LOGGING_CONFIG['loggers'].setdefault('{name}', {{ 'propagate': True }})
+LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
+",
+                level = config.level.to_python_expression()
+            );
+            output
+        });
+
+    format!(
+        "\
+import logging
+import os
+from airflow.config_templates import airflow_local_settings
+
+os.makedirs('{log_dir}', exist_ok=True)
+
+LOGGING_CONFIG = {{
+    'filters': {{
+        'mask_secrets_core': {{
+            '()': 'airflow._shared.secrets_masker._secrets_masker',
+        }}
+    }},
+    'formatters': {{
+        'airflow': {{
+            'format': '%(asctime)s logLevel=%(levelname)s logger=%(name)s - %(message)s',
+            'class': 'airflow.utils.log.timezone_aware.TimezoneAware',
+        }},
+        'json': {{
+            '()': 'airflow.utils.log.json_formatter.JSONFormatter',
+            'json_fields': ['asctime', 'levelname', 'message', 'name']
+        }}
+    }},
+    'handlers': {{
+        'task': {{
+            'class': 'airflow.utils.log.file_task_handler.FileTaskHandler',
+            'formatter': 'airflow',
+            'base_log_folder': '{log_dir}',
+            'filters': ['mask_secrets_core']
+        }},
+        'file': {{
+            'class': 'logging.handlers.RotatingFileHandler',
+            'level': {file_log_level},
+            'formatter': 'json',
+            'filename': '{log_dir}/{LOG_FILE}',
+            'maxBytes': 1048576,
+            'backupCount': 1
+        }}
+    }},
+    'loggers': {{
+        'airflow.task': {{
+            'handlers': ['task'],
+            'level': logging.INFO,
+            'propagate': True,
+            'filters': ['mask_secrets_core']
+        }}
+    }},
+    'root': {{
+        'handlers': ['default', 'file'],
+        'level': {root_log_level},
+        'propagate': True
+    }}
+}}
+{loggers_config}
+REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
+",
+        file_log_level = log_config
+            .file
+            .as_ref()
+            .and_then(|file| file.level)
+            .unwrap_or_default()
+            .to_python_expression(),
+        root_log_level = log_config.root_log_level().to_python_expression(),
     )
 }
