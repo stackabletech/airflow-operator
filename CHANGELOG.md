@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add support for airflow 3.1.6 ([#742]).
+- Add support for airflow 3.1.6 ([#742, #757]).
 - Add operator versioning ([#725]).
   - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
@@ -30,6 +30,7 @@
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
 [#752]: https://github.com/stackabletech/airflow-operator/pull/752
+[#757]: https://github.com/stackabletech/airflow-operator/pull/757
 
 ## [25.11.0] - 2025-11-07
 
