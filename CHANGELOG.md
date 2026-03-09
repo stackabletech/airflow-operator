@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- Fix "404 page not found" error for the initial object list ([#756]).
 - Default `API_WORKERS` to 1 (instead of letting Airflow default to 4) to prevent crashloop and update/correct docs to reflect this  ([#727]).
 - Prevent unnecessary Pod restarts when initially creating an AirflowCluster.
   This is achieved by applying the StatefulSet after all ConfigMaps and Secrets that it mounts ([#734]).
@@ -30,6 +31,7 @@
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
 [#752]: https://github.com/stackabletech/airflow-operator/pull/752
+[#756]: https://github.com/stackabletech/airflow-operator/pull/756
 
 ## [25.11.0] - 2025-11-07
 

@@ -192,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .map(anyhow::Ok);
 
-            let webhook_server = create_webhook_server(
+            let (webhook_server, initial_reconcile_rx) = create_webhook_server(
                 &operator_environment,
                 maintenance.disable_crd_maintenance,
                 client.as_kube_client(),
@@ -203,7 +203,12 @@ async fn main() -> anyhow::Result<()> {
                 .run(sigterm_watcher.handle())
                 .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
-            futures::try_join!(airflow_controller, webhook_server, eos_checker)?;
+            let delayed_airflow_controller = async {
+                let _ = initial_reconcile_rx.await;
+                airflow_controller.await
+            };
+
+            futures::try_join!(delayed_airflow_controller, webhook_server, eos_checker)?;
         }
     }
 
