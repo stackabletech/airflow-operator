@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add support for airflow 3.1.6 ([#742, #757]).
+- Add support for airflow 3.1.6 ([#742], [#757]).
 - Add operator versioning ([#725]).
   - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
