@@ -17,6 +17,9 @@ then
   exit 1
 fi
 
+echo "Waiting for node(s) to be ready..."
+kubectl wait node --all --for=condition=Ready --timeout=120s
+
 echo "Adding bitnami Helm Chart repository and dependencies (Postgresql and Redis)"
 # tag::helm-add-bitnami-pgs[]
 helm install airflow-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
@@ -70,6 +73,10 @@ echo "Need to give 'helm' or 'stackablectl' as an argument for which installatio
 exit 1
 ;;
 esac
+
+# As of SDP 26.3 CRDs are managed by the operator not helm, so there should be an initial delay
+# to allow the CRDs to be detected
+sleep 10
 
 echo "Creating credentials secret"
 # tag::apply-airflow-credentials[]
