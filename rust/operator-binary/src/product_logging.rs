@@ -236,11 +236,8 @@ LOGGING_CONFIG = {{
         }}
     }},
     'handlers': {{
-        'task': {{
-            'class': 'airflow.utils.log.file_task_handler.FileTaskHandler',
-            'formatter': 'airflow',
-            'base_log_folder': '{log_dir}',
-            'filters': ['mask_secrets_core']
+        'default': {{
+            'level': {console_log_level}
         }},
         'file': {{
             'class': 'logging.handlers.RotatingFileHandler',
@@ -249,6 +246,12 @@ LOGGING_CONFIG = {{
             'filename': '{log_dir}/{LOG_FILE}',
             'maxBytes': 1048576,
             'backupCount': 1
+        }},
+        'task': {{
+            'class': 'airflow.utils.log.file_task_handler.FileTaskHandler',
+            'formatter': 'airflow',
+            'base_log_folder': '{log_dir}',
+            'filters': ['mask_secrets_core']
         }}
     }},
     'loggers': {{
@@ -268,6 +271,12 @@ LOGGING_CONFIG = {{
 {loggers_config}
 REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
 ",
+        console_log_level = log_config
+            .console
+            .as_ref()
+            .and_then(|console| console.level)
+            .unwrap_or_default()
+            .to_python_expression(),
         file_log_level = log_config
             .file
             .as_ref()
