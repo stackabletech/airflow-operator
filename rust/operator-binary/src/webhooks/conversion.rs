@@ -7,7 +7,6 @@ use stackable_operator::{
         webhooks::{ConversionWebhook, ConversionWebhookOptions},
     },
 };
-use tokio::sync::oneshot;
 
 use crate::crd::{AirflowCluster, AirflowClusterVersion, FIELD_MANAGER};
 
@@ -27,7 +26,7 @@ pub async fn create_webhook_server(
     operator_environment: &OperatorEnvironmentOptions,
     disable_crd_maintenance: bool,
     client: Client,
-) -> Result<(WebhookServer, oneshot::Receiver<()>), Error> {
+) -> Result<WebhookServer, Error> {
     let crds_and_handlers = vec![(
         AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2).context(MergeCrdSnafu)?,
         AirflowCluster::try_convert,
@@ -38,7 +37,7 @@ pub async fn create_webhook_server(
         field_manager: FIELD_MANAGER.to_owned(),
     };
 
-    let (conversion_webhook, initial_reconcile_rx) =
+    let (conversion_webhook, _initial_reconcile_rx) =
         ConversionWebhook::new(crds_and_handlers, client, conversion_webhook_options);
 
     let webhook_server_options = WebhookServerOptions {
@@ -52,5 +51,5 @@ pub async fn create_webhook_server(
             .await
             .context(CreateWebhookSnafu)?;
 
-    Ok((webhook_server, initial_reconcile_rx))
+    Ok(webhook_server)
 }
