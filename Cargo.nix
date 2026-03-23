@@ -3695,6 +3695,14 @@ rec {
         ];
 
       };
+      "humantime" = rec {
+        crateName = "humantime";
+        version = "2.3.0";
+        edition = "2021";
+        sha256 = "092lpipp32ayz4kyyn4k3vz59j9blng36wprm5by0g2ykqr14nqk";
+        features = {
+        };
+      };
       "hyper" = rec {
         crateName = "hyper";
         version = "1.8.1";
@@ -5052,7 +5060,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "k8s_version";
@@ -8657,9 +8665,9 @@ rec {
       };
       "rustls-webpki" = rec {
         crateName = "rustls-webpki";
-        version = "0.103.9";
+        version = "0.103.10";
         edition = "2021";
-        sha256 = "0lwg1nnyv7pp2lfwwjhy81bxm233am99jnsp3iymdhd6k8827pyp";
+        sha256 = "1vyipcdbazvhl6kyi1m8n0bg98sk25iv12bby2xcly653awb4cyz";
         libName = "webpki";
         dependencies = [
           {
@@ -9828,7 +9836,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "telemetry" "versioned" "webhook" ];
+            features = [ "crds" "webhook" ];
           }
           {
             name = "strum";
@@ -9871,7 +9879,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_certs";
@@ -9969,12 +9977,12 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.106.2";
+        version = "0.108.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_operator";
@@ -10082,12 +10090,11 @@ rec {
           {
             name = "stackable-shared";
             packageId = "stackable-shared";
-            features = [ "time" "jiff" ];
+            features = [ "jiff" ];
           }
           {
             name = "stackable-telemetry";
             packageId = "stackable-telemetry";
-            optional = true;
             features = [ "clap" ];
           }
           {
@@ -10131,14 +10138,14 @@ rec {
         ];
         features = {
           "certs" = [ "dep:stackable-certs" ];
-          "default" = [ "telemetry" "versioned" "clap" ];
-          "full" = [ "certs" "telemetry" "versioned" "time" "webhook" "clap" ];
-          "telemetry" = [ "dep:stackable-telemetry" ];
+          "crds" = [ "dep:stackable-versioned" ];
+          "default" = [ "crds" ];
+          "full" = [ "crds" "certs" "time" "webhook" "kube-ws" ];
+          "kube-ws" = [ "kube/ws" ];
           "time" = [ "stackable-shared/time" ];
-          "versioned" = [ "dep:stackable-versioned" ];
           "webhook" = [ "dep:stackable-webhook" ];
         };
-        resolvedDefaultFeatures = [ "clap" "default" "telemetry" "versioned" "webhook" ];
+        resolvedDefaultFeatures = [ "crds" "default" "webhook" ];
       };
       "stackable-operator-derive" = rec {
         crateName = "stackable-operator-derive";
@@ -10147,7 +10154,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         procMacro = true;
@@ -10182,7 +10189,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_shared";
@@ -10258,12 +10265,12 @@ rec {
       };
       "stackable-telemetry" = rec {
         crateName = "stackable-telemetry";
-        version = "0.6.1";
+        version = "0.6.2";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_telemetry";
@@ -10373,7 +10380,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_versioned";
@@ -10417,7 +10424,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         procMacro = true;
@@ -10485,7 +10492,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "8da376ed45d91adb88aeb7e970ef8b3e57e1df15";
+          rev = "936b86b03c28ef1bca6d26c34d1353afafe0c59b";
           sha256 = "1pbghzc5vg2mn6ggvbr7s2h80dr1ydbmph7n29g9f4kd1d7pa4ds";
         };
         libName = "stackable_webhook";
@@ -10509,6 +10516,10 @@ rec {
           {
             name = "futures-util";
             packageId = "futures-util";
+          }
+          {
+            name = "humantime";
+            packageId = "humantime";
           }
           {
             name = "hyper";

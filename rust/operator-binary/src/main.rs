@@ -17,7 +17,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, Service},
     },
     kube::{
-        ResourceExt,
+        CustomResourceExt, ResourceExt,
         core::DeserializeGuard,
         runtime::{
             Controller,
@@ -29,12 +29,12 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    utils::signal::SignalWatcher,
+    utils::signal::{self, SignalWatcher},
 };
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
-    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha2},
+    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha1, v1alpha2},
     webhooks::conversion::create_webhook_server,
 };
 
@@ -203,7 +203,13 @@ async fn main() -> anyhow::Result<()> {
                 .run(sigterm_watcher.handle())
                 .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
-            futures::try_join!(airflow_controller, webhook_server, eos_checker)?;
+            let delayed_airflow_controller = async {
+                signal::crd_established(&client, v1alpha1::AirflowCluster::crd_name(), None)
+                    .await?;
+                airflow_controller.await
+            };
+
+            futures::try_join!(delayed_airflow_controller, webhook_server, eos_checker)?;
         }
     }
 

@@ -46,7 +46,10 @@ pub async fn create_webhook_server(
         webhook_service_name: operator_environment.operator_service_name.to_owned(),
     };
 
-    WebhookServer::new(vec![Box::new(conversion_webhook)], webhook_server_options)
-        .await
-        .context(CreateWebhookSnafu)
+    let webhook_server =
+        WebhookServer::new(vec![Box::new(conversion_webhook)], webhook_server_options)
+            .await
+            .context(CreateWebhookSnafu)?;
+
+    Ok(webhook_server)
 }
