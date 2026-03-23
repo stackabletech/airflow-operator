@@ -235,6 +235,14 @@ fn append_oidc_config(
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
 
+                let client_auth_method = serde_json::to_value(
+                    client_options.client_authentication_method,
+                )
+                .expect("ClientAuthenticationMethod should serialize to JSON");
+                let client_auth_method = client_auth_method
+                    .as_str()
+                    .expect("ClientAuthenticationMethod should serialize to a string");
+
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -248,6 +256,7 @@ fn append_oidc_config(
                           }},
                           'api_base_url': '{api_base_url}',
                           'server_metadata_url': '{well_known_config_url}',
+                          'token_endpoint_auth_method': '{client_auth_method}',
                         }},
                       }}",
                     scopes = scopes.join(" "),
@@ -460,6 +469,7 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
+                        client_authentication_method: Default::default(),
                         product_specific_fields: (),
                     },
                 },
@@ -468,6 +478,7 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
+                        client_authentication_method: Default::default(),
                         product_specific_fields: (),
                     },
                 },
@@ -509,6 +520,7 @@ mod tests {
                   }},
                   'api_base_url': 'https://my.keycloak1.server:12345/realms/sdp/protocol/',
                   'server_metadata_url': 'https://my.keycloak1.server:12345/realms/sdp/.well-known/openid-configuration',
+                  'token_endpoint_auth_method': 'client_secret_basic',
                 }},
               }},
               {{ 'name': 'keycloak',
@@ -522,6 +534,7 @@ mod tests {
                   }},
                   'api_base_url': 'http://my.keycloak2.server/protocol/',
                   'server_metadata_url': 'http://my.keycloak2.server/.well-known/openid-configuration',
+                  'token_endpoint_auth_method': 'client_secret_basic',
                 }},
               }}
               ]
