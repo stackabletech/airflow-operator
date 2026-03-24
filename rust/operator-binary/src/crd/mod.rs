@@ -753,11 +753,7 @@ impl AirflowRole {
     }
 
     pub fn roles() -> Vec<String> {
-        let mut roles = vec![];
-        for role in Self::iter() {
-            roles.push(role.to_string())
-        }
-        roles
+        Self::iter().map(|r| r.to_string()).collect()
     }
 
     pub fn listener_class_name(&self, airflow: &v1alpha2::AirflowCluster) -> Option<String> {
