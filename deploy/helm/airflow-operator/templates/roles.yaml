@@ -6,6 +6,7 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # For automatic cluster domain detection
   - apiGroups:
       - ""
     resources:
@@ -20,14 +21,22 @@ rules:
       - nodes/proxy
     verbs:
       - get
+  # Manage core workload resources created per AirflowCluster.
+  # All resources are applied via Server-Side Apply (create + patch) and tracked for
+  # orphan cleanup (list + delete). Resources watched by the controller also need watch.
+  # - configmaps: role group configuration (webserver_config.py, log config, vector config)
+  #     and KubernetesExecutor pod template; also watched for OPA discovery ConfigMap changes
+  # - secrets: auto-generated internal secret, JWT secret, and Fernet key (get for existence
+  #     check, create + patch for initial creation via SSA, list + delete for orphan cleanup)
+  # - services: headless service (StatefulSet DNS) and metrics service (Prometheus) per role
+  #     group; also watched via .owns() to re-reconcile on external changes
+  # - serviceaccounts: per-cluster ServiceAccount for workload pods
   - apiGroups:
       - ""
     resources:
-      - pods
       - configmaps
       - secrets
       - services
-      - endpoints
       - serviceaccounts
     verbs:
       - create
@@ -35,8 +44,9 @@ rules:
       - get
       - list
       - patch
-      - update
       - watch
+  # Per-cluster RoleBinding binding the workload ServiceAccount to the airflow-clusterrole.
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -47,32 +57,22 @@ rules:
       - get
       - list
       - patch
-      - update
-      - watch
+  # StatefulSets for each role group (webserver, scheduler, worker, triggerer, dag-processor).
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
+  # Also watched via .owns() to re-reconcile on external changes.
   - apiGroups:
       - apps
     resources:
       - statefulsets
     verbs:
-      - get
-      - create
-      - delete
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
       - create
       - delete
       - get
       - list
       - patch
-      - update
       - watch
+  # PodDisruptionBudgets per role to protect against simultaneous pod evictions.
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
       - policy
     resources:
@@ -83,8 +83,6 @@ rules:
       - get
       - list
       - patch
-      - update
-      - watch
   - apiGroups:
       - apiextensions.k8s.io
     resources:
@@ -100,17 +98,20 @@ rules:
       - list
       - watch
       {{- end }}
+  # Listener for the Webserver role to expose HTTP access via a configurable ListenerClass.
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
       - listeners.stackable.tech
     resources:
       - listeners
     verbs:
-      - get
-      - list
-      - watch
-      - patch
       - create
       - delete
+      - get
+      - list
+      - patch
+  # Primary reconciliation target: the controller watches AirflowCluster resources (list + watch)
+  # and reads them during reconciliation (get).
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
@@ -118,14 +119,17 @@ rules:
     verbs:
       - get
       - list
-      - patch
       - watch
+  # Write reconciliation status conditions back to AirflowCluster objects
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
+  # Resolve LDAP and OIDC authentication provider configuration.
+  # Watched (list + watch) to re-reconcile when an AuthenticationClass changes,
+  # and fetched individually (get) during reconciliation via resolve_class().
   - apiGroups:
       - authentication.stackable.tech
     resources:
@@ -134,6 +138,7 @@ rules:
       - get
       - list
       - watch
+  # Publish Kubernetes events for reconciliation activity
   - apiGroups:
       - events.k8s.io
     resources:
@@ -141,6 +146,8 @@ rules:
     verbs:
       - create
       - patch
+  # Allows the operator to create RoleBindings that reference the airflow-clusterrole
+  # (the product ClusterRole bound to workload pods, defined below)
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -150,6 +157,8 @@ rules:
     resourceNames:
       - {{ include "operator.name" . }}-clusterrole
 ---
+# Product ClusterRole: bound (via per-cluster RoleBinding) to the ServiceAccount that Airflow
+# workload pods (webserver, scheduler, worker, triggerer, dag-processor) run as.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -157,6 +166,7 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # Airflow pods read their own configuration, credentials, and service account token
   - apiGroups:
       - ""
     resources:
@@ -165,6 +175,7 @@ rules:
       - serviceaccounts
     verbs:
       - get
+  # KubernetesExecutor: the Airflow scheduler creates, monitors, and cleans up task pods directly
   - apiGroups:
       - ""
     resources:
@@ -177,12 +188,14 @@ rules:
       - patch
       - update
       - watch
+  # KubernetesExecutor: the scheduler reads task pod logs for display in the Airflow UI
   - apiGroups:
       - ""
     resources:
       - pods/log
     verbs:
       - get
+  # Airflow components publish Kubernetes events
   - apiGroups:
       - events.k8s.io
     resources:
@@ -191,6 +204,7 @@ rules:
       - create
       - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
+  # On OpenShift: allows workload pods to use the nonroot-v2 SecurityContextConstraint
   - apiGroups:
       - security.openshift.io
     resources:
