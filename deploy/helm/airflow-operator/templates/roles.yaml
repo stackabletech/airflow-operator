@@ -23,14 +23,7 @@ rules:
       - get
   # Manage core workload resources created per AirflowCluster.
   # All resources are applied via Server-Side Apply (create + patch) and tracked for
-  # orphan cleanup (list + delete). Resources watched by the controller also need watch.
-  # - configmaps: role group configuration (webserver_config.py, log config, vector config)
-  #     and KubernetesExecutor pod template; also watched for OPA discovery ConfigMap changes
-  # - secrets: auto-generated internal secret, JWT secret, and Fernet key (get for existence
-  #     check, create + patch for initial creation via SSA, list + delete for orphan cleanup)
-  # - services: headless service (StatefulSet DNS) and metrics service (Prometheus) per role
-  #     group; also watched via .owns() to re-reconcile on external changes
-  # - serviceaccounts: per-cluster ServiceAccount for workload pods
+  # orphan cleanup (list + delete).
   - apiGroups:
       - ""
     resources:
@@ -59,7 +52,6 @@ rules:
       - patch
   # StatefulSets for each role group (webserver, scheduler, worker, triggerer, dag-processor).
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
-  # Also watched via .owns() to re-reconcile on external changes.
   - apiGroups:
       - apps
     resources:
