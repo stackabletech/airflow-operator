@@ -50,6 +50,16 @@ rules:
       - get
       - list
       - patch
+  # Allows the operator to create RoleBindings that reference the airflow-clusterrole
+  # (the product ClusterRole bound to workload pods, defined below)
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+    verbs:
+      - bind
+    resourceNames:
+      - {{ include "operator.name" . }}-clusterrole
   # StatefulSets for each role group (webserver, scheduler, worker, triggerer, dag-processor).
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
@@ -139,16 +149,6 @@ rules:
     verbs:
       - create
       - patch
-  # Allows the operator to create RoleBindings that reference the airflow-clusterrole
-  # (the product ClusterRole bound to workload pods, defined below)
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - clusterroles
-    verbs:
-      - bind
-    resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
 ---
 # Product ClusterRole: bound (via per-cluster RoleBinding) to the ServiceAccount that Airflow
 # workload pods (webserver, scheduler, worker, triggerer, dag-processor) run as.
