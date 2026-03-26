@@ -38,7 +38,7 @@ rules:
       - list
       - patch
       - watch
-  # Per-cluster RoleBinding binding the workload ServiceAccount to the airflow-clusterrole.
+  # Per-cluster RoleBinding for the workload ServiceAccount to the airflow-clusterrole.
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
       - rbac.authorization.k8s.io
@@ -120,7 +120,7 @@ rules:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
-  # Resolve LDAP and OIDC authentication provider configuration.
+  # Resolve TLS and authentication provider configuration.
   # Watched (list + watch) to re-reconcile when an AuthenticationClass changes,
   # and fetched individually (get) during reconciliation via resolve_class().
   - apiGroups:
