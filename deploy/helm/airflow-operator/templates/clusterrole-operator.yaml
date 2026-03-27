@@ -10,14 +10,6 @@ rules:
   - apiGroups:
       - ""
     resources:
-      - nodes
-    verbs:
-      - list
-      - watch
-  # For automatic cluster domain detection
-  - apiGroups:
-      - ""
-    resources:
       - nodes/proxy
     verbs:
       - get
