@@ -1,5 +1,5 @@
 ---
-# Product ClusterRole: bound (via per-cluster RoleBinding) to the ServiceAccount that Airflow
+# Product ClusterRole: bound (via per AirflowCluster RoleBinding) to the ServiceAccount that Airflow
 # workload pods (webserver, scheduler, worker, triggerer, dag-processor) run as.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

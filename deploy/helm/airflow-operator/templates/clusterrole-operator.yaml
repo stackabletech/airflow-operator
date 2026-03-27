@@ -38,7 +38,7 @@ rules:
       - list
       - patch
       - watch
-  # Per-cluster RoleBinding for the workload ServiceAccount to the airflow-clusterrole.
+  # Per AirflowCluster RoleBinding for the workload ServiceAccount to the airflow-clusterrole.
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
       - rbac.authorization.k8s.io
