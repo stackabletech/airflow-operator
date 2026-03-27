@@ -935,7 +935,6 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
-    pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
@@ -959,15 +958,10 @@ impl Configuration for AirflowConfigFragment {
 
     fn compute_env(
         &self,
-        cluster: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut env: BTreeMap<String, Option<String>> = BTreeMap::new();
-        env.insert(
-            AirflowConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.cluster_config.credentials_secret.clone()),
-        );
-        Ok(env)
+        Ok(BTreeMap::new())
     }
 
     fn compute_cli(
