@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Helm deployed RBAC permissions documented, with unnecessary permissions removed ([#767]).
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
 
 - [#767]: https://github.com/stackabletech/airflow-operator/pull/767
 
