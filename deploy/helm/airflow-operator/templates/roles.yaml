@@ -159,15 +159,6 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # Airflow pods read their own configuration, credentials, and service account token
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - secrets
-      - serviceaccounts
-    verbs:
-      - get
   # KubernetesExecutor: the Airflow scheduler creates, monitors, and cleans up task pods directly
   - apiGroups:
       - ""
