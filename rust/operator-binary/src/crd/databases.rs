@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
-    databases::{
+    database_connections::{
         databases::{postgresql::PostgresqlConnection, redis::RedisConnection},
         drivers::{
             celery::{CeleryDatabaseConnection, GenericCeleryDatabaseConnection},
-            sqlalchemy::{GenericSQLAlchemyDatabaseConnection, SQLAlchemyDatabaseConnection},
+            sqlalchemy::{GenericSqlAlchemyDatabaseConnection, SqlAlchemyDatabaseConnection},
         },
     },
     schemars::{self, JsonSchema},
@@ -17,11 +17,11 @@ pub enum MetadataDatabaseConnection {
     Postgresql(PostgresqlConnection),
 
     // Docs are on the struct
-    Generic(GenericSQLAlchemyDatabaseConnection),
+    Generic(GenericSqlAlchemyDatabaseConnection),
 }
 
 impl MetadataDatabaseConnection {
-    pub fn as_sqlalchemy_database_connection(&self) -> &dyn SQLAlchemyDatabaseConnection {
+    pub fn as_sqlalchemy_database_connection(&self) -> &dyn SqlAlchemyDatabaseConnection {
         match self {
             Self::Postgresql(p) => p,
             Self::Generic(g) => g,

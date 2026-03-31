@@ -8,8 +8,8 @@ use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
-    databases::drivers::{
-        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SQLAlchemyDatabaseConnectionDetails,
+    database_connections::drivers::{
+        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
     },
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
@@ -83,7 +83,7 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     celery_database_connection_details: &Option<(
         CeleryDatabaseConnectionDetails,
         CeleryDatabaseConnectionDetails,
@@ -377,7 +377,7 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {

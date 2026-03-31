@@ -38,11 +38,11 @@ use stackable_operator::{
         authentication::{core as auth_core, ldap},
         git_sync, listener,
     },
-    databases::{
+    database_connections::{
         TemplatingMechanism,
         drivers::{
             celery::CeleryDatabaseConnectionDetails,
-            sqlalchemy::SQLAlchemyDatabaseConnectionDetails,
+            sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
         },
     },
     k8s_openapi::{
@@ -724,7 +724,7 @@ pub async fn reconcile_airflow(
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
-    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -973,7 +973,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
-    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     celery_database_connection_details: &Option<(
         CeleryDatabaseConnectionDetails,
         CeleryDatabaseConnectionDetails,
@@ -1305,7 +1305,7 @@ fn build_executor_template_config_map(
     airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    metadata_database_connection_details: &SQLAlchemyDatabaseConnectionDetails,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
