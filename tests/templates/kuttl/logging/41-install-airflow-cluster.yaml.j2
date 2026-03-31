@@ -62,6 +62,13 @@ data:
         'filename': '/stackable/log/airflow/airflow.py.json',
     }
 
+    LOGGING_CONFIG['loggers']['airflow'] = {
+        'level': logging.DEBUG,
+    }
+    LOGGING_CONFIG['loggers']['sqlalchemy.engine'] = {
+        'level': logging.DEBUG,
+    }
+
     LOGGING_CONFIG['root'] = {
         'level': logging.DEBUG,
         'handlers': ['file'],
@@ -185,6 +192,10 @@ spec:
                   level: DEBUG
                 loggers:
                   ROOT:
+                    level: DEBUG
+                  airflow:
+                    level: DEBUG
+                  sqlalchemy.engine:
                     level: DEBUG
               git-sync:
                 console:

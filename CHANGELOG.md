@@ -2,9 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
+
+- [#767]: https://github.com/stackabletech/airflow-operator/pull/767
+
+## [26.3.0] - 2026-03-16
+
+## [26.3.0-rc1] - 2026-03-16
+
 ### Added
 
-- Add support for airflow 3.1.6 ([#742]).
+- Add support for airflow 3.1.6 ([#742], [#757]).
 - Add operator versioning ([#725]).
   - GitSync considered for v1alpha1 and v1alpha2
 - Support objectOverrides using `.spec.objectOverrides`.
@@ -12,12 +22,13 @@
 
 ### Changed
 
-- Bump stackable-operator to 0.106.2, strum to 0.28, and rand to 0.10 ([#752]).
+- Bump stackable-operator to 0.108.0, strum to 0.28, and rand to 0.10 ([#752], [#759]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#741]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#733]).
 
 ### Fixed
 
+- Fix "404 page not found" error for the initial object list ([#756], [#759]).
 - Default `API_WORKERS` to 1 (instead of letting Airflow default to 4) to prevent crashloop and update/correct docs to reflect this  ([#727]).
 - Prevent unnecessary Pod restarts when initially creating an AirflowCluster.
   This is achieved by applying the StatefulSet after all ConfigMaps and Secrets that it mounts ([#734]).
@@ -30,6 +41,9 @@
 [#741]: https://github.com/stackabletech/airflow-operator/pull/741
 [#742]: https://github.com/stackabletech/airflow-operator/pull/742
 [#752]: https://github.com/stackabletech/airflow-operator/pull/752
+[#756]: https://github.com/stackabletech/airflow-operator/pull/756
+[#757]: https://github.com/stackabletech/airflow-operator/pull/757
+[#759]: https://github.com/stackabletech/airflow-operator/pull/759
 
 ## [25.11.0] - 2025-11-07
 
