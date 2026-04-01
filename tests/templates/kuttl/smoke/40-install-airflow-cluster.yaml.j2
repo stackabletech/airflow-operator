@@ -7,7 +7,7 @@ timeout: 480
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-airflow-credentials
+  name: airflow-admin-credentials
 type: Opaque
 stringData:
   adminUser.username: airflow
@@ -15,10 +15,23 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: airflow@airflow.com
   adminUser.password: airflow
-  connections.sqlalchemyDatabaseUri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-postgresql-credentials
+stringData:
+  username: airflow
+  password: airflow
 {% if test_scenario['values']['executor'] == 'celery' %}
-  connections.celeryResultBackend: db+postgresql://airflow:airflow@airflow-postgresql/airflow
-  connections.celeryBrokerUrl: redis://:redis@airflow-redis-master:6379/0
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-redis-credentials
+stringData:
+  username: ""
+  password: redis
 {% endif %}
 ---
 apiVersion: airflow.stackable.tech/v1alpha1
@@ -39,7 +52,12 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
     loadExamples: true
-    credentialsSecret: test-airflow-credentials
+    credentialsSecret: airflow-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecret: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -62,6 +80,15 @@ spec:
               COMMON_HEADER_VAR = "group-value"
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
+    celeryResultBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecret: airflow-postgresql-credentials
+    celeryBroker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecret: airflow-redis-credentials
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

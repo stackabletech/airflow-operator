@@ -472,7 +472,8 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
-                            product_specific_fields: ()
+                            product_specific_fields: (),
+                            client_authentication_method: todo!("Will be added in another PR"),
                         }
                     },
                     AirflowAuthenticationClassResolved::Oidc {
@@ -488,7 +489,8 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client2".into(),
                             extra_scopes: Vec::new(),
-                            product_specific_fields: ()
+                            product_specific_fields: (),
+                            client_authentication_method: todo!("Will be added in another PR"),
                         }
                     }
                 ],

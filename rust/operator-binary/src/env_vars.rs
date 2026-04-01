@@ -8,6 +8,9 @@ use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
+    database_connections::drivers::{
+        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+    },
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
@@ -80,11 +83,15 @@ pub fn build_airflow_statefulset_envs(
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
+    celery_database_connection_details: &Option<(
+        CeleryDatabaseConnectionDetails,
+        CeleryDatabaseConnectionDetails,
+    )>,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
     let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
     env.extend(static_envs(git_sync_resources));
@@ -126,31 +133,29 @@ pub fn build_airflow_statefulset_envs(
 
     env.insert(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-        env_var_from_secret(
-            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        ),
+        EnvVar {
+            name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
+            value: Some(metadata_database_connection_details.uri_template.clone()),
+            ..Default::default()
+        },
     );
-
-    // Redis is only needed when celery executors are used
-    // see https://github.com/stackabletech/airflow-operator/issues/424 for details
-    if matches!(executor, AirflowExecutor::CeleryExecutor { .. }) {
+    // Only needed when celery executors are used
+    if let Some((celery_result_backend, celery_broker)) = celery_database_connection_details {
         env.insert(
             AIRFLOW_CELERY_RESULT_BACKEND.into(),
-            env_var_from_secret(
-                AIRFLOW_CELERY_RESULT_BACKEND,
-                secret,
-                "connections.celeryResultBackend",
-            ),
+            EnvVar {
+                name: AIRFLOW_CELERY_RESULT_BACKEND.into(),
+                value: Some(celery_result_backend.uri_template.clone()),
+                ..Default::default()
+            },
         );
         env.insert(
             AIRFLOW_CELERY_BROKER_URL.into(),
-            env_var_from_secret(
-                AIRFLOW_CELERY_BROKER_URL,
-                secret,
-                "connections.celeryBrokerUrl",
-            ),
+            EnvVar {
+                name: AIRFLOW_CELERY_BROKER_URL.into(),
+                value: Some(celery_broker.uri_template.clone()),
+                ..Default::default()
+            },
         );
     }
 
@@ -199,12 +204,12 @@ pub fn build_airflow_statefulset_envs(
         AIRFLOW_CORE_EXECUTOR.into(),
         EnvVar {
             name: AIRFLOW_CORE_EXECUTOR.into(),
-            value: Some(executor.to_string()),
+            value: Some(executor.as_airflow_core_executor().to_owned()),
             ..Default::default()
         },
     );
 
-    if let AirflowExecutor::KubernetesExecutor { .. } = executor {
+    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         env.insert(
             AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE.into(),
             EnvVar {
@@ -372,19 +377,19 @@ pub fn build_airflow_template_envs(
     airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
+    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-    let secret = airflow.spec.cluster_config.credentials_secret.as_str();
 
     env.insert(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-        env_var_from_secret(
-            AIRFLOW_DATABASE_SQL_ALCHEMY_CONN,
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        ),
+        EnvVar {
+            name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
+            value: Some(metadata_database_connection_details.uri_template.clone()),
+            ..Default::default()
+        },
     );
 
     env.insert(

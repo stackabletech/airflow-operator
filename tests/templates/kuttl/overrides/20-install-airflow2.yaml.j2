@@ -15,7 +15,12 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    credentialsSecret: airflow-credentials
+    credentialsSecret: airflow-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecret: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable

@@ -461,6 +461,7 @@ mod tests {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
                         product_specific_fields: (),
+                        client_authentication_method: todo!("Will be added in another PR"),
                     },
                 },
                 AirflowAuthenticationClassResolved::Oidc {
@@ -469,6 +470,7 @@ mod tests {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
                         product_specific_fields: (),
+                        client_authentication_method: todo!("Will be added in another PR"),
                     },
                 },
             ],

@@ -39,6 +39,125 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBroker:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        description: |-
+                          Connection settings for a [Redis](https://redis.io/) instance.
+
+                          Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the Redis server.
+                            type: string
+                          databaseId:
+                            default: 0
+                            description: |-
+                              Numeric index of the Redis logical database to use. Defaults to `0`.
+
+                              Redis supports multiple logical databases within a single instance, identified by an
+                              integer index. Database `0` is the default.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                          host:
+                            description: Hostname or IP address of the Redis server.
+                            type: string
+                          port:
+                            default: 6379
+                            description: Port the Redis server is listening on. Defaults to `6379`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -414,7 +533,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -926,7 +1045,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -1030,6 +1149,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBroker
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -1048,6 +1169,16 @@ spec:
                           description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
                           nullable: true
                           properties:
+                            clientAuthenticationMethod:
+                              default: client_secret_basic
+                              description: 'The client authentication method used when communicating with the token endpoint. Defaults to `client_secret_basic`. The required contents of `clientCredentialsSecret` depend on the chosen method: secret-based methods (`client_secret_basic`, `client_secret_post`, `client_secret_jwt`) expect a client secret, while `private_key_jwt` expects a private key.'
+                              enum:
+                              - client_secret_basic
+                              - client_secret_post
+                              - client_secret_jwt
+                              - private_key_jwt
+                              - none
+                              type: string
                             clientCredentialsSecret:
                               description: |-
                                 A reference to the OIDC client credentials secret. The secret contains
@@ -1135,16 +1266,14 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
-                      Read the
+                      The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
                     type: string
                   dagsGitSync:
                     default: []
                     description: |-
-                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-                      Learn more in the
+                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
                       [mounting DAGs documentation](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_via_git_sync).
                     items:
                       properties:
@@ -1239,7 +1368,7 @@ spec:
                     type: object
                   exposeConfig:
                     default: false
-                    description: for internal use only - not for production use.
+                    description: For internal use only - not for production use.
                     type: boolean
                   loadExamples:
                     default: false
@@ -1247,6 +1376,64 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: Configure the database where Airflow stores all it's internal metadata
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -1271,6 +1458,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -1679,7 +1867,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -2191,7 +2379,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -2354,7 +2542,7 @@ spec:
                     type: string
                 type: object
               kubernetesExecutors:
-                description: With the Kuberentes executor, executor Pods are created on demand.
+                description: With the Kubernetes executor, executor Pods are created on demand.
                 properties:
                   cliOverrides:
                     additionalProperties:
@@ -2731,7 +2919,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -3222,7 +3410,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -3734,7 +3922,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -4219,7 +4407,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -4731,7 +4919,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -5216,7 +5404,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -5733,7 +5921,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -5918,6 +6106,125 @@ spec:
                   The celery executor.
                   Deployed with an explicit number of replicas.
                 properties:
+                  celeryBroker:
+                    description: Connection information for the celery broker queue.
+                    oneOf:
+                    - required:
+                      - redis
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      redis:
+                        description: |-
+                          Connection settings for a [Redis](https://redis.io/) instance.
+
+                          Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the Redis server.
+                            type: string
+                          databaseId:
+                            default: 0
+                            description: |-
+                              Numeric index of the Redis logical database to use. Defaults to `0`.
+
+                              Redis supports multiple logical databases within a single instance, identified by an
+                              integer index. Database `0` is the default.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                          host:
+                            description: Hostname or IP address of the Redis server.
+                            type: string
+                          port:
+                            default: 6379
+                            description: Port the Redis server is listening on. Defaults to `6379`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - host
+                        type: object
+                    type: object
+                  celeryResultBackend:
+                    description: Connection information for the celery backend database.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic Celery database connection for broker or result backend types not covered by a
+                          dedicated variant.
+
+                          Use this when you need a Celery-compatible connection that does not have a first-class
+                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          control over the connection string.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   cliOverrides:
                     additionalProperties:
                       type: string
@@ -6293,7 +6600,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -6805,7 +7112,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -6909,6 +7216,8 @@ spec:
                       type: object
                     type: object
                 required:
+                - celeryBroker
+                - celeryResultBackend
                 - roleGroups
                 type: object
               clusterConfig:
@@ -6927,6 +7236,16 @@ spec:
                           description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
                           nullable: true
                           properties:
+                            clientAuthenticationMethod:
+                              default: client_secret_basic
+                              description: 'The client authentication method used when communicating with the token endpoint. Defaults to `client_secret_basic`. The required contents of `clientCredentialsSecret` depend on the chosen method: secret-based methods (`client_secret_basic`, `client_secret_post`, `client_secret_jwt`) expect a client secret, while `private_key_jwt` expects a private key.'
+                              enum:
+                              - client_secret_basic
+                              - client_secret_post
+                              - client_secret_jwt
+                              - private_key_jwt
+                              - none
+                              type: string
                             clientCredentialsSecret:
                               description: |-
                                 A reference to the OIDC client credentials secret. The secret contains
@@ -7014,16 +7333,14 @@ spec:
                     type: object
                   credentialsSecret:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
-                      Read the
+                      The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
                       to find out more.
                     type: string
                   dagsGitSync:
                     default: []
                     description: |-
-                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`.
-                      Learn more in the
+                      The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
                       [mounting DAGs documentation](https://docs.stackable.tech/home/nightly/airflow/usage-guide/mounting-dags#_via_git_sync).
                     items:
                       properties:
@@ -7094,7 +7411,7 @@ spec:
                     type: object
                   exposeConfig:
                     default: false
-                    description: for internal use only - not for production use.
+                    description: For internal use only - not for production use.
                     type: boolean
                   loadExamples:
                     default: false
@@ -7102,6 +7419,64 @@ spec:
                       Whether to load example DAGs or not; defaults to false. The examples are used in the
                       [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
                     type: boolean
+                  metadataDatabase:
+                    description: Configure the database where Airflow stores all it's internal metadata
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
+                        properties:
+                          uriSecret:
+                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                            type: string
+                        required:
+                        - uriSecret
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecret:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecret
+                        - database
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -7126,6 +7501,7 @@ spec:
                     type: array
                 required:
                 - credentialsSecret
+                - metadataDatabase
                 type: object
               clusterOperation:
                 default:
@@ -7534,7 +7910,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -8046,7 +8422,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -8209,7 +8585,7 @@ spec:
                     type: string
                 type: object
               kubernetesExecutors:
-                description: With the Kuberentes executor, executor Pods are created on demand.
+                description: With the Kubernetes executor, executor Pods are created on demand.
                 properties:
                   cliOverrides:
                     additionalProperties:
@@ -8586,7 +8962,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -9077,7 +9453,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -9589,7 +9965,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -10074,7 +10450,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -10586,7 +10962,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -11071,7 +11447,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -11588,7 +11964,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
