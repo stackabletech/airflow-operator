@@ -2,9 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
 - Support for passing CAs to GitSync ([#750]).
 
+### Changed
+
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
+
 [#750]: https://github.com/stackabletech/airflow-operator/pull/750
+[#767]: https://github.com/stackabletech/airflow-operator/pull/767
 
 ## [26.3.0] - 2026-03-16
 
