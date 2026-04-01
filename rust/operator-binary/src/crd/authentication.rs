@@ -472,6 +472,8 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
+                            client_authentication_method:
+                                oidc::v1alpha1::ClientAuthenticationMethod::ClientSecretBasic,
                             product_specific_fields: ()
                         }
                     },
@@ -488,6 +490,8 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client2".into(),
                             extra_scopes: Vec::new(),
+                            client_authentication_method:
+                                oidc::v1alpha1::ClientAuthenticationMethod::ClientSecretBasic,
                             product_specific_fields: ()
                         }
                     }

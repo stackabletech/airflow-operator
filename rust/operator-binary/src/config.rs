@@ -460,6 +460,8 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
+                        client_authentication_method:
+                            oidc::v1alpha1::ClientAuthenticationMethod::ClientSecretBasic,
                         product_specific_fields: (),
                     },
                 },
@@ -468,6 +470,8 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
+                        client_authentication_method:
+                            oidc::v1alpha1::ClientAuthenticationMethod::ClientSecretBasic,
                         product_specific_fields: (),
                     },
                 },
