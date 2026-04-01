@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     database_connections::{
@@ -20,8 +22,10 @@ pub enum MetadataDatabaseConnection {
     Generic(GenericSqlAlchemyDatabaseConnection),
 }
 
-impl MetadataDatabaseConnection {
-    pub fn as_sqlalchemy_database_connection(&self) -> &dyn SqlAlchemyDatabaseConnection {
+impl Deref for MetadataDatabaseConnection {
+    type Target = dyn SqlAlchemyDatabaseConnection;
+
+    fn deref(&self) -> &Self::Target {
         match self {
             Self::Postgresql(p) => p,
             Self::Generic(g) => g,
@@ -39,8 +43,10 @@ pub enum CeleryResultBackendConnection {
     Generic(GenericCeleryDatabaseConnection),
 }
 
-impl CeleryResultBackendConnection {
-    pub fn as_celery_database_connection(&self) -> &dyn CeleryDatabaseConnection {
+impl Deref for CeleryResultBackendConnection {
+    type Target = dyn CeleryDatabaseConnection;
+
+    fn deref(&self) -> &Self::Target {
         match self {
             Self::Postgresql(p) => p,
             Self::Generic(g) => g,
@@ -58,8 +64,10 @@ pub enum CeleryBrokerConnection {
     Generic(GenericCeleryDatabaseConnection),
 }
 
-impl CeleryBrokerConnection {
-    pub fn as_celery_database_connection(&self) -> &dyn CeleryDatabaseConnection {
+impl Deref for CeleryBrokerConnection {
+    type Target = dyn CeleryDatabaseConnection;
+
+    fn deref(&self) -> &Self::Target {
         match self {
             Self::Redis(r) => r,
             Self::Generic(g) => g,
