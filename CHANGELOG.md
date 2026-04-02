@@ -6,7 +6,12 @@
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
 
+### Fixed
+
+- Do not make internal secrets immutable. Immutable secrets are cached and (accidental) deletes can render the cluster unusable ([#769]).
+
 - [#767]: https://github.com/stackabletech/airflow-operator/pull/767
+- [#769]: https://github.com/stackabletech/airflow-operator/pull/769
 
 ## [26.3.0] - 2026-03-16
 
