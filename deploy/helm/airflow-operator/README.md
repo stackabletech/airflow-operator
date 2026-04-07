@@ -17,45 +17,47 @@ make compile-chart
 helm install airflow-operator deploy/helm/airflow-operator
 ```
 
-## Publish The Chart To Multiple Registries
+## Publish The Chart
 
-This chart is structured so the operator image can be sourced from different registries without
-duplicating templates.
+The Helm chart is published to two different repositories:
 
-- `values.yaml` contains the default image coordinates (`image.registry` and `image.repository`).
-- `values.registry-oci.yaml` sets defaults for chart artifacts published to `oci.stackable.tech`.
-- `values.registry-quay.yaml` sets defaults for chart artifacts published to `quay.io`.
+- oci.stackable.tech
+- quay.io
 
-Package each artifact with a registry-specific `values.yaml` so users of each chart registry
-automatically pull images from the same source registry.
+Each chart version references images from it's corresponding repository.
 
-`helm package` does not accept a values overlay directly, so create a temporary chart copy per
-target and merge values before packaging:
+Package and publish both variants:
 
 ```bash
-# Package chart with oci.stackable.tech defaults
-tmp_oci="$(mktemp -d)"
-cp -r deploy/helm/airflow-operator "${tmp_oci}/"
-yq ea '. as $item ireduce ({}; . * $item )' \
-    "${tmp_oci}/airflow-operator/values.yaml" \
-    "${tmp_oci}/airflow-operator/values.registry-oci.yaml" \
-    > "${tmp_oci}/airflow-operator/values.yaml.new"
-mv "${tmp_oci}/airflow-operator/values.yaml.new" "${tmp_oci}/airflow-operator/values.yaml"
-helm package "${tmp_oci}/airflow-operator" --destination /tmp/charts-oci
-
-# Package chart with quay.io defaults
-tmp_quay="$(mktemp -d)"
-cp -r deploy/helm/airflow-operator "${tmp_quay}/"
-yq ea '. as $item ireduce ({}; . * $item )' \
-    "${tmp_quay}/airflow-operator/values.yaml" \
-    "${tmp_quay}/airflow-operator/values.registry-quay.yaml" \
-    > "${tmp_quay}/airflow-operator/values.yaml.new"
-mv "${tmp_quay}/airflow-operator/values.yaml.new" "${tmp_quay}/airflow-operator/values.yaml"
-helm package "${tmp_quay}/airflow-operator" --destination /tmp/charts-quay
+make chart-package-all
+make chart-publish-all
 ```
 
-Then push the packaged chart from `/tmp/charts-oci` to `oci.stackable.tech` and the packaged chart
-from `/tmp/charts-quay` to `quay.io`.
+Package and publish for oci.stackable.tech:
+
+```bash
+make chart-package-oci
+make chart-publish-oci
+```
+
+Package and publish for quay.io:
+
+```bash
+make chart-package-quay
+make chart-publish-quay
+```
+
+Install from oci.stackable.tech:
+
+```bash
+helm install airflow-operator oci://oci.stackable.tech/sdp/charts/airflow-operator --version 0.0.0-dev
+```
+
+Install from quay.io:
+
+```shell
+helm install airflow-operator oci://quay.io/stackable/charts/airflow-operator --version 0.0.0-dev
+```
 
 ## Usage of the CRDs
 
