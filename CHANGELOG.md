@@ -4,6 +4,7 @@
 
 ### Added
 
+- Support for passing CAs to GitSync ([#750]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#765]).
 
 ### Changed
@@ -14,6 +15,7 @@
 
 - Do not use immutable Secret objects for internal secrets. Migrate existing secrets to mutable versions ([#770]).
 
+[#750]: https://github.com/stackabletech/airflow-operator/pull/750
 [#765]: https://github.com/stackabletech/airflow-operator/pull/765
 [#767]: https://github.com/stackabletech/airflow-operator/pull/767
 [#770]: https://github.com/stackabletech/airflow-operator/pull/770

@@ -1,0 +1,67 @@
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: git-wrong-ca-cert
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: airflow.stackable.tech/v1alpha2
+kind: AirflowCluster
+metadata:
+  name: airflow-wrong-cert
+spec:
+  image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+    credentialsSecret: test-airflow-credentials
+    dagsGitSync:
+      - repo: https://git-proxy.$NAMESPACE.svc.cluster.local/stackable-airflow/dags
+        credentials:
+          basicAuthSecretName: git-credentials
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
+        wait: 5s
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-wrong-ca-cert
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  kubernetesExecutors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+  schedulers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  dagProcessors:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
