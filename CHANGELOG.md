@@ -6,7 +6,12 @@
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
 
+### Fixed
+
+- Do not use immutable Secret objects for internal secrets. Migrate existing secrets to mutable versions ([#770]).
+
 - [#767]: https://github.com/stackabletech/airflow-operator/pull/767
+- [#770]: https://github.com/stackabletech/airflow-operator/pull/770
 
 ## [26.3.0] - 2026-03-16
 
