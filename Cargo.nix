@@ -3696,6 +3696,14 @@ rec {
         ];
 
       };
+      "humantime" = rec {
+        crateName = "humantime";
+        version = "2.3.0";
+        edition = "2021";
+        sha256 = "092lpipp32ayz4kyyn4k3vz59j9blng36wprm5by0g2ykqr14nqk";
+        features = {
+        };
+      };
       "hyper" = rec {
         crateName = "hyper";
         version = "1.8.1";
@@ -5053,7 +5061,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "k8s_version";
@@ -5072,7 +5080,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
         ];
         features = {
@@ -8658,9 +8666,9 @@ rec {
       };
       "rustls-webpki" = rec {
         crateName = "rustls-webpki";
-        version = "0.103.9";
+        version = "0.103.10";
         edition = "2021";
-        sha256 = "0lwg1nnyv7pp2lfwwjhy81bxm233am99jnsp3iymdhd6k8827pyp";
+        sha256 = "1vyipcdbazvhl6kyi1m8n0bg98sk25iv12bby2xcly653awb4cyz";
         libName = "webpki";
         dependencies = [
           {
@@ -9607,6 +9615,34 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "default" "rust_1_61" "rust_1_65" "std" ];
       };
+      "snafu 0.9.0" = rec {
+        crateName = "snafu";
+        version = "0.9.0";
+        edition = "2018";
+        sha256 = "1ii9r99x5qcn754m624yzgb9hzvkqkrcygf0aqh0pyb9dbnvrm6i";
+        authors = [
+          "Jake Goulding <jake.goulding@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "snafu-derive";
+            packageId = "snafu-derive 0.9.0";
+          }
+        ];
+        features = {
+          "backtrace" = [ "dep:backtrace" ];
+          "backtraces-impl-backtrace-crate" = [ "backtrace" ];
+          "default" = [ "std" "rust_1_81" ];
+          "futures" = [ "futures-core-crate" "pin-project" ];
+          "futures-core-crate" = [ "dep:futures-core-crate" ];
+          "futures-crate" = [ "dep:futures-crate" ];
+          "internal-dev-dependencies" = [ "futures-crate" ];
+          "pin-project" = [ "dep:pin-project" ];
+          "std" = [ "alloc" ];
+          "unstable-provider-api" = [ "snafu-derive/unstable-provider-api" ];
+        };
+        resolvedDefaultFeatures = [ "alloc" "default" "rust_1_81" "std" ];
+      };
       "snafu-derive 0.6.10" = rec {
         crateName = "snafu-derive";
         version = "0.6.10";
@@ -9668,6 +9704,42 @@ rec {
         features = {
         };
         resolvedDefaultFeatures = [ "rust_1_61" ];
+      };
+      "snafu-derive 0.9.0" = rec {
+        crateName = "snafu-derive";
+        version = "0.9.0";
+        edition = "2018";
+        sha256 = "0h0x61kyj4fvilcr2nj02l85shw1ika64vq9brf2gyna662ln9al";
+        procMacro = true;
+        libName = "snafu_derive";
+        authors = [
+          "Jake Goulding <jake.goulding@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "heck";
+            packageId = "heck";
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "proc-macro2";
+            packageId = "proc-macro2";
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.116";
+            usesDefaultFeatures = false;
+            features = [ "clone-impls" "derive" "full" "parsing" "printing" "proc-macro" ];
+          }
+        ];
+        features = {
+        };
       };
       "socket2" = rec {
         crateName = "socket2";
@@ -9881,7 +9953,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_certs";
@@ -9940,7 +10012,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "stackable-shared";
@@ -9979,12 +10051,12 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.108.0";
+        version = "0.109.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_operator";
@@ -9992,6 +10064,10 @@ rec {
           "Stackable GmbH <info@stackable.de>"
         ];
         dependencies = [
+          {
+            name = "base64";
+            packageId = "base64";
+          }
           {
             name = "clap";
             packageId = "clap";
@@ -10056,6 +10132,10 @@ rec {
             packageId = "product-config";
           }
           {
+            name = "rand";
+            packageId = "rand 0.9.2";
+          }
+          {
             name = "regex";
             packageId = "regex";
           }
@@ -10083,7 +10163,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "stackable-operator-derive";
@@ -10156,7 +10236,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         procMacro = true;
@@ -10191,7 +10271,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_shared";
@@ -10236,7 +10316,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "strum";
@@ -10267,12 +10347,12 @@ rec {
       };
       "stackable-telemetry" = rec {
         crateName = "stackable-telemetry";
-        version = "0.6.2";
+        version = "0.6.3";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_telemetry";
@@ -10324,7 +10404,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "strum";
@@ -10377,12 +10457,12 @@ rec {
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";
-        version = "0.8.3";
+        version = "0.9.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_versioned";
@@ -10410,7 +10490,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "stackable-versioned-macros";
@@ -10421,12 +10501,12 @@ rec {
       };
       "stackable-versioned-macros" = rec {
         crateName = "stackable-versioned-macros";
-        version = "0.8.3";
+        version = "0.9.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         procMacro = true;
@@ -10489,12 +10569,12 @@ rec {
       };
       "stackable-webhook" = rec {
         crateName = "stackable-webhook";
-        version = "0.9.0";
+        version = "0.9.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7486017f60827d1d769d7bf17bf56adb21f8bb02";
+          rev = "a4a204b0696a696b9a49c930703037dd124e876d";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_webhook";
@@ -10518,6 +10598,10 @@ rec {
           {
             name = "futures-util";
             packageId = "futures-util";
+          }
+          {
+            name = "humantime";
+            packageId = "humantime";
           }
           {
             name = "hyper";
@@ -10563,7 +10647,7 @@ rec {
           }
           {
             name = "snafu";
-            packageId = "snafu 0.8.9";
+            packageId = "snafu 0.9.0";
           }
           {
             name = "stackable-certs";
