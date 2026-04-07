@@ -414,7 +414,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -926,7 +926,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -1048,6 +1048,16 @@ spec:
                           description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
                           nullable: true
                           properties:
+                            clientAuthenticationMethod:
+                              default: client_secret_basic
+                              description: 'The client authentication method used when communicating with the token endpoint. Defaults to `client_secret_basic`. The required contents of `clientCredentialsSecret` depend on the chosen method: secret-based methods (`client_secret_basic`, `client_secret_post`, `client_secret_jwt`) expect a client secret, while `private_key_jwt` expects a private key.'
+                              enum:
+                              - client_secret_basic
+                              - client_secret_post
+                              - client_secret_jwt
+                              - private_key_jwt
+                              - none
+                              type: string
                             clientCredentialsSecret:
                               description: |-
                                 A reference to the OIDC client credentials secret. The secret contains
@@ -1213,6 +1223,56 @@ spec:
                           description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                           format: uri
                           type: string
+                        tls:
+                          default:
+                            verification:
+                              server:
+                                caCert:
+                                  webPki: {}
+                          description: Configure a TLS connection. If not specified it will default to webPki validation.
+                          nullable: true
+                          properties:
+                            verification:
+                              description: The verification method used to verify the certificates of the server and/or the client.
+                              oneOf:
+                              - required:
+                                - none
+                              - required:
+                                - server
+                              properties:
+                                none:
+                                  description: Use TLS but don't verify certificates.
+                                  type: object
+                                server:
+                                  description: Use TLS and a CA certificate to verify the server.
+                                  properties:
+                                    caCert:
+                                      description: CA cert to verify the server.
+                                      oneOf:
+                                      - required:
+                                        - webPki
+                                      - required:
+                                        - secretClass
+                                      properties:
+                                        secretClass:
+                                          description: |-
+                                            Name of the [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) which will provide the CA certificate.
+                                            Note that a SecretClass does not need to have a key but can also work with just a CA certificate,
+                                            so if you got provided with a CA cert but don't have access to the key you can still use this method.
+                                          type: string
+                                        webPki:
+                                          description: |-
+                                            Use TLS and the CA certificates trusted by the common web browsers to verify the server.
+                                            This can be useful when you e.g. use public AWS S3 or other public available services.
+                                          type: object
+                                      type: object
+                                  required:
+                                  - caCert
+                                  type: object
+                              type: object
+                          required:
+                          - verification
+                          type: object
                         wait:
                           default: 20s
                           description: |-
@@ -1679,7 +1739,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -2191,7 +2251,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -2731,7 +2791,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -3222,7 +3282,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -3734,7 +3794,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -4219,7 +4279,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -4731,7 +4791,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -5216,7 +5276,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -5733,7 +5793,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -6293,7 +6353,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -6805,7 +6865,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -6927,6 +6987,16 @@ spec:
                           description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
                           nullable: true
                           properties:
+                            clientAuthenticationMethod:
+                              default: client_secret_basic
+                              description: 'The client authentication method used when communicating with the token endpoint. Defaults to `client_secret_basic`. The required contents of `clientCredentialsSecret` depend on the chosen method: secret-based methods (`client_secret_basic`, `client_secret_post`, `client_secret_jwt`) expect a client secret, while `private_key_jwt` expects a private key.'
+                              enum:
+                              - client_secret_basic
+                              - client_secret_post
+                              - client_secret_jwt
+                              - private_key_jwt
+                              - none
+                              type: string
                             clientCredentialsSecret:
                               description: |-
                                 A reference to the OIDC client credentials secret. The secret contains
@@ -7068,6 +7138,56 @@ spec:
                           description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                           format: uri
                           type: string
+                        tls:
+                          default:
+                            verification:
+                              server:
+                                caCert:
+                                  webPki: {}
+                          description: Configure a TLS connection. If not specified it will default to webPki validation.
+                          nullable: true
+                          properties:
+                            verification:
+                              description: The verification method used to verify the certificates of the server and/or the client.
+                              oneOf:
+                              - required:
+                                - none
+                              - required:
+                                - server
+                              properties:
+                                none:
+                                  description: Use TLS but don't verify certificates.
+                                  type: object
+                                server:
+                                  description: Use TLS and a CA certificate to verify the server.
+                                  properties:
+                                    caCert:
+                                      description: CA cert to verify the server.
+                                      oneOf:
+                                      - required:
+                                        - webPki
+                                      - required:
+                                        - secretClass
+                                      properties:
+                                        secretClass:
+                                          description: |-
+                                            Name of the [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) which will provide the CA certificate.
+                                            Note that a SecretClass does not need to have a key but can also work with just a CA certificate,
+                                            so if you got provided with a CA cert but don't have access to the key you can still use this method.
+                                          type: string
+                                        webPki:
+                                          description: |-
+                                            Use TLS and the CA certificates trusted by the common web browsers to verify the server.
+                                            This can be useful when you e.g. use public AWS S3 or other public available services.
+                                          type: object
+                                      type: object
+                                  required:
+                                  - caCert
+                                  type: object
+                              type: object
+                          required:
+                          - verification
+                          type: object
                         wait:
                           default: 20s
                           description: |-
@@ -7534,7 +7654,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -8046,7 +8166,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -8586,7 +8706,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -9077,7 +9197,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -9589,7 +9709,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -10074,7 +10194,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -10586,7 +10706,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -11071,7 +11191,7 @@ spec:
                                 type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -11588,7 +11708,7 @@ spec:
                                       type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
