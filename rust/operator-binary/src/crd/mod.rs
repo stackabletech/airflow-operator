@@ -61,6 +61,7 @@ use crate::{
 pub mod affinity;
 pub mod authentication;
 pub mod authorization;
+pub mod internal_secret;
 
 pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
