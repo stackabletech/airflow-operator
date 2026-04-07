@@ -235,10 +235,9 @@ fn append_oidc_config(
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
 
-                let client_auth_method = serde_json::to_value(
-                    client_options.client_authentication_method,
-                )
-                .expect("ClientAuthenticationMethod should serialize to JSON");
+                let client_auth_method =
+                    serde_json::to_value(client_options.client_authentication_method)
+                        .expect("ClientAuthenticationMethod should serialize to JSON");
                 let client_auth_method = client_auth_method
                     .as_str()
                     .expect("ClientAuthenticationMethod should serialize to a string");
