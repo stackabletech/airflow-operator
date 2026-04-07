@@ -32,6 +32,7 @@ use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::{self, ResolvedProductImage},
+        random_secret_creation,
         rbac::build_rbac_resources,
     },
     crd::{
@@ -95,7 +96,6 @@ use crate::{
         build_recommended_labels,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
-            create_random_secret,
         },
         v1alpha2,
     },
@@ -353,7 +353,9 @@ pub enum Error {
     },
 
     #[snafu(display("failed to create internal secret"))]
-    InvalidInternalSecret { source: crd::internal_secret::Error },
+    InvalidInternalSecret {
+        source: random_secret_creation::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -479,7 +481,7 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
-    create_random_secret(
+    random_secret_creation::create_random_secret_if_not_exists(
         &airflow.shared_internal_secret_secret_name(),
         INTERNAL_SECRET_SECRET_KEY,
         256,
@@ -489,7 +491,7 @@ pub async fn reconcile_airflow(
     .await
     .context(InvalidInternalSecretSnafu)?;
 
-    create_random_secret(
+    random_secret_creation::create_random_secret_if_not_exists(
         &airflow.shared_jwt_secret_secret_name(),
         JWT_SECRET_SECRET_KEY,
         256,
@@ -499,7 +501,7 @@ pub async fn reconcile_airflow(
     .await
     .context(InvalidInternalSecretSnafu)?;
 
-    create_random_secret(
+    random_secret_creation::create_random_secret_if_not_exists(
         &airflow.shared_fernet_key_secret_name(),
         FERNET_KEY_SECRET_KEY,
         // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
