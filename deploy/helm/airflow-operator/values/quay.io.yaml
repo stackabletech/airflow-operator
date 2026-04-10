@@ -1,0 +1,5 @@
+---
+# Values overlay for chart packages published to quay.io.
+image:
+  registry: quay.io
+  repository: stackable/sdp-test/airflow-operator
