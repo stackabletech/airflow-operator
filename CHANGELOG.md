@@ -9,7 +9,7 @@
 
 ### Changed
 
-- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
 
 ### Fixed
 
@@ -19,6 +19,7 @@
 [#765]: https://github.com/stackabletech/airflow-operator/pull/765
 [#767]: https://github.com/stackabletech/airflow-operator/pull/767
 [#770]: https://github.com/stackabletech/airflow-operator/pull/770
+[#774]: https://github.com/stackabletech/airflow-operator/pull/774
 
 ## [26.3.0] - 2026-03-16
 
