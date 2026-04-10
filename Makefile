@@ -76,3 +76,9 @@ run-dev: check-nix check-kubernetes
 
 stop-dev: check-nix check-kubernetes
 	nix run --extra-experimental-features "nix-command flakes" -f. tilt -- down
+
+helm-install:
+	helm install \
+	  --values deploy/helm/airflow-operator/values.yaml \
+		--values deploy/helm/airflow-operator/values/$(OCI_REGISTRY_HOSTNAME).yaml \
+		airflow-operator deploy/helm/airflow-operator
