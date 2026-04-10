@@ -48,7 +48,7 @@ jobs:
 
       - name: Check for changed files
         id: check
-        uses: stackabletech/actions/detect-changes@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/detect-changes@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           patterns: |
             - '.github/workflows/build.yaml'
@@ -166,7 +166,7 @@ jobs:
 
       - name: Build Container Image
         id: build
-        uses: stackabletech/actions/build-container-image@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/build-container-image@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-name: ${{ env.OPERATOR_NAME }}
           image-index-manifest-tag: ${{ steps.version.outputs.OPERATOR_VERSION }}
@@ -175,7 +175,7 @@ jobs:
 
       - name: Publish Container Image (oci.stackable.tech)
         if: ${{ !github.event.pull_request.head.repo.fork }}
-        uses: stackabletech/actions/publish-image@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/publish-image@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
@@ -186,7 +186,7 @@ jobs:
 
       - name: Publish Container Image (quay.io)
         if: ${{ !github.event.pull_request.head.repo.fork }}
-        uses: stackabletech/actions/publish-image@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/publish-image@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-registry-uri: quay.io
           image-registry-username: stackable+robot_sdp_test_github_action_build
@@ -214,7 +214,7 @@ jobs:
           persist-credentials: false
 
       - name: Publish and Sign Image Index (oci.stackable.tech)
-        uses: stackabletech/actions/publish-image-index-manifest@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/publish-image-index-manifest@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-registry-uri: oci.stackable.tech
           image-registry-username: robot$sdp+github-action-build
@@ -223,7 +223,7 @@ jobs:
           image-index-manifest-tag: ${{ needs.build-container-image.outputs.operator-version }}
 
       - name: Publish and Sign Image Index (quay.io)
-        uses: stackabletech/actions/publish-image-index-manifest@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/publish-image-index-manifest@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-registry-uri: quay.io
           image-registry-username: stackable+robot_sdp_test_github_action_build
@@ -250,7 +250,7 @@ jobs:
           submodules: recursive
 
       - name: Package, Publish, and Sign Helm Chart (oci.stackable.tech)
-        uses: stackabletech/actions/publish-helm-chart@38cb337cac05e42a76946963e78ab48bbbfa36a0 # unreleased
+        uses: stackabletech/actions/publish-helm-chart@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp-charts+github-action-build
@@ -262,7 +262,7 @@ jobs:
           publish-and-sign: ${{ !github.event.pull_request.head.repo.fork }}
 
       - name: Package, Publish, and Sign Helm Chart (quay.io)
-        uses: stackabletech/actions/publish-helm-chart@38cb337cac05e42a76946963e78ab48bbbfa36a0 # unreleased
+        uses: stackabletech/actions/publish-helm-chart@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           chart-registry-uri: quay.io
           chart-registry-username: stackable+robot_sdp_charts_test_github_action_build
@@ -292,13 +292,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run OpenShift Preflight Check (oci.stackable.tech)
-        uses: stackabletech/actions/run-openshift-preflight@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/run-openshift-preflight@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-index-uri: oci.stackable.tech/sdp/${{ env.OPERATOR_NAME }}:${{ needs.build-container-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
 
       - name: Run OpenShift Preflight Check (quay.io)
-        uses: stackabletech/actions/run-openshift-preflight@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/run-openshift-preflight@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           image-index-uri: quay.io/stackable/sdp-test/${{ env.OPERATOR_NAME }}:${{ needs.build-container-image.outputs.operator-version }}
           image-architecture: ${{ matrix.arch }}
@@ -338,7 +338,7 @@ jobs:
           persist-credentials: false
 
       - name: Send Notification
-        uses: stackabletech/actions/send-slack-notification@9848c5593dff4793aacba240116a648c02f20fa4 # v0.13.1
+        uses: stackabletech/actions/send-slack-notification@b4f7b1301d2e46e623cd04a22994a327470d4743 # unreleased
         with:
           publish-helm-chart-result: ${{ needs.publish-helm-chart.result }}
           publish-manifests-result: ${{ needs.publish-index-manifest.result }}
