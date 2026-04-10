@@ -70,6 +70,15 @@ spec:
             - name: OPERATOR_SERVICE_NAME
               value: {{ include "operator.fullname" . }}
 
+            # The URI of the image registry, like "oci.stackable.tech". Used to derive product image
+            # name.
+            - name: IMAGE_REGISTRY_URI
+              value: {{ .Values.image.registry }}
+
+            # The image repository, like "sdp/airflow-operator"
+            - name: IMAGE_REPOSITORY
+              value: {{ .Values.image.repository }}
+
             # Operators need to know the node name they are running on, to e.g. discover the
             # Kubernetes domain name from the kubelet API.
             - name: KUBERNETES_NODE_NAME
