@@ -34,9 +34,9 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
+    config_overrides::KeyValueConfigOverrides,
     role_utils::{
-        CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, Role,
-        RoleGroup, RoleGroupRef,
+        CommonConfiguration, GenericCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
     },
     schemars::{self, JsonSchema},
     shared::time::Duration,
@@ -53,7 +53,6 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetails,
             AirflowClientAuthenticationDetailsResolved,
         },
-        v1alpha2::WebserverRoleConfig,
     },
     util::role_service_name,
 };
@@ -91,6 +90,35 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+pub type AirflowRoleType = Role<AirflowConfigFragment, AirflowConfigOverrides>;
+
+pub type AirflowWebserverRoleType =
+    Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowConfigOverrides {
+    #[serde(
+        default,
+        rename = "webserver_config.py",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub webserver_config_py: Option<KeyValueConfigOverrides>,
+}
+
+impl stackable_operator::config_overrides::KeyValueOverridesProvider for AirflowConfigOverrides {
+    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
+        match file {
+            AIRFLOW_CONFIG_FILENAME => self
+                .webserver_config_py
+                .as_ref()
+                .map(|o| o.as_product_config_overrides())
+                .unwrap_or_default(),
+            _ => BTreeMap::new(),
+        }
+    }
+}
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -214,23 +242,23 @@ pub mod versioned {
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment, v1alpha2::WebserverRoleConfig>>,
+        pub webservers: Option<AirflowWebserverRoleType>,
 
         /// The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub schedulers: Option<Role<AirflowConfigFragment>>,
+        pub schedulers: Option<AirflowRoleType>,
 
         #[serde(flatten)]
         pub executor: AirflowExecutor,
 
         /// The `dagProcessors` role runs the DAG processor routine for DAG preparation.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub dag_processors: Option<Role<AirflowConfigFragment>>,
+        pub dag_processors: Option<AirflowRoleType>,
 
         /// The `triggerers` role runs the triggerer process for use with deferrable DAG operators.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub triggerers: Option<Role<AirflowConfigFragment>>,
+        pub triggerers: Option<AirflowRoleType>,
     }
 
     #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
@@ -370,7 +398,7 @@ impl v1alpha2::AirflowCluster {
 
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
     /// the kubernetes executor is specified)
-    pub fn get_role(&self, role: &AirflowRole) -> Option<Role<AirflowConfigFragment>> {
+    pub fn get_role(&self, role: &AirflowRole) -> Option<AirflowRoleType> {
         match role {
             AirflowRole::Webserver => self
                 .spec
@@ -478,8 +506,8 @@ impl v1alpha2::AirflowCluster {
 }
 
 fn extract_role_from_webserver_config(
-    fragment: Role<AirflowConfigFragment, WebserverRoleConfig>,
-) -> Role<AirflowConfigFragment> {
+    fragment: AirflowWebserverRoleType,
+) -> AirflowRoleType {
     Role {
         config: CommonConfiguration {
             config: fragment.config.config,
@@ -770,7 +798,7 @@ impl AirflowRole {
     pub fn role_config(
         &self,
         airflow: &v1alpha2::AirflowCluster,
-    ) -> Result<Role<AirflowConfigFragment>, Error> {
+    ) -> Result<AirflowRoleType, Error> {
         let role = self.to_string();
         let roles = AirflowRole::roles();
 
@@ -820,7 +848,7 @@ pub enum AirflowExecutor {
     #[serde(rename = "celeryExecutors")]
     CeleryExecutor {
         #[serde(flatten)]
-        config: Role<AirflowConfigFragment>,
+        config: AirflowRoleType,
     },
 
     /// With the Kuberentes executor, executor Pods are created on demand.
@@ -828,7 +856,7 @@ pub enum AirflowExecutor {
     KubernetesExecutor {
         #[serde(flatten)]
         common_configuration:
-            CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
+            CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     },
 }
 
