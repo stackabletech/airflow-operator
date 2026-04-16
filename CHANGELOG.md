@@ -11,7 +11,7 @@
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
 - BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
-- Bump `stackable-operator` to 0.110.0, kube to 3.1.0, and snafu to 0.9 ([#775]).
+- Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
 
 ### Fixed
 
