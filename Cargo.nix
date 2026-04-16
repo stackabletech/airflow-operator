@@ -1060,10 +1060,10 @@ rec {
       };
       "clap" = rec {
         crateName = "clap";
-        version = "4.6.0";
+        version = "4.6.1";
         edition = "2024";
         crateBin = [];
-        sha256 = "0l8k0ja5rf4hpn2g98bqv5m6lkh2q6b6likjpmm6fjw3cxdsz4xi";
+        sha256 = "0lcf88l7vlg796rrqr7wipbbmfa5sgsgx4211b7xmxxv8dz13nqx";
         dependencies = [
           {
             name = "clap_builder";
@@ -1141,9 +1141,9 @@ rec {
       };
       "clap_derive" = rec {
         crateName = "clap_derive";
-        version = "4.6.0";
+        version = "4.6.1";
         edition = "2024";
-        sha256 = "0snapc468s7n3avr33dky4y7rmb7ha3qsp9l0k5vh6jacf5bs40i";
+        sha256 = "1acpz49hi00iv9jkapixjzcv7s51x8qkfaqscjm36rqgf428dkpj";
         procMacro = true;
         dependencies = [
           {
@@ -10848,9 +10848,9 @@ rec {
       };
       "tokio" = rec {
         crateName = "tokio";
-        version = "1.51.1";
+        version = "1.52.0";
         edition = "2021";
-        sha256 = "131vl4p3hdn8kpvgv6qv06lspfxj7yvk9avq7r6p4jysbicgjszn";
+        sha256 = "0xnpygq9578c8rqjgkj5bj8pgfx9zj337kvk3v4kigqwkgska4d9";
         authors = [
           "Tokio Contributors <team@tokio.rs>"
         ];
