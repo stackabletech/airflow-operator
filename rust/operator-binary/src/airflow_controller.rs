@@ -84,9 +84,9 @@ use crate::{
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
         AirflowConfigOptions, AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole,
-        CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME,
-        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME,
-        OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
+        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
