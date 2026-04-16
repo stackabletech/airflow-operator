@@ -68,7 +68,7 @@ use stackable_operator::{
         framework::LoggingError,
         spec::{ContainerLogConfig, Logging},
     },
-    role_utils::{CommonConfiguration, GenericCommonConfig, GenericRoleConfig, RoleGroupRef},
+    role_utils::{GenericRoleConfig, RoleGroupRef},
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
@@ -83,8 +83,8 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowConfigOptions, AirflowConfigOverrides, AirflowExecutor, AirflowRole, CONFIG_PATH,
-        Container, ExecutorConfig, ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME,
+        AirflowConfigOptions, AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole,
+        CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME,
         LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME,
         OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
@@ -685,11 +685,7 @@ pub async fn reconcile_airflow(
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
-    common_config: &CommonConfiguration<
-        ExecutorConfigFragment,
-        GenericCommonConfig,
-        AirflowConfigOverrides,
-    >,
+    common_config: &AirflowExecutorCommonConfiguration,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,

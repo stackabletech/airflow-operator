@@ -93,6 +93,9 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 
 pub type AirflowRoleType = Role<AirflowConfigFragment, AirflowConfigOverrides>;
 
+pub type AirflowExecutorCommonConfiguration =
+    CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>;
+
 pub type AirflowWebserverRoleType =
     Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
 
@@ -853,11 +856,7 @@ pub enum AirflowExecutor {
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
-        common_configuration: CommonConfiguration<
-            ExecutorConfigFragment,
-            GenericCommonConfig,
-            AirflowConfigOverrides,
-        >,
+        common_configuration: AirflowExecutorCommonConfiguration,
     },
 }
 
