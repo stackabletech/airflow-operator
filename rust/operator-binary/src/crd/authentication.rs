@@ -83,7 +83,9 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[serde(rename_all = "camelCase")]
 pub struct AirflowClientAuthenticationDetails {
     #[serde(flatten)]
-    pub common: auth_core::v1alpha1::ClientAuthenticationDetails<()>,
+    pub common: auth_core::v1alpha1::ClientAuthenticationDetails<
+        oidc::v1alpha1::ClientAuthenticationMethodOption,
+    >,
 
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
@@ -132,7 +134,9 @@ pub enum AirflowAuthenticationClassResolved {
     },
     Oidc {
         provider: oidc::v1alpha1::AuthenticationProvider,
-        oidc: oidc::v1alpha1::ClientAuthenticationOptions<()>,
+        oidc: oidc::v1alpha1::ClientAuthenticationOptions<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >,
     },
 }
 
@@ -142,15 +146,19 @@ impl AirflowClientAuthenticationDetailsResolved {
         client: &Client,
     ) -> Result<AirflowClientAuthenticationDetailsResolved> {
         let resolve_auth_class =
-            |auth_details: auth_core::v1alpha1::ClientAuthenticationDetails| async move {
-                auth_details.resolve_class(client).await
-            };
+            |auth_details: auth_core::v1alpha1::ClientAuthenticationDetails<
+                oidc::v1alpha1::ClientAuthenticationMethodOption,
+            >| async move { auth_details.resolve_class(client).await };
         AirflowClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
     }
 
     pub async fn resolve<R>(
         auth_details: &[AirflowClientAuthenticationDetails],
-        resolve_auth_class: impl Fn(auth_core::v1alpha1::ClientAuthenticationDetails) -> R,
+        resolve_auth_class: impl Fn(
+            auth_core::v1alpha1::ClientAuthenticationDetails<
+                oidc::v1alpha1::ClientAuthenticationMethodOption,
+            >,
+        ) -> R,
     ) -> Result<AirflowClientAuthenticationDetailsResolved>
     where
         R: Future<
@@ -472,8 +480,10 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
-                            client_authentication_method: Default::default(),
-                            product_specific_fields: ()
+                            product_specific_fields:
+                                oidc::v1alpha1::ClientAuthenticationMethodOption {
+                                    client_authentication_method: Default::default(),
+                                }
                         }
                     },
                     AirflowAuthenticationClassResolved::Oidc {
@@ -489,8 +499,10 @@ mod tests {
                         oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "airflow-oidc-client2".into(),
                             extra_scopes: Vec::new(),
-                            client_authentication_method: Default::default(),
-                            product_specific_fields: ()
+                            product_specific_fields:
+                                oidc::v1alpha1::ClientAuthenticationMethodOption {
+                                    client_authentication_method: Default::default(),
+                                }
                         }
                     }
                 ],
@@ -926,10 +938,13 @@ mod tests {
     /// Use this function in the tests to replace
     /// `stackable_operator::commons::authentication::ClientAuthenticationDetails`
     /// which requires a Kubernetes client.
+    #[allow(clippy::type_complexity)]
     fn create_auth_class_resolver(
         auth_classes: Vec<auth_core::v1alpha1::AuthenticationClass>,
     ) -> impl Fn(
-        auth_core::v1alpha1::ClientAuthenticationDetails,
+        auth_core::v1alpha1::ClientAuthenticationDetails<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >,
     ) -> Pin<
         Box<
             dyn Future<
@@ -940,7 +955,9 @@ mod tests {
             >,
         >,
     > {
-        move |auth_details: auth_core::v1alpha1::ClientAuthenticationDetails| {
+        move |auth_details: auth_core::v1alpha1::ClientAuthenticationDetails<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >| {
             let auth_classes = auth_classes.clone();
             Box::pin(async move {
                 auth_classes

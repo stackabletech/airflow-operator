@@ -202,7 +202,9 @@ fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     providers: &[(
         &oidc::v1alpha1::AuthenticationProvider,
-        &oidc::v1alpha1::ClientAuthenticationOptions<()>,
+        &oidc::v1alpha1::ClientAuthenticationOptions<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >,
     )],
 ) -> Result<(), Error> {
     // Additionally can be set via config
@@ -235,12 +237,10 @@ fn append_oidc_config(
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
 
-                let client_auth_method =
-                    serde_json::to_value(client_options.client_authentication_method)
-                        .expect("ClientAuthenticationMethod should serialize to JSON");
-                let client_auth_method = client_auth_method
-                    .as_str()
-                    .expect("ClientAuthenticationMethod should serialize to a string");
+                let client_auth_method = client_options
+                    .product_specific_fields
+                    .client_authentication_method
+                    .as_ref();
 
                 formatdoc!(
                     "
@@ -468,8 +468,9 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
-                        client_authentication_method: Default::default(),
-                        product_specific_fields: (),
+                        product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
+                            client_authentication_method: Default::default(),
+                        },
                     },
                 },
                 AirflowAuthenticationClassResolved::Oidc {
@@ -477,8 +478,9 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
-                        client_authentication_method: Default::default(),
-                        product_specific_fields: (),
+                        product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
+                            client_authentication_method: Default::default(),
+                        },
                     },
                 },
             ],

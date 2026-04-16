@@ -38,7 +38,7 @@ impl OpaConfigResolved {
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         let connection_string = airflow_opa_config
             .opa
-            .full_document_url_from_config_map(client, airflow, None, OpaApiVersion::V1)
+            .full_document_url_from_config_map(client, airflow, None, &OpaApiVersion::V1)
             .await?;
         Ok(OpaConfigResolved {
             connection_string,

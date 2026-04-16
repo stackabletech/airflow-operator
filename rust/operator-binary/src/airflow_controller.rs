@@ -68,9 +68,7 @@ use stackable_operator::{
         framework::LoggingError,
         spec::{ContainerLogConfig, Logging},
     },
-    role_utils::{
-        CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroupRef,
-    },
+    role_utils::{GenericRoleConfig, RoleGroupRef},
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
@@ -85,8 +83,8 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowConfigOptions, AirflowExecutor, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        ExecutorConfigFragment, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
+        AirflowConfigOptions, AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole,
+        CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
         STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
@@ -422,7 +420,7 @@ pub async fn reconcile_airflow(
         }
     }
 
-    let role_config = transform_all_roles_to_config(airflow, roles);
+    let role_config = transform_all_roles_to_config(airflow, &roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &role_config.context(ProductConfigTransformSnafu)?,
@@ -687,7 +685,7 @@ pub async fn reconcile_airflow(
 #[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
-    common_config: &CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>,
+    common_config: &AirflowExecutorCommonConfiguration,
     resolved_product_image: &ResolvedProductImage,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -832,7 +830,7 @@ fn build_rolegroup_config_map(
                 .name(rolegroup.object_name())
                 .ownerreference_from_resource(airflow, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
+                .with_recommended_labels(&build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
                     &resolved_product_image.app_version_label_value,
@@ -878,7 +876,7 @@ fn build_rolegroup_metadata(
         .name(name)
         .ownerreference_from_resource(airflow, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
+        .with_recommended_labels(&build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
             &resolved_product_image.app_version_label_value,
@@ -903,7 +901,7 @@ pub fn build_group_listener(
             .name(listener_group_name)
             .ownerreference_from_resource(airflow, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(object_labels)
+            .with_recommended_labels(&object_labels)
             .context(ObjectMetaSnafu)?
             .build(),
         spec: listener::v1alpha1::ListenerSpec {
@@ -954,7 +952,7 @@ fn build_server_rolegroup_statefulset(
         &rolegroup_ref.role_group,
     );
     // Used for PVC templates that cannot be modified once they are deployed
-    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+    let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
         airflow,
         AIRFLOW_CONTROLLER_NAME,
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
@@ -965,7 +963,7 @@ fn build_server_rolegroup_statefulset(
     .context(LabelBuildSnafu)?;
 
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(recommended_object_labels)
+        .with_recommended_labels(&recommended_object_labels)
         .context(ObjectMetaSnafu)?
         .with_annotation(
             Annotation::try_from((
@@ -1263,7 +1261,7 @@ fn build_executor_template_config_map(
 ) -> Result<ConfigMap> {
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(build_recommended_labels(
+        .with_recommended_labels(&build_recommended_labels(
             airflow,
             AIRFLOW_CONTROLLER_NAME,
             &resolved_product_image.app_version_label_value,
@@ -1370,7 +1368,7 @@ fn build_executor_template_config_map(
                 .name(airflow.executor_template_configmap_name())
                 .ownerreference_from_resource(airflow, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
+                .with_recommended_labels(&build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
                     &resolved_product_image.app_version_label_value,
