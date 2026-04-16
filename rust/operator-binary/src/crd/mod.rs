@@ -19,6 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    config_overrides::KeyValueConfigOverrides,
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -34,7 +35,6 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    config_overrides::KeyValueConfigOverrides,
     role_utils::{
         CommonConfiguration, GenericCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
     },
@@ -505,9 +505,7 @@ impl v1alpha2::AirflowCluster {
     }
 }
 
-fn extract_role_from_webserver_config(
-    fragment: AirflowWebserverRoleType,
-) -> AirflowRoleType {
+fn extract_role_from_webserver_config(fragment: AirflowWebserverRoleType) -> AirflowRoleType {
     Role {
         config: CommonConfiguration {
             config: fragment.config.config,
@@ -855,8 +853,11 @@ pub enum AirflowExecutor {
     #[serde(rename = "kubernetesExecutors")]
     KubernetesExecutor {
         #[serde(flatten)]
-        common_configuration:
-            CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
+        common_configuration: CommonConfiguration<
+            ExecutorConfigFragment,
+            GenericCommonConfig,
+            AirflowConfigOverrides,
+        >,
     },
 }
 
