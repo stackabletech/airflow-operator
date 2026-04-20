@@ -417,8 +417,8 @@ pub async fn reconcile_airflow(
         .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
     let celery_database_connection_details = match &airflow.spec.executor {
         AirflowExecutor::CeleryExecutors {
-            celery_result_backend,
-            celery_broker,
+            result_backend: celery_result_backend,
+            broker: celery_broker,
             ..
         } => {
             let celery_result_backend = celery_result_backend

@@ -68,12 +68,12 @@ spec:
           AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
-    celeryResultBackend:
+    resultBackend:
       postgresql:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
-    celeryBroker:
+    broker:
       redis:
         host: airflow-redis-master
         credentialsSecretName: airflow-redis-credentials

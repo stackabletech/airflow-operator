@@ -859,10 +859,10 @@ pub enum AirflowExecutor {
         config: Box<AirflowRoleType>,
 
         /// Connection information for the celery backend database.
-        celery_result_backend: CeleryResultBackendConnection,
+        result_backend: CeleryResultBackendConnection,
 
         /// Connection information for the celery broker queue.
-        celery_broker: CeleryBrokerConnection,
+        broker: CeleryBrokerConnection,
     },
 
     /// With the Kubernetes executor, executor Pods are created on demand.

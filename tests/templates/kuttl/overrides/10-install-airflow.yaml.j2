@@ -75,12 +75,12 @@ spec:
           COMMON_VAR: group-value # overrides role value
           GROUP_VAR: group-value # only defined here at group level
   celeryExecutors:
-    celeryResultBackend:
+    resultBackend:
       postgresql:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
-    celeryBroker:
+    broker:
       redis:
         host: airflow-redis-master
         credentialsSecretName: airflow-redis-credentials

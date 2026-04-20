@@ -82,12 +82,12 @@ mod tests {
               default:
                 replicas: 1
           celeryExecutors:
-            celeryResultBackend:
+            resultBackend:
               postgresql:
                 host: airflow-postgresql
                 database: airflow
                 credentialsSecretName: airflow-postgresql-credentials
-            celeryBroker:
+            broker:
               redis:
                 host: airflow-redis-master
                 credentialsSecretName: airflow-redis-credentials

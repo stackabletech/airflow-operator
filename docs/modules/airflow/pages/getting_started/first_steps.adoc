@@ -66,8 +66,8 @@ Where:
 * `spec.celeryExecutors`: deploy executors managed by Airflow's Celery engine.
 Alternatively you can use `kuberenetesExectors` that use Airflow's Kubernetes engine for executor management.
 For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
-* `spec.celeryExecutors.celeryResultBackend`: specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
-* `spec.celeryExecutors.celeryBroker`: specifies one of the supported queue/broker types (in this case, `redis`) along with references to the host and the secret containing the connection credentials.
+* `spec.celeryExecutors.resultBackend`: specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
+* `spec.celeryExecutors.broker`: specifies one of the supported queue/broker types (in this case, `redis`) along with references to the host and the secret containing the connection credentials.
 * `spec.clusterConfig.loadExamples`: this key is optional and defaults to `false`.
 It is set to `true` here as the example DAGs are used when verifying the installation.
 * `spec.clusterConfig.exposeConfig`: this key is optional and defaults to `false`.
