@@ -14,7 +14,7 @@ Not all roles use each setting, but some things -- such as external endpoints --
 Airflow exposes an environment variable for every Airflow configuration setting, a list of which can be found in the {airflow-config-docs}[Configuration Reference].
 
 As Airflow can be configured with python code too, arbitrary code can be added to the `webserver_config.py`.
-You can use either `EXPERIMENTAL_FILE_HEADER` to add code to the top or `EXPERIMENTAL_FILE_FOOTER` to add to the bottom.
+You can use either `FILE_HEADER` to add code to the top or `FILE_FOOTER` to add to the bottom.
 
 IMPORTANT: This is an experimental feature.
 
@@ -24,9 +24,9 @@ webservers:
   configOverrides:
     webserver_config.py:
       CSV_EXPORT: "{'encoding': 'utf-8'}"
-      EXPERIMENTAL_FILE_HEADER: |
+      FILE_HEADER: |
         from modules.my_module import my_class
-      EXPERIMENTAL_FILE_FOOTER: |
+      FILE_FOOTER: |
         import logging
         from airflow.security import AirflowSecurityManager
 
