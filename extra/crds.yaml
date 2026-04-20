@@ -53,14 +53,14 @@ spec:
                           dedicated variant.
 
                           Use this when you need a Celery-compatible connection that does not have a first-class
-                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          connection type. The complete connection URL is read from a Secret, giving the user full
                           control over the connection string.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete Celery URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       redis:
                         description: |-
@@ -68,7 +68,7 @@ spec:
 
                           Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the Redis server.
@@ -95,7 +95,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - host
                         type: object
                     type: object
@@ -113,19 +113,19 @@ spec:
                           dedicated variant.
 
                           Use this when you need a Celery-compatible connection that does not have a first-class
-                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          connection type. The complete connection URL is read from a Secret, giving the user full
                           control over the connection string.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete Celery URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       postgresql:
                         description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the PostgreSQL server.
@@ -153,7 +153,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - database
                         - host
                         type: object
@@ -240,7 +240,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -320,7 +320,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -400,7 +400,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -480,7 +480,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -593,17 +593,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -752,7 +758,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -832,7 +838,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -912,7 +918,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -992,7 +998,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -1105,17 +1111,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -1264,7 +1276,7 @@ spec:
                         - configMapName
                         type: object
                     type: object
-                  credentialsSecret:
+                  credentialsSecretName:
                     description: |-
                       The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
@@ -1342,6 +1354,56 @@ spec:
                           description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                           format: uri
                           type: string
+                        tls:
+                          default:
+                            verification:
+                              server:
+                                caCert:
+                                  webPki: {}
+                          description: Configure a TLS connection. If not specified it will default to webPki validation.
+                          nullable: true
+                          properties:
+                            verification:
+                              description: The verification method used to verify the certificates of the server and/or the client.
+                              oneOf:
+                              - required:
+                                - none
+                              - required:
+                                - server
+                              properties:
+                                none:
+                                  description: Use TLS but don't verify certificates.
+                                  type: object
+                                server:
+                                  description: Use TLS and a CA certificate to verify the server.
+                                  properties:
+                                    caCert:
+                                      description: CA cert to verify the server.
+                                      oneOf:
+                                      - required:
+                                        - webPki
+                                      - required:
+                                        - secretClass
+                                      properties:
+                                        secretClass:
+                                          description: |-
+                                            Name of the [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) which will provide the CA certificate.
+                                            Note that a SecretClass does not need to have a key but can also work with just a CA certificate,
+                                            so if you got provided with a CA cert but don't have access to the key you can still use this method.
+                                          type: string
+                                        webPki:
+                                          description: |-
+                                            Use TLS and the CA certificates trusted by the common web browsers to verify the server.
+                                            This can be useful when you e.g. use public AWS S3 or other public available services.
+                                          type: object
+                                      type: object
+                                  required:
+                                  - caCert
+                                  type: object
+                              type: object
+                          required:
+                          - verification
+                          type: object
                         wait:
                           default: 20s
                           description: |-
@@ -1389,19 +1451,19 @@ spec:
                           A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
 
                           Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
-                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          first-class connection type. The complete connection URL is read from a Secret, giving the user
                           full control over the connection string including any driver-specific options.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       postgresql:
                         description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the PostgreSQL server.
@@ -1429,7 +1491,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - database
                         - host
                         type: object
@@ -1457,7 +1519,7 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     type: array
                 required:
-                - credentialsSecret
+                - credentialsSecretName
                 - metadataDatabase
                 type: object
               clusterOperation:
@@ -1574,7 +1636,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1654,7 +1716,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1734,7 +1796,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1814,7 +1876,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -1927,17 +1989,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -2086,7 +2154,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2166,7 +2234,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2246,7 +2314,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2326,7 +2394,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -2439,17 +2507,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -2626,7 +2700,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2706,7 +2780,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2786,7 +2860,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2866,7 +2940,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -2979,17 +3053,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -3117,7 +3197,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -3197,7 +3277,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -3277,7 +3357,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -3357,7 +3437,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -3470,17 +3550,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -3629,7 +3715,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3709,7 +3795,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3789,7 +3875,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3869,7 +3955,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -3982,17 +4068,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -4114,7 +4206,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -4194,7 +4286,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -4274,7 +4366,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -4354,7 +4446,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -4467,17 +4559,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -4626,7 +4724,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -4706,7 +4804,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -4786,7 +4884,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -4866,7 +4964,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -4979,17 +5077,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -5111,7 +5215,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -5191,7 +5295,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -5271,7 +5375,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -5351,7 +5455,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -5464,17 +5568,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -5628,7 +5738,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -5708,7 +5818,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -5788,7 +5898,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -5868,7 +5978,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -5981,17 +6091,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -6120,14 +6236,14 @@ spec:
                           dedicated variant.
 
                           Use this when you need a Celery-compatible connection that does not have a first-class
-                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          connection type. The complete connection URL is read from a Secret, giving the user full
                           control over the connection string.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete Celery URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       redis:
                         description: |-
@@ -6135,7 +6251,7 @@ spec:
 
                           Redis is commonly used as a Celery message broker or result backend (e.g. for Apache Airflow).
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the Redis server.
@@ -6162,7 +6278,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - host
                         type: object
                     type: object
@@ -6180,19 +6296,19 @@ spec:
                           dedicated variant.
 
                           Use this when you need a Celery-compatible connection that does not have a first-class
-                          connection type. The complete connection URI is read from a Secret, giving the user full
+                          connection type. The complete connection URL is read from a Secret, giving the user full
                           control over the connection string.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete Celery URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       postgresql:
                         description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the PostgreSQL server.
@@ -6220,7 +6336,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - database
                         - host
                         type: object
@@ -6307,7 +6423,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -6387,7 +6503,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -6467,7 +6583,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -6547,7 +6663,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -6660,17 +6776,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -6819,7 +6941,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -6899,7 +7021,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -6979,7 +7101,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -7059,7 +7181,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -7172,17 +7294,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -7331,7 +7459,7 @@ spec:
                         - configMapName
                         type: object
                     type: object
-                  credentialsSecret:
+                  credentialsSecretName:
                     description: |-
                       The name of the Secret object containing the admin user credentials. Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/airflow/getting_started/first_steps)
@@ -7385,6 +7513,56 @@ spec:
                           description: 'The git repository URL that will be cloned, for example: `https://github.com/stackabletech/airflow-operator` or `ssh://git@github.com:stackable-airflow/dags.git`.'
                           format: uri
                           type: string
+                        tls:
+                          default:
+                            verification:
+                              server:
+                                caCert:
+                                  webPki: {}
+                          description: Configure a TLS connection. If not specified it will default to webPki validation.
+                          nullable: true
+                          properties:
+                            verification:
+                              description: The verification method used to verify the certificates of the server and/or the client.
+                              oneOf:
+                              - required:
+                                - none
+                              - required:
+                                - server
+                              properties:
+                                none:
+                                  description: Use TLS but don't verify certificates.
+                                  type: object
+                                server:
+                                  description: Use TLS and a CA certificate to verify the server.
+                                  properties:
+                                    caCert:
+                                      description: CA cert to verify the server.
+                                      oneOf:
+                                      - required:
+                                        - webPki
+                                      - required:
+                                        - secretClass
+                                      properties:
+                                        secretClass:
+                                          description: |-
+                                            Name of the [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) which will provide the CA certificate.
+                                            Note that a SecretClass does not need to have a key but can also work with just a CA certificate,
+                                            so if you got provided with a CA cert but don't have access to the key you can still use this method.
+                                          type: string
+                                        webPki:
+                                          description: |-
+                                            Use TLS and the CA certificates trusted by the common web browsers to verify the server.
+                                            This can be useful when you e.g. use public AWS S3 or other public available services.
+                                          type: object
+                                      type: object
+                                  required:
+                                  - caCert
+                                  type: object
+                              type: object
+                          required:
+                          - verification
+                          type: object
                         wait:
                           default: 20s
                           description: |-
@@ -7432,19 +7610,19 @@ spec:
                           A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
 
                           Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
-                          first-class connection type. The complete connection URI is read from a Secret, giving the user
+                          first-class connection type. The complete connection URL is read from a Secret, giving the user
                           full control over the connection string including any driver-specific options.
                         properties:
-                          uriSecret:
-                            description: The name of the Secret that contains an `uri` key with the complete SQLAlchemy URI.
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
                             type: string
                         required:
-                        - uriSecret
+                        - connectionUrlSecretName
                         type: object
                       postgresql:
                         description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
                         properties:
-                          credentialsSecret:
+                          credentialsSecretName:
                             description: |-
                               Name of a Secret containing the `username` and `password` keys used to authenticate
                               against the PostgreSQL server.
@@ -7472,7 +7650,7 @@ spec:
                             minimum: 0.0
                             type: integer
                         required:
-                        - credentialsSecret
+                        - credentialsSecretName
                         - database
                         - host
                         type: object
@@ -7500,7 +7678,7 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     type: array
                 required:
-                - credentialsSecret
+                - credentialsSecretName
                 - metadataDatabase
                 type: object
               clusterOperation:
@@ -7617,7 +7795,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -7697,7 +7875,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -7777,7 +7955,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -7857,7 +8035,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -7970,17 +8148,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -8129,7 +8313,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -8209,7 +8393,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -8289,7 +8473,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -8369,7 +8553,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -8482,17 +8666,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -8669,7 +8859,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -8749,7 +8939,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -8829,7 +9019,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -8909,7 +9099,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -9022,17 +9212,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -9160,7 +9356,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -9240,7 +9436,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -9320,7 +9516,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -9400,7 +9596,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -9513,17 +9709,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -9672,7 +9874,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -9752,7 +9954,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -9832,7 +10034,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -9912,7 +10114,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -10025,17 +10227,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -10157,7 +10365,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -10237,7 +10445,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -10317,7 +10525,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -10397,7 +10605,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -10510,17 +10718,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -10669,7 +10883,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -10749,7 +10963,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -10829,7 +11043,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -10909,7 +11123,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -11022,17 +11236,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:
@@ -11154,7 +11374,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -11234,7 +11454,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -11314,7 +11534,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -11394,7 +11614,7 @@ spec:
                                         type: string
                                     type: object
                                   custom:
-                                    description: Custom log configuration provided in a ConfigMap
+                                    description: Log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
                                         description: ConfigMap containing the log configuration files
@@ -11507,17 +11727,23 @@ spec:
                         type: object
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      webserver_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -11671,7 +11897,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -11751,7 +11977,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -11831,7 +12057,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -11911,7 +12137,7 @@ spec:
                                               type: string
                                           type: object
                                         custom:
-                                          description: Custom log configuration provided in a ConfigMap
+                                          description: Log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
                                               description: ConfigMap containing the log configuration files
@@ -12024,17 +12250,23 @@ spec:
                               type: object
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            webserver_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:

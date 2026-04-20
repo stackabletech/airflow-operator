@@ -2,11 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for passing CAs to GitSync ([#750]).
+- Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#765]).
+
 ### Changed
 
-- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
+- BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
+- Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
 
-- [#767]: https://github.com/stackabletech/airflow-operator/pull/767
+### Fixed
+
+- Do not use immutable Secret objects for internal secrets. Migrate existing secrets to mutable versions ([#770]).
+
+[#750]: https://github.com/stackabletech/airflow-operator/pull/750
+[#765]: https://github.com/stackabletech/airflow-operator/pull/765
+[#767]: https://github.com/stackabletech/airflow-operator/pull/767
+[#770]: https://github.com/stackabletech/airflow-operator/pull/770
+[#774]: https://github.com/stackabletech/airflow-operator/pull/774
+[#775]: https://github.com/stackabletech/airflow-operator/pull/775
 
 ## [26.3.0] - 2026-03-16
 

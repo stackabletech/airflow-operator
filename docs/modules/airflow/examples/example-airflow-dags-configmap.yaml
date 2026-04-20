@@ -7,12 +7,12 @@ spec:
   image:
     productVersion: 3.1.6
   clusterConfig:
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     volumes:
       - name: cm-dag # <3>
         configMap:

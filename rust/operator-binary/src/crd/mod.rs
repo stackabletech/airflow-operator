@@ -19,6 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    config_overrides::KeyValueConfigOverrides,
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -35,8 +36,7 @@ use stackable_operator::{
         spec::Logging,
     },
     role_utils::{
-        CommonConfiguration, GenericProductSpecificCommonConfig, GenericRoleConfig, Role,
-        RoleGroup, RoleGroupRef,
+        CommonConfiguration, GenericCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
     },
     schemars::{self, JsonSchema},
     shared::time::Duration,
@@ -56,7 +56,6 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
-        v1alpha2::WebserverRoleConfig,
     },
     util::role_service_name,
 };
@@ -95,6 +94,38 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+pub type AirflowRoleType = Role<AirflowConfigFragment, AirflowConfigOverrides>;
+
+pub type AirflowExecutorCommonConfiguration =
+    CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>;
+
+pub type AirflowWebserverRoleType =
+    Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AirflowConfigOverrides {
+    #[serde(
+        default,
+        rename = "webserver_config.py",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub webserver_config_py: Option<KeyValueConfigOverrides>,
+}
+
+impl stackable_operator::config_overrides::KeyValueOverridesProvider for AirflowConfigOverrides {
+    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
+        match file {
+            AIRFLOW_CONFIG_FILENAME => self
+                .webserver_config_py
+                .as_ref()
+                .map(|o| o.as_product_config_overrides())
+                .unwrap_or_default(),
+            _ => BTreeMap::new(),
+        }
+    }
+}
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -218,23 +249,23 @@ pub mod versioned {
 
         /// The `webservers` role provides the main UI for user interaction.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub webservers: Option<Role<AirflowConfigFragment, v1alpha2::WebserverRoleConfig>>,
+        pub webservers: Option<AirflowWebserverRoleType>,
 
         /// The `schedulers` is responsible for triggering jobs and persisting their metadata to the backend database.
         /// Jobs are scheduled on the workers/executors.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub schedulers: Option<Role<AirflowConfigFragment>>,
+        pub schedulers: Option<AirflowRoleType>,
 
         #[serde(flatten)]
         pub executor: AirflowExecutor,
 
         /// The `dagProcessors` role runs the DAG processor routine for DAG preparation.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub dag_processors: Option<Role<AirflowConfigFragment>>,
+        pub dag_processors: Option<AirflowRoleType>,
 
         /// The `triggerers` role runs the triggerer process for use with deferrable DAG operators.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub triggerers: Option<Role<AirflowConfigFragment>>,
+        pub triggerers: Option<AirflowRoleType>,
     }
 
     #[derive(Clone, Deserialize, Debug, JsonSchema, PartialEq, Serialize)]
@@ -254,7 +285,7 @@ pub mod versioned {
         /// The name of the Secret object containing the admin user credentials. Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
-        pub credentials_secret: String,
+        pub credentials_secret_name: String,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
@@ -375,7 +406,7 @@ impl v1alpha2::AirflowCluster {
 
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
     /// the kubernetes executor is specified)
-    pub fn get_role(&self, role: &AirflowRole) -> Option<Role<AirflowConfigFragment>> {
+    pub fn get_role(&self, role: &AirflowRole) -> Option<AirflowRoleType> {
         match role {
             AirflowRole::Webserver => self
                 .spec
@@ -482,9 +513,7 @@ impl v1alpha2::AirflowCluster {
     }
 }
 
-fn extract_role_from_webserver_config(
-    fragment: Role<AirflowConfigFragment, WebserverRoleConfig>,
-) -> Role<AirflowConfigFragment> {
+fn extract_role_from_webserver_config(fragment: AirflowWebserverRoleType) -> AirflowRoleType {
     Role {
         config: CommonConfiguration {
             config: fragment.config.config,
@@ -776,7 +805,7 @@ impl AirflowRole {
     pub fn role_config(
         &self,
         airflow: &v1alpha2::AirflowCluster,
-    ) -> Result<Role<AirflowConfigFragment>, Error> {
+    ) -> Result<AirflowRoleType, Error> {
         let role = self.to_string();
         let roles = AirflowRole::roles();
 
@@ -827,7 +856,7 @@ pub enum AirflowExecutor {
     #[serde(rename_all = "camelCase")]
     CeleryExecutors {
         #[serde(flatten)]
-        config: Box<Role<AirflowConfigFragment>>,
+        config: Box<AirflowRoleType>,
 
         /// Connection information for the celery backend database.
         celery_result_backend: CeleryResultBackendConnection,
@@ -839,8 +868,7 @@ pub enum AirflowExecutor {
     /// With the Kubernetes executor, executor Pods are created on demand.
     KubernetesExecutors {
         #[serde(flatten)]
-        common_configuration:
-            Box<CommonConfiguration<ExecutorConfigFragment, GenericProductSpecificCommonConfig>>,
+        common_configuration: Box<AirflowExecutorCommonConfiguration>,
     },
 }
 
@@ -1099,12 +1127,12 @@ mod tests {
           clusterConfig:
             loadExamples: true
             exposeConfig: true
-            credentialsSecret: airflow-admin-credentials
+            credentialsSecretName: airflow-admin-credentials
             metadataDatabase:
               postgresql:
                 host: airflow-postgresql
                 database: airflow
-                credentialsSecret: airflow-postgresql-credentials
+                credentialsSecretName: airflow-postgresql-credentials
           webservers:
             roleGroups:
               default:

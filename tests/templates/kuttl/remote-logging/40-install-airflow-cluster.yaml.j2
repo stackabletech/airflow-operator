@@ -49,12 +49,12 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     loadExamples: true
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -72,11 +72,11 @@ spec:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     celeryBroker:
       redis:
         host: airflow-redis-master
-        credentialsSecret: airflow-redis-credentials
+        credentialsSecretName: airflow-redis-credentials
     roleGroups:
       default:
         replicas: 2

@@ -1,0 +1,10 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+timeout: 480
+commands:
+  - script: |
+      kubectl delete airflowcluster airflow-wrong-cert -n $NAMESPACE --wait=false
+      envsubst < 30_airflow-cluster.yaml | kubectl apply -n $NAMESPACE -f -

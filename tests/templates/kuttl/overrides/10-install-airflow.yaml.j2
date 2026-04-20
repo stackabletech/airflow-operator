@@ -55,19 +55,19 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level
-      credentialsSecret: test-override
+      credentialsSecretName: test-override
     roleGroups:
       default:
         replicas: 1
@@ -79,11 +79,11 @@ spec:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     celeryBroker:
       redis:
         host: airflow-redis-master
-        credentialsSecret: airflow-redis-credentials
+        credentialsSecretName: airflow-redis-credentials
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level
@@ -125,4 +125,4 @@ spec:
       default:
         replicas: 1
         envOverrides:
-          credentialsSecret: test-override
+          credentialsSecretName: test-override

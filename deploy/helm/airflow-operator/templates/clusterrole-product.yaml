@@ -28,14 +28,6 @@ rules:
       - pods/log
     verbs:
       - get
-  # Airflow components publish Kubernetes events
-  - apiGroups:
-      - events.k8s.io
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   # On OpenShift: allows workload pods to use the nonroot-v2 SecurityContextConstraint
   - apiGroups:

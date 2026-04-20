@@ -53,17 +53,17 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     dagsGitSync:
       - repo: https://github.com/stackable-airflow/dags
         # v1alpha1 field which should be converted to an enum
         # N.B. only works for the existing v1 field
-        credentialsSecret: airflow-git-credentials
+        credentialsSecretName: airflow-git-credentials
         gitFolder: "mount-dags-gitsync/dags_airflow3"
         wait: 5s
   webservers:

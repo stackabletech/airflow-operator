@@ -1,0 +1,16 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |
+      # this is to avoid excessive looping while the git-sync pod starts
+      sleep 10
+
+      POD="airflow-wrong-cert-dagprocessor-default-0"
+      CONTAINER="git-sync-0"
+
+      kubectl logs -n "$NAMESPACE" "$POD" -c "$CONTAINER" 2>/dev/null \
+        | grep -q "SSL certificate problem: unable to get local issuer certificate" && exit 0
+
+      exit 1

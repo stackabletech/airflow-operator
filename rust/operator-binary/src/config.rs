@@ -202,7 +202,9 @@ fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     providers: &[(
         &oidc::v1alpha1::AuthenticationProvider,
-        &oidc::v1alpha1::ClientAuthenticationOptions<()>,
+        &oidc::v1alpha1::ClientAuthenticationOptions<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >,
     )],
 ) -> Result<(), Error> {
     // Additionally can be set via config
@@ -235,6 +237,11 @@ fn append_oidc_config(
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
 
+                let client_auth_method = client_options
+                    .product_specific_fields
+                    .client_authentication_method
+                    .as_ref();
+
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -248,6 +255,7 @@ fn append_oidc_config(
                           }},
                           'api_base_url': '{api_base_url}',
                           'server_metadata_url': '{well_known_config_url}',
+                          'token_endpoint_auth_method': '{client_auth_method}',
                         }},
                       }}",
                     scopes = scopes.join(" "),
@@ -460,8 +468,9 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret1".to_string(),
                         extra_scopes: vec!["roles".to_string()],
-                        product_specific_fields: (),
-                        client_authentication_method: todo!("Will be added in another PR"),
+                        product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
+                            client_authentication_method: Default::default(),
+                        },
                     },
                 },
                 AirflowAuthenticationClassResolved::Oidc {
@@ -469,8 +478,9 @@ mod tests {
                     oidc: oidc::v1alpha1::ClientAuthenticationOptions {
                         client_credentials_secret_ref: "test-client-secret2".to_string(),
                         extra_scopes: vec![],
-                        product_specific_fields: (),
-                        client_authentication_method: todo!("Will be added in another PR"),
+                        product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
+                            client_authentication_method: Default::default(),
+                        },
                     },
                 },
             ],
@@ -511,6 +521,7 @@ mod tests {
                   }},
                   'api_base_url': 'https://my.keycloak1.server:12345/realms/sdp/protocol/',
                   'server_metadata_url': 'https://my.keycloak1.server:12345/realms/sdp/.well-known/openid-configuration',
+                  'token_endpoint_auth_method': 'client_secret_basic',
                 }},
               }},
               {{ 'name': 'keycloak',
@@ -524,6 +535,7 @@ mod tests {
                   }},
                   'api_base_url': 'http://my.keycloak2.server/protocol/',
                   'server_metadata_url': 'http://my.keycloak2.server/.well-known/openid-configuration',
+                  'token_endpoint_auth_method': 'client_secret_basic',
                 }},
               }}
               ]

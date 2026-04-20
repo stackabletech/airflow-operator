@@ -65,10 +65,15 @@ include::example$example-airflow-gitsync-https.yaml[]
     This should include two fields: `user` and `password` (which can be either a password -- which is not recommended -- or a GitHub token, as described https://github.com/kubernetes/git-sync/tree/v3.6.4#flags-which-configure-authentication[here])
 <9> A map of optional configuration settings that are listed in https://github.com/kubernetes/git-sync/tree/v4.2.1?tab=readme-ov-file#manual[this] configuration section (and the ones that follow on that link)
 <10> An example showing how to specify a target revision (the default is HEAD).
-     The revision can also be a tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`.
-     If a tag or commit hash is specified, then git-sync recognizes this and does not perform further cloning.
-<11> Git-sync settings can be provided inline, although some of these (`--dest`, `--root`) are specified internally in the operator and are ignored if provided by the user.
-     Git-config settings can also be specified, although a warning is logged if `safe.directory` is specified as this is defined internally, and should not be defined by the user.
+    The revision can also be a tag or a commit, though this assumes that the target hash is contained within the number of commits specified by `depth`.
+    If a tag or commit hash is specified, then git-sync recognizes this and does not perform further cloning.
+    Git-sync settings can be provided inline, although some of these (`--dest`, `--root`) are specified internally in the operator and are ignored if provided by the user.
+    Git-config settings can also be specified, although a warning is logged if `safe.directory` is specified as this is defined internally, and should not be defined by the user.
+<11> An optional reference to the SecretClass used for holding CA certificates that will be used to verify the git server's TLS certificate by passing it to the git config option `http.sslCAInfo` passed with the gitsync command.
+    The associated secret must have a key named `ca.crt` whose value is the PEM-encoded certificate bundle.
+    If this field is set to `webPki: {}` or is omitted altogether, then no changes will be made to the gitsync command and it will default to presenting no certificate to the backend.
+    Omitting this field is non-breaking behaviour and as such it does *not* set `http.sslverify` to `false` as disabling security checks should be a last resort and not something activated by default.
+    This can still be achieved explicitly: either by setting `tls: verification: none: {}` or by passing `--git-config: http.sslverify=false` as part of the `gitSyncConf` field.
 
 .git-sync usage example: ssh
 [source,yaml]

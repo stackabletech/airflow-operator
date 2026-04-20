@@ -86,12 +86,12 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     dagsGitSync:
 {% if test_scenario['values']['access'] == 'ssh' %}
       - repo: ssh://git@github.com/stackable-airflow/dags.git
@@ -109,8 +109,6 @@ spec:
         wait: 5s
 {% endif %}
         gitSyncConf:
-          # supply some config to check that safe.directory is correctly set
-          --git-config: http.sslVerify:false
         # N.B. dags definitions changed from 2.x to 3.x:
         # this test assumes airflow-latest > 2
         gitFolder: "mount-dags-gitsync/dags_airflow3"
@@ -138,11 +136,11 @@ spec:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     celeryBroker:
       redis:
         host: airflow-redis-master
-        credentialsSecret: airflow-redis-credentials
+        credentialsSecretName: airflow-redis-credentials
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

@@ -90,12 +90,12 @@ spec:
   clusterConfig:
     vectorAggregatorConfigMapName: airflow-vector-aggregator-discovery
     loadExamples: true
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     dagsGitSync:
       - repo: https://github.com/stackabletech/example-dags
         gitFolder: dags
@@ -166,11 +166,11 @@ spec:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     celeryBroker:
       redis:
         host: airflow-redis-master
-        credentialsSecret: airflow-redis-credentials
+        credentialsSecretName: airflow-redis-credentials
     config:
       resources:
         cpu:

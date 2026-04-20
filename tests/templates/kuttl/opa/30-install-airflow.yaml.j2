@@ -53,12 +53,12 @@ spec:
         cache:
           entryTimeToLive: 5s
           maxEntries: 10
-    credentialsSecret: airflow-admin-credentials
+    credentialsSecretName: airflow-admin-credentials
     metadataDatabase:
       postgresql:
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials
+        credentialsSecretName: airflow-postgresql-credentials
     exposeConfig: true
     loadExamples: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}

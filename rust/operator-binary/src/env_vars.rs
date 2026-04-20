@@ -135,7 +135,7 @@ pub fn build_airflow_statefulset_envs(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         EnvVar {
             name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-            value: Some(metadata_database_connection_details.uri_template.clone()),
+            value: Some(metadata_database_connection_details.url_template.clone()),
             ..Default::default()
         },
     );
@@ -145,7 +145,7 @@ pub fn build_airflow_statefulset_envs(
             AIRFLOW_CELERY_RESULT_BACKEND.into(),
             EnvVar {
                 name: AIRFLOW_CELERY_RESULT_BACKEND.into(),
-                value: Some(celery_result_backend.uri_template.clone()),
+                value: Some(celery_result_backend.url_template.clone()),
                 ..Default::default()
             },
         );
@@ -153,7 +153,7 @@ pub fn build_airflow_statefulset_envs(
             AIRFLOW_CELERY_BROKER_URL.into(),
             EnvVar {
                 name: AIRFLOW_CELERY_BROKER_URL.into(),
-                value: Some(celery_broker.uri_template.clone()),
+                value: Some(celery_broker.url_template.clone()),
                 ..Default::default()
             },
         );
@@ -232,7 +232,7 @@ pub fn build_airflow_statefulset_envs(
         // Database initialization is limited to the scheduler.
         // See https://github.com/stackabletech/airflow-operator/issues/259
         AirflowRole::Scheduler => {
-            let secret = &airflow.spec.cluster_config.credentials_secret;
+            let secret = &airflow.spec.cluster_config.credentials_secret_name;
             env.insert(
                 ADMIN_USERNAME.into(),
                 env_var_from_secret(ADMIN_USERNAME, secret, "adminUser.username"),
@@ -387,7 +387,7 @@ pub fn build_airflow_template_envs(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         EnvVar {
             name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-            value: Some(metadata_database_connection_details.uri_template.clone()),
+            value: Some(metadata_database_connection_details.url_template.clone()),
             ..Default::default()
         },
     );

@@ -14,7 +14,7 @@ spec:
       postgresql: # <1>
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials # <2>
+        credentialsSecretName: airflow-postgresql-credentials # <2>
 ----
 <1> A reference to one of the supported database backends (e.g. `postgresql`).
 <2> A reference to a Secret which must contain the two fields `username` and `password`.
@@ -31,11 +31,11 @@ spec:
       postgresql: # <1>
         host: airflow-postgresql
         database: airflow
-        credentialsSecret: airflow-postgresql-credentials # <2>
+        credentialsSecretName: airflow-postgresql-credentials # <2>
     celeryBroker:
       redis: # <3>
         host: airflow-redis-master
-        credentialsSecret: airflow-redis-credentials # <2>
+        credentialsSecretName: airflow-redis-credentials # <2>
 ----
 <1> A reference to one of the supported database backends (e.g. `postgresql`).
 <2> A reference to a secret which must contain the two fields `username` and `password`.
@@ -51,7 +51,7 @@ spec:
   clusterConfig:
     metadataDatabase:
       generic:
-        uriSecret: postgresql-metadata # <1>
+        connectionUrlSecretName: postgresql-metadata # <1>
 ----
 
 [source,yaml]
@@ -59,15 +59,12 @@ spec:
 spec:
   celeryResultBackend:
       generic:
-        uriSecret: postgresql-celery # <2>
+        connectionUrlSecretName: postgresql-celery # <2>
     celeryBroker:
       generic:
-        uriSecret: redis-celery # <3>
+        connectionUrlSecretName: redis-celery # <3>
 ----
 
-<1> A reference to a secret which must contain the single fields `uri` e.g.
-`uri: postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow`
-<2> A reference to a secret which must contain the single fields `uri` e.g.
-`uri: db+postgresql://airflow:airflow@airflow-postgresql/airflow`
-<3> A reference to a secret which must contain the single fields `uri` e.g.
-`uri: redis://:redis@airflow-redis-master:6379/0`
+<1> A reference to a secret which must contain the single fields `connectionUrl` e.g. `postgresql+psycopg2://airflow:airflow@airflow-postgresql/airflow`
+<2> A reference to a secret which must contain the single fields `connectionUrl` e.g. `db+postgresql://airflow:airflow@airflow-postgresql/airflow`
+<3> A reference to a secret which must contain the single fields `connectionUrl` e.g. `redis://:redis@airflow-redis-master:6379/0`

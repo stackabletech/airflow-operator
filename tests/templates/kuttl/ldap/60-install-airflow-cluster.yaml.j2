@@ -65,12 +65,12 @@ commands:
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
           loadExamples: true
-          credentialsSecret: airflow-admin-credentials
+          credentialsSecretName: airflow-admin-credentials
           metadataDatabase:
             postgresql:
               host: airflow-postgresql
               database: airflow
-              credentialsSecret: airflow-postgresql-credentials
+              credentialsSecretName: airflow-postgresql-credentials
           authentication:
             - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
               no-tls-$NAMESPACE
@@ -96,11 +96,11 @@ commands:
             postgresql:
               host: airflow-postgresql
               database: airflow
-              credentialsSecret: airflow-postgresql-credentials
+              credentialsSecretName: airflow-postgresql-credentials
           celeryBroker:
             redis:
               host: airflow-redis-master
-              credentialsSecret: airflow-redis-credentials
+              credentialsSecretName: airflow-redis-credentials
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
