@@ -1,8 +1,8 @@
 = Mounting DAGs
-:description: Mount DAGs in Airflow via ConfigMap for single DAGs or use git-sync for multiple DAGs. git-sync pulls from a Git repo and handles updates automatically.
+:description: Mount DAGs in Airflow via ConfigMap for single DAGs, git-sync for multiple DAGs from a single repo, or DAG bundles (Airflow 3.x) for multiple repositories.
 :git-sync: https://github.com/kubernetes/git-sync/tree/v4.2.4
 
-DAGs can be mounted by using a ConfigMap or `git-sync`.
+DAGs can be mounted by using a ConfigMap, `git-sync`, or - on Airflow 3.x - DAG bundles.
 This is best illustrated with an example of each, shown in the sections below.
 
 == Via ConfigMap
@@ -87,3 +87,168 @@ include::example$example-airflow-gitsync-ssh.yaml[]
 
 NOTE: git-sync can be used with DAGs that make use of Python modules, as Python is configured to use the git-sync target folder as the "root" location when looking for referenced files.
 See the xref:usage-guide/applying-custom-resources.adoc[] example for more details.
+
+== Via DAG bundles (Airflow 3.x)
+
+https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/dag-bundles.html[DAG bundles] are an Airflow 3.x feature that natively supports loading DAGs from multiple sources - including multiple Git repositories - without requiring a git-sync sidecar.
+This is particularly useful when DAGs are maintained in separate repositories by different teams.
+
+The Stackable Airflow operator does not have first-class CRD support for DAG bundles, but they can be configured using `envOverrides` to set the `AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST` environment variable.
+No changes to the Stackable Airflow image are required: the `apache-airflow-providers-git` package and the `git` binary are both included in the standard image.
+
+=== When to use DAG bundles instead of git-sync
+
+Use `git-sync` (via `dagsGitSync`) when:
+
+* DAGs come from a single repository.
+* You need per-repository TLS/CA certificate configuration.
+
+Use DAG bundles when:
+
+* DAGs come from **multiple repositories** and must all be visible to Airflow.
+* You want DAG versioning (each DAG run is pinned to the Git commit at the time it was created).
+
+=== Prerequisites
+
+* Airflow 3.x (the `dag_bundle_config_list` setting does not exist in Airflow 2.x).
+* Each `GitDagBundle` requires an https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[Airflow Git connection] - even for public repositories.
+  For public repos, the connection only needs a `host` (the repository URL) and no credentials.
+  Connections can be created via the Airflow UI, CLI, a https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html[secrets backend], or - as shown in the example below - via `AIRFLOW_CONN_*` environment variables.
+  The operator does not manage Airflow connections.
+
+=== Example
+
+The following example configures two DAG bundles, each pulling from a public Git repository.
+The Airflow connections are defined as `AIRFLOW_CONN_*` environment variables alongside the bundle configuration.
+
+WARNING: This example points both bundles at the same repository and subdirectory for illustrative purposes.
+In practice, each bundle should reference a different repository (or at least a different subdirectory) with distinct DAG files.
+Airflow requires that https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/multi-team.html[DAG IDs are unique across the entire deployment]:
+if two bundles define the same DAG ID, the last one parsed silently overwrites the other - with no error or warning - and the DAG may flip-flop between bundles on each parse cycle.
+
+NOTE: The `envOverrides` are set at the role level (not the role group level) in all cases, so that they apply to all role groups within that role.
+
+[source,yaml]
+----
+include::example$example-airflow-dag-bundles.yaml[]
+----
+
+<1> The credentials Secret for database and admin user access (same as any other Airflow cluster).
+<2> `dagsGitSync` is intentionally not configured.
+    DAG bundles replace the git-sync sidecar entirely.
+<3> A YAML anchor is used to define the environment variables once at the role level and reuse them across all roles.
+<4> Each bundle requires an Airflow Git connection.
+    Connections are defined as `AIRFLOW_CONN_<CONN_ID>` environment variables with a JSON value containing `conn_type` and `host` (the repository URL).
+    For private repositories, add `login` (username) and `password` (access token) fields for HTTPS auth, or `key_file` / `private_key` in the `extra` dict for SSH auth.
+    The connection ID in the env var name must be uppercase (e.g. `AIRFLOW_CONN_REPO1`), while the `git_conn_id` in the bundle config uses the lowercase form (`repo1`).
+<5> The `AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST` environment variable is a JSON list of bundle definitions.
+    Each entry specifies a `name`, the `classpath` of the bundle backend, and `kwargs` passed to the bundle constructor.
+    For `GitDagBundle`, the key kwargs are `git_conn_id` (referencing an Airflow connection), `tracking_ref` (branch or tag), and `subdir` (subdirectory within the repository containing DAGs).
+<6> The YAML anchor is referenced on all other roles so that every Airflow component sees the same bundle configuration.
+
+=== Airflow Git connection reference
+
+When using `GitDagBundle` with private repositories, credentials are configured via an https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[Airflow Git connection].
+The table below shows which capabilities of the operator's `dagsGitSync` fields have equivalents in a Git connection or `GitDagBundle`.
+The connection field names (`login`, `password`, `extra`) refer to the https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[JSON field names] used in `AIRFLOW_CONN_*` environment variables.
+The `GitDagBundle` kwargs are documented in the https://airflow.apache.org/docs/apache-airflow-providers-git/stable/bundles/index.html[git provider bundles reference].
+
+[cols="2,3,1"]
+|===
+|`dagsGitSync` field |Git connection / `GitDagBundle` equivalent |Parity
+
+|`repo`
+|Connection `host` field, or `GitDagBundle` `repo_url` kwarg.
+|Full
+
+|`branch`
+|`GitDagBundle` `tracking_ref` kwarg. Accepts branches, tags, or commit hashes.
+|Full
+
+|`gitFolder`
+|`GitDagBundle` `subdir` kwarg.
+|Full
+
+|`wait`
+|`GitDagBundle` `refresh_interval` kwarg (integer, in seconds).
+|Full
+
+|`credentials.basicAuthSecretName`
+|Connection username and access token fields (JSON keys `login` and `password` in `AIRFLOW_CONN_*` env vars).
+|Full - but the user must create the Airflow connection rather than referencing a Kubernetes Secret directly.
+
+|`credentials.sshPrivateKeySecretName` (key)
+|Connection extra https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[`key_file`] (path to a mounted key file) or `private_key` (inline key content). Mutually exclusive.
+|Full
+
+|`credentials.sshPrivateKeySecretName` (knownHosts)
+|Connection extra https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[`known_hosts_file`] (path to a mounted file) and `strict_host_key_checking` (defaults to `"no"`).
+To replicate git-sync's known-hosts verification, set `strict_host_key_checking` to `"yes"` and provide a `known_hosts_file`.
+|Full
+
+|`depth`
+|No equivalent. `GitDagBundle` always performs a full clone.
+|None
+
+|`gitSyncConf`
+|No equivalent. There is no pass-through mechanism for arbitrary git options.
+|None
+
+|`tls.verification.none`
+|Not supported by the Git provider. Workaround: set the `GIT_SSL_NO_VERIFY=true` environment variable on the pod (applies globally to all repositories).
+|None
+
+|`tls.verification.server.caCert.webPki`
+|Implicit - Git uses the operating system's CA trust store by default.
+|Implicit
+
+|`tls.verification.server.caCert.secretClass`
+|Not supported by the Git provider. Workaround: mount the CA certificate and set the `GIT_SSL_CAINFO` environment variable on the pod, but this applies globally to *all* repositories, not per-repo.
+|None (global workaround only)
+|===
+
+The https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[Git connection] also supports several extra keys *not* available in `dagsGitSync`:
+
+[cols="1,3"]
+|===
+|Connection extra key |Description
+
+|`private_key_passphrase`
+|Passphrase for encrypted SSH private keys.
+
+|`ssh_config_file`
+|Path to a custom SSH configuration file.
+
+|`host_proxy_cmd`
+|SSH `ProxyCommand` for connecting through bastion or jump hosts.
+
+|`ssh_port`
+|Non-default SSH port (set via `-p` on the SSH command).
+|===
+
+`GitDagBundle` itself also accepts two additional kwargs (see the https://airflow.apache.org/docs/apache-airflow-providers-git/stable/bundles/index.html[bundles reference]):
+
+[cols="1,1,3"]
+|===
+|Kwarg |Default |Description
+
+|`submodules`
+|`false`
+|Initialise and update Git submodules recursively.
+
+|`prune_dotgit_folder`
+|`true`
+|Remove the `.git` folder from version clones to save disk space. Forced to `false` when `submodules` is `true`.
+|===
+
+=== Limitations
+
+* **No per-repository TLS/CA certificates.** The Airflow Git provider does not support custom CA certificates per connection.
+  The only workaround is setting `GIT_SSL_CAINFO` as a pod-level environment variable, which applies to all repositories.
+* **No clone depth control.** `GitDagBundle` always performs a full clone.
+  For large repositories this may increase pod startup time, particularly with the Kubernetes executor where each short-lived worker pod clones independently.
+* **No `gitSyncConf` equivalent.** There is no mechanism to pass arbitrary git or git-sync options through to the bundle.
+* **Triggerer limitation.** The Airflow triggerer does not initialise DAG bundles.
+  Custom trigger classes cannot be loaded from a bundle and must be installed as Python packages in the image.
+* **Static configuration.** Bundle definitions are read from configuration at process startup.
+  Adding or removing a bundle requires updating the `envOverrides` and restarting the affected pods.
