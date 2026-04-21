@@ -70,9 +70,8 @@ spec:
             - name: OPERATOR_SERVICE_NAME
               value: {{ include "operator.fullname" . }}
 
-            # The URI of the image registry, like "oci.stackable.tech". Used to derive product image
-            # name.
-            - name: IMAGE_REGISTRY_URI
+            # The image registry, like "oci.stackable.tech". Used to derive product image name.
+            - name: IMAGE_REGISTRY
               value: {{ .Values.image.registry }}
 
             # The image repository, like "sdp/airflow-operator"
