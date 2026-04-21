@@ -12,3 +12,7 @@ spec:
   clusterOperation:
     reconciliationPaused: true
     stopped: false
+  celeryExecutors:
+    roleGroups:
+      default:
+        replicas: 3 # ignored because paused
