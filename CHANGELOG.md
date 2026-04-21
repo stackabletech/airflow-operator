@@ -13,6 +13,8 @@
 - BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
 - Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([#775], [#777]).
+- BREAKING: The `.clusterConfig.credentialsSecret` has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#754]).
+- BREAKING: TODO describer generic database connection change ([#754]).
 
 ### Fixed
 
@@ -25,6 +27,7 @@
 [#774]: https://github.com/stackabletech/airflow-operator/pull/774
 [#775]: https://github.com/stackabletech/airflow-operator/pull/775
 [#777]: https://github.com/stackabletech/airflow-operator/pull/777
+[#754]: https://github.com/stackabletech/airflow-operator/pull/754
 
 ## [26.3.0] - 2026-03-16
 
