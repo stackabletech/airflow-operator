@@ -1,0 +1,60 @@
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow-dag-bundles
+spec:
+  image:
+    productVersion: 3.1.6
+  clusterConfig:
+    loadExamples: false
+    exposeConfig: false
+    credentialsSecret: airflow-credentials # <1>
+    # dagsGitSync is intentionally not configured: DAG bundles replace git-sync # <2>
+  webservers:
+    envOverrides: &bundleEnvOverrides # <3>
+      AIRFLOW_CONN_REPO1: >- # <4>
+        {"conn_type": "git", "host": "https://github.com/apache/airflow.git"}
+      AIRFLOW_CONN_REPO2: >-
+        {"conn_type": "git", "host": "https://github.com/apache/airflow.git"}
+      AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST: >- # <5>
+        [
+          {
+            "name": "repo1",
+            "classpath": "airflow.providers.git.bundles.git.GitDagBundle",
+            "kwargs": {
+              "git_conn_id": "repo1",
+              "tracking_ref": "3.1.6",
+              "subdir": "airflow-core/src/airflow/example_dags"
+            }
+          },
+          {
+            "name": "repo2",
+            "classpath": "airflow.providers.git.bundles.git.GitDagBundle",
+            "kwargs": {
+              "git_conn_id": "repo2",
+              "tracking_ref": "3.1.6",
+              "subdir": "airflow-core/src/airflow/example_dags"
+            }
+          }
+        ]
+    roleGroups:
+      default:
+        replicas: 1
+  schedulers:
+    envOverrides: *bundleEnvOverrides # <6>
+    roleGroups:
+      default:
+        replicas: 1
+  dagProcessors:
+    envOverrides: *bundleEnvOverrides
+    roleGroups:
+      default:
+        replicas: 1
+  kubernetesExecutors:
+    envOverrides: *bundleEnvOverrides
+  triggerers:
+    envOverrides: *bundleEnvOverrides
+    roleGroups:
+      default:
+        replicas: 1
