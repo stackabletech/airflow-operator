@@ -26,7 +26,12 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-    credentialsSecretName: test-airflow-credentials
+    credentialsSecretName: airflow-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
     dagsGitSync:
       - repo: https://git-proxy.$NAMESPACE.svc.cluster.local/stackable-airflow/dags
         credentials:
