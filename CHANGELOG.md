@@ -13,7 +13,7 @@
 - BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
 - Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([#775], [#777]).
-- BREAKING: The `.clusterConfig.credentialsSecret` has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#754]).
+- BREAKING: The `.clusterConfig.credentialsSecret` field has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#754]).
 - BREAKING: Implement generic database connection.
   This means you need to replace your simple database connection string with a typed struct.
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
