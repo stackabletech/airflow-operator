@@ -9,7 +9,10 @@
 
 ### Changed
 
-- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767]).
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
+- BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
+- Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
+- BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([#775], [#777]).
 
 ### Fixed
 
@@ -19,6 +22,9 @@
 [#765]: https://github.com/stackabletech/airflow-operator/pull/765
 [#767]: https://github.com/stackabletech/airflow-operator/pull/767
 [#770]: https://github.com/stackabletech/airflow-operator/pull/770
+[#774]: https://github.com/stackabletech/airflow-operator/pull/774
+[#775]: https://github.com/stackabletech/airflow-operator/pull/775
+[#777]: https://github.com/stackabletech/airflow-operator/pull/777
 
 ## [26.3.0] - 2026-03-16
 
