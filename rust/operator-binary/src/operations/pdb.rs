@@ -40,8 +40,8 @@ pub async fn add_pdbs(
         AirflowRole::DagProcessor => max_unavailable_dag_processors(),
         AirflowRole::Triggerer => max_unavailable_triggerers(),
         AirflowRole::Worker => match airflow.spec.executor {
-            AirflowExecutor::CeleryExecutor { .. } => max_unavailable_workers(),
-            AirflowExecutor::KubernetesExecutor { .. } => {
+            AirflowExecutor::CeleryExecutors { .. } => max_unavailable_workers(),
+            AirflowExecutor::KubernetesExecutors { .. } => {
                 // In case Airflow creates the Pods, we don't want to influence that.
                 return Ok(());
             }

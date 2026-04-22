@@ -10,7 +10,12 @@ spec:
   clusterConfig:
     loadExamples: true
     exposeConfig: false
-    credentialsSecret: simple-airflow-credentials
+    credentialsSecretName: airflow-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -18,6 +23,15 @@ spec:
       default:
         replicas: 1
   celeryExecutors:
+    resultBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    broker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecretName: airflow-redis-credentials
     roleGroups:
       default:
         replicas: 1

@@ -12,39 +12,3 @@ spec:
   clusterOperation:
     reconciliationPaused: false
     stopped: true
-  image:
-{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
-{% else %}
-    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
-{% endif %}
-    pullPolicy: IfNotPresent
-  clusterConfig:
-{% if lookup('env', 'VECTOR_AGGREGATOR') %}
-    vectorAggregatorConfigMapName: vector-aggregator-discovery
-{% endif %}
-    credentialsSecret: test-airflow-credentials
-  webservers:
-    roleConfig:
-      listenerClass: external-unstable
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        replicas: 1
-  celeryExecutors:
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        replicas: 3 # ignored because paused
-  schedulers:
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        replicas: 1

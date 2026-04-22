@@ -23,6 +23,7 @@ spec:
               "flask_appbuilder":
                 level: WARN
   celeryExecutors:
+    ...
     config:
       logging:
         enableVectorAgent: true

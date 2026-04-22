@@ -27,6 +27,7 @@ spec:
       default:
         replicas: 2
   celeryExecutors:
+    ...
     config:
       resources:
         cpu:
