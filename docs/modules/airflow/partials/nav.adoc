@@ -21,6 +21,6 @@
 * xref:airflow:troubleshooting/index.adoc[]
 * xref:airflow:reference/index.adoc[]
 ** xref:airflow:reference/crds.adoc[]
-*** {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/[AirflowCluster {external-link-icon}^]
+*** {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha2/[AirflowCluster {external-link-icon}^]
 ** xref:airflow:reference/commandline-parameters.adoc[]
 ** xref:airflow:reference/environment-variables.adoc[]
