@@ -77,3 +77,10 @@ Labels for Kubernetes objects created by helm test
 {{- define "operator.testLabels" -}}
 helm.sh/test: {{ include "operator.chart" . }}
 {{- end }}
+
+{{/*
+Build the full container image reference.
+*/}}
+{{- define "operator.image" -}}
+{{- printf "%s/%s:%s" .Values.image.registry .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end }}

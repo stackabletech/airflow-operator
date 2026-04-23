@@ -1,7 +1,8 @@
 # Default values for airflow-operator.
 ---
 image:
-  repository: oci.stackable.tech/sdp/airflow-operator
+  registry: oci.stackable.tech/sdp
+  repository: airflow-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
 

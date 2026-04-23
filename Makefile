@@ -8,12 +8,20 @@
 # This script also requires `jq` https://stedolan.github.io/jq/
 
 .PHONY: build publish
+.PHONY: chart-package-oci chart-package-quay chart-package-all
+.PHONY: chart-publish-oci chart-publish-quay chart-publish-all
 
 OPERATOR_NAME := airflow-operator
 VERSION := $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="stackable-${OPERATOR_NAME}") | .version')
 
 OCI_REGISTRY_HOSTNAME := oci.stackable.tech
 OCI_REGISTRY_PROJECT_IMAGES := sdp
+
+OCI_REGISTRY_PROJECT_CHARTS ?= sdp/charts
+QUAY_REGISTRY_PROJECT_CHARTS ?= stackable/charts
+
+CHART_DIR := deploy/helm/${OPERATOR_NAME}
+CHART_PACKAGE_OUTPUT_DIR ?= /tmp
 
 SHELL=/usr/bin/env bash -euo pipefail
 
@@ -52,6 +60,38 @@ crds:
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
+
+chart-package-oci: compile-chart
+	tmp_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	cp -r "${CHART_DIR}" "$$tmp_dir/"; \
+	yq ea '. as $$item ireduce ({}; . * $$item )' \
+		"$$tmp_dir/${OPERATOR_NAME}/values.yaml" \
+		"$$tmp_dir/${OPERATOR_NAME}/values.registry-oci.yaml" \
+		> "$$tmp_dir/${OPERATOR_NAME}/values.yaml.new"; \
+	mv "$$tmp_dir/${OPERATOR_NAME}/values.yaml.new" "$$tmp_dir/${OPERATOR_NAME}/values.yaml"; \
+	helm package "$$tmp_dir/${OPERATOR_NAME}" --destination "${CHART_PACKAGE_OUTPUT_DIR}"
+
+chart-package-quay: compile-chart
+	tmp_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	cp -r "${CHART_DIR}" "$$tmp_dir/"; \
+	yq ea '. as $$item ireduce ({}; . * $$item )' \
+		"$$tmp_dir/${OPERATOR_NAME}/values.yaml" \
+		"$$tmp_dir/${OPERATOR_NAME}/values.registry-quay.yaml" \
+		> "$$tmp_dir/${OPERATOR_NAME}/values.yaml.new"; \
+	mv "$$tmp_dir/${OPERATOR_NAME}/values.yaml.new" "$$tmp_dir/${OPERATOR_NAME}/values.yaml"; \
+	helm package "$$tmp_dir/${OPERATOR_NAME}" --destination "${CHART_PACKAGE_OUTPUT_DIR}"
+
+chart-package-all: chart-package-oci chart-package-quay
+
+chart-publish-oci: chart-package-oci
+	helm push "${CHART_PACKAGE_OUTPUT_DIR}/${OPERATOR_NAME}-${VERSION}.tgz" "oci://${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_CHARTS}"
+
+chart-publish-quay: chart-package-quay
+	helm push "${CHART_PACKAGE_OUTPUT_DIR}/${OPERATOR_NAME}-${VERSION}.tgz" "oci://quay.io/${QUAY_REGISTRY_PROJECT_CHARTS}"
+
+chart-publish-all: chart-publish-oci chart-publish-quay
 
 clean: chart-clean
 	cargo clean
