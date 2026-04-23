@@ -1,6 +1,6 @@
 = Security
 :description: Secure Apache Airflow by configuring user authentication and authorization.
-:airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html
+:airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow-providers-fab/stable/auth-manager/access-control.html
 :keycloak: https://www.keycloak.org/
 
 Secure Apache Airflow by configuring user authentication and authorization.
@@ -47,7 +47,7 @@ spec:
 <1> The reference to an AuthenticationClass called `ldap`
 <2> The default role that all users are assigned to
 
-Users that log in with LDAP are assigned to a default {airflow-access-control-docs}[role] which is specified with the `userRegistrationRole` property.
+Users that log in with LDAP are assigned to a default {airflow-access-control-docs}[role{external-link-icon}^] which is specified with the `userRegistrationRole` property.
 
 You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-docs}/authentication.stackable.tech/authenticationclass/v1alpha1/[AuthenticationClass reference {external-link-icon}^].
 
@@ -61,7 +61,7 @@ An OpenID Connect provider can be used for authentication.
 Unfortunately, there is no generic support for OpenID Connect built into Airflow.
 This means that only specific OpenID Connect providers can be configured.
 
-IMPORTANT: Airflow deployments on the Stackable Data Platform only support {keycloak}[Keycloak].
+IMPORTANT: Airflow deployments on the Stackable Data Platform only support {keycloak}[Keycloak{external-link-icon}^].
 
 [source,yaml]
 ----
@@ -84,7 +84,7 @@ spec:
 <2> The reference to the Secret containing the Airflow client credentials
 <3> The default role to which all users are assigned
 
-Users that log in with OpenID Connect are assigned to a default {airflow-access-control-docs}[role] which is specified with the `userRegistrationRole` property.
+Users that log in with OpenID Connect are assigned to a default {airflow-access-control-docs}[role{external-link-icon}^] which is specified with the `userRegistrationRole` property.
 
 The Secret containing the Airflow client credentials:
 
@@ -130,7 +130,7 @@ Further information for specifying an AuthenticationClass for an OIDC provider c
 
 == Authorization
 
-The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control] to the https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder].
+The Airflow Webserver delegates the {airflow-access-control-docs}[handling of user access control{external-link-icon}^] to the https://flask-appbuilder.readthedocs.io/en/latest/security.html[Flask AppBuilder{external-link-icon}^].
 The AuthManager in the Flask AppBuilder can be configured to fetch the user roles from the authentication backend, e.g. LDAP.
 Instead of using the integrated authorization, the Stackable Data Platform also provides an AuthManager which delegates the authorization requests to an xref:opa:index.adoc[Open Policy Agent (OPA)].
 
@@ -142,7 +142,7 @@ You can view, add to, and assign the roles displayed in the Airflow Webserver UI
 
 ==== LDAP
 
-Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
+Airflow supports assigning {airflow-access-control-docs}[Roles{external-link-icon}^] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
 All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the AirflowCluster object:
 
 [source,yaml]
@@ -164,7 +164,7 @@ spec:
 ==== OpenID Connect
 
 The mechanism for assigning roles to users described in the LDAP section also applies to OpenID Connect.
-Airflow supports assigning {airflow-access-control-docs}[Roles] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
+Airflow supports assigning {airflow-access-control-docs}[Roles{external-link-icon}^] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
 All the users logging in via OpenID Connect get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `AirflowCluster` object:
 
 [source,yaml]
