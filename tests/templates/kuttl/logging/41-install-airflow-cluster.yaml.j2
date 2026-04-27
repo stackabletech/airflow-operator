@@ -103,6 +103,7 @@ spec:
     roleConfig:
       listenerClass: external-unstable
     config:
+      gracefulShutdownTimeout: 10s
       resources:
         cpu:
           min: 1000m
@@ -172,6 +173,7 @@ spec:
         host: airflow-redis-master
         credentialsSecretName: airflow-redis-credentials
     config:
+      gracefulShutdownTimeout: 10s
       resources:
         cpu:
           min: 1000m
@@ -225,6 +227,7 @@ spec:
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
   kubernetesExecutors:
     config:
+      gracefulShutdownTimeout: 10s
       resources:
         cpu:
           min: 50m
@@ -264,6 +267,7 @@ spec:
 {% endif %}
   schedulers:
     config:
+      gracefulShutdownTimeout: 10s
       resources:
         cpu:
           min: 1000m
