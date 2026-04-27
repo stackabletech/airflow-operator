@@ -121,6 +121,17 @@ async fn main() -> anyhow::Result<()> {
                 },
             ));
 
+            let webhook_server = create_webhook_server(
+                &operator_environment,
+                maintenance.disable_crd_maintenance,
+                client.as_kube_client(),
+            )
+            .await?;
+
+            let webhook_server = webhook_server
+                .run(sigterm_watcher.handle())
+                .map_err(|err| anyhow!(err).context("failed to run webhook server"));
+
             let airflow_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha2::AirflowCluster>>(&client),
                 watcher::Config::default(),
@@ -170,6 +181,7 @@ async fn main() -> anyhow::Result<()> {
                     airflow_controller::error_policy,
                     Arc::new(airflow_controller::Ctx {
                         client: client.clone(),
+                        operator_environment,
                         product_config,
                     }),
                 )
@@ -191,17 +203,6 @@ async fn main() -> anyhow::Result<()> {
                     },
                 )
                 .map(anyhow::Ok);
-
-            let webhook_server = create_webhook_server(
-                &operator_environment,
-                maintenance.disable_crd_maintenance,
-                client.as_kube_client(),
-            )
-            .await?;
-
-            let webhook_server = webhook_server
-                .run(sigterm_watcher.handle())
-                .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
             let delayed_airflow_controller = async {
                 signal::crd_established(&client, v1alpha1::AirflowCluster::crd_name(), None)
