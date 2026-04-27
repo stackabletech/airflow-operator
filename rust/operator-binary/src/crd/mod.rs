@@ -1110,9 +1110,12 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::commons::product_image_selection::ResolvedProductImage;
+    use stackable_operator::{
+        commons::product_image_selection::ResolvedProductImage,
+        versioned::test_utils::RoundtripTestData,
+    };
 
-    use crate::v1alpha2::AirflowCluster;
+    use crate::{v1alpha1, v1alpha2};
 
     #[test]
     fn test_cluster_config() {
@@ -1146,7 +1149,7 @@ mod tests {
           ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let cluster: AirflowCluster =
+        let cluster: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_airflow_image: ResolvedProductImage = cluster
@@ -1165,5 +1168,17 @@ mod tests {
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
         assert!(cluster.spec.cluster_config.database_initialization.enabled);
+    }
+
+    impl RoundtripTestData for v1alpha1::AirflowClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            vec![]
+        }
+    }
+
+    impl RoundtripTestData for v1alpha2::AirflowClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            vec![]
+        }
     }
 }
