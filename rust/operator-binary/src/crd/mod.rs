@@ -1183,6 +1183,11 @@ mod tests {
         gitSyncConf:
           foo: bar
         gitFolder: "mount-dags-gitsync/dags_airflow3"
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-ca-cert
       - repo: ssh://git@github.com/stackable-airflow/dags.git
     "#;
             let yaml = test_airflow_cluster_yaml(git_sync_section);
@@ -1206,6 +1211,11 @@ mod tests {
         gitSyncConf:
           foo: bar
         gitFolder: "mount-dags-gitsync/dags_airflow3"
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-ca-cert
       - repo: ssh://git@github.com/stackable-airflow/dags.git
         # FIXME: The roundtrip looses data when private keys are used.
         # See https://github.com/stackabletech/issues/issues/849 for details.
