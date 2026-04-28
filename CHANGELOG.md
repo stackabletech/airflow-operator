@@ -4,6 +4,7 @@
 
 ### Added
 
+- BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#784]).
 - Support for passing CAs to GitSync ([#750]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#765]).
 
@@ -31,6 +32,7 @@
 [#775]: https://github.com/stackabletech/airflow-operator/pull/775
 [#777]: https://github.com/stackabletech/airflow-operator/pull/777
 [#754]: https://github.com/stackabletech/airflow-operator/pull/754
+[#784]: https://github.com/stackabletech/airflow-operator/pull/784
 
 ## [26.3.0] - 2026-03-16
 

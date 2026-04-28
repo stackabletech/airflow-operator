@@ -29,6 +29,7 @@ use stackable_operator::{
             },
         },
     },
+    cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::{self, ResolvedProductImage},
@@ -119,13 +120,14 @@ use crate::{
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
-pub const DOCKER_IMAGE_BASE_NAME: &str = "airflow";
+pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
+    pub operator_environment: OperatorEnvironmentOptions,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -387,7 +389,11 @@ pub async fn reconcile_airflow(
     let resolved_product_image = airflow
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            &ctx.operator_environment.image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
     let cluster_operation_cond_builder =

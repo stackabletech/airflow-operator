@@ -1110,9 +1110,13 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::commons::product_image_selection::ResolvedProductImage;
+    use indoc::formatdoc;
+    use stackable_operator::{
+        commons::product_image_selection::ResolvedProductImage,
+        versioned::test_utils::RoundtripTestData,
+    };
 
-    use crate::v1alpha2::AirflowCluster;
+    use crate::{v1alpha1, v1alpha2};
 
     #[test]
     fn test_cluster_config() {
@@ -1146,13 +1150,13 @@ mod tests {
           ";
 
         let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let cluster: AirflowCluster =
+        let cluster: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec
             .image
-            .resolve("airflow", "0.0.0-dev")
+            .resolve("airflow", "oci.example.org", "0.0.0-dev")
             .expect("test: resolved product image is always valid");
 
         assert_eq!("3.1.6", &resolved_airflow_image.product_version);
@@ -1165,5 +1169,176 @@ mod tests {
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
         assert!(cluster.spec.cluster_config.database_initialization.enabled);
+    }
+
+    impl RoundtripTestData for v1alpha1::AirflowClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            let git_sync_section = r#"
+    dagsGitSync:
+      - repo: ssh://git@github.com/stackable-airflow/dags.git
+      - repo: https://github.com/stackable-airflow/dags
+        branch: main
+        credentialsSecret: my-basic-auth
+        wait: 5s
+        gitSyncConf:
+          foo: bar
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-ca-cert
+      - repo: ssh://git@github.com/stackable-airflow/dags.git
+    "#;
+            let yaml = test_airflow_cluster_yaml(git_sync_section);
+            stackable_operator::utils::yaml_from_str_singleton_map(&yaml)
+                .expect("Failed to parse AirflowClusterSpec YAML")
+        }
+    }
+
+    // FIXME: The roundtrip looses data when private keys are used.
+    // See https://github.com/stackabletech/issues/issues/849 for details.
+    impl RoundtripTestData for v1alpha2::AirflowClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            let git_sync_section = r#"
+    dagsGitSync:
+      - repo: ssh://git@github.com/stackable-airflow/dags.git
+      - repo: https://github.com/stackable-airflow/dags
+        branch: main
+        credentials:
+          basicAuthSecretName: my-basic-auth
+        wait: 5s
+        gitSyncConf:
+          foo: bar
+        gitFolder: "mount-dags-gitsync/dags_airflow3"
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: git-ca-cert
+      - repo: ssh://git@github.com/stackable-airflow/dags.git
+        # FIXME: The roundtrip looses data when private keys are used.
+        # See https://github.com/stackabletech/issues/issues/849 for details.
+        # credentials:
+        #   sshPrivateKeySecretName: my-private-key
+    "#;
+            let yaml = test_airflow_cluster_yaml(git_sync_section);
+            stackable_operator::utils::yaml_from_str_singleton_map(&yaml)
+                .expect("Failed to parse AirflowClusterSpec YAML")
+        }
+    }
+
+    fn test_airflow_cluster_yaml(git_sync_section: &str) -> String {
+        formatdoc! {
+          r#"
+            - image:
+                productVersion: 1.2.3
+                pullPolicy: IfNotPresent
+              clusterConfig:
+                vectorAggregatorConfigMapName: vector-aggregator-discovery
+                loadExamples: true
+                credentialsSecretName: airflow-admin-credentials
+                metadataDatabase:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+                authentication:
+                  - authenticationClass: my-ldap
+                    userRegistrationRole: Admin
+                authorization:
+                  opa:
+                    configMapName: test-opa
+                    package: airflow
+                    cache:
+                      entryTimeToLive: 5s
+                      maxEntries: 10
+                volumes:
+                  - name: test-cm-dag
+                    configMap:
+                      name: test-cm-dag
+                volumeMounts:
+                  - name: test-cm-dag
+                    mountPath: /dags/example_trigger_target_dag.py
+                    subPath: example_trigger_target_dag.py
+                {git_sync_section}
+              webservers:
+                roleConfig:
+                  listenerClass: external-unstable
+                config:
+                  resources:
+                    cpu:
+                      min: 100m
+                      max: "1"
+                    memory:
+                      limit: 3001Mi
+                  logging:
+                    enableVectorAgent: true
+                configOverrides:
+                  webserver_config.py:
+                    FILE_HEADER: |
+                      COMMON_HEADER_VAR = "role-value"
+                      ROLE_HEADER_VAR = "role-value"
+                    FILE_FOOTER: |
+                      ROLE_FOOTER_VAR = "role-value"
+                podOverrides:
+                  spec:
+                    containers:
+                      - name: airflow
+                        resources:
+                          requests:
+                            cpu: 300m
+                          limits:
+                            cpu: 900m
+                roleGroups:
+                  default:
+                    replicas: 1
+                    configOverrides:
+                      webserver_config.py:
+                        FILE_HEADER: |
+                          COMMON_HEADER_VAR = "group-value"
+              celeryExecutors:
+                resultBackend:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+                broker:
+                  redis:
+                    host: airflow-redis-master
+                    credentialsSecretName: airflow-redis-credentials
+                config:
+                  logging:
+                    enableVectorAgent: true
+                roleGroups:
+                  default:
+                    replicas: 2
+              kubernetesExecutors:
+                config:
+                  logging:
+                    enableVectorAgent: true
+              schedulers:
+                config:
+                  logging:
+                    enableVectorAgent: true
+                roleGroups:
+                  default:
+                    replicas: 1
+              dagProcessors:
+                config:
+                  logging:
+                    enableVectorAgent: true
+                roleGroups:
+                  default:
+                    replicas: 1
+              triggerers:
+                config:
+                  logging:
+                    enableVectorAgent: true
+                roleGroups:
+                  default:
+                    replicas: 1
+                "#
+        }
     }
 }

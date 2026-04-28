@@ -1525,7 +1525,7 @@ dependencies = [
 [[package]]
 name = "k8s-version"
 version = "0.1.3"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "darling",
  "regex",
@@ -2510,9 +2510,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.12"
+version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
+checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -2920,7 +2920,7 @@ dependencies = [
 [[package]]
 name = "stackable-certs"
 version = "0.4.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "const-oid",
  "ecdsa",
@@ -2943,8 +2943,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.110.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+version = "0.111.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "base64",
  "clap",
@@ -2985,7 +2985,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2996,7 +2996,7 @@ dependencies = [
 [[package]]
 name = "stackable-shared"
 version = "0.1.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "jiff",
  "k8s-openapi",
@@ -3013,7 +3013,7 @@ dependencies = [
 [[package]]
 name = "stackable-telemetry"
 version = "0.6.3"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "axum",
  "clap",
@@ -3036,9 +3036,10 @@ dependencies = [
 
 [[package]]
 name = "stackable-versioned"
-version = "0.9.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+version = "0.10.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
+ "kube",
  "schemars",
  "serde",
  "serde_json",
@@ -3049,8 +3050,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-versioned-macros"
-version = "0.9.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+version = "0.10.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "convert_case",
  "convert_case_extras",
@@ -3068,7 +3069,7 @@ dependencies = [
 [[package]]
 name = "stackable-webhook"
 version = "0.9.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.110.1#96f42571ea185a3cd76fedde351fcabbeefcae16"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.111.0#b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51"
 dependencies = [
  "arc-swap",
  "async-trait",
