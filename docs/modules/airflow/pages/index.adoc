@@ -5,7 +5,7 @@
 :dags: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
 :github: https://github.com/stackabletech/airflow-operator/
 :crd: {crd-docs-base-url}/airflow-operator/{crd-docs-version}/
-:crd-airflowcluster: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha1/
+:crd-airflowcluster: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha2/
 :feature-tracker: https://features.stackable.tech/unified
 :deferrable-operators: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html#deferrable-operators-triggers
 
