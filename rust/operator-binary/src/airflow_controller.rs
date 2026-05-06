@@ -393,23 +393,23 @@ pub async fn reconcile_airflow(
         .cluster_config
         .metadata_database
         .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
-    let celery_database_connection_details = match &airflow.spec.executor {
-        AirflowExecutor::CeleryExecutors {
-            result_backend: celery_result_backend,
-            broker: celery_broker,
-            ..
-        } => {
-            let celery_result_backend = celery_result_backend
+
+    let celery_database_connection_details =
+        if let (Some(celery_results_backend), Some(celery_broker)) = (
+            &airflow.spec.cluster_config.celery_results_backend,
+            &airflow.spec.cluster_config.celery_broker,
+        ) {
+            let celery_results_backend = celery_results_backend
                 .celery_connection_details_with_templating(
                     "CELERY_RESULT_BACKEND",
                     &templating_mechanism,
                 );
             let celery_broker = celery_broker
                 .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
-            Some((celery_result_backend, celery_broker))
-        }
-        _ => None,
-    };
+            Some((celery_results_backend, celery_broker))
+        } else {
+            None
+        };
 
     let mut roles = HashMap::new();
 
