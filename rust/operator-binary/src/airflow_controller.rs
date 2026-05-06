@@ -394,22 +394,35 @@ pub async fn reconcile_airflow(
         .metadata_database
         .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
 
-    let celery_database_connection_details =
-        if let (Some(celery_results_backend), Some(celery_broker)) = (
-            &airflow.spec.cluster_config.celery_results_backend,
-            &airflow.spec.cluster_config.celery_broker,
+    let celery_database_connection_details = if let (
+        Some(celery_results_backend),
+        Some(celery_broker),
+    ) = (
+        &airflow.spec.cluster_config.celery_results_backend,
+        &airflow.spec.cluster_config.celery_broker,
+    ) {
+        // The celery results backend and celery broker only work with configured celeryExecutors.
+        // Emit a warning if celery executors were not configured properly.
+        if !matches!(
+            &airflow.spec.executor,
+            AirflowExecutor::CeleryExecutors { .. }
         ) {
-            let celery_results_backend = celery_results_backend
-                .celery_connection_details_with_templating(
-                    "CELERY_RESULT_BACKEND",
-                    &templating_mechanism,
-                );
-            let celery_broker = celery_broker
-                .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
-            Some((celery_results_backend, celery_broker))
-        } else {
-            None
-        };
+            tracing::warn!(
+                "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
+            )
+        }
+
+        let celery_results_backend = celery_results_backend
+            .celery_connection_details_with_templating(
+                "CELERY_RESULT_BACKEND",
+                &templating_mechanism,
+            );
+        let celery_broker = celery_broker
+            .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
+        Some((celery_results_backend, celery_broker))
+    } else {
+        None
+    };
 
     let mut roles = HashMap::new();
 
