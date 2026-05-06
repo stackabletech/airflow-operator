@@ -1245,6 +1245,15 @@ mod tests {
                     host: airflow-postgresql
                     database: airflow
                     credentialsSecretName: airflow-postgresql-credentials
+                celeryResultsBackend:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+                celeryBroker:
+                  redis:
+                    host: airflow-redis-master
+                    credentialsSecretName: airflow-redis-credentials
                 authentication:
                   - authenticationClass: my-ldap
                     userRegistrationRole: Admin
@@ -1300,15 +1309,6 @@ mod tests {
                         FILE_HEADER: |
                           COMMON_HEADER_VAR = "group-value"
               celeryExecutors:
-                resultBackend:
-                  postgresql:
-                    host: airflow-postgresql
-                    database: airflow
-                    credentialsSecretName: airflow-postgresql-credentials
-                broker:
-                  redis:
-                    host: airflow-redis-master
-                    credentialsSecretName: airflow-redis-credentials
                 config:
                   logging:
                     enableVectorAgent: true
