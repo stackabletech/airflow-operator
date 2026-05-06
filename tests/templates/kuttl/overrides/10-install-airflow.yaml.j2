@@ -61,6 +61,15 @@ spec:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
+    celeryResultsBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    celeryBroker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecretName: airflow-redis-credentials
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -75,15 +84,6 @@ spec:
           COMMON_VAR: group-value # overrides role value
           GROUP_VAR: group-value # only defined here at group level
   celeryExecutors:
-    resultBackend:
-      postgresql:
-        host: airflow-postgresql
-        database: airflow
-        credentialsSecretName: airflow-postgresql-credentials
-    broker:
-      redis:
-        host: airflow-redis-master
-        credentialsSecretName: airflow-redis-credentials
     envOverrides:
       COMMON_VAR: role-value # overridden by role group below
       ROLE_VAR: role-value   # only defined here at role level

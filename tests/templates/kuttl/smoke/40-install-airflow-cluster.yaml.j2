@@ -58,6 +58,17 @@ spec:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
+{% if test_scenario['values']['executor'] == 'celery' %}
+    celeryResultsBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    celeryBroker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecretName: airflow-redis-credentials
+{% endif %}
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -80,15 +91,6 @@ spec:
               COMMON_HEADER_VAR = "group-value"
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
-    resultBackend:
-      postgresql:
-        host: airflow-postgresql
-        database: airflow
-        credentialsSecretName: airflow-postgresql-credentials
-    broker:
-      redis:
-        host: airflow-redis-master
-        credentialsSecretName: airflow-redis-credentials
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

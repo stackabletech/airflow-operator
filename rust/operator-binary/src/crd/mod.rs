@@ -309,6 +309,14 @@ pub mod versioned {
         #[serde(default)]
         pub database_initialization: DatabaseInitializationConfig,
 
+        #[serde(skip_serializing_if = "Option::is_none")]
+        /// Connection information for the celery backend database.
+        pub celery_results_backend: Option<CeleryResultBackendConnection>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        /// Connection information for the celery broker queue.
+        pub celery_broker: Option<CeleryBrokerConnection>,
+
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
@@ -857,12 +865,6 @@ pub enum AirflowExecutor {
     CeleryExecutors {
         #[serde(flatten)]
         config: Box<AirflowRoleType>,
-
-        /// Connection information for the celery backend database.
-        result_backend: CeleryResultBackendConnection,
-
-        /// Connection information for the celery broker queue.
-        broker: CeleryBrokerConnection,
     },
 
     /// With the Kubernetes executor, executor Pods are created on demand.
@@ -1243,6 +1245,15 @@ mod tests {
                     host: airflow-postgresql
                     database: airflow
                     credentialsSecretName: airflow-postgresql-credentials
+                celeryResultsBackend:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+                celeryBroker:
+                  redis:
+                    host: airflow-redis-master
+                    credentialsSecretName: airflow-redis-credentials
                 authentication:
                   - authenticationClass: my-ldap
                     userRegistrationRole: Admin
@@ -1298,15 +1309,6 @@ mod tests {
                         FILE_HEADER: |
                           COMMON_HEADER_VAR = "group-value"
               celeryExecutors:
-                resultBackend:
-                  postgresql:
-                    host: airflow-postgresql
-                    database: airflow
-                    credentialsSecretName: airflow-postgresql-credentials
-                broker:
-                  redis:
-                    host: airflow-redis-master
-                    credentialsSecretName: airflow-redis-credentials
                 config:
                   logging:
                     enableVectorAgent: true

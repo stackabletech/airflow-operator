@@ -71,6 +71,17 @@ commands:
               host: airflow-postgresql
               database: airflow
               credentialsSecretName: airflow-postgresql-credentials
+{% if test_scenario['values']['executor'] == 'celery' %}
+          celeryResultsBackend:
+            postgresql:
+              host: airflow-postgresql
+              database: airflow
+              credentialsSecretName: airflow-postgresql-credentials
+          celeryBroker:
+            redis:
+              host: airflow-redis-master
+              credentialsSecretName: airflow-redis-credentials
+{% endif %}
           authentication:
             - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
               no-tls-$NAMESPACE
@@ -92,15 +103,6 @@ commands:
               replicas: 1
 {% if test_scenario['values']['executor'] == 'celery' %}
         celeryExecutors:
-          resultBackend:
-            postgresql:
-              host: airflow-postgresql
-              database: airflow
-              credentialsSecretName: airflow-postgresql-credentials
-          broker:
-            redis:
-              host: airflow-redis-master
-              credentialsSecretName: airflow-redis-credentials
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
