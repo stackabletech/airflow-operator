@@ -36,10 +36,7 @@ use stackable_operator::{
         random_secret_creation,
         rbac::build_rbac_resources,
     },
-    crd::{
-        authentication::{core as auth_core, ldap},
-        git_sync, listener,
-    },
+    crd::{authentication::ldap, git_sync, listener},
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -136,11 +133,6 @@ pub enum Error {
     #[snafu(display("object defines no airflow config role"))]
     NoAirflowRole,
 
-    #[snafu(display("failed to apply global Service"))]
-    ApplyRoleService {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
@@ -187,21 +179,6 @@ pub enum Error {
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::commons::rbac::Error,
-    },
-
-    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
-    AuthenticationClassRetrieval {
-        source: stackable_operator::cluster_resources::Error,
-        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
-    },
-
-    #[snafu(display(
-        "Airflow doesn't support the AuthenticationClass provider
-    {authentication_class_provider} from AuthenticationClass {authentication_class}"
-    ))]
-    AuthenticationClassProviderNotSupported {
-        authentication_class_provider: String,
-        authentication_class: ObjectRef<auth_core::v1alpha1::AuthenticationClass>,
     },
 
     #[snafu(display("failed to build config file for {rolegroup}"))]
@@ -290,11 +267,6 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
-
-    #[snafu(display(
-        "failed to build volume or volume mount spec for the LDAP backend TLS config"
-    ))]
-    VolumeAndMounts { source: ldap::v1alpha1::Error },
 
     #[snafu(display("failed to construct config"))]
     ConstructConfig { source: config::Error },
