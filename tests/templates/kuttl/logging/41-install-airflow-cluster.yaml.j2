@@ -96,6 +96,17 @@ spec:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
+{% if test_scenario['values']['executor'] == 'celery' %}
+    celeryResultsBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    celeryBroker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecretName: airflow-redis-credentials
+{% endif %}
     dagsGitSync:
       - repo: https://github.com/stackabletech/example-dags
         gitFolder: dags
@@ -162,15 +173,6 @@ spec:
                   configMap: airflow-log-config
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
-    resultBackend:
-      postgresql:
-        host: airflow-postgresql
-        database: airflow
-        credentialsSecretName: airflow-postgresql-credentials
-    broker:
-      redis:
-        host: airflow-redis-master
-        credentialsSecretName: airflow-redis-credentials
     config:
       resources:
         cpu:
