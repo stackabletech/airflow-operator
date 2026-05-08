@@ -33,18 +33,17 @@ use stackable_operator::{
 };
 
 use crate::{
-    airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
+    controller::AIRFLOW_FULL_CONTROLLER_NAME,
     crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha1, v1alpha2},
     webhooks::conversion::create_webhook_server,
 };
 
-mod airflow_controller;
 mod config;
+mod controller;
 mod controller_commons;
 mod crd;
 mod env_vars;
 mod framework;
-mod operations;
 mod product_logging;
 mod service;
 mod util;
@@ -178,9 +177,9 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
-                    airflow_controller::reconcile_airflow,
-                    airflow_controller::error_policy,
-                    Arc::new(airflow_controller::Ctx {
+                    controller::reconcile,
+                    controller::error_policy,
+                    Arc::new(controller::Ctx {
                         client: client.clone(),
                         operator_environment,
                         product_config,

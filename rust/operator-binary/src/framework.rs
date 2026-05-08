@@ -21,16 +21,13 @@
 
 use types::kubernetes::Uid;
 
-#[allow(dead_code)]
 pub mod builder;
 #[allow(dead_code)]
 pub mod cluster_resources;
 #[allow(dead_code)]
 pub mod controller_utils;
-#[allow(dead_code)]
 pub mod kvp;
 pub mod macros;
-#[allow(dead_code)]
 pub mod product_logging;
 #[allow(dead_code)]
 pub mod role_group_utils;
@@ -48,13 +45,11 @@ pub trait HasName {
 }
 
 /// Has a Kubernetes UID
-#[allow(dead_code)]
 pub trait HasUid {
     fn to_uid(&self) -> Uid;
 }
 
 /// The name is a valid label value
-#[allow(dead_code)]
 pub trait NameIsValidLabelValue {
     fn to_label_value(&self) -> String;
 }

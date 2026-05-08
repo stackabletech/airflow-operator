@@ -1,16 +1,13 @@
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
-    product_logging::{
-        self,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
-        },
-    },
+    product_logging,
 };
 
-use crate::crd::MAX_LOG_FILES_SIZE;
+use crate::{
+    crd::MAX_LOG_FILES_SIZE,
+    framework::product_logging::framework::ValidatedContainerLogConfigChoice,
+};
 
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
@@ -18,7 +15,7 @@ pub const LOG_VOLUME_NAME: &str = "log";
 
 pub fn create_volumes(
     config_map_name: &str,
-    log_config: Option<&ContainerLogConfig>,
+    log_config: &ValidatedContainerLogConfigChoice,
 ) -> Vec<Volume> {
     let mut volumes = Vec::new();
 
@@ -38,17 +35,11 @@ pub fn create_volumes(
         ..Volume::default()
     });
 
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = log_config
-    {
+    if let ValidatedContainerLogConfigChoice::Custom(custom_config_map) = log_config {
         volumes.push(Volume {
             name: LOG_CONFIG_VOLUME_NAME.into(),
             config_map: Some(ConfigMapVolumeSource {
-                name: config_map.into(),
+                name: custom_config_map.as_ref().into(),
                 ..ConfigMapVolumeSource::default()
             }),
             ..Volume::default()

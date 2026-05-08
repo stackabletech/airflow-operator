@@ -22,7 +22,7 @@ use super::{
     },
 };
 
-/// Variant of [`stackable_operator::role_utils::GenericProductSpecificCommonConfig`] that
+/// Variant of `stackable_operator::role_utils::GenericCommonConfig` that
 /// implements [`Merge`]
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericProductSpecificCommonConfig {}
@@ -289,9 +289,27 @@ mod tests {
     }
 
     #[rstest]
-    #[case("role-group", Some("role-group"), Some("role-group"), Some("role"), Some("default"))]
-    #[case("role-group", Some("role-group"), Some("role-group"), Some("role"), None)]
-    #[case("role-group", Some("role-group"), Some("role-group"), None, Some("default"))]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        Some("role"),
+        Some("default")
+    )]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        Some("role"),
+        None
+    )]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        None,
+        Some("default")
+    )]
     #[case("role-group", Some("role-group"), Some("role-group"), None, None)]
     #[case("role", Some("role"), None, Some("role"), Some("default"))]
     #[case("role", Some("role"), None, Some("role"), None)]

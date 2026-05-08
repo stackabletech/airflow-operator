@@ -4,15 +4,18 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
+    kube::Resource,
     kvp::{Annotations, Labels, ObjectLabels},
     role_utils::RoleGroupRef,
 };
 
 use crate::crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha2};
 
+#[allow(dead_code)]
 pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
 pub const HEADLESS_SERVICE_SUFFIX: &str = "headless";
 
+#[allow(dead_code)]
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("object is missing metadata to build owner reference"))]
@@ -33,6 +36,7 @@ pub enum Error {
 
 /// The rolegroup headless [`Service`] is a service that allows direct access to the instances of a certain rolegroup
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
+#[allow(dead_code)]
 pub fn build_rolegroup_headless_service(
     airflow: &v1alpha2::AirflowCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
@@ -70,6 +74,7 @@ pub fn build_rolegroup_headless_service(
 }
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
+#[allow(dead_code)]
 pub fn build_rolegroup_metrics_service(
     airflow: &v1alpha2::AirflowCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
@@ -106,9 +111,7 @@ pub fn build_rolegroup_metrics_service(
     })
 }
 
-pub fn stateful_set_service_name(
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-) -> Option<String> {
+pub fn stateful_set_service_name<T: Resource>(rolegroup_ref: &RoleGroupRef<T>) -> Option<String> {
     Some(rolegroup_headless_service_name(
         &rolegroup_ref.object_name(),
     ))

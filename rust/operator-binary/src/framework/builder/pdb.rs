@@ -75,13 +75,29 @@ mod tests {
         type DynamicType = ();
         type Scope = ();
 
-        fn kind(_dt: &Self::DynamicType) -> Cow<'_, str> { Cow::from("AirflowCluster") }
-        fn group(_dt: &Self::DynamicType) -> Cow<'_, str> { Cow::from("airflow.stackable.tech") }
-        fn version(_dt: &Self::DynamicType) -> Cow<'_, str> { Cow::from("v1alpha2") }
-        fn plural(_dt: &Self::DynamicType) -> Cow<'_, str> { Cow::from("airflowclusters") }
+        fn kind(_dt: &Self::DynamicType) -> Cow<'_, str> {
+            Cow::from("AirflowCluster")
+        }
 
-        fn meta(&self) -> &ObjectMeta { &self.object_meta }
-        fn meta_mut(&mut self) -> &mut ObjectMeta { &mut self.object_meta }
+        fn group(_dt: &Self::DynamicType) -> Cow<'_, str> {
+            Cow::from("airflow.stackable.tech")
+        }
+
+        fn version(_dt: &Self::DynamicType) -> Cow<'_, str> {
+            Cow::from("v1alpha2")
+        }
+
+        fn plural(_dt: &Self::DynamicType) -> Cow<'_, str> {
+            Cow::from("airflowclusters")
+        }
+
+        fn meta(&self) -> &ObjectMeta {
+            &self.object_meta
+        }
+
+        fn meta_mut(&mut self) -> &mut ObjectMeta {
+            &mut self.object_meta
+        }
     }
 
     impl HasName for Cluster {

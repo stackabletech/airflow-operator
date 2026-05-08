@@ -573,7 +573,9 @@ pub struct AirflowOpaConfig {
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
     EnumString,
 )]
@@ -981,6 +983,7 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
+    #[allow(dead_code)]
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
     fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
@@ -1089,7 +1092,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
     }
 }
 
-/// Creates recommended `ObjectLabels` to be used in deployed resources
+#[allow(dead_code)]
 pub fn build_recommended_labels<'a, T>(
     owner: &'a T,
     controller_name: &'a str,
