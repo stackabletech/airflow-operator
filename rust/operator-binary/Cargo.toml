@@ -21,10 +21,12 @@ indoc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+regex.workspace = true
 snafu.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid.workspace = true
 
 [build-dependencies]
 built.workspace = true
