@@ -8,7 +8,7 @@ timeout: 1200
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-webserver-automatic-log-config
+  name: airflow-webserver-auto-log-config
 status:
   readyReplicas: 1
   replicas: 1
@@ -16,7 +16,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-webserver-custom-log-config
+  name: airflow-webserver-custom-log-cfg
 status:
   readyReplicas: 1
   replicas: 1
@@ -25,7 +25,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-automatic-log-config
+  name: airflow-worker-auto-log-config
 status:
   readyReplicas: 1
   replicas: 1
@@ -33,7 +33,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-custom-log-config
+  name: airflow-worker-custom-log-cfg
 status:
   readyReplicas: 1
   replicas: 1
@@ -42,7 +42,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-scheduler-automatic-log-config
+  name: airflow-scheduler-auto-log-config
 status:
   readyReplicas: 1
   replicas: 1
@@ -50,7 +50,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-scheduler-custom-log-config
+  name: airflow-scheduler-custom-log-cfg
 status:
   readyReplicas: 1
   replicas: 1

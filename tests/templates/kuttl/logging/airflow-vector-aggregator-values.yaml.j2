@@ -28,98 +28,98 @@ customConfig:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .pod == "airflow-webserver-auto-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigWebserverGitSync:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .pod == "airflow-webserver-auto-log-config-0" &&
         .container == "git-sync-0"
     filteredAutomaticLogConfigWebserverVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .pod == "airflow-webserver-auto-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigWebserverAirflow:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-webserver-custom-log-config-0" &&
+        .pod == "airflow-webserver-custom-log-cfg-0" &&
         .container == "airflow"
     filteredCustomLogConfigWebserverVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-webserver-custom-log-config-0" &&
+        .pod == "airflow-webserver-custom-log-cfg-0" &&
         .container == "vector"
     filteredAutomaticLogConfigSchedulerAirflow:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .pod == "airflow-scheduler-auto-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigSchedulerGitSync:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .pod == "airflow-scheduler-auto-log-config-0" &&
         .container == "git-sync-0"
     filteredAutomaticLogConfigSchedulerVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .pod == "airflow-scheduler-auto-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigSchedulerAirflow:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-scheduler-custom-log-config-0" &&
+        .pod == "airflow-scheduler-custom-log-cfg-0" &&
         .container == "airflow"
     filteredCustomLogConfigSchedulerVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-scheduler-custom-log-config-0" &&
+        .pod == "airflow-scheduler-custom-log-cfg-0" &&
         .container == "vector"
 {% if test_scenario['values']['executor'] == 'celery' %}
     filteredAutomaticLogConfigWorkerAirflow:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
+        .pod == "airflow-worker-auto-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigWorkerGitSync:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
+        .pod == "airflow-worker-auto-log-config-0" &&
         .container == "git-sync-0"
     filteredAutomaticLogConfigWorkerGitSyncInit:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
+        .pod == "airflow-worker-auto-log-config-0" &&
         .container == "git-sync-0-init"
     filteredAutomaticLogConfigWorkerVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-automatic-log-config-0" &&
+        .pod == "airflow-worker-auto-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigWorkerAirflow:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-custom-log-config-0" &&
+        .pod == "airflow-worker-custom-log-cfg-0" &&
         .container == "airflow"
     filteredCustomLogConfigWorkerVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "airflow-worker-custom-log-config-0" &&
+        .pod == "airflow-worker-custom-log-cfg-0" &&
         .container == "vector"
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
     filteredExampleTriggerTargetDagBashTaskBase:
