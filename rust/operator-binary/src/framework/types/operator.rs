@@ -27,8 +27,9 @@ attributed_string_type! {
     "The name of a cluster/stacklet",
     "my-airflow-cluster",
     // Suffixes are added to produce resource names. According compile-time checks ensure that
-    // max_length cannot be set higher.
-    (max_length = 24),
+    // max_length cannot be set higher. Reduced from opensearch's 24 to 22 because airflow's
+    // longest role name ("dagprocessor") is 12 chars vs opensearch's 10.
+    (max_length = 22),
     is_rfc_1035_label_name,
     is_valid_label_value
 }
@@ -66,7 +67,7 @@ attributed_string_type! {
     // The role name is used to produce resource names. To make sure that all resource names are
     // valid, max_length is restricted. Compile-time checks ensure that max_length cannot be set
     // higher if not other names like the RoleGroupName are set lower accordingly.
-    (max_length = 10),
+    (max_length = 12),
     is_rfc_1123_label_name,
     is_valid_label_value
 }

@@ -418,8 +418,8 @@ pub fn validate_cluster(
     let (auth_volumes, auth_volume_mounts) =
         compute_auth_volumes_and_mounts(&dereferenced.authentication_config)?;
 
-    // --- service account name (matches build_rbac_resources output) ---
-    let service_account_name = airflow.name_any();
+    // --- service account name (matches build_rbac_resources output: "{cluster}-serviceaccount") ---
+    let service_account_name = format!("{}-serviceaccount", airflow.name_any());
 
     // --- per-role/rolegroup validation ---
     let mut validated_role_groups = BTreeMap::new();
