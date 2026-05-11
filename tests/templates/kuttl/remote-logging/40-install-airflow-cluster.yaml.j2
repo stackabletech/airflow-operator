@@ -55,6 +55,17 @@ spec:
         host: airflow-postgresql
         database: airflow
         credentialsSecretName: airflow-postgresql-credentials
+{% if test_scenario['values']['executor'] == 'celery' %}
+    celeryResultsBackend:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    celeryBroker:
+      redis:
+        host: airflow-redis-master
+        credentialsSecretName: airflow-redis-credentials
+{% endif %}
   webservers:
     roleConfig:
       listenerClass: external-unstable
@@ -68,15 +79,6 @@ spec:
           AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: minio_conn
 {% if test_scenario['values']['executor'] == 'celery' %}
   celeryExecutors:
-    resultBackend:
-      postgresql:
-        host: airflow-postgresql
-        database: airflow
-        credentialsSecretName: airflow-postgresql-credentials
-    broker:
-      redis:
-        host: airflow-redis-master
-        credentialsSecretName: airflow-redis-credentials
     roleGroups:
       default:
         replicas: 2

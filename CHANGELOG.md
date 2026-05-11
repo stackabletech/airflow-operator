@@ -19,6 +19,9 @@
   This means you need to replace your simple database connection string with a typed struct.
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
   Read on the [Airflow database documentation](https://docs.stackable.tech/home/nightly/airflow/usage-guide/database-connections) for details ([#754]).
+- BREAKING: Renamed and moved the `celeryExecutor` broker and results backend to `clusterConfig` ([#786]).
+  The results backend `spec.celeryExecutors.resultBackend` is now `spec.clusterConfig.celeryResultsBackend`.
+  The broker `spec.celeryExecutors.broker` is now `spec.clusterConfig.celeryBroker`.
 
 ### Fixed
 
@@ -33,6 +36,7 @@
 [#777]: https://github.com/stackabletech/airflow-operator/pull/777
 [#754]: https://github.com/stackabletech/airflow-operator/pull/754
 [#784]: https://github.com/stackabletech/airflow-operator/pull/784
+[#786]: https://github.com/stackabletech/airflow-operator/pull/786
 
 ## [26.3.0] - 2026-03-16
 

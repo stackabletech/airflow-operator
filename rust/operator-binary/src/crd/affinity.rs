@@ -77,20 +77,20 @@ mod tests {
                 host: airflow-postgresql
                 database: airflow
                 credentialsSecretName: airflow-postgresql-credentials
+            celeryResultsBackend:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+            celeryBroker:
+              redis:
+                host: airflow-redis-master
+                credentialsSecretName: airflow-redis-credentials
           webservers:
             roleGroups:
               default:
                 replicas: 1
           celeryExecutors:
-            resultBackend:
-              postgresql:
-                host: airflow-postgresql
-                database: airflow
-                credentialsSecretName: airflow-postgresql-credentials
-            broker:
-              redis:
-                host: airflow-redis-master
-                credentialsSecretName: airflow-redis-credentials
             roleGroups:
               default:
                 replicas: 2
