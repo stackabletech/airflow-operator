@@ -4,6 +4,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
+    kube::Resource,
     kvp::{Annotations, Labels, ObjectLabels},
     role_utils::RoleGroupRef,
 };
@@ -106,8 +107,10 @@ pub fn build_rolegroup_metrics_service(
     })
 }
 
-pub fn stateful_set_service_name(
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+// REVIEW: made generic so the new controller can call this with
+// RoleGroupRef<ValidatedAirflowCluster> instead of RoleGroupRef<v1alpha2::AirflowCluster>
+pub fn stateful_set_service_name<T: Resource>(
+    rolegroup_ref: &RoleGroupRef<T>,
 ) -> Option<String> {
     Some(rolegroup_headless_service_name(
         &rolegroup_ref.object_name(),
