@@ -21,7 +21,17 @@
 
 #[macro_use]
 pub mod macros;
+pub mod kvp;
 pub mod types;
+
+/// Has a non-empty name
+///
+/// Useful as an object reference; Should not be used to create an object because the name could
+/// violate the naming constraints (e.g. maximum length) of the object.
+pub trait HasName {
+    #[allow(dead_code)]
+    fn to_name(&self) -> String;
+}
 
 /// The name is a valid label value
 pub trait NameIsValidLabelValue {
