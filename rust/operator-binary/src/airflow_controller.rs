@@ -358,6 +358,8 @@ fn validate_cluster(
 ) -> Result<ValidatedAirflowCluster> {
     let mut roles = HashMap::new();
 
+    // if the kubernetes executor is specified there will be no worker role as the pods
+    // are provisioned by airflow as defined by the task (default: one pod per task)
     for role in AirflowRole::iter() {
         if let Some(resolved_role) = airflow.get_role(&role) {
             roles.insert(
