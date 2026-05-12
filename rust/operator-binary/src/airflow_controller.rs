@@ -2,7 +2,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::Write,
-    str::FromStr,
     sync::Arc,
 };
 
@@ -61,8 +60,7 @@ use stackable_operator::{
     logging::controller::ReconcilerError,
     product_config_utils::{
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY, env_vars_from,
-        env_vars_from_rolegroup_config, transform_all_roles_to_config,
-        validate_all_roles_and_groups_config,
+        env_vars_from_rolegroup_config,
     },
     product_logging::{
         self,
@@ -77,7 +75,7 @@ use stackable_operator::{
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     config::{self, PYTHON_IMPORTS},
@@ -119,33 +117,6 @@ pub struct Ctx {
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
-/// Per-role configuration extracted during validation.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
-}
-
-/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: AirflowConfig,
-    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
-}
-
-pub use crate::controller::dereference::DereferencedObjects;
-
-/// The validated cluster: proves that product-config validation and config merging
-/// succeeded for every role and role group before any resources are created.
-#[derive(Clone, Debug)]
-pub struct ValidatedAirflowCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
-    pub executor: AirflowExecutor,
-}
-
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
@@ -170,19 +141,9 @@ pub enum Error {
         rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
-    #[snafu(display("invalid product config"))]
-    InvalidProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::builder::meta::Error,
-    },
-
-    #[snafu(display("Failed to transform configs"))]
-    ProductConfigTransform {
-        source: stackable_operator::product_config_utils::Error,
     },
 
     #[snafu(display("failed to patch service account"))]
@@ -214,12 +175,6 @@ pub enum Error {
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crd::Error },
-
-    #[snafu(display("could not parse Airflow role [{role}]"))]
-    UnidentifiedAirflowRole {
-        source: strum::ParseError,
-        role: String,
-    },
 
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
@@ -256,6 +211,11 @@ pub enum Error {
     #[snafu(display("failed to dereference cluster resources"))]
     Dereference {
         source: crate::controller::dereference::Error,
+    },
+
+    #[snafu(display("failed to validate cluster configuration"))]
+    Validate {
+        source: crate::controller::validate::Error,
     },
 
     #[snafu(display("pod template serialization"))]
@@ -351,94 +311,6 @@ impl ReconcilerError for Error {
     }
 }
 
-fn validate_cluster(
-    airflow: &v1alpha2::AirflowCluster,
-    dereferenced: &DereferencedObjects,
-    product_config_manager: &ProductConfigManager,
-) -> Result<ValidatedAirflowCluster> {
-    let mut roles = HashMap::new();
-
-    // if the kubernetes executor is specified there will be no worker role as the pods
-    // are provisioned by airflow as defined by the task (default: one pod per task)
-    for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role) {
-            roles.insert(
-                role.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::Env,
-                        PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
-                    ],
-                    resolved_role.clone(),
-                ),
-            );
-        }
-    }
-
-    let role_config = transform_all_roles_to_config(airflow, &roles);
-    let validated_role_config = validate_all_roles_and_groups_config(
-        &dereferenced.resolved_product_image.product_version,
-        &role_config.context(ProductConfigTransformSnafu)?,
-        product_config_manager,
-        false,
-        false,
-    )
-    .context(InvalidProductConfigSnafu)?;
-
-    let mut role_groups = BTreeMap::new();
-    let mut role_configs = BTreeMap::new();
-
-    for (role_name, rolegroup_configs) in validated_role_config.iter() {
-        let airflow_role =
-            AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
-                role: role_name.to_string(),
-            })?;
-
-        role_configs.insert(
-            airflow_role.clone(),
-            ValidatedRoleConfig {
-                pdb: airflow
-                    .role_config(&airflow_role)
-                    .map(|rc| rc.pod_disruption_budget),
-                listener_class: airflow_role
-                    .listener_class_name(airflow)
-                    .map(|s| s.to_string()),
-                group_listener_name: airflow.group_listener_name(&airflow_role),
-            },
-        );
-
-        let mut group_configs = BTreeMap::new();
-        for (rolegroup_name, rolegroup_config) in rolegroup_configs.iter() {
-            let rolegroup_ref = RoleGroupRef {
-                cluster: ObjectRef::from_obj(airflow),
-                role: role_name.into(),
-                role_group: rolegroup_name.into(),
-            };
-
-            let merged_config = airflow
-                .merged_config(&airflow_role, &rolegroup_ref)
-                .context(FailedToResolveConfigSnafu)?;
-
-            group_configs.insert(
-                rolegroup_name.clone(),
-                ValidatedRoleGroupConfig {
-                    merged_config,
-                    product_config_properties: rolegroup_config.clone(),
-                },
-            );
-        }
-
-        role_groups.insert(airflow_role, group_configs);
-    }
-
-    Ok(ValidatedAirflowCluster {
-        image: dereferenced.resolved_product_image.clone(),
-        role_groups,
-        role_configs,
-        executor: airflow.spec.executor.clone(),
-    })
-}
-
 pub async fn reconcile_airflow(
     airflow: Arc<DeserializeGuard<v1alpha2::AirflowCluster>>,
     ctx: Arc<Ctx>,
@@ -503,7 +375,9 @@ pub async fn reconcile_airflow(
         None
     };
 
-    let validated = validate_cluster(airflow, &dereferenced, &ctx.product_config)?;
+    let validated =
+        crate::controller::validate::validate_cluster(airflow, &dereferenced, &ctx.product_config)
+            .context(ValidateSnafu)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
