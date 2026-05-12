@@ -359,10 +359,6 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     fn build_volumes(&self) -> Vec<Volume> {
-        // REVIEW: controller_commons::create_volumes is called with the new validated type
-        // (&ValidatedContainerLogConfigChoice) instead of the old Option<&ContainerLogConfig>.
-        // This is safe because the logging config has already been validated during the
-        // validate stage.
         let mut volumes = controller_commons::create_volumes(
             &self.rolegroup_ref.object_name(),
             &self.role_group_config.logging.airflow_container,

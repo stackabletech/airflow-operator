@@ -373,7 +373,6 @@ fn static_envs(
 
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
-// REVIEW: simplified from &ExecutorConfig — only config.logging.enable_vector_agent was used
 pub fn build_airflow_template_envs(
     airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,

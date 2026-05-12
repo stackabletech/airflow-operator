@@ -13,8 +13,6 @@ pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
 
-// REVIEW: parameter changed from Option<&ContainerLogConfig> to &ValidatedContainerLogConfigChoice.
-// Pattern matching is simpler now because we match on a flat enum instead of nested Option<ContainerLogConfig>.
 pub fn create_volumes(
     config_map_name: &str,
     log_config: &ValidatedContainerLogConfigChoice,

@@ -571,8 +571,6 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-// REVIEW: Ord/PartialOrd added so AirflowRole can be used as a BTreeMap key
-// in the new controller's ValidatedAirflowCluster (BTreeMap<AirflowRole, ValidatedRoleConfig>)
 #[derive(
     Clone,
     Debug,

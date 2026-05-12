@@ -793,9 +793,6 @@ fn build_executor_template_config_maps(
         pb.add_container(airflow_container.build());
         pb.add_volumes(airflow.volumes().clone())
             .context(AddVolumeSnafu)?;
-        // REVIEW: controller_commons::create_volumes now takes &ValidatedContainerLogConfigChoice
-        // instead of Option<&ContainerLogConfig>. The validated type ensures logging config
-        // has already been checked, so the build stage can use it directly.
         pb.add_volumes(controller_commons::create_volumes(
             &executor_rolegroup_ref.object_name(),
             &validated_config.logging.airflow_container,

@@ -12,7 +12,6 @@ use crate::attributed_string_type;
 attributed_string_type! {
     ProductName,
     "The name of a product",
-    // REVIEW: example is operator-specific — parameterise when moving to operator-rs
     "airflow",
     // A suffix is added to produce a label value. An according compile-time check ensures that
     // max_length cannot be set higher.
@@ -31,13 +30,10 @@ attributed_string_type! {
 attributed_string_type! {
     ClusterName,
     "The name of a cluster/stacklet",
-    // REVIEW: example is operator-specific — parameterise when moving to operator-rs
     "my-airflow-cluster",
     // Suffixes are added to produce resource names. According compile-time checks ensure that
     // max_length cannot be set higher. Reduced from opensearch's 24 to 22 because airflow's
     // longest role name ("dagprocessor") is 12 chars vs opensearch's 10.
-    // REVIEW: max_length is operator-specific (depends on longest RoleName) — parameterise
-    // when moving to operator-rs
     (max_length = 22),
     is_rfc_1035_label_name,
     is_valid_label_value
@@ -46,7 +42,6 @@ attributed_string_type! {
 attributed_string_type! {
     ControllerName,
     "The name of a controller in an operator",
-    // REVIEW: example is operator-specific — parameterise when moving to operator-rs
     "airflowcluster",
     is_valid_label_value
 }
@@ -54,7 +49,6 @@ attributed_string_type! {
 attributed_string_type! {
     OperatorName,
     "The name of an operator",
-    // REVIEW: example is operator-specific — parameterise when moving to operator-rs
     "airflow.stackable.tech",
     is_valid_label_value
 }
@@ -66,8 +60,6 @@ attributed_string_type! {
     // The role-group name is used to produce resource names. To make sure that all resource names
     // are valid, max_length is restricted. Compile-time checks ensure that max_length cannot be
     // set higher if not other names like the RoleName are set lower accordingly.
-    // REVIEW: max_length is operator-specific (depends on ClusterName and RoleName budgets) —
-    // parameterise when moving to operator-rs
     (max_length = 16),
     is_rfc_1123_label_name,
     is_valid_label_value
@@ -76,13 +68,10 @@ attributed_string_type! {
 attributed_string_type! {
     RoleName,
     "The name of a role name",
-    // REVIEW: example is operator-specific — parameterise when moving to operator-rs
     "webserver",
     // The role name is used to produce resource names. To make sure that all resource names are
     // valid, max_length is restricted. Compile-time checks ensure that max_length cannot be set
     // higher if not other names like the RoleGroupName are set lower accordingly.
-    // REVIEW: max_length is operator-specific (airflow needs 12 for "dagprocessor", opensearch
-    // uses 10) — parameterise when moving to operator-rs
     (max_length = 12),
     is_rfc_1123_label_name,
     is_valid_label_value

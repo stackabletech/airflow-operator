@@ -18,8 +18,6 @@ use crate::{
 const LOG_CONFIG_FILE: &str = "log_config.py";
 const LOG_FILE: &str = "airflow.py.json";
 
-// REVIEW: signature changed from Logging<C> + two container keys to pre-validated types.
-// The function is now infallible — validation happens earlier in the pipeline.
 /// Extend the ConfigMap with logging and Vector configurations
 pub fn extend_config_map_with_log_config<K>(
     rolegroup: &RoleGroupRef<K>,

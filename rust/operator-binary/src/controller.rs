@@ -159,9 +159,6 @@ impl ValidatedLogging {
     }
 }
 
-// REVIEW: ValidatedAirflowCluster is the central validated type. It holds all data needed
-// by the build stage so that build() can be infallible. All optional-after-merge fields
-// are unwrapped during validation, and logging is pre-validated into ValidatedLogging.
 #[derive(Clone)]
 pub struct ValidatedAirflowCluster {
     metadata: ObjectMeta,
@@ -303,12 +300,6 @@ impl ReconcilerError for Error {
     }
 }
 
-// REVIEW: The reconcile pipeline is structured as five sequential stages:
-// 1. dereference — async, fallible: resolve external references
-// 2. validate — sync, fallible: validate and merge configs
-// 3. build — sync, infallible: construct Kubernetes resources
-// 4. apply — async, fallible: apply resources to the cluster
-// 5. update_status — async, fallible: patch status on the CRD
 pub async fn reconcile(
     airflow: Arc<DeserializeGuard<v1alpha2::AirflowCluster>>,
     ctx: Arc<Ctx>,
@@ -336,9 +327,6 @@ pub async fn reconcile(
     let validated =
         validate_cluster(airflow, &dereferenced, &ctx.product_config).context(ValidateSnafu)?;
 
-    // REVIEW: build() is infallible — all validation and fallible operations (config
-    // generation, PodBuilder/ContainerBuilder usage, logging validation) happen in the
-    // validate stage. The build stage purely assembles Kubernetes resource structs.
     // --- build (sync, infallible) ---
     let prepared = build(&validated);
 

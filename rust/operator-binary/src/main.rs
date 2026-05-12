@@ -177,7 +177,6 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
-                    // REVIEW: renamed from reconcile_airflow to reconcile
                     controller::reconcile,
                     controller::error_policy,
                     Arc::new(controller::Ctx {

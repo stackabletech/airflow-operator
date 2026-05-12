@@ -33,9 +33,6 @@ fn main_container_for_role(_role: &AirflowRole) -> Container {
     Container::Airflow
 }
 
-// REVIEW: build() is infallible. All validation and fallible operations (config generation,
-// PodBuilder/ContainerBuilder usage, logging validation) are performed in the validate
-// stage. The build stage purely assembles Kubernetes resource structs from validated data.
 pub(crate) fn build(validated: &ValidatedAirflowCluster) -> KubernetesResources<Prepared> {
     let mut stateful_sets = Vec::new();
     let mut config_maps = Vec::new();
@@ -140,9 +137,6 @@ fn build_pdb(
         _ => 1,
     });
 
-    // REVIEW: from_str_unsafe is used here because the values come from constants (APP_NAME,
-    // OPERATOR_NAME, AIRFLOW_CONTROLLER_NAME) or validated role names — they are known to be
-    // valid at compile time or have been validated during the validate stage.
     Some({
         framework::builder::pdb::pod_disruption_budget_builder_with_role(
             cluster,
@@ -240,11 +234,6 @@ fn build_metrics_service(
     }
 }
 
-// REVIEW: from_str_unsafe is used for label construction throughout these helpers because
-// the inputs are either compile-time constants (APP_NAME, OPERATOR_NAME, etc.) or values
-// that have already been validated during the validate stage (role names, role group names,
-// product versions). Using from_str_unsafe avoids redundant re-validation in the infallible
-// build stage.
 pub(super) fn build_recommended_labels(
     cluster: &ValidatedAirflowCluster,
     role: &str,
