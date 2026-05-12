@@ -18,8 +18,8 @@ use stackable_operator::{
 
 use crate::{
     crd::{
-        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
+        TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -373,10 +373,11 @@ fn static_envs(
 
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
+// REVIEW: simplified from &ExecutorConfig — only config.logging.enable_vector_agent was used
 pub fn build_airflow_template_envs(
     airflow: &v1alpha2::AirflowCluster,
     env_overrides: &HashMap<String, String>,
-    config: &ExecutorConfig,
+    vector_agent_enabled: bool,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     resolved_product_image: &ResolvedProductImage,
@@ -434,7 +435,7 @@ pub fn build_airflow_template_envs(
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
     // that are created and then terminated (we do a similar thing for spark-k8s).
-    if config.logging.enable_vector_agent {
+    if vector_agent_enabled {
         env.insert(
             "_STACKABLE_POST_HOOK".into(),
             EnvVar {

@@ -1340,7 +1340,7 @@ fn build_executor_template_config_map(
         .add_env_vars(build_airflow_template_envs(
             airflow,
             env_overrides,
-            merged_executor_config,
+            merged_executor_config.logging.enable_vector_agent,
             metadata_database_connection_details,
             git_sync_resources,
             resolved_product_image,
