@@ -31,11 +31,7 @@ use stackable_operator::{
     },
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        product_image_selection::{self, ResolvedProductImage},
-        random_secret_creation,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     crd::{authentication::ldap, git_sync, listener},
     database_connections::{
         TemplatingMechanism,
@@ -73,7 +69,7 @@ use stackable_operator::{
         framework::LoggingError,
         spec::{ContainerLogConfig, Logging},
     },
-    role_utils::{GenericRoleConfig, RoleGroupRef},
+    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
@@ -96,11 +92,7 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        build_recommended_labels,
-        internal_secret::{
-            FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
-        },
-        v1alpha2,
+        build_recommended_labels, v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
     operations::{
@@ -125,6 +117,33 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
+    pub listener_class: Option<String>,
+    pub group_listener_name: Option<String>,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: AirflowConfig,
+    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
+}
+
+pub use crate::controller::dereference::DereferencedObjects;
+
+/// The validated cluster: proves that product-config validation and config merging
+/// succeeded for every role and role group before any resources are created.
+#[derive(Clone, Debug)]
+pub struct ValidatedAirflowCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+    pub executor: AirflowExecutor,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -234,8 +253,10 @@ pub enum Error {
         source: stackable_operator::client::Error,
     },
 
-    #[snafu(display("failed to apply authentication configuration"))]
-    InvalidAuthenticationConfig { source: crd::authentication::Error },
+    #[snafu(display("failed to dereference cluster resources"))]
+    Dereference {
+        source: crate::controller::dereference::Error,
+    },
 
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
@@ -320,21 +341,6 @@ pub enum Error {
 
     #[snafu(display("failed to configure service"))]
     ServiceConfiguration { source: crate::service::Error },
-
-    #[snafu(display("invalid authorization config"))]
-    InvalidAuthorizationConfig {
-        source: stackable_operator::commons::opa::Error,
-    },
-
-    #[snafu(display("failed to resolve product image"))]
-    ResolveProductImage {
-        source: product_image_selection::Error,
-    },
-
-    #[snafu(display("failed to create internal secret"))]
-    InvalidInternalSecret {
-        source: random_secret_creation::Error,
-    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -343,6 +349,92 @@ impl ReconcilerError for Error {
     fn category(&self) -> &'static str {
         ErrorDiscriminants::from(self).into()
     }
+}
+
+fn validate_cluster(
+    airflow: &v1alpha2::AirflowCluster,
+    dereferenced: &DereferencedObjects,
+    product_config_manager: &ProductConfigManager,
+) -> Result<ValidatedAirflowCluster> {
+    let mut roles = HashMap::new();
+
+    for role in AirflowRole::iter() {
+        if let Some(resolved_role) = airflow.get_role(&role) {
+            roles.insert(
+                role.to_string(),
+                (
+                    vec![
+                        PropertyNameKind::Env,
+                        PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
+                    ],
+                    resolved_role.clone(),
+                ),
+            );
+        }
+    }
+
+    let role_config = transform_all_roles_to_config(airflow, &roles);
+    let validated_role_config = validate_all_roles_and_groups_config(
+        &dereferenced.resolved_product_image.product_version,
+        &role_config.context(ProductConfigTransformSnafu)?,
+        product_config_manager,
+        false,
+        false,
+    )
+    .context(InvalidProductConfigSnafu)?;
+
+    let mut role_groups = BTreeMap::new();
+    let mut role_configs = BTreeMap::new();
+
+    for (role_name, rolegroup_configs) in validated_role_config.iter() {
+        let airflow_role =
+            AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
+                role: role_name.to_string(),
+            })?;
+
+        role_configs.insert(
+            airflow_role.clone(),
+            ValidatedRoleConfig {
+                pdb: airflow
+                    .role_config(&airflow_role)
+                    .map(|rc| rc.pod_disruption_budget),
+                listener_class: airflow_role
+                    .listener_class_name(airflow)
+                    .map(|s| s.to_string()),
+                group_listener_name: airflow.group_listener_name(&airflow_role),
+            },
+        );
+
+        let mut group_configs = BTreeMap::new();
+        for (rolegroup_name, rolegroup_config) in rolegroup_configs.iter() {
+            let rolegroup_ref = RoleGroupRef {
+                cluster: ObjectRef::from_obj(airflow),
+                role: role_name.into(),
+                role_group: rolegroup_name.into(),
+            };
+
+            let merged_config = airflow
+                .merged_config(&airflow_role, &rolegroup_ref)
+                .context(FailedToResolveConfigSnafu)?;
+
+            group_configs.insert(
+                rolegroup_name.clone(),
+                ValidatedRoleGroupConfig {
+                    merged_config,
+                    product_config_properties: rolegroup_config.clone(),
+                },
+            );
+        }
+
+        role_groups.insert(airflow_role, group_configs);
+    }
+
+    Ok(ValidatedAirflowCluster {
+        image: dereferenced.resolved_product_image.clone(),
+        role_groups,
+        role_configs,
+        executor: airflow.spec.executor.clone(),
+    })
 }
 
 pub async fn reconcile_airflow(
@@ -358,34 +450,19 @@ pub async fn reconcile_airflow(
         .context(InvalidAirflowClusterSnafu)?;
 
     let client = &ctx.client;
-    let resolved_product_image = airflow
-        .spec
-        .image
-        .resolve(
-            CONTAINER_IMAGE_BASE_NAME,
-            &ctx.operator_environment.image_repository,
-            crate::built_info::PKG_VERSION,
-        )
-        .context(ResolveProductImageSnafu)?;
+
+    let dereferenced = crate::controller::dereference::dereference(
+        client,
+        airflow,
+        CONTAINER_IMAGE_BASE_NAME,
+        &ctx.operator_environment.image_repository,
+        crate::built_info::PKG_VERSION,
+    )
+    .await
+    .context(DereferenceSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
-
-    let authentication_config = AirflowClientAuthenticationDetailsResolved::from(
-        &airflow.spec.cluster_config.authentication,
-        client,
-    )
-    .await
-    .context(InvalidAuthenticationConfigSnafu)?;
-
-    let authorization_config = AirflowAuthorizationResolved::from_authorization_config(
-        client,
-        airflow,
-        &airflow.spec.cluster_config.authorization,
-    )
-    .await
-    .context(InvalidAuthorizationConfigSnafu)?;
-    // We don't have a config file, but do everything via env substitution
 
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = airflow
@@ -424,34 +501,7 @@ pub async fn reconcile_airflow(
         None
     };
 
-    let mut roles = HashMap::new();
-
-    // if the kubernetes executor is specified there will be no worker role as the pods
-    // are provisioned by airflow as defined by the task (default: one pod per task)
-    for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role) {
-            roles.insert(
-                role.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::Env,
-                        PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
-                    ],
-                    resolved_role.clone(),
-                ),
-            );
-        }
-    }
-
-    let role_config = transform_all_roles_to_config(airflow, &roles);
-    let validated_role_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.product_version,
-        &role_config.context(ProductConfigTransformSnafu)?,
-        &ctx.product_config,
-        false,
-        false,
-    )
-    .context(InvalidProductConfigSnafu)?;
+    let validated = validate_cluster(airflow, &dereferenced, &ctx.product_config)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -481,21 +531,19 @@ pub async fn reconcile_airflow(
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    let airflow_executor = &airflow.spec.executor;
-
     // if the kubernetes executor is specified, in place of a worker role that will be in the role
     // collection there will be a pod template created to be used for pod provisioning
     if let AirflowExecutor::KubernetesExecutors {
         common_configuration,
-    } = &airflow_executor
+    } = &validated.executor
     {
         build_executor_template(
             airflow,
             common_configuration,
             &metadata_database_connection_details,
-            &resolved_product_image,
-            &authentication_config,
-            &authorization_config,
+            &validated.image,
+            &dereferenced.authentication_config,
+            &dereferenced.authorization_config,
             &mut cluster_resources,
             client,
             &rbac_sa,
@@ -503,94 +551,53 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
-    random_secret_creation::create_random_secret_if_not_exists(
-        &airflow.shared_internal_secret_secret_name(),
-        INTERNAL_SECRET_SECRET_KEY,
-        256,
-        airflow,
-        client,
-    )
-    .await
-    .context(InvalidInternalSecretSnafu)?;
+    for (airflow_role, role_group_configs) in &validated.role_groups {
+        let role_name = airflow_role.to_string();
 
-    random_secret_creation::create_random_secret_if_not_exists(
-        &airflow.shared_jwt_secret_secret_name(),
-        JWT_SECRET_SECRET_KEY,
-        256,
-        airflow,
-        client,
-    )
-    .await
-    .context(InvalidInternalSecretSnafu)?;
-
-    random_secret_creation::create_random_secret_if_not_exists(
-        &airflow.shared_fernet_key_secret_name(),
-        FERNET_KEY_SECRET_KEY,
-        // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
-        // does not document how long the fernet key should be, but recommends using
-        // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-        // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
-        32,
-        airflow,
-        client,
-    )
-    .await
-    .context(InvalidInternalSecretSnafu)?;
-
-    for (role_name, role_config) in validated_role_config.iter() {
-        let airflow_role =
-            AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
-                role: role_name.to_string(),
-            })?;
-
-        if let Some(GenericRoleConfig {
-            pod_disruption_budget: pdb,
-        }) = airflow.role_config(&airflow_role)
-        {
-            add_pdbs(&pdb, airflow, &airflow_role, client, &mut cluster_resources)
-                .await
-                .context(FailedToCreatePdbSnafu)?;
-        }
-
-        if let Some(listener_class) = airflow_role.listener_class_name(airflow) {
-            if let Some(listener_group_name) = airflow.group_listener_name(&airflow_role) {
-                let rg_group_listener = build_group_listener(
-                    airflow,
-                    build_recommended_labels(
-                        airflow,
-                        AIRFLOW_CONTROLLER_NAME,
-                        &resolved_product_image.app_version_label_value,
-                        role_name,
-                        "none",
-                    ),
-                    listener_class.to_string(),
-                    listener_group_name,
-                )?;
-                cluster_resources
-                    .add(client, rg_group_listener)
+        if let Some(role_config) = validated.role_configs.get(airflow_role) {
+            if let Some(pdb) = &role_config.pdb {
+                add_pdbs(pdb, airflow, airflow_role, client, &mut cluster_resources)
                     .await
-                    .context(ApplyGroupListenerSnafu)?;
+                    .context(FailedToCreatePdbSnafu)?;
+            }
+
+            if let Some(listener_class) = &role_config.listener_class {
+                if let Some(listener_group_name) = &role_config.group_listener_name {
+                    let rg_group_listener = build_group_listener(
+                        airflow,
+                        build_recommended_labels(
+                            airflow,
+                            AIRFLOW_CONTROLLER_NAME,
+                            &validated.image.app_version_label_value,
+                            &role_name,
+                            "none",
+                        ),
+                        listener_class.to_string(),
+                        listener_group_name.clone(),
+                    )?;
+                    cluster_resources
+                        .add(client, rg_group_listener)
+                        .await
+                        .context(ApplyGroupListenerSnafu)?;
+                }
             }
         }
 
-        for (rolegroup_name, rolegroup_config) in role_config.iter() {
+        for (rolegroup_name, validated_rg_config) in role_group_configs {
             let rolegroup = RoleGroupRef {
                 cluster: ObjectRef::from_obj(airflow),
-                role: role_name.into(),
+                role: role_name.clone(),
                 role_group: rolegroup_name.into(),
             };
 
-            let merged_airflow_config = airflow
-                .merged_config(&airflow_role, &rolegroup)
-                .context(FailedToResolveConfigSnafu)?;
-
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
-                &resolved_product_image,
-                &env_vars_from_rolegroup_config(rolegroup_config),
+                &validated.image,
+                &env_vars_from_rolegroup_config(&validated_rg_config.product_config_properties),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
-                &merged_airflow_config
+                &validated_rg_config
+                    .merged_config
                     .logging
                     .for_container(&Container::GitSync),
             )
@@ -599,7 +606,7 @@ pub async fn reconcile_airflow(
             let role_group_service_recommended_labels = build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label_value,
+                &validated.image.app_version_label_value,
                 &rolegroup.role,
                 &rolegroup.role_group,
             );
@@ -643,12 +650,12 @@ pub async fn reconcile_airflow(
 
             let rg_configmap = build_rolegroup_config_map(
                 airflow,
-                &resolved_product_image,
+                &validated.image,
                 &rolegroup,
-                rolegroup_config,
-                &authentication_config,
-                &authorization_config,
-                &merged_airflow_config.logging,
+                &validated_rg_config.product_config_properties,
+                &dereferenced.authentication_config,
+                &dereferenced.authorization_config,
+                &validated_rg_config.merged_config.logging,
                 &Container::Airflow,
             )?;
             cluster_resources
@@ -658,22 +665,19 @@ pub async fn reconcile_airflow(
                     rolegroup: rolegroup.clone(),
                 })?;
 
-            // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
-            // to prevent unnecessary Pod restarts.
-            // See https://github.com/stackabletech/commons-operator/issues/111 for details.
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
-                &resolved_product_image,
-                &airflow_role,
+                &validated.image,
+                airflow_role,
                 &rolegroup,
-                rolegroup_config,
-                &authentication_config,
-                &authorization_config,
+                &validated_rg_config.product_config_properties,
+                &dereferenced.authentication_config,
+                &dereferenced.authorization_config,
                 &metadata_database_connection_details,
                 &celery_database_connection_details,
                 &rbac_sa,
-                &merged_airflow_config,
-                airflow_executor,
+                &validated_rg_config.merged_config,
+                &validated.executor,
                 &git_sync_resources,
             )?;
 
