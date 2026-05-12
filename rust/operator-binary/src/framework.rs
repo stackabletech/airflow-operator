@@ -21,6 +21,7 @@
 
 #[macro_use]
 pub mod macros;
+pub mod types;
 
 /// The name is a valid label value
 pub trait NameIsValidLabelValue {
