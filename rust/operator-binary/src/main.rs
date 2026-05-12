@@ -44,7 +44,6 @@ mod controller_commons;
 mod crd;
 mod env_vars;
 mod framework;
-mod operations;
 mod product_logging;
 mod service;
 mod util;
