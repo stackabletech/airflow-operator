@@ -22,7 +22,16 @@
 #[macro_use]
 pub mod macros;
 pub mod builder;
+#[allow(dead_code)]
+pub mod cluster_resources;
+#[allow(dead_code)]
+pub mod controller_utils;
 pub mod kvp;
+pub mod product_logging;
+#[allow(dead_code)]
+pub mod role_group_utils;
+#[allow(dead_code)]
+pub mod role_utils;
 pub mod types;
 
 use types::kubernetes::Uid;
