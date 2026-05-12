@@ -21,8 +21,11 @@
 
 #[macro_use]
 pub mod macros;
+pub mod builder;
 pub mod kvp;
 pub mod types;
+
+use types::kubernetes::Uid;
 
 /// Has a non-empty name
 ///
@@ -31,6 +34,11 @@ pub mod types;
 pub trait HasName {
     #[allow(dead_code)]
     fn to_name(&self) -> String;
+}
+
+/// Has a Kubernetes UID
+pub trait HasUid {
+    fn to_uid(&self) -> Uid;
 }
 
 /// The name is a valid label value
