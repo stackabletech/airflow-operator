@@ -121,7 +121,7 @@ spec:
         memory:
           limit: 3Gi
     roleGroups:
-      automatic-log-config:
+      auto-log-cfg:
         replicas: 1
         config:
           logging:
@@ -162,7 +162,7 @@ spec:
               - name: prepared-logs
                 configMap:
                   name: prepared-logs
-      custom-log-config:
+      custom-log-cfg:
         replicas: 1
         config:
           logging:
@@ -181,7 +181,7 @@ spec:
         memory:
           limit: 3Gi
     roleGroups:
-      automatic-log-config:
+      auto-log-cfg:
         replicas: 1
         config:
           logging:
@@ -215,7 +215,7 @@ spec:
                 loggers:
                   ROOT:
                     level: INFO
-      custom-log-config:
+      custom-log-cfg:
         replicas: 1
         config:
           logging:
@@ -233,7 +233,7 @@ spec:
           max: 250m
         memory:
           limit: 512Mi
-      #  automatic-log-config
+      #  auto-log-cfg
       logging:
         enableVectorAgent: true
         containers:
@@ -261,7 +261,7 @@ spec:
             loggers:
               ROOT:
                 level: INFO
-      # custom-log-config is not tested for kubernetesExecutors because
+      # custom-log-cfg is not tested for kubernetesExecutors because
       # there are no roleGroups to test both
 {% endif %}
   schedulers:
@@ -273,7 +273,7 @@ spec:
         memory:
           limit: 1Gi
     roleGroups:
-      automatic-log-config:
+      auto-log-cfg:
         replicas: 1
         config:
           logging:
@@ -303,7 +303,7 @@ spec:
                 loggers:
                   ROOT:
                     level: INFO
-      custom-log-config:
+      custom-log-cfg:
         replicas: 1
         config:
           logging:

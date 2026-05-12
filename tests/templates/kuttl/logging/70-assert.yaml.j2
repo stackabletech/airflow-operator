@@ -19,17 +19,17 @@ commands:
       # has to be declared.
       # See https://github.com/apache/airflow/pull/52581.
 
-      # Rolegroup custom-log-config
+      # Rolegroup custom-log-cfg
       CURL_RESPONSE_CUSTOM=$(
-          kubectl -n $NAMESPACE exec airflow-webserver-custom-log-config-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-custom-log-config-headless:8793/log 2>/dev/null || true);echo "$CODE"'
+          kubectl -n $NAMESPACE exec airflow-webserver-custom-log-cfg-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-custom-log-cfg-headless:8793/log 2>/dev/null || true);echo "$CODE"'
       )
 
       # Log-Endpoint Test Assertions:
       echo "The HTTP Code is $CURL_RESPONSE_CUSTOM (an internal JWT token is needed for full access)"
 
-      # Rolegroup automatic-log-config
+      # Rolegroup auto-log-cfg
       CURL_RESPONSE_AUTO=$(
-          kubectl -n $NAMESPACE exec airflow-webserver-automatic-log-config-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-automatic-log-config-headless:8793/log 2>/dev/null || true);echo "$CODE"'
+          kubectl -n $NAMESPACE exec airflow-webserver-auto-log-cfg-0 -- sh -c 'CODE=$(curl -s -o /dev/null -w "%{http_code}" http://airflow-worker-auto-log-cfg-headless:8793/log 2>/dev/null || true);echo "$CODE"'
       )
       echo "The HTTP Code is $CURL_RESPONSE_AUTO (an internal JWT token is needed for full access)"
       [ "$CURL_RESPONSE_CUSTOM" -eq 403 ] && [ "$CURL_RESPONSE_AUTO" -eq 403 ]
