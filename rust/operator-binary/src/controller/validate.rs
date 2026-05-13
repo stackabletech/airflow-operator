@@ -6,17 +6,21 @@ use std::{
 use product_config::{ProductConfigManager, types::PropertyNameKind};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection::ResolvedProductImage,
+    commons::product_image_selection::{self, ResolvedProductImage},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
 use strum::IntoEnumIterator;
 
-use super::dereference::DereferencedObjects;
 use crate::crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfig, AirflowExecutor, AirflowRole, v1alpha2};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
+
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
         source: stackable_operator::product_config_utils::Error,
@@ -64,9 +68,17 @@ pub struct ValidatedAirflowCluster {
 
 pub fn validate_cluster(
     airflow: &v1alpha2::AirflowCluster,
-    dereferenced: &DereferencedObjects,
+    image_base_name: &str,
+    image_repository: &str,
+    pkg_version: &str,
     product_config_manager: &ProductConfigManager,
 ) -> Result<ValidatedAirflowCluster, Error> {
+    let resolved_product_image = airflow
+        .spec
+        .image
+        .resolve(image_base_name, image_repository, pkg_version)
+        .context(ResolveProductImageSnafu)?;
+
     let mut roles = HashMap::new();
 
     // if the kubernetes executor is specified there will be no worker role as the pods
@@ -88,7 +100,7 @@ pub fn validate_cluster(
 
     let role_config = transform_all_roles_to_config(airflow, &roles);
     let validated_role_config = validate_all_roles_and_groups_config(
-        &dereferenced.resolved_product_image.product_version,
+        &resolved_product_image.product_version,
         &role_config.context(GenerateProductConfigSnafu)?,
         product_config_manager,
         false,
@@ -143,7 +155,7 @@ pub fn validate_cluster(
     }
 
     Ok(ValidatedAirflowCluster {
-        image: dereferenced.resolved_product_image.clone(),
+        image: resolved_product_image,
         role_groups,
         role_configs,
         executor: airflow.spec.executor.clone(),

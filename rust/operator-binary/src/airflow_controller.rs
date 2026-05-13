@@ -325,15 +325,9 @@ pub async fn reconcile_airflow(
 
     let client = &ctx.client;
 
-    let dereferenced = crate::controller::dereference::dereference(
-        client,
-        airflow,
-        CONTAINER_IMAGE_BASE_NAME,
-        &ctx.operator_environment.image_repository,
-        crate::built_info::PKG_VERSION,
-    )
-    .await
-    .context(DereferenceSnafu)?;
+    let dereferenced = crate::controller::dereference::dereference(client, airflow)
+        .await
+        .context(DereferenceSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
@@ -375,9 +369,14 @@ pub async fn reconcile_airflow(
         None
     };
 
-    let validated =
-        crate::controller::validate::validate_cluster(airflow, &dereferenced, &ctx.product_config)
-            .context(ValidateSnafu)?;
+    let validated = crate::controller::validate::validate_cluster(
+        airflow,
+        CONTAINER_IMAGE_BASE_NAME,
+        &ctx.operator_environment.image_repository,
+        crate::built_info::PKG_VERSION,
+        &ctx.product_config,
+    )
+    .context(ValidateSnafu)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
