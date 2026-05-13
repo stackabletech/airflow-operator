@@ -22,6 +22,7 @@
 - BREAKING: Renamed and moved the `celeryExecutor` broker and results backend to `clusterConfig` ([#786]).
   The results backend `spec.celeryExecutors.resultBackend` is now `spec.clusterConfig.celeryResultsBackend`.
   The broker `spec.celeryExecutors.broker` is now `spec.clusterConfig.celeryBroker`.
+- Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#795]).
 
 ### Fixed
 
@@ -37,6 +38,7 @@
 [#754]: https://github.com/stackabletech/airflow-operator/pull/754
 [#784]: https://github.com/stackabletech/airflow-operator/pull/784
 [#786]: https://github.com/stackabletech/airflow-operator/pull/786
+[#795]: https://github.com/stackabletech/airflow-operator/pull/795
 
 ## [26.3.0] - 2026-03-16
 

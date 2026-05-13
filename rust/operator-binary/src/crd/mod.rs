@@ -581,7 +581,9 @@ pub struct AirflowOpaConfig {
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
     EnumString,
 )]
