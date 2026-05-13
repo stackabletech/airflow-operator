@@ -30,7 +30,10 @@ use stackable_operator::{
     },
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::ResolvedProductImage, random_secret_creation,
+        rbac::build_rbac_resources,
+    },
     crd::{authentication::ldap, git_sync, listener},
     database_connections::{
         TemplatingMechanism,
@@ -90,7 +93,11 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
         authorization::AirflowAuthorizationResolved,
-        build_recommended_labels, v1alpha2,
+        build_recommended_labels,
+        internal_secret::{
+            FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
+        },
+        v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
     operations::{
@@ -206,6 +213,11 @@ pub enum Error {
     #[snafu(display("failed to update status"))]
     ApplyStatus {
         source: stackable_operator::client::Error,
+    },
+
+    #[snafu(display("failed to create internal secret"))]
+    InternalSecret {
+        source: random_secret_creation::Error,
     },
 
     #[snafu(display("failed to dereference cluster resources"))]
@@ -377,6 +389,41 @@ pub async fn reconcile_airflow(
         &ctx.product_config,
     )
     .context(ValidateSnafu)?;
+
+    // TODO: Move secret creation to a dedicated apply step once it exists.
+    random_secret_creation::create_random_secret_if_not_exists(
+        &airflow.shared_internal_secret_secret_name(),
+        INTERNAL_SECRET_SECRET_KEY,
+        256,
+        airflow,
+        client,
+    )
+    .await
+    .context(InternalSecretSnafu)?;
+
+    random_secret_creation::create_random_secret_if_not_exists(
+        &airflow.shared_jwt_secret_secret_name(),
+        JWT_SECRET_SECRET_KEY,
+        256,
+        airflow,
+        client,
+    )
+    .await
+    .context(InternalSecretSnafu)?;
+
+    // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
+    // does not document how long the fernet key should be, but recommends using
+    // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
+    random_secret_creation::create_random_secret_if_not_exists(
+        &airflow.shared_fernet_key_secret_name(),
+        FERNET_KEY_SECRET_KEY,
+        32,
+        airflow,
+        client,
+    )
+    .await
+    .context(InternalSecretSnafu)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
