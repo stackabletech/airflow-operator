@@ -22,8 +22,8 @@ pub enum Error {
         source: stackable_operator::product_config_utils::Error,
     },
 
-    #[snafu(display("Failed to transform configs"))]
-    ProductConfigTransform {
+    #[snafu(display("failed to generate product config"))]
+    GenerateProductConfig {
         source: stackable_operator::product_config_utils::Error,
     },
 
@@ -89,7 +89,7 @@ pub fn validate_cluster(
     let role_config = transform_all_roles_to_config(airflow, &roles);
     let validated_role_config = validate_all_roles_and_groups_config(
         &dereferenced.resolved_product_image.product_version,
-        &role_config.context(ProductConfigTransformSnafu)?,
+        &role_config.context(GenerateProductConfigSnafu)?,
         product_config_manager,
         false,
         false,
