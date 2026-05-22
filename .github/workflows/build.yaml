@@ -250,7 +250,7 @@ jobs:
           submodules: recursive
 
       - name: Package, Publish, and Sign Helm Chart to oci.stackable.tech
-        uses: stackabletech/actions/publish-helm-chart@6a84fcfccf4ee37d85217407bc6a94742afbb45f # v0.14.2
+        uses: stackabletech/actions/publish-helm-chart@c4e5950de85c53b6ed0c1e329a721e43196ea3c3 # unreleased
         with:
           chart-registry-uri: oci.stackable.tech
           chart-registry-username: robot$sdp-charts+github-action-build
@@ -267,7 +267,7 @@ jobs:
           helm registry logout oci.stackable.tech
 
       - name: Package, Publish, and Sign Helm Chart to quay.io
-        uses: stackabletech/actions/publish-helm-chart@6a84fcfccf4ee37d85217407bc6a94742afbb45f # v0.14.2
+        uses: stackabletech/actions/publish-helm-chart@c4e5950de85c53b6ed0c1e329a721e43196ea3c3 # unreleased
         with:
           chart-registry-uri: quay.io
           chart-registry-username: stackable+robot_sdp_charts_github_action_build
