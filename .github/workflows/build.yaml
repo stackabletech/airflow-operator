@@ -261,11 +261,6 @@ jobs:
           app-version: ${{ needs.build-container-image.outputs.operator-version }}
           publish-and-sign: ${{ !github.event.pull_request.head.repo.fork }}
 
-      - name: Test logging out before
-        shell: bash
-        run: |
-          helm registry logout oci.stackable.tech
-
       - name: Package, Publish, and Sign Helm Chart to quay.io
         uses: stackabletech/actions/publish-helm-chart@c4e5950de85c53b6ed0c1e329a721e43196ea3c3 # unreleased
         with:
