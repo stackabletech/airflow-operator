@@ -1,0 +1,22 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: create-users
+timeout: 300
+commands:
+  - script: |
+      kubectl exec -n $NAMESPACE airflow-webserver-default-0 -- airflow users create \
+        --username "jane.doe" \
+        --firstname "Jane" \
+        --lastname "Doe" \
+        --email "jane.doe@stackable.tech" \
+        --password "T8mn72D9" \
+        --role "Public"
+      kubectl exec -n $NAMESPACE airflow-webserver-default-0 -- airflow users create \
+        --username "john.doe" \
+        --firstname "John" \
+        --lastname "Doe" \
+        --email "john.doe@stackable.tech" \
+        --password "T8mn72D9" \
+        --role "Admin"
