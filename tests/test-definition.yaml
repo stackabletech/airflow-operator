@@ -14,9 +14,7 @@ dimensions:
       # - x.x.x,oci.stackable.tech/sandbox/airflow:x.x.x-stackable0.0.0-dev
   - name: airflow-latest
     values:
-      # TODO: Remove before merge
-      - 3.1.6,oci.stackable.tech/sandbox/airflow:opa-fix
-      # - 3.1.6
+      - 3.1.6
       # To use a custom image, add a comma and the full name after the product version
       # - x.x.x,oci.stackable.tech/sandbox/airflow:x.x.x-stackable0.0.0-dev
   - name: opa-latest
