@@ -1,0 +1,6 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: kubectl exec -n $NAMESPACE -i airflow-webserver-default-0 -- python3 < 40_check-listing_3.py
