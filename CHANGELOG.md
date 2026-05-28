@@ -28,6 +28,7 @@
 ### Fixed
 
 - Do not use immutable Secret objects for internal secrets. Migrate existing secrets to mutable versions ([#770]).
+- Allow OPA integration with arbitrary user role. Previously, this only worked for users with Admin role ([#800])
 
 [#750]: https://github.com/stackabletech/airflow-operator/pull/750
 [#765]: https://github.com/stackabletech/airflow-operator/pull/765
@@ -40,6 +41,7 @@
 [#784]: https://github.com/stackabletech/airflow-operator/pull/784
 [#786]: https://github.com/stackabletech/airflow-operator/pull/786
 [#795]: https://github.com/stackabletech/airflow-operator/pull/795
+[#800]: https://github.com/stackabletech/airflow-operator/pull/800
 [#801]: https://github.com/stackabletech/airflow-operator/pull/801
 
 ## [26.3.0] - 2026-03-16
