@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-rules
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+  airflow.rego: |
+    package airflow
+
+    # Default deny everything. Only the rules below should permit anything.
+    default is_authorized_configuration := false
+    default is_authorized_connection := false
+    default is_authorized_dag := false
+    default is_authorized_pool := false
+    default is_authorized_variable := false
+    default is_authorized_view := false
+    default is_authorized_custom_view := false
+    default is_authorized_backfill := false
+    default is_authorized_asset := false
+    default is_authorized_asset_alias := false
+
+    # Allow-all for the "airflow" admin so the operator can bootstrap the
+    # cluster (creating the admin user, syncing example DAGs, etc).
+    is_authorized_configuration if input.user.name == "airflow"
+    is_authorized_connection   if input.user.name == "airflow"
+    is_authorized_dag          if input.user.name == "airflow"
+    is_authorized_pool         if input.user.name == "airflow"
+    is_authorized_variable     if input.user.name == "airflow"
+    is_authorized_view         if input.user.name == "airflow"
+    is_authorized_custom_view  if input.user.name == "airflow"
+    is_authorized_backfill     if input.user.name == "airflow"
+    is_authorized_asset        if input.user.name == "airflow"
+    is_authorized_asset_alias  if input.user.name == "airflow"
+
+    # jane.doe is OPA-allow-all - same shape as the airflow admin block above.
+    # Intentionally broad: the goal of this test is to isolate the FAB
+    # filter/listing layer. Any 403 we see for jane.doe must therefore come
+    # from FAB (the layer with the bug), not from OPA denying some auxiliary
+    # check (is_authorized_view, is_authorized_configuration, ...) that the
+    # listing endpoint also performs.
+    #
+    # With this rule + Admin role: both layers say yes -> test passes.
+    # With this rule + Public role: OPA says yes everywhere, FAB's
+    # unoverridden get_authorized_dag_ids says no -> 403 -> test fails (bug).
+    is_authorized_configuration if input.user.name == "jane.doe"
+    is_authorized_connection   if input.user.name == "jane.doe"
+    is_authorized_dag          if input.user.name == "jane.doe"
+    is_authorized_pool         if input.user.name == "jane.doe"
+    is_authorized_variable     if input.user.name == "jane.doe"
+    is_authorized_view         if input.user.name == "jane.doe"
+    is_authorized_custom_view  if input.user.name == "jane.doe"
+    is_authorized_backfill     if input.user.name == "jane.doe"
+    is_authorized_asset        if input.user.name == "jane.doe"
+    is_authorized_asset_alias  if input.user.name == "jane.doe"

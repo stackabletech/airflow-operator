@@ -68,6 +68,11 @@ tests:
       - airflow
       - opa-latest
       - openshift
+  - name: opa-interop
+    dimensions:
+      - airflow-latest
+      - opa-latest
+      - openshift
   - name: resources
     dimensions:
       - airflow-latest

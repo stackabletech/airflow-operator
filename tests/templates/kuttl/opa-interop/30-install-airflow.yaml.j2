@@ -1,0 +1,64 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-admin-credentials
+type: Opaque
+stringData:
+  adminUser.username: airflow
+  adminUser.firstname: Airflow
+  adminUser.lastname: Admin
+  adminUser.email: airflow@airflow.com
+  adminUser.password: airflow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-postgresql-credentials
+stringData:
+  username: airflow
+  password: airflow
+---
+apiVersion: airflow.stackable.tech/v1alpha1
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  image:
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['airflow-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['airflow-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    authorization:
+      opa:
+        configMapName: test-opa
+        package: airflow
+    credentialsSecretName: airflow-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: airflow-postgresql
+        database: airflow
+        credentialsSecretName: airflow-postgresql-credentials
+    loadExamples: true
+  webservers:
+    roleConfig:
+      listenerClass: external-unstable
+    envOverrides:
+      AIRFLOW__CORE__AUTH_OPA_CACHE_MAXSIZE: "0"
+    roleGroups:
+      default:
+        replicas: 1
+  kubernetesExecutors: {}
+  schedulers:
+    roleGroups:
+      default:
+        replicas: 1
