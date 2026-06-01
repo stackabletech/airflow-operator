@@ -483,25 +483,25 @@ pub async fn reconcile_airflow(
                     .context(FailedToCreatePdbSnafu)?;
             }
 
-            if let Some(listener_class) = &role_config.listener_class {
-                if let Some(listener_group_name) = &role_config.group_listener_name {
-                    let rg_group_listener = build_group_listener(
+            if let Some(listener_class) = &role_config.listener_class
+                && let Some(listener_group_name) = &role_config.group_listener_name
+            {
+                let rg_group_listener = build_group_listener(
+                    airflow,
+                    build_recommended_labels(
                         airflow,
-                        build_recommended_labels(
-                            airflow,
-                            AIRFLOW_CONTROLLER_NAME,
-                            &validated.image.app_version_label_value,
-                            &role_name,
-                            "none",
-                        ),
-                        listener_class.to_string(),
-                        listener_group_name.clone(),
-                    )?;
-                    cluster_resources
-                        .add(client, rg_group_listener)
-                        .await
-                        .context(ApplyGroupListenerSnafu)?;
-                }
+                        AIRFLOW_CONTROLLER_NAME,
+                        &validated.image.app_version_label_value,
+                        &role_name,
+                        "none",
+                    ),
+                    listener_class.to_string(),
+                    listener_group_name.clone(),
+                )?;
+                cluster_resources
+                    .add(client, rg_group_listener)
+                    .await
+                    .context(ApplyGroupListenerSnafu)?;
             }
         }
 
