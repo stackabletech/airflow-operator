@@ -25,20 +25,21 @@ in pkgs.mkShell rec {
 
   # build time dependencies
   nativeBuildInputs = pkgs.lib.unique (pkgs.lib.concatMap (crate: crate.nativeBuildInputs) cargoDependencySet ++ (with pkgs; [
-    beku
-    docker
-    gettext # for the proper envsubst
-    git
-    jq
-    kind
-    kubectl
-    kubernetes-helm
-    kuttl
-    nix # this is implied, but needed in the pure env
-    # tilt already defined in default.nix
-    which
-    yq-go
-  ]));
+      beku
+      docker
+      gettext # for the proper envsubst
+      git
+      jq
+      kind
+      kubectl
+      kubernetes-helm
+      kuttl
+      nix # this is implied, but needed in the pure env
+      # tilt already defined in default.nix
+      which
+      yq-go
+      grpcurl # for interacting with the Vector API
+    ]));
 
   LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
   BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang}/resource-root/include";
