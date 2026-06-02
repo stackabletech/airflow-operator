@@ -1,11 +1,21 @@
 let
-  self = import ./. {};
+  self = import ./. { };
   inherit (self) sources pkgs meta;
 
-  beku = pkgs.callPackage (sources."beku.py" + "/beku.nix") {};
-  cargoDependencySetOfCrate = crate: [ crate ] ++ pkgs.lib.concatMap cargoDependencySetOfCrate (crate.dependencies ++ crate.buildDependencies);
-  cargoDependencySet = pkgs.lib.unique (pkgs.lib.flatten (pkgs.lib.mapAttrsToList (crateName: crate: cargoDependencySetOfCrate crate.build) self.cargo.workspaceMembers));
-in pkgs.mkShell rec {
+  beku = pkgs.callPackage (sources."beku.py" + "/beku.nix") { };
+  cargoDependencySetOfCrate =
+    crate:
+    [ crate ]
+    ++ pkgs.lib.concatMap cargoDependencySetOfCrate (crate.dependencies ++ crate.buildDependencies);
+  cargoDependencySet = pkgs.lib.unique (
+    pkgs.lib.flatten (
+      pkgs.lib.mapAttrsToList (
+        crateName: crate: cargoDependencySetOfCrate crate.build
+      ) self.cargo.workspaceMembers
+    )
+  );
+in
+pkgs.mkShell rec {
   name = meta.operator.name;
 
   packages = with pkgs; [
@@ -24,7 +34,9 @@ in pkgs.mkShell rec {
   buildInputs = pkgs.lib.unique (pkgs.lib.concatMap (crate: crate.buildInputs) cargoDependencySet);
 
   # build time dependencies
-  nativeBuildInputs = pkgs.lib.unique (pkgs.lib.concatMap (crate: crate.nativeBuildInputs) cargoDependencySet ++ (with pkgs; [
+  nativeBuildInputs = pkgs.lib.unique (
+    pkgs.lib.concatMap (crate: crate.nativeBuildInputs) cargoDependencySet
+    ++ (with pkgs; [
       beku
       docker
       gettext # for the proper envsubst
@@ -39,7 +51,8 @@ in pkgs.mkShell rec {
       which
       yq-go
       grpcurl # for interacting with the Vector API
-    ]));
+    ])
+  );
 
   LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
   BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang}/resource-root/include";
