@@ -55,11 +55,7 @@ use stackable_operator::{
     },
     kvp::{Annotation, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    product_logging::{
-        self,
-        framework::LoggingError,
-        spec::{ContainerLogConfig, Logging},
-    },
+    product_logging::{self, framework::LoggingError, spec::ContainerLogConfig},
     role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
@@ -71,14 +67,14 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    config,
+    controller::build::config_map,
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container,
-        ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        self, APP_NAME, AirflowClusterStatus, AirflowConfig, AirflowExecutor,
+        AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
+        HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
+        METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
+        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -96,7 +92,6 @@ use crate::{
         },
         pdb::add_pdbs,
     },
-    product_logging::extend_config_map_with_log_config,
     service::{
         build_rolegroup_headless_service, build_rolegroup_metrics_service,
         stateful_set_service_name,
@@ -157,16 +152,9 @@ pub enum Error {
         source: stackable_operator::commons::rbac::Error,
     },
 
-    #[snafu(display("failed to build webserver config for {rolegroup}"))]
-    BuildWebserverConfig {
-        source: config::webserver_config::Error,
-        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
-    },
-
-    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
-    BuildRoleGroupConfig {
-        source: stackable_operator::builder::configmap::Error,
-        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
+    #[snafu(display("failed to build rolegroup ConfigMap"))]
+    BuildConfigMap {
+        source: crate::controller::build::config_map::Error,
     },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
@@ -192,12 +180,6 @@ pub enum Error {
 
     #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
     VectorAggregatorConfigMapMissing,
-
-    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
-    InvalidLoggingConfig {
-        source: crate::product_logging::Error,
-        cm_name: String,
-    },
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
@@ -558,7 +540,7 @@ pub async fn reconcile_airflow(
                     rolegroup: rolegroup.clone(),
                 })?;
 
-            let rg_configmap = build_rolegroup_config_map(
+            let rg_configmap = config_map::build_rolegroup_config_map(
                 airflow,
                 &validated.image,
                 &rolegroup,
@@ -567,7 +549,8 @@ pub async fn reconcile_airflow(
                 &validated.authorization_config,
                 &validated_rg_config.merged_config.logging,
                 &Container::Airflow,
-            )?;
+            )
+            .context(BuildConfigMapSnafu)?;
             cluster_resources
                 .add(client, rg_configmap)
                 .await
@@ -643,7 +626,7 @@ async fn build_executor_template(
         role_group: "kubernetes".into(),
     };
 
-    let rg_configmap = build_rolegroup_config_map(
+    let rg_configmap = config_map::build_rolegroup_config_map(
         airflow,
         resolved_product_image,
         &rolegroup,
@@ -652,7 +635,8 @@ async fn build_executor_template(
         authorization_config,
         &merged_executor_config.logging,
         &Container::Base,
-    )?;
+    )
+    .context(BuildConfigMapSnafu)?;
     cluster_resources
         .add(client, rg_configmap)
         .await
@@ -697,68 +681,6 @@ async fn build_executor_template(
         .await
         .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
     Ok(())
-}
-
-/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
-#[allow(clippy::too_many_arguments)]
-fn build_rolegroup_config_map(
-    airflow: &v1alpha2::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    config_file_overrides: &BTreeMap<String, String>,
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
-    logging: &Logging<Container>,
-    container: &Container,
-) -> Result<ConfigMap, Error> {
-    let config_file = config::webserver_config::build(
-        authentication_config,
-        authorization_config,
-        &resolved_product_image.product_version,
-        config_file_overrides,
-    )
-    .with_context(|_| BuildWebserverConfigSnafu {
-        rolegroup: rolegroup.clone(),
-    })?;
-
-    let mut cm_builder = ConfigMapBuilder::new();
-
-    cm_builder
-        .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(airflow)
-                .name(rolegroup.object_name())
-                .ownerreference_from_resource(airflow, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(&build_recommended_labels(
-                    airflow,
-                    AIRFLOW_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label_value,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                ))
-                .context(ObjectMetaSnafu)?
-                .build(),
-        )
-        .add_data(AIRFLOW_CONFIG_FILENAME, config_file);
-
-    extend_config_map_with_log_config(
-        rolegroup,
-        logging,
-        container,
-        &Container::Vector,
-        &mut cm_builder,
-        resolved_product_image,
-    )
-    .context(InvalidLoggingConfigSnafu {
-        cm_name: rolegroup.object_name(),
-    })?;
-
-    cm_builder
-        .build()
-        .with_context(|_| BuildRoleGroupConfigSnafu {
-            rolegroup: rolegroup.clone(),
-        })
 }
 
 fn build_rolegroup_metadata(
