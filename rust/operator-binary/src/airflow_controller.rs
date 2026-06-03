@@ -67,7 +67,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::build::config_map,
+    controller::{build::config_map, validate::ValidatedAirflowCluster},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, APP_NAME, AirflowClusterStatus, AirflowConfig, AirflowExecutor,
@@ -344,7 +344,7 @@ pub async fn reconcile_airflow(
         None
     };
 
-    let validated = crate::controller::validate::validate_cluster(
+    let validated_cluster = crate::controller::validate::validate_cluster(
         airflow,
         &ctx.operator_environment.image_repository,
         dereferenced,
@@ -418,15 +418,13 @@ pub async fn reconcile_airflow(
     // collection there will be a pod template created to be used for pod provisioning
     if let AirflowExecutor::KubernetesExecutors {
         common_configuration,
-    } = &validated.executor
+    } = &validated_cluster.executor
     {
         build_executor_template(
             airflow,
             common_configuration,
             &metadata_database_connection_details,
-            &validated.image,
-            &validated.authentication_config,
-            &validated.authorization_config,
+            &validated_cluster,
             &mut cluster_resources,
             client,
             &rbac_sa,
@@ -434,10 +432,10 @@ pub async fn reconcile_airflow(
         .await?;
     }
 
-    for (airflow_role, role_group_configs) in &validated.role_groups {
+    for (airflow_role, role_group_configs) in &validated_cluster.role_groups {
         let role_name = airflow_role.to_string();
 
-        if let Some(role_config) = validated.role_configs.get(airflow_role) {
+        if let Some(role_config) = validated_cluster.role_configs.get(airflow_role) {
             if let Some(pdb) = &role_config.pdb {
                 add_pdbs(pdb, airflow, airflow_role, client, &mut cluster_resources)
                     .await
@@ -451,7 +449,7 @@ pub async fn reconcile_airflow(
                         build_recommended_labels(
                             airflow,
                             AIRFLOW_CONTROLLER_NAME,
-                            &validated.image.app_version_label_value,
+                            &validated_cluster.image.app_version_label_value,
                             &role_name,
                             "none",
                         ),
@@ -475,7 +473,7 @@ pub async fn reconcile_airflow(
 
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
-                &validated.image,
+                &validated_cluster.image,
                 &validated_rg_config
                     .overrides
                     .env_overrides
@@ -498,7 +496,7 @@ pub async fn reconcile_airflow(
             let role_group_service_recommended_labels = build_recommended_labels(
                 airflow,
                 AIRFLOW_CONTROLLER_NAME,
-                &validated.image.app_version_label_value,
+                &validated_cluster.image.app_version_label_value,
                 &rolegroup.role,
                 &rolegroup.role_group,
             );
@@ -542,11 +540,9 @@ pub async fn reconcile_airflow(
 
             let rg_configmap = config_map::build_rolegroup_config_map(
                 airflow,
-                &validated.image,
+                &validated_cluster,
                 &rolegroup,
                 &validated_rg_config.overrides.config_file_overrides,
-                &validated.authentication_config,
-                &validated.authorization_config,
                 &validated_rg_config.merged_config.logging,
                 &Container::Airflow,
             )
@@ -560,17 +556,17 @@ pub async fn reconcile_airflow(
 
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
-                &validated.image,
+                &validated_cluster.image,
                 airflow_role,
                 &rolegroup,
                 &validated_rg_config.overrides.env_overrides,
-                &validated.authentication_config,
-                &validated.authorization_config,
+                &validated_cluster.authentication_config,
+                &validated_cluster.authorization_config,
                 &metadata_database_connection_details,
                 &celery_database_connection_details,
                 &rbac_sa,
                 &validated_rg_config.merged_config,
-                &validated.executor,
+                &validated_cluster.executor,
                 &git_sync_resources,
             )?;
 
@@ -610,9 +606,7 @@ async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &AirflowExecutorCommonConfiguration,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
-    resolved_product_image: &ResolvedProductImage,
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
+    validated_cluster: &ValidatedAirflowCluster,
     cluster_resources: &mut ClusterResources<'_>,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
@@ -628,11 +622,9 @@ async fn build_executor_template(
 
     let rg_configmap = config_map::build_rolegroup_config_map(
         airflow,
-        resolved_product_image,
+        validated_cluster,
         &rolegroup,
         &BTreeMap::new(),
-        authentication_config,
-        authorization_config,
         &merged_executor_config.logging,
         &Container::Base,
     )
@@ -646,7 +638,7 @@ async fn build_executor_template(
 
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
-        resolved_product_image,
+        &validated_cluster.image,
         &common_config
             .env_overrides
             .iter()
@@ -666,8 +658,8 @@ async fn build_executor_template(
 
     let worker_pod_template_config_map = build_executor_template_config_map(
         airflow,
-        resolved_product_image,
-        authentication_config,
+        &validated_cluster.image,
+        &validated_cluster.authentication_config,
         metadata_database_connection_details,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
