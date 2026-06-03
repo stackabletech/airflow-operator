@@ -4715,6 +4715,11 @@ rec {
             packageId = "jsonptr";
           }
           {
+            name = "schemars";
+            packageId = "schemars";
+            optional = true;
+          }
+          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
@@ -4730,6 +4735,10 @@ rec {
         ];
         devDependencies = [
           {
+            name = "schemars";
+            packageId = "schemars";
+          }
+          {
             name = "serde_json";
             packageId = "serde_json";
             features = [ "preserve_order" ];
@@ -4740,7 +4749,7 @@ rec {
           "schemars" = [ "dep:schemars" ];
           "utoipa" = [ "dep:utoipa" ];
         };
-        resolvedDefaultFeatures = [ "default" "diff" ];
+        resolvedDefaultFeatures = [ "default" "diff" "schemars" ];
       };
       "jsonpath-rust" = rec {
         crateName = "jsonpath-rust";
@@ -4866,8 +4875,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "k8s_version";
@@ -9637,8 +9646,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_certs";
@@ -9736,12 +9745,12 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.111.0";
+        version = "0.111.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_operator";
@@ -9799,6 +9808,7 @@ rec {
           {
             name = "json-patch";
             packageId = "json-patch";
+            features = [ "schemars" ];
           }
           {
             name = "k8s-openapi";
@@ -9902,6 +9912,10 @@ rec {
             packageId = "url";
             features = [ "serde" ];
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+          }
         ];
         features = {
           "certs" = [ "dep:stackable-certs" ];
@@ -9920,8 +9934,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         procMacro = true;
@@ -9955,8 +9969,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_shared";
@@ -10036,8 +10050,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_telemetry";
@@ -10146,8 +10160,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_versioned";
@@ -10196,8 +10210,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         procMacro = true;
@@ -10264,8 +10278,8 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "b7c8a3a5483b4d35d0abfa11f6db6c153bda8a51";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "a31cd2514445b251038fc4ea7abc28c57b2a6ad9";
           sha256 = "14q10sppdjdf3vbcbxz12rlgm1g9l6p87nk9wr707w2a71z8vgxc";
         };
         libName = "stackable_webhook";
@@ -12288,6 +12302,66 @@ rec {
         features = {
         };
         resolvedDefaultFeatures = [ "default" ];
+      };
+      "uuid" = rec {
+        crateName = "uuid";
+        version = "1.23.2";
+        edition = "2021";
+        sha256 = "1xy942s4z0bi8p3441wvd4ry3hx6ry1c7s6fgrr38462xqybhn6j";
+        authors = [
+          "Ashley Mannix<ashleymannix@live.com.au>"
+          "Dylan DPC<dylan.dpc@gmail.com>"
+          "Hunar Roop Kahlon<hunar.roop@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "js-sys";
+            packageId = "js-sys";
+            optional = true;
+            usesDefaultFeatures = false;
+            target = { target, features }: (("wasm32" == target."arch" or null) && (("unknown" == target."os" or null) || ("none" == target."os" or null)) && (builtins.elem "atomics" targetFeatures));
+          }
+          {
+            name = "wasm-bindgen";
+            packageId = "wasm-bindgen";
+            optional = true;
+            usesDefaultFeatures = false;
+            target = { target, features }: (("wasm32" == target."arch" or null) && (("unknown" == target."os" or null) || ("none" == target."os" or null)));
+          }
+        ];
+        devDependencies = [
+          {
+            name = "wasm-bindgen";
+            packageId = "wasm-bindgen";
+            target = { target, features }: (("wasm32" == target."arch" or null) && (("unknown" == target."os" or null) || ("none" == target."os" or null)));
+          }
+        ];
+        features = {
+          "arbitrary" = [ "dep:arbitrary" ];
+          "atomic" = [ "dep:atomic" ];
+          "borsh" = [ "dep:borsh" "dep:borsh-derive" ];
+          "bytemuck" = [ "dep:bytemuck" ];
+          "default" = [ "std" ];
+          "fast-rng" = [ "rng" "dep:rand" ];
+          "js" = [ "dep:wasm-bindgen" "dep:js-sys" ];
+          "md5" = [ "dep:md-5" ];
+          "rng" = [ "dep:getrandom" ];
+          "rng-getrandom" = [ "rng" "dep:getrandom" "uuid-rng-internal-lib" "uuid-rng-internal-lib/getrandom" ];
+          "rng-rand" = [ "rng" "dep:rand" "uuid-rng-internal-lib" "uuid-rng-internal-lib/rand" ];
+          "serde" = [ "dep:serde_core" ];
+          "sha1" = [ "dep:sha1_smol" ];
+          "slog" = [ "dep:slog" ];
+          "std" = [ "wasm-bindgen?/std" "js-sys?/std" ];
+          "uuid-rng-internal-lib" = [ "dep:uuid-rng-internal-lib" ];
+          "v1" = [ "atomic" ];
+          "v3" = [ "md5" ];
+          "v4" = [ "rng" ];
+          "v5" = [ "sha1" ];
+          "v6" = [ "atomic" ];
+          "v7" = [ "rng" ];
+          "zerocopy" = [ "dep:zerocopy" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
       };
       "valuable" = rec {
         crateName = "valuable";

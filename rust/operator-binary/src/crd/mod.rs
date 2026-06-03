@@ -18,7 +18,6 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -40,6 +39,7 @@ use stackable_operator::{
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
+    v2::config_overrides::KeyValueConfigOverrides,
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -111,19 +111,6 @@ pub struct AirflowConfigOverrides {
         skip_serializing_if = "Option::is_none"
     )]
     pub webserver_config_py: Option<KeyValueConfigOverrides>,
-}
-
-impl KeyValueOverridesProvider for AirflowConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            AIRFLOW_CONFIG_FILENAME => self
-                .webserver_config_py
-                .as_ref()
-                .map(|o| o.as_product_config_overrides())
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -463,18 +450,21 @@ impl v1alpha2::AirflowCluster {
         let role_config = role.role_config(self)?;
 
         let mut env_overrides = role_config.config.env_overrides.clone();
+        // role-level webserver_config.py overrides; role-group overrides are extended on top below
+        // (role-group wins). Reads the v2 KeyValueConfigOverrides map directly, like hdfs/trino.
         let mut file_overrides = role_config
             .config
             .config_overrides
-            .get_key_value_overrides(AIRFLOW_CONFIG_FILENAME);
+            .webserver_config_py
+            .as_ref()
+            .map(|o| o.overrides.clone())
+            .unwrap_or_default();
 
         if let Some(rg) = role_config.role_groups.get(rolegroup_name) {
             env_overrides.extend(rg.config.env_overrides.clone());
-            let rg_file = rg
-                .config
-                .config_overrides
-                .get_key_value_overrides(AIRFLOW_CONFIG_FILENAME);
-            file_overrides.extend(rg_file);
+            if let Some(rg_file) = rg.config.config_overrides.webserver_config_py.as_ref() {
+                file_overrides.extend(rg_file.overrides.clone());
+            }
         }
 
         let config_file_overrides = file_overrides
