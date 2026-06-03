@@ -6,11 +6,7 @@ use std::{
 };
 
 use const_format::concatcp;
-use product_config::{
-    ProductConfigManager,
-    flask_app_config_writer::{self, FlaskAppConfigWriterError},
-    types::PropertyNameKind,
-};
+use product_config::flask_app_config_writer::{self, FlaskAppConfigWriterError};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -61,10 +57,7 @@ use stackable_operator::{
     },
     kvp::{Annotation, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    product_config_utils::{
-        CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY, env_vars_from,
-        env_vars_from_rolegroup_config,
-    },
+    product_config_utils::env_vars_from,
     product_logging::{
         self,
         framework::LoggingError,
@@ -118,9 +111,11 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
+const CONFIG_OVERRIDE_FILE_HEADER_KEY: &str = "FILE_HEADER";
+const CONFIG_OVERRIDE_FILE_FOOTER_KEY: &str = "FILE_FOOTER";
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
-    pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
@@ -386,7 +381,7 @@ pub async fn reconcile_airflow(
         CONTAINER_IMAGE_BASE_NAME,
         &ctx.operator_environment.image_repository,
         crate::built_info::PKG_VERSION,
-        &ctx.product_config,
+        dereferenced,
     )
     .context(ValidateSnafu)?;
 
@@ -464,8 +459,8 @@ pub async fn reconcile_airflow(
             common_configuration,
             &metadata_database_connection_details,
             &validated.image,
-            &dereferenced.authentication_config,
-            &dereferenced.authorization_config,
+            &validated.authentication_config,
+            &validated.authorization_config,
             &mut cluster_resources,
             client,
             &rbac_sa,
@@ -515,7 +510,7 @@ pub async fn reconcile_airflow(
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated.image,
-                &env_vars_from_rolegroup_config(&validated_rg_config.product_config_properties),
+                &env_vars_from(&validated_rg_config.overrides.env_overrides),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
                 &validated_rg_config
@@ -574,9 +569,9 @@ pub async fn reconcile_airflow(
                 airflow,
                 &validated.image,
                 &rolegroup,
-                &validated_rg_config.product_config_properties,
-                &dereferenced.authentication_config,
-                &dereferenced.authorization_config,
+                &validated_rg_config.overrides.config_file_overrides,
+                &validated.authentication_config,
+                &validated.authorization_config,
                 &validated_rg_config.merged_config.logging,
                 &Container::Airflow,
             )?;
@@ -592,9 +587,9 @@ pub async fn reconcile_airflow(
                 &validated.image,
                 airflow_role,
                 &rolegroup,
-                &validated_rg_config.product_config_properties,
-                &dereferenced.authentication_config,
-                &dereferenced.authorization_config,
+                &validated_rg_config.overrides.env_overrides,
+                &validated.authentication_config,
+                &validated.authorization_config,
                 &metadata_database_connection_details,
                 &celery_database_connection_details,
                 &rbac_sa,
@@ -659,7 +654,7 @@ async fn build_executor_template(
         airflow,
         resolved_product_image,
         &rolegroup,
-        &HashMap::new(),
+        &BTreeMap::new(),
         authentication_config,
         authorization_config,
         &merged_executor_config.logging,
@@ -709,7 +704,7 @@ fn build_rolegroup_config_map(
     airflow: &v1alpha2::AirflowCluster,
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    config_file_overrides: &BTreeMap<String, String>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     logging: &Logging<Container>,
@@ -732,10 +727,7 @@ fn build_rolegroup_config_map(
         config
     );
 
-    let mut file_config = rolegroup_config
-        .get(&PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.to_string()))
-        .cloned()
-        .unwrap_or_default();
+    let mut file_config = config_file_overrides.clone();
 
     tracing::debug!(
         "Config overrides for {}: {:?}",
@@ -884,7 +876,7 @@ fn build_server_rolegroup_statefulset(
     resolved_product_image: &ResolvedProductImage,
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    env_overrides: &HashMap<String, String>,
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
@@ -974,7 +966,7 @@ fn build_server_rolegroup_statefulset(
         env_vars::build_airflow_statefulset_envs(
             airflow,
             airflow_role,
-            rolegroup_config,
+            env_overrides,
             executor,
             authentication_config,
             authorization_config,

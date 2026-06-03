@@ -3,7 +3,6 @@ use std::{
     path::PathBuf,
 };
 
-use product_config::types::PropertyNameKind;
 use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
@@ -79,7 +78,7 @@ pub enum Error {
 pub fn build_airflow_statefulset_envs(
     airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    env_overrides: &HashMap<String, String>,
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -95,9 +94,6 @@ pub fn build_airflow_statefulset_envs(
     let internal_secret_name = airflow.shared_internal_secret_secret_name();
 
     env.extend(static_envs(git_sync_resources));
-
-    // environment variables
-    let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
 
     add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
 
@@ -266,17 +262,15 @@ pub fn build_airflow_statefulset_envs(
     }
 
     // apply overrides last of all with a fixed ordering
-    if let Some(env_vars) = env_vars {
-        for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
-            env.insert(
-                k.into(),
-                EnvVar {
-                    name: k.to_string(),
-                    value: Some(v.to_string()),
-                    ..Default::default()
-                },
-            );
-        }
+    for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
+        env.insert(
+            k.into(),
+            EnvVar {
+                name: k.to_string(),
+                value: Some(v.to_string()),
+                ..Default::default()
+            },
+        );
     }
 
     // Needed for the `containerdebug` process to log it's tracing information to.

@@ -29,7 +29,6 @@ use stackable_operator::{
     kube::{CustomResource, ResourceExt},
     kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{self, Configuration},
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
@@ -1039,35 +1038,6 @@ impl AirflowConfig {
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
-    }
-}
-
-impl Configuration for AirflowConfigFragment {
-    type Configurable = v1alpha2::AirflowCluster;
-
-    fn compute_env(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        _file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
     }
 }
 
