@@ -44,6 +44,7 @@ mod controller;
 mod controller_commons;
 mod crd;
 mod env_vars;
+mod flask_config_writer;
 mod operations;
 mod product_logging;
 mod service;
