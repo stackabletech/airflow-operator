@@ -1,7 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    io::Write,
     sync::Arc,
 };
 
@@ -72,17 +71,14 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    config::{
-        self, PYTHON_IMPORTS,
-        writer::{self, FlaskAppConfigWriterError},
-    },
+    config,
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
-        AirflowConfigOptions, AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole,
-        CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
-        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME,
-        STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container,
+        ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
+        LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -111,9 +107,6 @@ pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
-
-const CONFIG_OVERRIDE_FILE_HEADER_KEY: &str = "FILE_HEADER";
-const CONFIG_OVERRIDE_FILE_FOOTER_KEY: &str = "FILE_FOOTER";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -164,9 +157,9 @@ pub enum Error {
         source: stackable_operator::commons::rbac::Error,
     },
 
-    #[snafu(display("failed to build config file for {rolegroup}"))]
-    BuildRoleGroupConfigFile {
-        source: FlaskAppConfigWriterError,
+    #[snafu(display("failed to build webserver config for {rolegroup}"))]
+    BuildWebserverConfig {
+        source: config::webserver_config::Error,
         rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
     },
 
@@ -256,14 +249,6 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
-
-    #[snafu(display("failed to construct config"))]
-    ConstructConfig { source: config::Error },
-
-    #[snafu(display(
-        "failed to write to String (Vec<u8> to be precise) containing Airflow config"
-    ))]
-    WriteToConfigFileString { source: std::io::Error },
 
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging { source: LoggingError },
@@ -728,58 +713,15 @@ fn build_rolegroup_config_map(
     logging: &Logging<Container>,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
-    let mut config: BTreeMap<String, String> = BTreeMap::new();
-
-    // this will call default values from AirflowClientAuthenticationDetails
-    config::add_airflow_config(
-        &mut config,
+    let config_file = config::webserver_config::build(
         authentication_config,
         authorization_config,
         &resolved_product_image.product_version,
+        config_file_overrides,
     )
-    .context(ConstructConfigSnafu)?;
-
-    tracing::debug!(
-        "Default config for {}: {:?}",
-        rolegroup.object_name(),
-        config
-    );
-
-    let mut file_config = config_file_overrides.clone();
-
-    tracing::debug!(
-        "Config overrides for {}: {:?}",
-        rolegroup.object_name(),
-        file_config
-    );
-
-    // now add any overrides, replacing any defaults
-    config.append(&mut file_config);
-
-    tracing::debug!(
-        "Merged config for {}: {:?}",
-        rolegroup.object_name(),
-        config
-    );
-
-    let mut config_file = Vec::new();
-
-    // By removing the keys from `config_properties`, we avoid pasting the Python code into a Python variable as well
-    // (which would be bad)
-    if let Some(header) = config.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
-        writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
-    }
-
-    let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
-
-    writer::write::<AirflowConfigOptions, _, _>(&mut config_file, config.iter(), PYTHON_IMPORTS)
-        .with_context(|_| BuildRoleGroupConfigFileSnafu {
-            rolegroup: rolegroup.clone(),
-        })?;
-
-    if let Some(footer) = temp_file_footer {
-        writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
-    }
+    .with_context(|_| BuildWebserverConfigSnafu {
+        rolegroup: rolegroup.clone(),
+    })?;
 
     let mut cm_builder = ConfigMapBuilder::new();
 
@@ -800,10 +742,7 @@ fn build_rolegroup_config_map(
                 .context(ObjectMetaSnafu)?
                 .build(),
         )
-        .add_data(
-            AIRFLOW_CONFIG_FILENAME,
-            String::from_utf8(config_file).unwrap(),
-        );
+        .add_data(AIRFLOW_CONFIG_FILENAME, config_file);
 
     extend_config_map_with_log_config(
         rolegroup,
