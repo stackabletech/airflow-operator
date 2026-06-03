@@ -42,7 +42,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, PersistentVolumeClaim, PodTemplateSpec, Probe, ServiceAccount,
+                ConfigMap, EnvVar, PersistentVolumeClaim, PodTemplateSpec, Probe, ServiceAccount,
                 TCPSocketAction,
             },
         },
@@ -56,7 +56,6 @@ use stackable_operator::{
     },
     kvp::{Annotation, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    product_config_utils::env_vars_from,
     product_logging::{
         self,
         framework::LoggingError,
@@ -510,7 +509,16 @@ pub async fn reconcile_airflow(
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated.image,
-                &env_vars_from(&validated_rg_config.overrides.env_overrides),
+                &validated_rg_config
+                    .overrides
+                    .env_overrides
+                    .iter()
+                    .map(|(k, v)| EnvVar {
+                        name: k.clone(),
+                        value: Some(v.clone()),
+                        ..EnvVar::default()
+                    })
+                    .collect::<Vec<_>>(),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
                 &validated_rg_config
@@ -670,7 +678,15 @@ async fn build_executor_template(
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
         resolved_product_image,
-        &env_vars_from(&common_config.env_overrides),
+        &common_config
+            .env_overrides
+            .iter()
+            .map(|(k, v)| EnvVar {
+                name: k.clone(),
+                value: Some(v.clone()),
+                ..EnvVar::default()
+            })
+            .collect::<Vec<_>>(),
         &airflow.volume_mounts(),
         LOG_VOLUME_NAME,
         &merged_executor_config
