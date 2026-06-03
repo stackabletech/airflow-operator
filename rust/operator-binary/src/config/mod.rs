@@ -1,3 +1,5 @@
+pub mod writer;
+
 use std::collections::BTreeMap;
 
 use indoc::formatdoc;

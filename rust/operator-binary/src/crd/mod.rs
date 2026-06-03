@@ -45,6 +45,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    config::writer::{FlaskAppConfigOptions, PythonType},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -55,7 +56,6 @@ use crate::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
     },
-    framework::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     util::role_service_name,
 };
 

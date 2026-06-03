@@ -72,7 +72,10 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    config::{self, PYTHON_IMPORTS},
+    config::{
+        self, PYTHON_IMPORTS,
+        writer::{self, FlaskAppConfigWriterError},
+    },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, AIRFLOW_CONFIG_FILENAME, APP_NAME, AirflowClusterStatus, AirflowConfig,
@@ -91,7 +94,6 @@ use crate::{
         v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
-    framework::flask_app_config_writer::{self, FlaskAppConfigWriterError},
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -770,14 +772,10 @@ fn build_rolegroup_config_map(
 
     let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
-    flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
-        &mut config_file,
-        config.iter(),
-        PYTHON_IMPORTS,
-    )
-    .with_context(|_| BuildRoleGroupConfigFileSnafu {
-        rolegroup: rolegroup.clone(),
-    })?;
+    writer::write::<AirflowConfigOptions, _, _>(&mut config_file, config.iter(), PYTHON_IMPORTS)
+        .with_context(|_| BuildRoleGroupConfigFileSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
 
     if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
