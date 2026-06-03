@@ -92,7 +92,7 @@ use crate::{
         v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
-    flask_config_writer::{self, FlaskAppConfigWriterError},
+    framework::flask_app_config_writer::{self, FlaskAppConfigWriterError},
     operations::{
         graceful_shutdown::{
             add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
@@ -754,7 +754,7 @@ fn build_rolegroup_config_map(
 
     let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
-    flask_config_writer::write::<AirflowConfigOptions, _, _>(
+    flask_app_config_writer::write::<AirflowConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
         PYTHON_IMPORTS,

@@ -55,7 +55,7 @@ use crate::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
     },
-    flask_config_writer::{FlaskAppConfigOptions, PythonType},
+    framework::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     util::role_service_name,
 };
 
