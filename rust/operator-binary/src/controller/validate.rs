@@ -8,10 +8,13 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use super::dereference::DereferencedObjects;
-use crate::crd::{
-    AirflowConfig, AirflowExecutor, AirflowRole, MergedOverrides,
-    authentication::AirflowClientAuthenticationDetailsResolved,
-    authorization::AirflowAuthorizationResolved, v1alpha2,
+use crate::{
+    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
+    crd::{
+        AirflowConfig, AirflowExecutor, AirflowRole, MergedOverrides,
+        authentication::AirflowClientAuthenticationDetailsResolved,
+        authorization::AirflowAuthorizationResolved, v1alpha2,
+    },
 };
 
 #[derive(Snafu, Debug)]
@@ -55,15 +58,17 @@ pub struct ValidatedAirflowCluster {
 
 pub fn validate_cluster(
     airflow: &v1alpha2::AirflowCluster,
-    image_base_name: &str,
     image_repository: &str,
-    pkg_version: &str,
     dereferenced: DereferencedObjects,
 ) -> Result<ValidatedAirflowCluster, Error> {
     let resolved_product_image = airflow
         .spec
         .image
-        .resolve(image_base_name, image_repository, pkg_version)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
     let mut role_groups = BTreeMap::new();

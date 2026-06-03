@@ -364,9 +364,7 @@ pub async fn reconcile_airflow(
 
     let validated = crate::controller::validate::validate_cluster(
         airflow,
-        CONTAINER_IMAGE_BASE_NAME,
         &ctx.operator_environment.image_repository,
-        crate::built_info::PKG_VERSION,
         dereferenced,
     )
     .context(ValidateSnafu)?;
