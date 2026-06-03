@@ -23,6 +23,7 @@
   The results backend `spec.celeryExecutors.resultBackend` is now `spec.clusterConfig.celeryResultsBackend`.
   The broker `spec.celeryExecutors.broker` is now `spec.clusterConfig.celeryBroker`.
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#795]).
+- Removed the product-config based configuration validation. Config and environment overrides are now merged directly from the CRD, and the dereferenced objects are carried on the validated cluster. The `--product-config` CLI flag is now a no-op ([#XXX]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#801]).
 
 ### Fixed
