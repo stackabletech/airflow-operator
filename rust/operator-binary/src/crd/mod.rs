@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    config_overrides::KeyValueConfigOverrides,
+    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -114,7 +114,7 @@ pub struct AirflowConfigOverrides {
     pub webserver_config_py: Option<KeyValueConfigOverrides>,
 }
 
-impl stackable_operator::config_overrides::KeyValueOverridesProvider for AirflowConfigOverrides {
+impl KeyValueOverridesProvider for AirflowConfigOverrides {
     fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
         match file {
             AIRFLOW_CONFIG_FILENAME => self
@@ -125,6 +125,12 @@ impl stackable_operator::config_overrides::KeyValueOverridesProvider for Airflow
             _ => BTreeMap::new(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct MergedOverrides {
+    pub env_overrides: HashMap<String, String>,
+    pub config_file_overrides: BTreeMap<String, String>,
 }
 
 #[derive(Snafu, Debug)]
@@ -448,6 +454,39 @@ impl v1alpha2::AirflowCluster {
 
     pub fn executor_template_configmap_name(&self) -> String {
         format!("{}-executor-pod-template", self.name_any())
+    }
+
+    pub fn merged_overrides(
+        &self,
+        role: &AirflowRole,
+        rolegroup_name: &str,
+    ) -> Result<MergedOverrides, Error> {
+        let role_config = role.role_config(self)?;
+
+        let mut env_overrides = role_config.config.env_overrides.clone();
+        let mut file_overrides = role_config
+            .config
+            .config_overrides
+            .get_key_value_overrides(AIRFLOW_CONFIG_FILENAME);
+
+        if let Some(rg) = role_config.role_groups.get(rolegroup_name) {
+            env_overrides.extend(rg.config.env_overrides.clone());
+            let rg_file = rg
+                .config
+                .config_overrides
+                .get_key_value_overrides(AIRFLOW_CONFIG_FILENAME);
+            file_overrides.extend(rg_file);
+        }
+
+        let config_file_overrides = file_overrides
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect();
+
+        Ok(MergedOverrides {
+            env_overrides,
+            config_file_overrides,
+        })
     }
 
     /// Retrieve and merge resource configs for role and role groups
@@ -1114,13 +1153,15 @@ pub fn build_recommended_labels<'a, T>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use indoc::formatdoc;
     use stackable_operator::{
         commons::product_image_selection::ResolvedProductImage,
         versioned::test_utils::RoundtripTestData,
     };
 
-    use crate::{v1alpha1, v1alpha2};
+    use crate::{crd::AirflowRole, v1alpha1, v1alpha2};
 
     #[test]
     fn test_cluster_config() {
@@ -1344,5 +1385,94 @@ mod tests {
                     replicas: 1
                 "#
         }
+    }
+
+    #[test]
+    fn merged_overrides_match_config_overrides_from_crd() {
+        let cluster_yaml = r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecretName: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+          webservers:
+            config: {}
+            configOverrides:
+              webserver_config.py:
+                AUTH_TYPE: "AUTH_OID"
+                ROLE_ONLY_KEY: "role-value"
+            envOverrides:
+              ROLE_ENV_VAR: "role-env-value"
+            roleGroups:
+              default:
+                config: {}
+                configOverrides:
+                  webserver_config.py:
+                    AUTH_TYPE: "AUTH_DB"
+                    GROUP_ONLY_KEY: "group-value"
+                envOverrides:
+                  GROUP_ENV_VAR: "group-env-value"
+          schedulers:
+            config: {}
+            roleGroups:
+              default:
+                config: {}
+          kubernetesExecutors:
+            config: {}
+        "#;
+
+        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
+        let cluster: v1alpha2::AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        // Webservers/default: role-group overrides merge with (and override) role-level ones
+        let overrides = cluster
+            .merged_overrides(&AirflowRole::Webserver, "default")
+            .expect("merged_overrides should succeed");
+
+        // configOverrides: group AUTH_TYPE overrides role AUTH_TYPE, both unique keys kept
+        assert_eq!(
+            overrides.config_file_overrides,
+            BTreeMap::from([
+                ("AUTH_TYPE".into(), "AUTH_DB".into()),
+                ("ROLE_ONLY_KEY".into(), "role-value".into()),
+                ("GROUP_ONLY_KEY".into(), "group-value".into()),
+            ])
+        );
+
+        // envOverrides: both role and group env vars present
+        assert_eq!(overrides.env_overrides.len(), 2);
+        assert_eq!(
+            overrides.env_overrides.get("ROLE_ENV_VAR").unwrap(),
+            "role-env-value"
+        );
+        assert_eq!(
+            overrides.env_overrides.get("GROUP_ENV_VAR").unwrap(),
+            "group-env-value"
+        );
+
+        // Schedulers/default: no overrides configured → both maps empty
+        let overrides = cluster
+            .merged_overrides(&AirflowRole::Scheduler, "default")
+            .expect("merged_overrides should succeed");
+        assert!(
+            overrides.config_file_overrides.is_empty(),
+            "scheduler should have no config file overrides"
+        );
+        assert!(
+            overrides.env_overrides.is_empty(),
+            "scheduler should have no env overrides"
+        );
     }
 }
