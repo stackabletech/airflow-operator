@@ -4,8 +4,9 @@
 use std::{collections::BTreeMap, io::Write};
 
 use snafu::{ResultExt, Snafu};
+use stackable_operator::v2::flask_config_writer;
 
-use super::{PYTHON_IMPORTS, add_airflow_config, writer};
+use super::{PYTHON_IMPORTS, add_airflow_config};
 use crate::crd::{
     AirflowConfigOptions, authentication::AirflowClientAuthenticationDetailsResolved,
     authorization::AirflowAuthorizationResolved,
@@ -23,7 +24,7 @@ pub enum Error {
 
     #[snafu(display("failed to write the webserver config file"))]
     WriteConfigFile {
-        source: writer::FlaskAppConfigWriterError,
+        source: flask_config_writer::FlaskAppConfigWriterError,
     },
 
     #[snafu(display("failed to write the header/footer to the webserver config file"))]
@@ -65,8 +66,12 @@ pub fn build(
 
     let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
-    writer::write::<AirflowConfigOptions, _, _>(&mut config_file, config.iter(), PYTHON_IMPORTS)
-        .context(WriteConfigFileSnafu)?;
+    flask_config_writer::write::<AirflowConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        PYTHON_IMPORTS,
+    )
+    .context(WriteConfigFileSnafu)?;
 
     if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{}", footer).context(WriteHeaderFooterSnafu)?;

@@ -1,5 +1,4 @@
 pub mod webserver_config;
-pub mod writer;
 
 use std::collections::BTreeMap;
 

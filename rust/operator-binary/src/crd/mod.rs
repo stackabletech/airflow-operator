@@ -39,13 +39,15 @@ use stackable_operator::{
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
-    v2::config_overrides::KeyValueConfigOverrides,
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        flask_config_writer::{FlaskAppConfigOptions, PythonType},
+    },
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    config::writer::{FlaskAppConfigOptions, PythonType},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{

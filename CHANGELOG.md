@@ -27,6 +27,8 @@
 - Removed the product-config based configuration validation.
   Config and environment overrides are now merged directly from the CRD, and dereferenced objects are added to the validated cluster.
   The `--product-config` CLI flag is now a no-op ([#804]).
+- The Flask config-file writer for `webserver_config.py` is now provided by `stackable-operator`
+  (`v2::flask_config_writer`) instead of a vendored copy ([#804]).
 
 ### Fixed
 

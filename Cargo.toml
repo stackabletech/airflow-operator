@@ -13,7 +13,7 @@ repository = "https://github.com/stackabletech/airflow-operator"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", features = [
   "crds",
   "webhook",
-], tag = "stackable-operator-0.111.0" }
+], tag = "stackable-operator-0.111.1" }
 
 anyhow = "1.0"
 built = { version = "0.8", features = ["chrono", "git2"] }
