@@ -1,8 +1,8 @@
 //! Writer for Flask App configurations (Python config files).
 //!
-//! Vendored verbatim from `product_config::flask_app_config_writer` so
-//! airflow-operator can drop the `product-config` crate dependency. Applications
-//! based on the Flask App Builder (e.g. Apache Airflow, Apache Superset) use
+//! Vendored verbatim from `product_config::flask_app_config_writer` so the
+//! operator does not depend on the `product-config` crate. Applications based
+//! on the Flask App Builder (e.g. Apache Airflow, Apache Superset) use
 //! configuration files written in Python. This writer only covers top-level
 //! assignments of a few primitive types and expressions — it is not a general
 //! Python code generator.
@@ -11,10 +11,10 @@
 //! invalid expressions produce invalid configuration files. Config overrides that do
 //! not map to a known option are treated as plain expressions.
 //!
-// TODO: This is vendored, not airflow-specific. superset-operator still depends on
-// `product_config::flask_app_config_writer`; this writer is a candidate for a shared
-// crate (e.g. operator-rs) so both operators can drop the product-config crate.
-// Until such a home exists it is duplicated here, kept identical to the upstream source.
+// TODO: This file is vendored identically in airflow-operator and superset-operator;
+// it is a candidate for a shared crate (e.g. operator-rs) so the duplication can be
+// removed. Until such a home exists it is kept identical in both operators and to the
+// upstream source.
 
 use std::{
     io::{self, Write},
