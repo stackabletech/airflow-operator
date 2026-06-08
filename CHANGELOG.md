@@ -24,11 +24,9 @@
   The broker `spec.celeryExecutors.broker` is now `spec.clusterConfig.celeryBroker`.
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#795]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#801]).
-- Removed the product-config based configuration validation.
-  Config and environment overrides are now merged directly from the CRD, and dereferenced objects are added to the validated cluster.
+- BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
+￼ Users relying on the product-config `properties.yaml` file have to set these properties via the CRD.
   The `--product-config` CLI flag is now a no-op ([#804]).
-- The Flask config-file writer for `webserver_config.py` is now provided by `stackable-operator`
-  (`v2::flask_config_writer`) instead of a vendored copy ([#804]).
 
 ### Fixed
 
