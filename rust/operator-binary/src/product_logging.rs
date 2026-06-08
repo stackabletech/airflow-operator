@@ -32,8 +32,6 @@ pub enum Error {
     MissingVectorAggregatorAddress,
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
 const LOG_CONFIG_FILE: &str = "log_config.py";
 const LOG_FILE: &str = "airflow.py.json";
 
@@ -45,8 +43,7 @@ pub fn extend_config_map_with_log_config<C, K>(
     vector_container: &C,
     cm_builder: &mut ConfigMapBuilder,
     resolved_product_image: &ResolvedProductImage,
-) -> Result<()>
-where
+) where
     C: Clone + Ord + Display,
     K: Resource,
 {
@@ -76,8 +73,6 @@ where
             product_logging::framework::create_vector_config(rolegroup, vector_log_config),
         );
     }
-
-    Ok(())
 }
 
 fn create_airflow_config(

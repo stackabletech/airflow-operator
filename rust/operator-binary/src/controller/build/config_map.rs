@@ -98,10 +98,7 @@ pub fn build_rolegroup_config_map(
         &Container::Vector,
         &mut cm_builder,
         &validated_cluster.image,
-    )
-    .context(InvalidLoggingConfigSnafu {
-        cm_name: rolegroup.object_name(),
-    })?;
+    );
 
     cm_builder.build().with_context(|_| BuildConfigMapSnafu {
         rolegroup: rolegroup.clone(),
