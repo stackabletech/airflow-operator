@@ -1,20 +1,10 @@
-use std::fmt::{Display, Write};
+use std::fmt::Write;
 
 use snafu::Snafu;
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
     commons::product_image_selection::ResolvedProductImage,
-    kube::Resource,
-    product_logging::{
-        self,
-        spec::{
-            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
-        },
-    },
-    role_utils::RoleGroupRef,
+    product_logging::spec::AutomaticContainerLogConfig,
 };
-
-use crate::crd::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -32,50 +22,10 @@ pub enum Error {
     MissingVectorAggregatorAddress,
 }
 
-const LOG_CONFIG_FILE: &str = "log_config.py";
+pub const LOG_CONFIG_FILE: &str = "log_config.py";
 const LOG_FILE: &str = "airflow.py.json";
 
-/// Extend the ConfigMap with logging and Vector configurations
-pub fn extend_config_map_with_log_config<C, K>(
-    rolegroup: &RoleGroupRef<K>,
-    logging: &Logging<C>,
-    main_container: &C,
-    vector_container: &C,
-    cm_builder: &mut ConfigMapBuilder,
-    resolved_product_image: &ResolvedProductImage,
-) where
-    C: Clone + Ord + Display,
-    K: Resource,
-{
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(main_container)
-    {
-        let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
-        cm_builder.add_data(
-            LOG_CONFIG_FILE,
-            create_airflow_config(log_config, &log_dir, resolved_product_image),
-        );
-    }
-
-    let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(vector_container)
-    {
-        Some(log_config)
-    } else {
-        None
-    };
-
-    if logging.enable_vector_agent {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
-        );
-    }
-}
-
-fn create_airflow_config(
+pub fn create_airflow_config(
     log_config: &AutomaticContainerLogConfig,
     log_dir: &str,
     resolved_product_image: &ResolvedProductImage,

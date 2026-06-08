@@ -7,7 +7,10 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
-    product_logging::spec::Logging,
+    product_logging::{
+        self,
+        spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
+    },
     role_utils::RoleGroupRef,
 };
 
@@ -15,8 +18,10 @@ use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
     config::webserver_config,
     controller::validate::ValidatedAirflowCluster,
-    crd::{AIRFLOW_CONFIG_FILENAME, Container, build_recommended_labels, v1alpha2},
-    product_logging::extend_config_map_with_log_config,
+    crd::{
+        AIRFLOW_CONFIG_FILENAME, Container, STACKABLE_LOG_DIR, build_recommended_labels, v1alpha2,
+    },
+    product_logging::{LOG_CONFIG_FILE, create_airflow_config},
 };
 
 #[derive(Snafu, Debug)]
@@ -91,14 +96,33 @@ pub fn build_rolegroup_config_map(
         )
         .add_data(AIRFLOW_CONFIG_FILENAME, config_file);
 
-    extend_config_map_with_log_config(
-        rolegroup,
-        logging,
-        container,
-        &Container::Vector,
-        &mut cm_builder,
-        &validated_cluster.image,
-    );
+    // Log config for the main container, when it uses an Automatic log config.
+    if let Some(ContainerLogConfig {
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = logging.containers.get(container)
+    {
+        let log_dir = format!("{STACKABLE_LOG_DIR}/{container}");
+        cm_builder.add_data(
+            LOG_CONFIG_FILE,
+            create_airflow_config(log_config, &log_dir, &validated_cluster.image),
+        );
+    }
+
+    // Vector agent config, when enabled.
+    if logging.enable_vector_agent {
+        let vector_log_config = if let Some(ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+        }) = logging.containers.get(&Container::Vector)
+        {
+            Some(log_config)
+        } else {
+            None
+        };
+        cm_builder.add_data(
+            product_logging::framework::VECTOR_CONFIG_FILE,
+            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
+        );
+    }
 
     cm_builder.build().with_context(|_| BuildConfigMapSnafu {
         rolegroup: rolegroup.clone(),
