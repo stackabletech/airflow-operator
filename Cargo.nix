@@ -9555,7 +9555,7 @@ rec {
       "stackable-airflow-operator" = rec {
         crateName = "stackable-airflow-operator";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-airflow-operator";
