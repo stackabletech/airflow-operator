@@ -107,12 +107,8 @@ pub type AirflowWebserverRoleType =
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfigOverrides {
-    #[serde(
-        default,
-        rename = "webserver_config.py",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub webserver_config_py: Option<KeyValueConfigOverrides>,
+    #[serde(default, rename = "webserver_config.py")]
+    pub webserver_config_py: KeyValueConfigOverrides,
 }
 
 #[derive(Clone, Debug)]
@@ -458,15 +454,18 @@ impl v1alpha2::AirflowCluster {
             .config
             .config_overrides
             .webserver_config_py
-            .as_ref()
-            .map(|o| o.overrides.clone())
-            .unwrap_or_default();
+            .overrides
+            .clone();
 
         if let Some(rg) = role_config.role_groups.get(rolegroup_name) {
             env_overrides.extend(rg.config.env_overrides.clone());
-            if let Some(rg_file) = rg.config.config_overrides.webserver_config_py.as_ref() {
-                file_overrides.extend(rg_file.overrides.clone());
-            }
+            file_overrides.extend(
+                rg.config
+                    .config_overrides
+                    .webserver_config_py
+                    .overrides
+                    .clone(),
+            );
         }
 
         let config_file_overrides = file_overrides
