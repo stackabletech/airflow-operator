@@ -475,16 +475,7 @@ pub async fn reconcile_airflow(
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated_cluster.image,
-                &validated_rg_config
-                    .overrides
-                    .env_overrides
-                    .iter()
-                    .map(|(k, v)| EnvVar {
-                        name: k.clone(),
-                        value: Some(v.clone()),
-                        ..EnvVar::default()
-                    })
-                    .collect::<Vec<_>>(),
+                &env_vars_from_overrides(&validated_rg_config.overrides.env_overrides),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
                 &validated_rg_config
@@ -635,15 +626,7 @@ async fn build_executor_template(
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &airflow.spec.cluster_config.dags_git_sync,
         &validated_cluster.image,
-        &common_config
-            .env_overrides
-            .iter()
-            .map(|(k, v)| EnvVar {
-                name: k.clone(),
-                value: Some(v.clone()),
-                ..EnvVar::default()
-            })
-            .collect::<Vec<_>>(),
+        &env_vars_from_overrides(&common_config.env_overrides),
         &airflow.volume_mounts(),
         LOG_VOLUME_NAME,
         &merged_executor_config
@@ -1291,4 +1274,16 @@ fn add_git_sync_resources(
         .context(AddVolumeMountSnafu)?;
 
     Ok(())
+}
+
+/// Convert user-supplied `envOverrides` into a list of [`EnvVar`]s.
+fn env_vars_from_overrides(env_overrides: &HashMap<String, String>) -> Vec<EnvVar> {
+    env_overrides
+        .iter()
+        .map(|(k, v)| EnvVar {
+            name: k.clone(),
+            value: Some(v.clone()),
+            ..EnvVar::default()
+        })
+        .collect()
 }
