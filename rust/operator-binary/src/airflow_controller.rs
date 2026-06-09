@@ -1,6 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap},
     sync::Arc,
 };
 
@@ -73,10 +73,11 @@ use crate::{
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, APP_NAME, AirflowClusterStatus, AirflowExecutor, AirflowExecutorCommonConfiguration,
-        AirflowRole, CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME,
-        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME,
-        OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        self, APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, AirflowExecutor,
+        AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
+        HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
+        METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
+        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -475,7 +476,7 @@ pub async fn reconcile_airflow(
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated_cluster.image,
-                &env_vars_from_overrides(&validated_rg_config.overrides.env_overrides),
+                &env_vars_from_overrides(&validated_rg_config.env_overrides),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
                 &validated_rg_config
@@ -534,7 +535,7 @@ pub async fn reconcile_airflow(
                 airflow,
                 &validated_cluster,
                 &rolegroup,
-                &validated_rg_config.overrides.config_file_overrides,
+                &validated_rg_config.config_overrides,
                 &validated_rg_config.merged_config.logging,
                 &Container::Airflow,
             )
@@ -611,7 +612,9 @@ async fn build_executor_template(
         airflow,
         validated_cluster,
         &rolegroup,
-        &BTreeMap::new(),
+        // The kubernetes-executor pod template does not apply webserver_config.py overrides
+        // (preserves prior behaviour, which passed an empty map here).
+        &AirflowConfigOverrides::default(),
         &merged_executor_config.logging,
         &Container::Base,
     )
@@ -730,7 +733,7 @@ fn build_server_rolegroup_statefulset(
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
     let merged_airflow_config = &validated_rg_config.merged_config;
-    let env_overrides = &validated_rg_config.overrides.env_overrides;
+    let env_overrides = &validated_rg_config.env_overrides;
 
     let resolved_product_image = &validated_cluster.image;
     let authentication_config = &validated_cluster.authentication_config;

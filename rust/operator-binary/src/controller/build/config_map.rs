@@ -19,7 +19,8 @@ use crate::{
     config::webserver_config,
     controller::validate::ValidatedAirflowCluster,
     crd::{
-        AIRFLOW_CONFIG_FILENAME, Container, STACKABLE_LOG_DIR, build_recommended_labels, v1alpha2,
+        AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR,
+        build_recommended_labels, v1alpha2,
     },
     product_logging::{LOG_CONFIG_FILE, create_airflow_config},
 };
@@ -60,15 +61,24 @@ pub fn build_rolegroup_config_map(
     airflow: &v1alpha2::AirflowCluster,
     validated_cluster: &ValidatedAirflowCluster,
     rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    config_file_overrides: &BTreeMap<String, String>,
+    config_overrides: &AirflowConfigOverrides,
     logging: &Logging<Container>,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
+    // Flatten the typed `webserver_config.py` overrides into a plain map for the file writer,
+    // dropping entries whose value is unset (`null`).
+    let config_file_overrides: BTreeMap<String, String> = config_overrides
+        .webserver_config_py
+        .overrides
+        .iter()
+        .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
+        .collect();
+
     let config_file = webserver_config::build(
         &validated_cluster.authentication_config,
         &validated_cluster.authorization_config,
         &validated_cluster.image.product_version,
-        config_file_overrides,
+        &config_file_overrides,
     )
     .with_context(|_| BuildWebserverConfigSnafu {
         rolegroup: rolegroup.clone(),
