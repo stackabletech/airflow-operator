@@ -104,7 +104,7 @@ pub type AirflowExecutorCommonConfiguration =
 pub type AirflowWebserverRoleType =
     Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfigOverrides {
     #[serde(default, rename = "webserver_config.py")]
@@ -446,29 +446,27 @@ impl v1alpha2::AirflowCluster {
         rolegroup_name: &str,
     ) -> Result<MergedOverrides, Error> {
         let role_config = role.role_config(self)?;
+        let rolegroup = role_config.role_groups.get(rolegroup_name);
 
+        // env overrides: role first, role-group extended on top (role-group wins)
         let mut env_overrides = role_config.config.env_overrides.clone();
-        // role-level webserver_config.py overrides; role-group overrides are extended on top below
-        // (role-group wins). Reads the v2 KeyValueConfigOverrides map directly, like hdfs/trino.
-        let mut file_overrides = role_config
-            .config
-            .config_overrides
-            .webserver_config_py
-            .overrides
-            .clone();
-
-        if let Some(rg) = role_config.role_groups.get(rolegroup_name) {
+        if let Some(rg) = rolegroup {
             env_overrides.extend(rg.config.env_overrides.clone());
-            file_overrides.extend(
-                rg.config
-                    .config_overrides
-                    .webserver_config_py
-                    .overrides
-                    .clone(),
-            );
         }
 
-        let config_file_overrides = file_overrides
+        // file overrides: role-group merged over role (role-group wins) via the `Merge`
+        // impl on AirflowConfigOverrides. A role-group `null` inherits the role value
+        // rather than unsetting it. Mirrors hdfs-operator.
+
+        let mut config_overrides = rolegroup
+            .map(|rg| rg.config.config_overrides.clone())
+            .unwrap_or_default();
+
+        config_overrides.merge(&role_config.config.config_overrides);
+
+        let config_file_overrides = config_overrides
+            .webserver_config_py
+            .overrides
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
             .collect();
