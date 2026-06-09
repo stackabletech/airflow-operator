@@ -67,18 +67,19 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{build::config_map, validate::ValidatedAirflowCluster},
+    controller::{
+        build::config_map,
+        validate::{ValidatedAirflowCluster, ValidatedRoleGroupConfig},
+    },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, APP_NAME, AirflowClusterStatus, AirflowConfig, AirflowExecutor,
-        AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
-        METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
-        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        self, APP_NAME, AirflowClusterStatus, AirflowExecutor, AirflowExecutorCommonConfiguration,
+        AirflowRole, CONFIG_PATH, Container, ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME,
+        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME,
+        OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
-        authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
@@ -556,17 +557,13 @@ pub async fn reconcile_airflow(
 
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
-                &validated_cluster.image,
+                &validated_cluster,
                 airflow_role,
                 &rolegroup,
-                &validated_rg_config.overrides.env_overrides,
-                &validated_cluster.authentication_config,
-                &validated_cluster.authorization_config,
+                validated_rg_config,
                 &metadata_database_connection_details,
                 &celery_database_connection_details,
                 &rbac_sa,
-                &validated_rg_config.merged_config,
-                &validated_cluster.executor,
                 &git_sync_resources,
             )?;
 
@@ -601,7 +598,6 @@ pub async fn reconcile_airflow(
     Ok(Action::await_change())
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &AirflowExecutorCommonConfiguration,
@@ -738,22 +734,26 @@ fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     airflow: &v1alpha2::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
+    validated_cluster: &ValidatedAirflowCluster,
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    env_overrides: &HashMap<String, String>,
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
+    validated_rg_config: &ValidatedRoleGroupConfig,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     celery_database_connection_details: &Option<(
         CeleryDatabaseConnectionDetails,
         CeleryDatabaseConnectionDetails,
     )>,
     service_account: &ServiceAccount,
-    merged_airflow_config: &AirflowConfig,
-    executor: &AirflowExecutor,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
+    let merged_airflow_config = &validated_rg_config.merged_config;
+    let env_overrides = &validated_rg_config.overrides.env_overrides;
+
+    let resolved_product_image = &validated_cluster.image;
+    let authentication_config = &validated_cluster.authentication_config;
+    let authorization_config = &validated_cluster.authorization_config;
+    let executor = &validated_cluster.executor;
+
     let binding = airflow.get_role(airflow_role);
     let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
 
