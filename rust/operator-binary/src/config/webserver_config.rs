@@ -7,10 +7,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::flask_config_writer;
 
 use super::{PYTHON_IMPORTS, add_airflow_config};
-use crate::crd::{
-    AirflowConfigOptions, authentication::AirflowClientAuthenticationDetailsResolved,
-    authorization::AirflowAuthorizationResolved,
-};
+use crate::{airflow_controller::ValidatedCluster, crd::AirflowConfigOptions};
 
 /// Marks arbitrary Python code to prepend verbatim to the generated file.
 const CONFIG_OVERRIDE_FILE_HEADER_KEY: &str = "FILE_HEADER";
@@ -35,9 +32,7 @@ pub enum Error {
 /// resolved authentication/authorization config) with the user's `config_overrides`
 /// applied last, wrapped by the optional `FILE_HEADER`/`FILE_FOOTER` Python blocks.
 pub fn build(
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
-    product_version: &str,
+    validated_cluster: &ValidatedCluster,
     config_file_overrides: &BTreeMap<String, String>,
 ) -> Result<String, Error> {
     let mut config: BTreeMap<String, String> = BTreeMap::new();
@@ -45,9 +40,9 @@ pub fn build(
     // this will call default values from AirflowClientAuthenticationDetails
     add_airflow_config(
         &mut config,
-        authentication_config,
-        authorization_config,
-        product_version,
+        &validated_cluster.cluster_config.authentication_config,
+        &validated_cluster.cluster_config.authorization_config,
+        &validated_cluster.image.product_version,
     )
     .context(ConstructConfigSnafu)?;
 

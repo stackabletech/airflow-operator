@@ -118,29 +118,35 @@ pub struct ValidatedRoleConfig {
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
 ///
-/// `config_overrides` is kept as the typed [`AirflowConfigOverrides`] (role-group merged over
-/// role); it is flattened into the rendered config file later, in the build step. This mirrors
-/// hdfs-operator. `env_overrides` is already a flat map.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: AirflowConfig,
-    pub config_overrides: AirflowConfigOverrides,
-    pub env_overrides: HashMap<String, String>,
-    pub replicas: Option<u16>,
-    pub pod_overrides: PodTemplateSpec,
-}
+/// This is the generic [`stackable_operator::v2::role_utils::RoleGroupConfig`]: the merged config
+/// fragment in `config`, the typed `config_overrides` (role-group merged over role) and the merged
+/// `env_overrides`/`cli_overrides`/`pod_overrides`. The config overrides are kept typed
+/// ([`AirflowConfigOverrides`]) and flattened into the rendered config file later, in the build step.
+pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
+    AirflowConfig,
+    stackable_operator::v2::role_utils::GenericCommonConfig,
+    AirflowConfigOverrides,
+>;
 
-/// The validated cluster: proves that config merging succeeded for every role and
-/// role group before any resources are created. It also carries the dereferenced
-/// external references, so every downstream build step reads them from here.
+/// Cluster-wide configuration that applies to every role and role group.
+///
+/// Carries the dereferenced external references, so every downstream build step reads them from
+/// here rather than from the raw cluster object.
 #[derive(Clone, Debug)]
-pub struct ValidatedAirflowCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+pub struct ValidatedClusterConfig {
     pub executor: AirflowExecutor,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
+}
+
+/// The validated cluster: proves that config merging succeeded for every role and
+/// role group before any resources are created.
+#[derive(Clone, Debug)]
+pub struct ValidatedCluster {
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, AirflowRoleGroupConfig>>,
+    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -450,7 +456,7 @@ pub async fn reconcile_airflow(
     // collection there will be a pod template created to be used for pod provisioning
     if let AirflowExecutor::KubernetesExecutors {
         common_configuration,
-    } = &validated_cluster.executor
+    } = &validated_cluster.cluster_config.executor
     {
         build_executor_template(
             airflow,
@@ -506,11 +512,11 @@ pub async fn reconcile_airflow(
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated_cluster.image,
-                &env_vars_from_overrides(&validated_rg_config.env_overrides),
+                &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME,
                 &validated_rg_config
-                    .merged_config
+                    .config
                     .logging
                     .for_container(&Container::GitSync),
             )
@@ -566,7 +572,7 @@ pub async fn reconcile_airflow(
                 &validated_cluster,
                 &rolegroup,
                 &validated_rg_config.config_overrides,
-                &validated_rg_config.merged_config.logging,
+                &validated_rg_config.config.logging,
                 &Container::Airflow,
             )
             .context(BuildConfigMapSnafu)?;
@@ -624,7 +630,7 @@ async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &AirflowExecutorCommonConfiguration,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
-    validated_cluster: &ValidatedAirflowCluster,
+    validated_cluster: &ValidatedCluster,
     cluster_resources: &mut ClusterResources<'_>,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
@@ -671,7 +677,7 @@ async fn build_executor_template(
     let worker_pod_template_config_map = build_executor_template_config_map(
         airflow,
         &validated_cluster.image,
-        &validated_cluster.authentication_config,
+        &validated_cluster.cluster_config.authentication_config,
         metadata_database_connection_details,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
@@ -750,10 +756,10 @@ fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     airflow: &v1alpha2::AirflowCluster,
-    validated_cluster: &ValidatedAirflowCluster,
+    validated_cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    validated_rg_config: &ValidatedRoleGroupConfig,
+    validated_rg_config: &AirflowRoleGroupConfig,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     celery_database_connection_details: &Option<(
         CeleryDatabaseConnectionDetails,
@@ -762,13 +768,13 @@ fn build_server_rolegroup_statefulset(
     service_account: &ServiceAccount,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
-    let merged_airflow_config = &validated_rg_config.merged_config;
+    let merged_airflow_config = &validated_rg_config.config;
     let env_overrides = &validated_rg_config.env_overrides;
 
     let resolved_product_image = &validated_cluster.image;
-    let authentication_config = &validated_cluster.authentication_config;
-    let authorization_config = &validated_cluster.authorization_config;
-    let executor = &validated_cluster.executor;
+    let authentication_config = &validated_cluster.cluster_config.authentication_config;
+    let authorization_config = &validated_cluster.cluster_config.authorization_config;
+    let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
     let recommended_object_labels = build_recommended_labels(
@@ -1044,7 +1050,7 @@ fn build_server_rolegroup_statefulset(
             }
             .to_string(),
         ),
-        replicas: validated_rg_config.replicas.map(i32::from),
+        replicas: Some(i32::from(validated_rg_config.replicas)),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
@@ -1123,7 +1129,6 @@ fn build_executor_template_config_map(
     let mut airflow_container =
         ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
 
-    // Works too, had been changed
     add_authentication_volumes_and_volume_mounts(
         authentication_config,
         &mut airflow_container,

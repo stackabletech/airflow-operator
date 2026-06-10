@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -6,15 +6,18 @@ use stackable_operator::{
     config::fragment,
     kube::ResourceExt,
     role_utils::{GenericRoleConfig, RoleGroup},
-    v2::role_utils::{GenericCommonConfig, with_validated_config},
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
+    },
 };
 use strum::IntoEnumIterator;
 
 use super::dereference::DereferencedObjects;
 use crate::{
     airflow_controller::{
-        CONTAINER_IMAGE_BASE_NAME, ValidatedAirflowCluster, ValidatedRoleConfig,
-        ValidatedRoleGroupConfig,
+        AirflowRoleGroupConfig, CONTAINER_IMAGE_BASE_NAME, ValidatedCluster,
+        ValidatedClusterConfig, ValidatedRoleConfig,
     },
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
@@ -34,13 +37,18 @@ pub enum Error {
         source: fragment::ValidationError,
         role_group: String,
     },
+
+    #[snafu(display("failed to parse an environment variable override name"))]
+    ParseEnvVarName {
+        source: stackable_operator::v2::builder::pod::container::Error,
+    },
 }
 
 pub fn validate_cluster(
     airflow: &v1alpha2::AirflowCluster,
     image_repository: &str,
     dereferenced: DereferencedObjects,
-) -> Result<ValidatedAirflowCluster, Error> {
+) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = airflow
         .spec
         .image
@@ -76,10 +84,8 @@ pub fn validate_cluster(
 
         let mut group_configs = BTreeMap::new();
         for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
-            let validated = validate_role_group(&resolved_role, rolegroup, &default_config)
-                .with_context(|_| FailedToResolveConfigSnafu {
-                    role_group: rolegroup_name.clone(),
-                })?;
+            let validated =
+                validate_role_group(&resolved_role, rolegroup_name, rolegroup, &default_config)?;
 
             group_configs.insert(rolegroup_name.clone(), validated);
         }
@@ -92,18 +98,21 @@ pub fn validate_cluster(
         authorization_config,
     } = dereferenced;
 
-    Ok(ValidatedAirflowCluster {
+    Ok(ValidatedCluster {
         image: resolved_product_image,
+        cluster_config: ValidatedClusterConfig {
+            executor: airflow.spec.executor.clone(),
+            authentication_config,
+            authorization_config,
+        },
         role_groups,
         role_configs,
-        executor: airflow.spec.executor.clone(),
-        authentication_config,
-        authorization_config,
     })
 }
 
 /// Validate and merge one role group against its role, via the shared
-/// [`with_validated_config`] from `operator-rs`.
+/// [`with_validated_config`] from `operator-rs`, returning the generic
+/// [`stackable_operator::v2::role_utils::RoleGroupConfig`].
 ///
 /// This performs the full `default → role → role-group` merge of the config fragment (then
 /// validates it) *and* the role←role-group merge of the overrides in one step. The config
@@ -114,29 +123,46 @@ pub fn validate_cluster(
 /// than unsetting it (config overrides), and env overrides layer role-group on top of role.
 fn validate_role_group(
     role: &AirflowRoleType,
+    role_group_name: &str,
     rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     default_config: &AirflowConfigFragment,
-) -> Result<ValidatedRoleGroupConfig, fragment::ValidationError> {
+) -> Result<AirflowRoleGroupConfig, Error> {
     let validated = with_validated_config::<
         AirflowConfig,
         GenericCommonConfig,
         AirflowConfigFragment,
         GenericRoleConfig,
         AirflowConfigOverrides,
-    >(rolegroup, role, default_config)?;
+    >(rolegroup, role, default_config)
+    .with_context(|_| FailedToResolveConfigSnafu {
+        role_group: role_group_name.to_owned(),
+    })?;
 
-    Ok(ValidatedRoleGroupConfig {
-        merged_config: validated.config.config,
+    let mut env_overrides = EnvVarSet::new();
+    for (env_var_name, env_var_value) in validated.config.env_overrides {
+        env_overrides = env_overrides.with_value(
+            &EnvVarName::from_str(&env_var_name).context(ParseEnvVarNameSnafu)?,
+            env_var_value,
+        );
+    }
+
+    Ok(RoleGroupConfig {
+        // Kubernetes defaults to 1 if `replicas` is not set
+        replicas: validated.replicas.unwrap_or(1),
+        config: validated.config.config,
         config_overrides: validated.config.config_overrides,
-        env_overrides: validated.config.env_overrides,
-        replicas: validated.replicas,
+        env_overrides,
+        cli_overrides: validated.config.cli_overrides,
         pod_overrides: validated.config.pod_overrides,
+        product_specific_common_config: validated.config.product_specific_common_config,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+
+    use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
 
     use super::validate_role_group;
     use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
@@ -197,10 +223,9 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated =
-            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
+        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
+            .expect("validated role group");
         let config_overrides = validated.config_overrides;
-        let env_overrides = validated.env_overrides;
 
         // configOverrides are kept typed. The role-group AUTH_TYPE overrides the role-level one;
         // both role-only and group-only keys are kept.
@@ -213,11 +238,20 @@ mod tests {
             ])
         );
 
+        // env overrides layer role-group on top of role.
+        let env_overrides: BTreeMap<String, Option<String>> =
+            Vec::<EnvVar>::from(validated.env_overrides)
+                .into_iter()
+                .map(|env_var| (env_var.name, env_var.value))
+                .collect();
         assert_eq!(env_overrides.len(), 2);
-        assert_eq!(env_overrides.get("ROLE_ENV_VAR").unwrap(), "role-env-value");
         assert_eq!(
-            env_overrides.get("GROUP_ENV_VAR").unwrap(),
-            "group-env-value"
+            env_overrides.get("ROLE_ENV_VAR").unwrap().as_deref(),
+            Some("role-env-value")
+        );
+        assert_eq!(
+            env_overrides.get("GROUP_ENV_VAR").unwrap().as_deref(),
+            Some("group-env-value")
         );
     }
 
@@ -281,8 +315,8 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated =
-            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
+        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
+            .expect("validated role group");
 
         assert!(
             validated
@@ -291,11 +325,11 @@ mod tests {
                 .overrides
                 .is_empty()
         );
-        assert!(validated.env_overrides.is_empty());
+        assert!(Vec::<EnvVar>::from(validated.env_overrides).is_empty());
     }
 
     /// `replicas` and the role←role-group merged `pod_overrides` are produced by
-    /// `with_validated_config` and must be carried on `ValidatedRoleGroupConfig`, so the build
+    /// `with_validated_config` and must be carried on `AirflowRoleGroupConfig`, so the build
     /// step reads them from here rather than re-deriving from the raw cluster.
     #[test]
     fn role_group_carries_merged_pod_overrides_and_replicas() {
@@ -349,11 +383,11 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated =
-            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
+        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
+            .expect("validated role group");
 
         // replicas is carried through from the role group.
-        assert_eq!(validated.replicas, Some(3));
+        assert_eq!(validated.replicas, 3);
 
         // pod_overrides is merged role←role-group (role-group wins on shared keys, both levels'
         // unique keys survive).

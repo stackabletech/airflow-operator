@@ -13,6 +13,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
+    v2::builder::pod::container::EnvVarSet,
 };
 
 use crate::{
@@ -78,7 +79,7 @@ pub enum Error {
 pub fn build_airflow_statefulset_envs(
     airflow: &v1alpha2::AirflowCluster,
     airflow_role: &AirflowRole,
-    env_overrides: &HashMap<String, String>,
+    env_overrides: &EnvVarSet,
     executor: &AirflowExecutor,
     auth_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
@@ -261,16 +262,10 @@ pub fn build_airflow_statefulset_envs(
         _ => {}
     }
 
-    // apply overrides last of all with a fixed ordering
-    for (k, v) in env_overrides.iter().collect::<BTreeMap<_, _>>() {
-        env.insert(
-            k.into(),
-            EnvVar {
-                name: k.to_string(),
-                value: Some(v.to_string()),
-                ..Default::default()
-            },
-        );
+    // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
+    // in a fixed (sorted-by-name) order
+    for env_var in env_overrides.clone() {
+        env.insert(env_var.name.clone(), env_var);
     }
 
     // Needed for the `containerdebug` process to log it's tracing information to.

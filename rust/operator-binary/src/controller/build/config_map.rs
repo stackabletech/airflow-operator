@@ -15,7 +15,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    airflow_controller::{AIRFLOW_CONTROLLER_NAME, ValidatedAirflowCluster},
+    airflow_controller::{AIRFLOW_CONTROLLER_NAME, ValidatedCluster},
     config::webserver_config,
     crd::{
         AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR,
@@ -58,7 +58,7 @@ pub enum Error {
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 pub fn build_rolegroup_config_map(
     airflow: &v1alpha2::AirflowCluster,
-    validated_cluster: &ValidatedAirflowCluster,
+    validated_cluster: &ValidatedCluster,
     rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
     config_overrides: &AirflowConfigOverrides,
     logging: &Logging<Container>,
@@ -68,15 +68,10 @@ pub fn build_rolegroup_config_map(
     let config_file_overrides: BTreeMap<String, String> =
         config_overrides.webserver_config_py.overrides.clone();
 
-    let config_file = webserver_config::build(
-        &validated_cluster.authentication_config,
-        &validated_cluster.authorization_config,
-        &validated_cluster.image.product_version,
-        &config_file_overrides,
-    )
-    .with_context(|_| BuildWebserverConfigSnafu {
-        rolegroup: rolegroup.clone(),
-    })?;
+    let config_file = webserver_config::build(validated_cluster, &config_file_overrides)
+        .with_context(|_| BuildWebserverConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
 
     let mut cm_builder = ConfigMapBuilder::new();
 
