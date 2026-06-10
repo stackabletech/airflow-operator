@@ -3,8 +3,10 @@ use std::collections::{BTreeMap, HashMap};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self, ResolvedProductImage},
-    config::merge::Merge,
-    role_utils::RoleGroupRef,
+    config::fragment,
+    kube::ResourceExt,
+    role_utils::{GenericRoleConfig, RoleGroup},
+    v2::role_utils::{GenericCommonConfig, with_validated_config},
 };
 use strum::IntoEnumIterator;
 
@@ -12,8 +14,8 @@ use super::dereference::DereferencedObjects;
 use crate::{
     airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
-        AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole, AirflowRoleType,
-        authentication::AirflowClientAuthenticationDetailsResolved,
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        AirflowRoleType, authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved, v1alpha2,
     },
 };
@@ -25,8 +27,11 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crate::crd::Error },
+    #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
+    FailedToResolveConfig {
+        source: fragment::ValidationError,
+        role_group: String,
+    },
 }
 
 /// Per-role configuration extracted during validation.
@@ -98,29 +103,16 @@ pub fn validate_cluster(
             },
         );
 
+        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+
         let mut group_configs = BTreeMap::new();
-        for rolegroup_name in resolved_role.role_groups.keys() {
-            let rolegroup_ref = RoleGroupRef {
-                cluster: stackable_operator::kube::runtime::reflector::ObjectRef::from_obj(airflow),
-                role: role.to_string(),
-                role_group: rolegroup_name.into(),
-            };
+        for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
+            let validated = validate_role_group(&resolved_role, rolegroup, &default_config)
+                .with_context(|_| FailedToResolveConfigSnafu {
+                    role_group: rolegroup_name.clone(),
+                })?;
 
-            let merged_config = airflow
-                .merged_config(&role, &rolegroup_ref)
-                .context(FailedToResolveConfigSnafu)?;
-
-            let (config_overrides, env_overrides) =
-                merge_role_group_overrides(&resolved_role, rolegroup_name);
-
-            group_configs.insert(
-                rolegroup_name.clone(),
-                ValidatedRoleGroupConfig {
-                    merged_config,
-                    config_overrides,
-                    env_overrides,
-                },
-            );
+            group_configs.insert(rolegroup_name.clone(), validated);
         }
 
         role_groups.insert(role, group_configs);
@@ -141,38 +133,42 @@ pub fn validate_cluster(
     })
 }
 
-/// Merge a role group's config overrides over the role-level ones (role-group wins per key) via
-/// the `Merge` impl on [`AirflowConfigOverrides`], and combine env overrides (role first, then
-/// role-group on top). Mirrors hdfs-operator's `validate_role_group_config`.
+/// Validate and merge one role group against its role, via the shared
+/// [`with_validated_config`] from `operator-rs`.
 ///
-/// The merged overrides are returned *typed*; flattening into the rendered `webserver_config.py`
-/// happens later, in the build step. Note the `Merge` semantics: a role-group `null` inherits the
-/// role-level value rather than unsetting it.
-fn merge_role_group_overrides(
+/// This performs the full `default → role → role-group` merge of the config fragment (then
+/// validates it) *and* the role←role-group merge of the overrides in one step. The config
+/// overrides are kept *typed* ([`AirflowConfigOverrides`]); flattening into the rendered
+/// `webserver_config.py` happens later, in the build step.
+///
+/// Note the override `Merge` semantics: a role-group `null` inherits the role-level value rather
+/// than unsetting it (config overrides), and env overrides layer role-group on top of role.
+fn validate_role_group(
     role: &AirflowRoleType,
-    rolegroup_name: &str,
-) -> (AirflowConfigOverrides, HashMap<String, String>) {
-    let rolegroup = role.role_groups.get(rolegroup_name);
+    rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
+    default_config: &AirflowConfigFragment,
+) -> Result<ValidatedRoleGroupConfig, fragment::ValidationError> {
+    let validated = with_validated_config::<
+        AirflowConfig,
+        GenericCommonConfig,
+        AirflowConfigFragment,
+        GenericRoleConfig,
+        AirflowConfigOverrides,
+    >(rolegroup, role, default_config)?;
 
-    let mut config_overrides = rolegroup
-        .map(|rg| rg.config.config_overrides.clone())
-        .unwrap_or_default();
-    config_overrides.merge(&role.config.config_overrides);
-
-    let mut env_overrides = role.config.env_overrides.clone();
-    if let Some(rg) = rolegroup {
-        env_overrides.extend(rg.config.env_overrides.clone());
-    }
-
-    (config_overrides, env_overrides)
+    Ok(ValidatedRoleGroupConfig {
+        merged_config: validated.config.config,
+        config_overrides: validated.config.config_overrides,
+        env_overrides: validated.config.env_overrides,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::merge_role_group_overrides;
-    use crate::crd::{AirflowRole, v1alpha2};
+    use super::validate_role_group;
+    use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
 
     fn test_cluster() -> v1alpha2::AirflowCluster {
         let cluster_yaml = r#"
@@ -227,8 +223,13 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let (config_overrides, env_overrides) = merge_role_group_overrides(&role, "default");
+        let validated =
+            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
+        let config_overrides = validated.config_overrides;
+        let env_overrides = validated.env_overrides;
 
         // configOverrides are kept typed (values are `Option<String>`). The role-group AUTH_TYPE
         // overrides the role-level one; both role-only and group-only keys are kept.
@@ -330,7 +331,11 @@ mod tests {
 
         // What we do now (Merge): the role-group `null` inherits the role-level value, so
         // AUTH_TYPE survives as the role's "AUTH_OID".
-        let (config_overrides, _env_overrides) = merge_role_group_overrides(&role, "default");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
+        let config_overrides = validate_role_group(&role, rolegroup, &default_config)
+            .expect("validated role group")
+            .config_overrides;
         assert_eq!(
             config_overrides
                 .webserver_config_py
@@ -347,10 +352,19 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Scheduler)
             .expect("scheduler role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let (config_overrides, env_overrides) = merge_role_group_overrides(&role, "default");
+        let validated =
+            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
 
-        assert!(config_overrides.webserver_config_py.overrides.is_empty());
-        assert!(env_overrides.is_empty());
+        assert!(
+            validated
+                .config_overrides
+                .webserver_config_py
+                .overrides
+                .is_empty()
+        );
+        assert!(validated.env_overrides.is_empty());
     }
 }

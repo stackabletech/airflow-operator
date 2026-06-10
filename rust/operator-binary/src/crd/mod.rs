@@ -32,9 +32,7 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{
-        CommonConfiguration, GenericCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
-    },
+    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -42,6 +40,7 @@ use stackable_operator::{
     v2::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        role_utils::GenericCommonConfig,
     },
     versioned::versioned,
 };
@@ -96,13 +95,18 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
-pub type AirflowRoleType = Role<AirflowConfigFragment, AirflowConfigOverrides>;
+pub type AirflowRoleType =
+    Role<AirflowConfigFragment, AirflowConfigOverrides, GenericRoleConfig, GenericCommonConfig>;
 
 pub type AirflowExecutorCommonConfiguration =
     CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>;
 
-pub type AirflowWebserverRoleType =
-    Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
+pub type AirflowWebserverRoleType = Role<
+    AirflowConfigFragment,
+    AirflowConfigOverrides,
+    v1alpha2::WebserverRoleConfig,
+    GenericCommonConfig,
+>;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -971,7 +975,7 @@ pub struct AirflowConfig {
 impl AirflowConfig {
     pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
 
-    fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
+    pub(crate) fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
