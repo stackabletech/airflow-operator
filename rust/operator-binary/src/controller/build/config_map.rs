@@ -15,8 +15,9 @@ use stackable_operator::{
 };
 
 use crate::{
-    airflow_controller::{AIRFLOW_CONTROLLER_NAME, ValidatedCluster},
+    airflow_controller::AIRFLOW_CONTROLLER_NAME,
     config::webserver_config,
+    controller::ValidatedCluster,
     crd::{
         AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR,
         build_recommended_labels, v1alpha2,

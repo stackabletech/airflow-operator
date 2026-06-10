@@ -13,12 +13,12 @@ use stackable_operator::{
 };
 use strum::IntoEnumIterator;
 
-use super::dereference::DereferencedObjects;
+use super::{
+    AirflowRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
+    dereference::DereferencedObjects,
+};
 use crate::{
-    airflow_controller::{
-        AirflowRoleGroupConfig, CONTAINER_IMAGE_BASE_NAME, ValidatedCluster,
-        ValidatedClusterConfig, ValidatedRoleConfig,
-    },
+    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
         v1alpha2,

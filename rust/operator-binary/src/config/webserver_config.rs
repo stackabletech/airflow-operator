@@ -7,7 +7,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::flask_config_writer;
 
 use super::{PYTHON_IMPORTS, add_airflow_config};
-use crate::{airflow_controller::ValidatedCluster, crd::AirflowConfigOptions};
+use crate::{controller::ValidatedCluster, crd::AirflowConfigOptions};
 
 /// Marks arbitrary Python code to prepend verbatim to the generated file.
 const CONFIG_OVERRIDE_FILE_HEADER_KEY: &str = "FILE_HEADER";
