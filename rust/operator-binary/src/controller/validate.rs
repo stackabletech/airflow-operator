@@ -202,17 +202,14 @@ mod tests {
         let config_overrides = validated.config_overrides;
         let env_overrides = validated.env_overrides;
 
-        // configOverrides are kept typed (values are `Option<String>`). The role-group AUTH_TYPE
-        // overrides the role-level one; both role-only and group-only keys are kept.
+        // configOverrides are kept typed. The role-group AUTH_TYPE overrides the role-level one;
+        // both role-only and group-only keys are kept.
         assert_eq!(
             config_overrides.webserver_config_py.overrides,
             BTreeMap::from([
-                ("AUTH_TYPE".to_string(), Some("AUTH_DB".to_string())),
-                ("ROLE_ONLY_KEY".to_string(), Some("role-value".to_string())),
-                (
-                    "GROUP_ONLY_KEY".to_string(),
-                    Some("group-value".to_string())
-                ),
+                ("AUTH_TYPE".to_string(), "AUTH_DB".to_string()),
+                ("ROLE_ONLY_KEY".to_string(), "role-value".to_string()),
+                ("GROUP_ONLY_KEY".to_string(), "group-value".to_string()),
             ])
         );
 
@@ -224,12 +221,12 @@ mod tests {
         );
     }
 
-    /// A role-group `null` override inherits the role-level value instead of unsetting it — the
-    /// behavioural consequence of merging with `Merge` rather than `.extend()`. `main`'s
-    /// product-config used `.extend()`, where the same input would have *removed* the key. This
-    /// test pins that choice (mirrors the kafka-operator test).
+    /// A `null` override value is rejected by the CRD. `configOverrides` values are typed as
+    /// `String` (operator-rs `KeyValueConfigOverrides`, since the `Option<String>` was removed in
+    /// operator-rs #1219), so there is no longer a way to express "unset this key" via `null` —
+    /// the previous `null`-means-inherit/unset semantics no longer exist at the type level.
     #[test]
-    fn role_group_null_inherits_role_value_rather_than_unsetting_it() {
+    fn role_group_null_override_value_is_rejected() {
         let cluster_yaml = r#"
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
@@ -267,53 +264,11 @@ mod tests {
             config: {}
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
-        let cluster: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
-        let role = cluster
-            .get_role(&AirflowRole::Webserver)
-            .expect("webserver role");
-
-        // For contrast: under the old `.extend()` layering the role-group `null` overwrites the
-        // role value, and the key is dropped on flatten — i.e. AUTH_TYPE is unset entirely.
-        let old_extend_behaviour: BTreeMap<String, String> = {
-            let mut combined = role
-                .config
-                .config_overrides
-                .webserver_config_py
-                .overrides
-                .clone();
-            let rg = role.role_groups.get("default").expect("default role group");
-            combined.extend(
-                rg.config
-                    .config_overrides
-                    .webserver_config_py
-                    .overrides
-                    .clone(),
-            );
-            combined
-                .into_iter()
-                .filter_map(|(key, value)| value.map(|value| (key, value)))
-                .collect()
-        };
+        let result: Result<v1alpha2::AirflowCluster, _> =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer);
         assert!(
-            !old_extend_behaviour.contains_key("AUTH_TYPE"),
-            "under the old `.extend()` behaviour the role-group `null` unsets AUTH_TYPE"
-        );
-
-        // What we do now (Merge): the role-group `null` inherits the role-level value, so
-        // AUTH_TYPE survives as the role's "AUTH_OID".
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
-        let rolegroup = role.role_groups.get("default").expect("default role group");
-        let config_overrides = validate_role_group(&role, rolegroup, &default_config)
-            .expect("validated role group")
-            .config_overrides;
-        assert_eq!(
-            config_overrides
-                .webserver_config_py
-                .overrides
-                .get("AUTH_TYPE"),
-            Some(&Some("AUTH_OID".to_string())),
-            "role-group `null` should inherit the role-level AUTH_TYPE under Merge semantics"
+            result.is_err(),
+            "a `null` configOverrides value should be rejected: values are typed as `String`"
         );
     }
 

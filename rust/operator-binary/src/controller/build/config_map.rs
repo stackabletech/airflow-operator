@@ -64,14 +64,9 @@ pub fn build_rolegroup_config_map(
     logging: &Logging<Container>,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
-    // Flatten the typed `webserver_config.py` overrides into a plain map for the file writer,
-    // dropping entries whose value is unset (`null`).
-    let config_file_overrides: BTreeMap<String, String> = config_overrides
-        .webserver_config_py
-        .overrides
-        .iter()
-        .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
-        .collect();
+    // Flatten the typed `webserver_config.py` overrides into a plain map for the file writer.
+    let config_file_overrides: BTreeMap<String, String> =
+        config_overrides.webserver_config_py.overrides.clone();
 
     let config_file = webserver_config::build(
         &validated_cluster.authentication_config,
