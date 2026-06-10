@@ -98,16 +98,17 @@ pub fn validate_cluster(
         authorization_config,
     } = dereferenced;
 
-    Ok(ValidatedCluster {
-        image: resolved_product_image,
-        cluster_config: ValidatedClusterConfig {
+    Ok(ValidatedCluster::new(
+        airflow,
+        resolved_product_image,
+        ValidatedClusterConfig {
             executor: airflow.spec.executor.clone(),
             authentication_config,
             authorization_config,
         },
         role_groups,
         role_configs,
-    })
+    ))
 }
 
 /// Validate and merge one role group against its role, via the shared

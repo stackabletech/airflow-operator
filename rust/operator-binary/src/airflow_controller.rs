@@ -143,10 +143,69 @@ pub struct ValidatedClusterConfig {
 /// role group before any resources are created.
 #[derive(Clone, Debug)]
 pub struct ValidatedCluster {
+    /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
+    /// struct can stand in as the owner [`Resource`] for child objects.
+    metadata: ObjectMeta,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
     pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, AirflowRoleGroupConfig>>,
     pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+}
+
+impl ValidatedCluster {
+    pub fn new(
+        airflow: &v1alpha2::AirflowCluster,
+        image: ResolvedProductImage,
+        cluster_config: ValidatedClusterConfig,
+        role_groups: BTreeMap<AirflowRole, BTreeMap<String, AirflowRoleGroupConfig>>,
+        role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+    ) -> Self {
+        Self {
+            // Capture only the identity fields needed to own child objects.
+            metadata: ObjectMeta {
+                name: Some(airflow.name_any()),
+                namespace: airflow.namespace(),
+                uid: airflow.uid(),
+                ..ObjectMeta::default()
+            },
+            image,
+            cluster_config,
+            role_groups,
+            role_configs,
+        }
+    }
+}
+
+/// Lets [`ValidatedCluster`] stand in for the raw [`v1alpha2::AirflowCluster`] when building owner
+/// references and metadata for child objects. Kind/group/version are delegated to the CRD; the
+/// `metadata` (name, namespace, uid) is captured during validation.
+impl Resource for ValidatedCluster {
+    type DynamicType = <v1alpha2::AirflowCluster as Resource>::DynamicType;
+    type Scope = <v1alpha2::AirflowCluster as Resource>::Scope;
+
+    fn kind(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha2::AirflowCluster::kind(dt)
+    }
+
+    fn group(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha2::AirflowCluster::group(dt)
+    }
+
+    fn version(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha2::AirflowCluster::version(dt)
+    }
+
+    fn plural(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha2::AirflowCluster::plural(dt)
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -568,7 +627,6 @@ pub async fn reconcile_airflow(
                 })?;
 
             let rg_configmap = config_map::build_rolegroup_config_map(
-                airflow,
                 &validated_cluster,
                 &rolegroup,
                 &validated_rg_config.config_overrides,
@@ -645,7 +703,6 @@ async fn build_executor_template(
     };
 
     let rg_configmap = config_map::build_rolegroup_config_map(
-        airflow,
         validated_cluster,
         &rolegroup,
         // The kubernetes-executor pod template does not apply webserver_config.py overrides

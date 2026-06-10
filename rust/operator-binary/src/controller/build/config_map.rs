@@ -57,7 +57,6 @@ pub enum Error {
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 pub fn build_rolegroup_config_map(
-    airflow: &v1alpha2::AirflowCluster,
     validated_cluster: &ValidatedCluster,
     rolegroup: &RoleGroupRef<v1alpha2::AirflowCluster>,
     config_overrides: &AirflowConfigOverrides,
@@ -78,12 +77,12 @@ pub fn build_rolegroup_config_map(
     cm_builder
         .metadata(
             ObjectMetaBuilder::new()
-                .name_and_namespace(airflow)
+                .name_and_namespace(validated_cluster)
                 .name(rolegroup.object_name())
-                .ownerreference_from_resource(airflow, None, Some(true))
+                .ownerreference_from_resource(validated_cluster, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(&build_recommended_labels(
-                    airflow,
+                    validated_cluster,
                     AIRFLOW_CONTROLLER_NAME,
                     &validated_cluster.image.app_version_label_value,
                     &rolegroup.role,
