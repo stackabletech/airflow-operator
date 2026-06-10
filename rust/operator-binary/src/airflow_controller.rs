@@ -5,7 +5,7 @@ use std::{
 };
 
 use const_format::concatcp;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         self,
@@ -113,9 +113,6 @@ pub struct Ctx {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("object defines no airflow config role"))]
-    NoAirflowRole,
-
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
@@ -740,11 +737,6 @@ fn build_server_rolegroup_statefulset(
     let authorization_config = &validated_cluster.authorization_config;
     let executor = &validated_cluster.executor;
 
-    let binding = airflow.get_role(airflow_role);
-    let role = binding.as_ref().context(NoAirflowRoleSnafu)?;
-
-    let rolegroup = role.role_groups.get(&rolegroup_ref.role_group);
-
     let mut pb = PodBuilder::new();
     let recommended_object_labels = build_recommended_labels(
         airflow,
@@ -868,7 +860,11 @@ fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if let Some(listener_group_name) = airflow.group_listener_name(airflow_role) {
+    if let Some(listener_group_name) = validated_cluster
+        .role_configs
+        .get(airflow_role)
+        .and_then(|role_config| role_config.group_listener_name.clone())
+    {
         // Listener endpoints for the Webserver role will use persistent volumes
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
@@ -981,10 +977,7 @@ fn build_server_rolegroup_statefulset(
         }
     }
     let mut pod_template = pb.build_template();
-    pod_template.merge_from(role.config.pod_overrides.clone());
-    if let Some(rolegroup) = rolegroup {
-        pod_template.merge_from(rolegroup.config.pod_overrides.clone());
-    }
+    pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
     let restarter_label =
         Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
@@ -1018,7 +1011,7 @@ fn build_server_rolegroup_statefulset(
             }
             .to_string(),
         ),
-        replicas: rolegroup.and_then(|rg| rg.replicas).map(i32::from),
+        replicas: validated_rg_config.replicas.map(i32::from),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()

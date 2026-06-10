@@ -4,6 +4,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self, ResolvedProductImage},
     config::fragment,
+    k8s_openapi::api::core::v1::PodTemplateSpec,
     kube::ResourceExt,
     role_utils::{GenericRoleConfig, RoleGroup},
     v2::role_utils::{GenericCommonConfig, with_validated_config},
@@ -52,6 +53,8 @@ pub struct ValidatedRoleGroupConfig {
     pub merged_config: AirflowConfig,
     pub config_overrides: AirflowConfigOverrides,
     pub env_overrides: HashMap<String, String>,
+    pub replicas: Option<u16>,
+    pub pod_overrides: PodTemplateSpec,
 }
 
 /// The validated cluster: proves that config merging succeeded for every role and
@@ -160,6 +163,8 @@ fn validate_role_group(
         merged_config: validated.config.config,
         config_overrides: validated.config.config_overrides,
         env_overrides: validated.config.env_overrides,
+        replicas: validated.replicas,
+        pod_overrides: validated.config.pod_overrides,
     })
 }
 
@@ -366,5 +371,79 @@ mod tests {
                 .is_empty()
         );
         assert!(validated.env_overrides.is_empty());
+    }
+
+    /// `replicas` and the role←role-group merged `pod_overrides` are produced by
+    /// `with_validated_config` and must be carried on `ValidatedRoleGroupConfig`, so the build
+    /// step reads them from here rather than re-deriving from the raw cluster.
+    #[test]
+    fn role_group_carries_merged_pod_overrides_and_replicas() {
+        let cluster_yaml = r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecretName: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+          webservers:
+            config: {}
+            podOverrides:
+              metadata:
+                labels:
+                  role-label: role
+                  shared: role
+            roleGroups:
+              default:
+                replicas: 3
+                config: {}
+                podOverrides:
+                  metadata:
+                    labels:
+                      rg-label: rg
+                      shared: rg
+          schedulers:
+            config: {}
+            roleGroups:
+              default:
+                config: {}
+          kubernetesExecutors:
+            config: {}
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
+        let cluster: v1alpha2::AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let role = cluster
+            .get_role(&AirflowRole::Webserver)
+            .expect("webserver role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
+
+        let validated =
+            validate_role_group(&role, rolegroup, &default_config).expect("validated role group");
+
+        // replicas is carried through from the role group.
+        assert_eq!(validated.replicas, Some(3));
+
+        // pod_overrides is merged role←role-group (role-group wins on shared keys, both levels'
+        // unique keys survive).
+        let labels = validated
+            .pod_overrides
+            .metadata
+            .expect("pod override metadata")
+            .labels
+            .expect("pod override labels");
+        assert_eq!(labels.get("role-label"), Some(&"role".to_string()));
+        assert_eq!(labels.get("rg-label"), Some(&"rg".to_string()));
+        assert_eq!(labels.get("shared"), Some(&"rg".to_string()));
     }
 }
