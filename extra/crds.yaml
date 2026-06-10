@@ -483,14 +483,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -1002,14 +997,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -2000,14 +1990,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -2519,14 +2504,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -3073,14 +3053,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -3571,14 +3546,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -4090,14 +4060,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -4582,14 +4547,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -5101,14 +5061,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -5593,14 +5548,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -6117,14 +6067,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -6684,14 +6629,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -7203,14 +7143,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -8177,14 +8112,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -8696,14 +8626,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -9250,14 +9175,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -9748,14 +9668,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -10267,14 +10182,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -10759,14 +10669,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -11278,14 +11183,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -11770,14 +11670,9 @@ spec:
                     properties:
                       webserver_config.py:
                         additionalProperties:
-                          nullable: true
                           type: string
                         default: {}
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -12294,14 +12189,9 @@ spec:
                           properties:
                             webserver_config.py:
                               additionalProperties:
-                                nullable: true
                                 type: string
                               default: {}
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
