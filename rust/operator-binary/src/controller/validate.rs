@@ -1,10 +1,9 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection::{self, ResolvedProductImage},
+    commons::product_image_selection,
     config::fragment,
-    k8s_openapi::api::core::v1::PodTemplateSpec,
     kube::ResourceExt,
     role_utils::{GenericRoleConfig, RoleGroup},
     v2::role_utils::{GenericCommonConfig, with_validated_config},
@@ -13,11 +12,13 @@ use strum::IntoEnumIterator;
 
 use super::dereference::DereferencedObjects;
 use crate::{
-    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
+    airflow_controller::{
+        CONTAINER_IMAGE_BASE_NAME, ValidatedAirflowCluster, ValidatedRoleConfig,
+        ValidatedRoleGroupConfig,
+    },
     crd::{
-        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        AirflowRoleType, authentication::AirflowClientAuthenticationDetailsResolved,
-        authorization::AirflowAuthorizationResolved, v1alpha2,
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
+        v1alpha2,
     },
 };
 
@@ -33,41 +34,6 @@ pub enum Error {
         source: fragment::ValidationError,
         role_group: String,
     },
-}
-
-/// Per-role configuration extracted during validation.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
-}
-
-/// Per-rolegroup configuration: the merged CRD config plus overrides.
-///
-/// `config_overrides` is kept as the typed [`AirflowConfigOverrides`] (role-group merged over
-/// role); it is flattened into the rendered config file later, in the build step. This mirrors
-/// hdfs-operator. `env_overrides` is already a flat map.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: AirflowConfig,
-    pub config_overrides: AirflowConfigOverrides,
-    pub env_overrides: HashMap<String, String>,
-    pub replicas: Option<u16>,
-    pub pod_overrides: PodTemplateSpec,
-}
-
-/// The validated cluster: proves that config merging succeeded for every role and
-/// role group before any resources are created. It also carries the dereferenced
-/// external references, so every downstream build step reads them from here.
-#[derive(Clone, Debug)]
-pub struct ValidatedAirflowCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
-    pub executor: AirflowExecutor,
-    pub authentication_config: AirflowClientAuthenticationDetailsResolved,
-    pub authorization_config: AirflowAuthorizationResolved,
 }
 
 pub fn validate_cluster(

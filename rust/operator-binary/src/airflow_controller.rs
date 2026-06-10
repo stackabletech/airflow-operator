@@ -1,6 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
 };
 
@@ -67,20 +67,18 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{
-        build::config_map,
-        validate::{ValidatedAirflowCluster, ValidatedRoleGroupConfig},
-    },
+    controller::build::config_map,
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        self, APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, AirflowExecutor,
-        AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
-        METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
-        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        self, APP_NAME, AirflowClusterStatus, AirflowConfig, AirflowConfigOverrides,
+        AirflowExecutor, AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container,
+        ExecutorConfig, HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
+        LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
+        authorization::AirflowAuthorizationResolved,
         build_recommended_labels,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
@@ -108,6 +106,41 @@ pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
+    pub listener_class: Option<String>,
+    pub group_listener_name: Option<String>,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus overrides.
+///
+/// `config_overrides` is kept as the typed [`AirflowConfigOverrides`] (role-group merged over
+/// role); it is flattened into the rendered config file later, in the build step. This mirrors
+/// hdfs-operator. `env_overrides` is already a flat map.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: AirflowConfig,
+    pub config_overrides: AirflowConfigOverrides,
+    pub env_overrides: HashMap<String, String>,
+    pub replicas: Option<u16>,
+    pub pod_overrides: PodTemplateSpec,
+}
+
+/// The validated cluster: proves that config merging succeeded for every role and
+/// role group before any resources are created. It also carries the dereferenced
+/// external references, so every downstream build step reads them from here.
+#[derive(Clone, Debug)]
+pub struct ValidatedAirflowCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+    pub executor: AirflowExecutor,
+    pub authentication_config: AirflowClientAuthenticationDetailsResolved,
+    pub authorization_config: AirflowAuthorizationResolved,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
