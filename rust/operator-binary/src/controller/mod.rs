@@ -5,11 +5,24 @@ use std::str::FromStr;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     kube::{Resource, ResourceExt, api::ObjectMeta},
-    v2::{HasName, HasUid, types::kubernetes::Uid},
+    kvp::Labels,
+    v2::{
+        HasName, HasUid, NameIsValidLabelValue,
+        kvp::label::{recommended_labels, role_group_selector},
+        role_group_utils::ResourceNames,
+        types::{
+            kubernetes::Uid,
+            operator::{
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                RoleGroupName, RoleName,
+            },
+        },
+    },
 };
 
+use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
 use crate::crd::{
-    AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+    APP_NAME, OPERATOR_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
     authentication::AirflowClientAuthenticationDetailsResolved,
     authorization::AirflowAuthorizationResolved, v1alpha2,
 };
@@ -56,20 +69,30 @@ pub struct ValidatedCluster {
     /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
     /// struct can stand in as the owner [`Resource`] for child objects.
     metadata: ObjectMeta,
+    /// The cluster name as a type-safe value, used to build resource names and labels.
+    pub name: ClusterName,
+    /// The product version as a valid label value, for the recommended `app.kubernetes.io/version`
+    /// label. Derived from the resolved image's app-version label value.
+    pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, AirflowRoleGroupConfig>>,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
     pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
 }
 
 impl ValidatedCluster {
     pub fn new(
         airflow: &v1alpha2::AirflowCluster,
+        name: ClusterName,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<AirflowRole, BTreeMap<String, AirflowRoleGroupConfig>>,
+        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
         role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
     ) -> Self {
+        // `app_version_label_value` is constructed to be a valid label value, so it is also a valid
+        // `ProductVersion`.
+        let product_version = ProductVersion::from_str(&image.app_version_label_value)
+            .expect("the app version label value is a valid product version");
         Self {
             // Capture only the identity fields needed to own child objects.
             metadata: ObjectMeta {
@@ -78,12 +101,104 @@ impl ValidatedCluster {
                 uid: airflow.uid(),
                 ..ObjectMeta::default()
             },
+            name,
+            product_version,
             image,
             cluster_config,
             role_groups,
             role_configs,
         }
     }
+
+    /// Type-safe names for the resources of a role group.
+    ///
+    /// Infallible: the combined name length was validated during cluster validation
+    /// (see `validate::validate_cluster`).
+    pub fn resource_names(&self, role: &AirflowRole, role_group_name: &RoleGroupName) -> ResourceNames {
+        self.resource_names_for(&role.role_name(), role_group_name)
+    }
+
+    /// Type-safe resource names for a free-form role/role-group (e.g. the Kubernetes executor
+    /// pseudo-role). Infallible: the combined name was validated during cluster validation.
+    pub fn resource_names_for(
+        &self,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> ResourceNames {
+        ResourceNames::new(self.name.clone(), role_name.clone(), role_group_name.clone())
+            .expect("the combined resource name was validated during cluster validation")
+    }
+
+    /// Recommended labels for a role-group resource.
+    pub fn recommended_labels(&self, role: &AirflowRole, role_group_name: &RoleGroupName) -> Labels {
+        self.recommended_labels_for(&role.role_name(), role_group_name)
+    }
+
+    /// Recommended labels for a resource that is not tied to a concrete [`AirflowRole`] (e.g. the
+    /// Kubernetes executor pod template), using a free-form role/role-group label value.
+    pub fn recommended_labels_for(
+        &self,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
+    }
+
+    /// Recommended labels with a constant `none` version, for PVC templates that cannot be modified
+    /// after deployment (keeps the labels stable across version upgrades).
+    pub fn unversioned_recommended_labels(
+        &self,
+        role: &AirflowRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(
+            &ProductVersion::from_str("none").expect("'none' is a valid product version"),
+            &role.role_name(),
+            role_group_name,
+        )
+    }
+
+    fn recommended_labels_with(
+        &self,
+        product_version: &ProductVersion,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        recommended_labels(
+            self,
+            &product_name(),
+            product_version,
+            &operator_name(),
+            &controller_name(),
+            role_name,
+            role_group_name,
+        )
+    }
+
+    /// Selector labels matching the pods of a role group.
+    pub fn role_group_selector(
+        &self,
+        role: &AirflowRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+    }
+}
+
+/// The product name (`airflow`) as a type-safe label value.
+fn product_name() -> ProductName {
+    ProductName::from_str(APP_NAME).expect("'airflow' is a valid product name")
+}
+
+/// The operator name as a type-safe label value.
+fn operator_name() -> OperatorName {
+    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
+}
+
+/// The controller name as a type-safe label value.
+fn controller_name() -> ControllerName {
+    ControllerName::from_str(AIRFLOW_CONTROLLER_NAME)
+        .expect("the controller name is a valid label value")
 }
 
 /// Lets [`ValidatedCluster`] stand in for the raw [`v1alpha2::AirflowCluster`] when building owner
@@ -121,6 +236,12 @@ impl Resource for ValidatedCluster {
 impl HasName for ValidatedCluster {
     fn to_name(&self) -> String {
         self.name_any()
+    }
+}
+
+impl NameIsValidLabelValue for ValidatedCluster {
+    fn to_label_value(&self) -> String {
+        self.name.to_label_value()
     }
 }
 

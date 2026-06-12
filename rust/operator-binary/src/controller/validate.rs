@@ -8,7 +8,9 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, RoleGroup},
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        role_group_utils::ResourceNames,
         role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
+        types::operator::{ClusterName, RoleGroupName},
     },
 };
 use strum::IntoEnumIterator;
@@ -18,10 +20,10 @@ use super::{
     dereference::DereferencedObjects,
 };
 use crate::{
-    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
+    airflow_controller::{CONTAINER_IMAGE_BASE_NAME, executor_role_group_name, executor_role_name},
     crd::{
-        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
-        v1alpha2,
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        AirflowRoleType, v1alpha2,
     },
 };
 
@@ -32,10 +34,31 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
+    #[snafu(display("invalid cluster name {cluster_name}"))]
+    ParseClusterName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        cluster_name: String,
+    },
+
+    #[snafu(display("invalid role group name {role_group}"))]
+    ParseRoleGroupName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role_group: String,
+    },
+
+    #[snafu(display(
+        "the combined resource name `<cluster>-<role>-<role group>` for role group {role_group} \
+        exceeds the allowed length"
+    ))]
+    BuildResourceNames {
+        source: stackable_operator::v2::role_group_utils::Error,
+        role_group: RoleGroupName,
+    },
+
     #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
     FailedToResolveConfig {
         source: fragment::ValidationError,
-        role_group: String,
+        role_group: RoleGroupName,
     },
 
     #[snafu(display("failed to parse an environment variable override name"))]
@@ -58,6 +81,12 @@ pub fn validate_cluster(
             crate::built_info::PKG_VERSION,
         )
         .context(ResolveProductImageSnafu)?;
+
+    let cluster_name = ClusterName::from_str(&airflow.name_any()).with_context(|_| {
+        ParseClusterNameSnafu {
+            cluster_name: airflow.name_any(),
+        }
+    })?;
 
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
@@ -84,13 +113,34 @@ pub fn validate_cluster(
 
         let mut group_configs = BTreeMap::new();
         for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
+            let role_group_name = RoleGroupName::from_str(rolegroup_name)
+                .with_context(|_| ParseRoleGroupNameSnafu {
+                    role_group: rolegroup_name.clone(),
+                })?;
+            // Validate up-front that the combined `<cluster>-<role>-<role group>` resource name
+            // fits; resource building then derives names via `ResourceNames` infallibly.
+            ResourceNames::new(cluster_name.clone(), role.role_name(), role_group_name.clone())
+                .with_context(|_| BuildResourceNamesSnafu {
+                    role_group: role_group_name.clone(),
+                })?;
             let validated =
-                validate_role_group(&resolved_role, rolegroup_name, rolegroup, &default_config)?;
+                validate_role_group(&resolved_role, &role_group_name, rolegroup, &default_config)?;
 
-            group_configs.insert(rolegroup_name.clone(), validated);
+            group_configs.insert(role_group_name, validated);
         }
 
         role_groups.insert(role, group_configs);
+    }
+
+    // The Kubernetes executor produces a role-group ConfigMap under the pseudo-role
+    // `executor`/`kubernetes` (it is not a real `AirflowRole`); validate its combined resource
+    // name too, so the build step can derive it via `ResourceNames` infallibly.
+    if matches!(airflow.spec.executor, AirflowExecutor::KubernetesExecutors { .. }) {
+        let role_group_name = executor_role_group_name();
+        ResourceNames::new(cluster_name.clone(), executor_role_name(), role_group_name.clone())
+            .with_context(|_| BuildResourceNamesSnafu {
+                role_group: role_group_name,
+            })?;
     }
 
     let DereferencedObjects {
@@ -100,6 +150,7 @@ pub fn validate_cluster(
 
     Ok(ValidatedCluster::new(
         airflow,
+        cluster_name,
         resolved_product_image,
         ValidatedClusterConfig {
             executor: airflow.spec.executor.clone(),
@@ -124,7 +175,7 @@ pub fn validate_cluster(
 /// than unsetting it (config overrides), and env overrides layer role-group on top of role.
 fn validate_role_group(
     role: &AirflowRoleType,
-    role_group_name: &str,
+    role_group_name: &RoleGroupName,
     rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     default_config: &AirflowConfigFragment,
 ) -> Result<AirflowRoleGroupConfig, Error> {
@@ -136,7 +187,7 @@ fn validate_role_group(
         AirflowConfigOverrides,
     >(rolegroup, role, default_config)
     .with_context(|_| FailedToResolveConfigSnafu {
-        role_group: role_group_name.to_owned(),
+        role_group: role_group_name.clone(),
     })?;
 
     let mut env_overrides = EnvVarSet::new();
@@ -224,8 +275,13 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
-            .expect("validated role group");
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+        )
+        .expect("validated role group");
         let config_overrides = validated.config_overrides;
 
         // configOverrides are kept typed. The role-group AUTH_TYPE overrides the role-level one;
@@ -316,8 +372,13 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
-            .expect("validated role group");
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+        )
+        .expect("validated role group");
 
         assert!(
             validated
@@ -384,8 +445,13 @@ mod tests {
         let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
-        let validated = validate_role_group(&role, "default", rolegroup, &default_config)
-            .expect("validated role group");
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+        )
+        .expect("validated role group");
 
         // replicas is carried through from the role group.
         assert_eq!(validated.replicas, 3);

@@ -25,7 +25,6 @@ use stackable_operator::{
         apimachinery::pkg::api::resource::Quantity,
     },
     kube::{CustomResource, ResourceExt},
-    kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{
         self,
@@ -789,6 +788,15 @@ impl AirflowRole {
         Self::iter().map(|r| r.to_string()).collect()
     }
 
+    /// The role name as a type-safe label/resource-name value.
+    ///
+    /// Infallible: every `AirflowRole` serialises to a short, valid role name.
+    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
+        self.to_string()
+            .parse()
+            .expect("an AirflowRole serialises to a valid RoleName")
+    }
+
     pub fn listener_class_name(&self, airflow: &v1alpha2::AirflowCluster) -> Option<String> {
         match self {
             Self::Webserver => airflow
@@ -1049,25 +1057,6 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         cpu,
         memory,
         storage: AirflowStorageConfigFragment {},
-    }
-}
-
-/// Creates recommended `ObjectLabels` to be used in deployed resources
-pub fn build_recommended_labels<'a, T>(
-    owner: &'a T,
-    controller_name: &'a str,
-    app_version: &'a str,
-    role: &'a str,
-    role_group: &'a str,
-) -> ObjectLabels<'a, T> {
-    ObjectLabels {
-        owner,
-        app_name: APP_NAME,
-        app_version,
-        operator_name: OPERATOR_NAME,
-        controller_name,
-        role,
-        role_group,
     }
 }
 

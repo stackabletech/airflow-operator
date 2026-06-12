@@ -53,7 +53,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::{controller::Action, reflector::ObjectRef},
     },
-    kvp::{Annotation, Label, LabelError, Labels, ObjectLabels},
+    kvp::{Annotation, Label, LabelError},
     logging::controller::ReconcilerError,
     product_logging::{self, framework::LoggingError, spec::ContainerLogConfig},
     role_utils::RoleGroupRef,
@@ -63,7 +63,10 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::builder::meta::ownerreference_from_resource,
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -79,7 +82,6 @@ use crate::{
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
-        build_recommended_labels,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
@@ -100,6 +102,33 @@ use crate::{
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
+
+/// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
+/// [`AirflowRole`]). Used to derive its labels and ConfigMap name.
+pub const EXECUTOR_ROLE_NAME: &str = "executor";
+pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
+
+/// The executor pseudo-role name (`executor`) as a type-safe value.
+pub fn executor_role_name() -> RoleName {
+    EXECUTOR_ROLE_NAME
+        .parse()
+        .expect("'executor' is a valid role name")
+}
+
+/// The executor's role-group name (`kubernetes`), used for its role-group ConfigMap.
+pub fn executor_role_group_name() -> RoleGroupName {
+    EXECUTOR_ROLE_GROUP_NAME
+        .parse()
+        .expect("'kubernetes' is a valid role group name")
+}
+
+/// The executor *pod-template* role-group name (`executor-template`), used for the template
+/// ConfigMap/pod labels.
+pub fn executor_template_role_group_name() -> RoleGroupName {
+    "executor-template"
+        .parse()
+        .expect("'executor-template' is a valid role group name")
+}
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
@@ -265,9 +294,6 @@ pub enum Error {
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
     },
-
-    #[snafu(display("failed to configure service"))]
-    ServiceConfiguration { source: crate::service::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -439,16 +465,10 @@ pub async fn reconcile_airflow(
             {
                 let rg_group_listener = build_group_listener(
                     &validated_cluster,
-                    build_recommended_labels(
-                        airflow,
-                        AIRFLOW_CONTROLLER_NAME,
-                        &validated_cluster.image.app_version_label_value,
-                        &role_name,
-                        "none",
-                    ),
+                    airflow_role,
                     listener_class.to_string(),
                     listener_group_name.clone(),
-                )?;
+                );
                 cluster_resources
                     .add(client, rg_group_listener)
                     .await
@@ -476,29 +496,8 @@ pub async fn reconcile_airflow(
             )
             .context(InvalidGitSyncSpecSnafu)?;
 
-            let role_group_service_recommended_labels = build_recommended_labels(
-                airflow,
-                AIRFLOW_CONTROLLER_NAME,
-                &validated_cluster.image.app_version_label_value,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            );
-
-            let role_group_service_selector = Labels::role_group_selector(
-                airflow,
-                APP_NAME,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            )
-            .context(LabelBuildSnafu)?;
-
-            let rg_headless_service = build_rolegroup_headless_service(
-                &validated_cluster,
-                &rolegroup,
-                role_group_service_recommended_labels.clone(),
-                role_group_service_selector.clone().into(),
-            )
-            .context(ServiceConfigurationSnafu)?;
+            let rg_headless_service =
+                build_rolegroup_headless_service(&validated_cluster, airflow_role, rolegroup_name);
 
             cluster_resources
                 .add(client, rg_headless_service)
@@ -507,13 +506,8 @@ pub async fn reconcile_airflow(
                     rolegroup: rolegroup.clone(),
                 })?;
 
-            let rg_metrics_service = build_rolegroup_metrics_service(
-                &validated_cluster,
-                &rolegroup,
-                role_group_service_recommended_labels,
-                role_group_service_selector.into(),
-            )
-            .context(ServiceConfigurationSnafu)?;
+            let rg_metrics_service =
+                build_rolegroup_metrics_service(&validated_cluster, airflow_role, rolegroup_name);
             cluster_resources
                 .add(client, rg_metrics_service)
                 .await
@@ -521,12 +515,16 @@ pub async fn reconcile_airflow(
                     rolegroup: rolegroup.clone(),
                 })?;
 
+            let vector_config =
+                config_map::build_vector_config(&rolegroup, &validated_rg_config.config.logging);
             let rg_configmap = config_map::build_rolegroup_config_map(
                 &validated_cluster,
-                &rolegroup,
+                &airflow_role.role_name(),
+                rolegroup_name,
                 &validated_rg_config.config_overrides,
                 &validated_rg_config.config.logging,
                 &Container::Airflow,
+                vector_config,
             )
             .context(BuildConfigMapSnafu)?;
             cluster_resources
@@ -593,18 +591,22 @@ async fn build_executor_template(
         .context(FailedToResolveConfigSnafu)?;
     let rolegroup = RoleGroupRef {
         cluster: ObjectRef::from_obj(airflow),
-        role: "executor".into(),
-        role_group: "kubernetes".into(),
+        role: EXECUTOR_ROLE_NAME.into(),
+        role_group: EXECUTOR_ROLE_GROUP_NAME.into(),
     };
 
+    let vector_config =
+        config_map::build_vector_config(&rolegroup, &merged_executor_config.logging);
     let rg_configmap = config_map::build_rolegroup_config_map(
         validated_cluster,
-        &rolegroup,
+        &executor_role_name(),
+        &executor_role_group_name(),
         // The kubernetes-executor pod template does not apply webserver_config.py overrides
         // (preserves prior behaviour, which passed an empty map here).
         &AirflowConfigOverrides::default(),
         &merged_executor_config.logging,
         &Container::Base,
+        vector_config,
     )
     .context(BuildConfigMapSnafu)?;
     cluster_resources
@@ -646,40 +648,37 @@ async fn build_executor_template(
 
 fn build_rolegroup_metadata(
     cluster: &ValidatedCluster,
-    rolegroup: &&RoleGroupRef<v1alpha2::AirflowCluster>,
+    role: &AirflowRole,
+    role_group_name: &RoleGroupName,
     prometheus_label: Label,
     name: String,
-) -> Result<ObjectMeta, Error> {
-    let metadata = ObjectMetaBuilder::new()
+) -> ObjectMeta {
+    ObjectMetaBuilder::new()
         .name_and_namespace(cluster)
         .name(name)
         .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-        .with_recommended_labels(&build_recommended_labels(
-            cluster,
-            AIRFLOW_CONTROLLER_NAME,
-            &cluster.image.app_version_label_value,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
+        .with_labels(cluster.recommended_labels(role, role_group_name))
         .with_label(prometheus_label)
-        .build();
-    Ok(metadata)
+        .build()
 }
 
 pub fn build_group_listener(
     cluster: &ValidatedCluster,
-    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
+    role: &AirflowRole,
     listener_class: String,
     listener_group_name: String,
-) -> Result<listener::v1alpha1::Listener> {
-    Ok(listener::v1alpha1::Listener {
+) -> listener::v1alpha1::Listener {
+    listener::v1alpha1::Listener {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(cluster)
             .name(listener_group_name)
             .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-            .with_recommended_labels(&object_labels)
-            .context(ObjectMetaSnafu)?
+            // The group listener is a role-level object, so a constant `none` role-group is used
+            // as the role-group label value.
+            .with_labels(cluster.recommended_labels_for(
+                &role.role_name(),
+                &"none".parse().expect("'none' is a valid role group name"),
+            ))
             .build(),
         spec: listener::v1alpha1::ListenerSpec {
             class_name: Some(listener_class),
@@ -687,7 +686,7 @@ pub fn build_group_listener(
             ..listener::v1alpha1::ListenerSpec::default()
         },
         status: None,
-    })
+    }
 }
 
 /// We only use the http port here and intentionally omit
@@ -725,27 +724,21 @@ fn build_server_rolegroup_statefulset(
     let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
-    let recommended_object_labels = build_recommended_labels(
-        airflow,
-        AIRFLOW_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label_value,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    );
-    // Used for PVC templates that cannot be modified once they are deployed
-    let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
-        airflow,
-        AIRFLOW_CONTROLLER_NAME,
-        // A version value is required, and we do want to use the "recommended" format for the other desired labels
-        "none",
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    ))
-    .context(LabelBuildSnafu)?;
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    let resource_names = validated_cluster.resource_names(airflow_role, &role_group_name);
+
+    let recommended_object_labels =
+        validated_cluster.recommended_labels(airflow_role, &role_group_name);
+    // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
+    // version keeps the labels stable across version upgrades).
+    let unversioned_recommended_labels =
+        validated_cluster.unversioned_recommended_labels(airflow_role, &role_group_name);
 
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&recommended_object_labels)
-        .context(ObjectMetaSnafu)?
+        .with_labels(recommended_object_labels)
         .with_annotation(
             Annotation::try_from((
                 "kubectl.kubernetes.io/default-container",
@@ -925,7 +918,7 @@ fn build_server_rolegroup_statefulset(
     pb.add_volumes(airflow.volumes().clone())
         .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
-        &rolegroup_ref.object_name(),
+        resource_names.role_group_config_map().as_ref(),
         merged_airflow_config
             .logging
             .containers
@@ -971,18 +964,14 @@ fn build_server_rolegroup_statefulset(
 
     let metadata = build_rolegroup_metadata(
         validated_cluster,
-        &rolegroup_ref,
+        airflow_role,
+        &role_group_name,
         restarter_label,
-        rolegroup_ref.object_name(),
-    )?;
+        resource_names.stateful_set_name().to_string(),
+    );
 
-    let statefulset_match_labels = Labels::role_group_selector(
-        airflow,
-        APP_NAME,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    )
-    .context(BuildLabelSnafu)?;
+    let statefulset_match_labels =
+        validated_cluster.role_group_selector(airflow_role, &role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some(
@@ -1002,7 +991,7 @@ fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: stateful_set_service_name(rolegroup_ref),
+        service_name: stateful_set_service_name(validated_cluster, airflow_role, &role_group_name),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
@@ -1053,14 +1042,9 @@ fn build_executor_template_config_map(
 
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&build_recommended_labels(
-            airflow,
-            AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label_value,
-            "executor",
-            "executor-template",
-        ))
-        .context(ObjectMetaSnafu)?
+        .with_labels(
+            cluster.recommended_labels_for(&executor_role_name(), &executor_template_role_group_name()),
+        )
         .build();
 
     pb.metadata(pb_metadata)
@@ -1161,14 +1145,10 @@ fn build_executor_template_config_map(
                 .name_and_namespace(airflow)
                 .name(airflow.executor_template_configmap_name())
                 .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-                .with_recommended_labels(&build_recommended_labels(
-                    airflow,
-                    AIRFLOW_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label_value,
-                    "executor",
-                    "executor-template",
+                .with_labels(cluster.recommended_labels_for(
+                    &executor_role_name(),
+                    &executor_template_role_group_name(),
                 ))
-                .context(ObjectMetaSnafu)?
                 .with_label(restarter_label)
                 .build(),
         )

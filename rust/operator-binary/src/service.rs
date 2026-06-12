@@ -1,126 +1,105 @@
-use std::collections::BTreeMap;
-
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
-    kvp::{Annotations, Labels, ObjectLabels},
-    role_utils::RoleGroupRef,
-    v2::builder::meta::ownerreference_from_resource,
+    kvp::{Annotations, Labels},
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::ValidatedCluster,
-    crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha2},
+    crd::{AirflowRole, HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME},
 };
 
 pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
-pub const HEADLESS_SERVICE_SUFFIX: &str = "headless";
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to build Metadata"))]
-    MetadataBuild {
-        source: stackable_operator::builder::meta::Error,
-    },
-
-    #[snafu(display("failed to build Labels"))]
-    LabelBuild {
-        source: stackable_operator::kvp::LabelError,
-    },
-}
 
 /// The rolegroup headless [`Service`] is a service that allows direct access to the instances of a certain rolegroup
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_rolegroup_headless_service(
     cluster: &ValidatedCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
-    selector: BTreeMap<String, String>,
-) -> Result<Service, Error> {
-    let ports = headless_service_ports();
-
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(cluster)
-        .name(rolegroup_headless_service_name(
-            &rolegroup_ref.object_name(),
-        ))
-        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-        .with_recommended_labels(&object_labels)
-        .context(MetadataBuildSnafu)?
-        .build();
-
-    let service_spec = ServiceSpec {
-        // Internal communication does not need to be exposed
-        type_: Some("ClusterIP".to_string()),
-        cluster_ip: Some("None".to_string()),
-        ports: Some(ports),
-        selector: Some(selector),
-        publish_not_ready_addresses: Some(true),
-        ..ServiceSpec::default()
-    };
-
-    Ok(Service {
-        metadata,
-        spec: Some(service_spec),
+    role: &AirflowRole,
+    role_group_name: &RoleGroupName,
+) -> Service {
+    Service {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(cluster)
+            .name(
+                cluster
+                    .resource_names(role, role_group_name)
+                    .headless_service_name()
+                    .to_string(),
+            )
+            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
+            .with_labels(cluster.recommended_labels(role, role_group_name))
+            .build(),
+        spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(headless_service_ports()),
+            selector: Some(cluster.role_group_selector(role, role_group_name).into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        }),
         status: None,
-    })
+    }
 }
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
 pub fn build_rolegroup_metrics_service(
     cluster: &ValidatedCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
-    selector: BTreeMap<String, String>,
-) -> Result<Service, Error> {
-    let ports = metrics_service_ports();
-
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(cluster)
-        .name(rolegroup_metrics_service_name(&rolegroup_ref.object_name()))
-        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-        .with_recommended_labels(&object_labels)
-        .context(MetadataBuildSnafu)?
-        .with_labels(prometheus_labels())
-        .with_annotations(prometheus_annotations())
-        .build();
-
-    let service_spec = ServiceSpec {
-        // Internal communication does not need to be exposed
-        type_: Some("ClusterIP".to_string()),
-        cluster_ip: Some("None".to_string()),
-        ports: Some(ports),
-        selector: Some(selector),
-        publish_not_ready_addresses: Some(true),
-        ..ServiceSpec::default()
-    };
-
-    Ok(Service {
-        metadata,
-        spec: Some(service_spec),
+    role: &AirflowRole,
+    role_group_name: &RoleGroupName,
+) -> Service {
+    Service {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(cluster)
+            .name(metrics_service_name(cluster, role, role_group_name))
+            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
+            .with_labels(cluster.recommended_labels(role, role_group_name))
+            .with_labels(prometheus_labels())
+            .with_annotations(prometheus_annotations())
+            .build(),
+        spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(metrics_service_ports()),
+            selector: Some(cluster.role_group_selector(role, role_group_name).into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        }),
         status: None,
-    })
+    }
 }
 
+/// The headless [`Service`] name backing the StatefulSet (`<cluster>-<role>-<rolegroup>-headless`).
 pub fn stateful_set_service_name(
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    cluster: &ValidatedCluster,
+    role: &AirflowRole,
+    role_group_name: &RoleGroupName,
 ) -> Option<String> {
-    Some(rolegroup_headless_service_name(
-        &rolegroup_ref.object_name(),
-    ))
+    Some(
+        cluster
+            .resource_names(role, role_group_name)
+            .headless_service_name()
+            .to_string(),
+    )
 }
 
-/// Returns the metrics rolegroup service name `<cluster>-<role>-<rolegroup>-<METRICS_SERVICE_SUFFIX>`.
-// TODO: Replace by operator.rs functions
-fn rolegroup_metrics_service_name(role_group_ref_object_name: &str) -> String {
-    format!("{role_group_ref_object_name}-{METRICS_SERVICE_SUFFIX}")
-}
-
-/// Returns the headless rolegroup service name `<cluster>-<role>-<rolegroup>-<HEADLESS_SERVICE_SUFFIX>`.
-// TODO: Replace by operator.rs functions
-fn rolegroup_headless_service_name(role_group_ref_object_name: &str) -> String {
-    format!("{role_group_ref_object_name}-{HEADLESS_SERVICE_SUFFIX}")
+/// The metrics [`Service`] name `<cluster>-<role>-<rolegroup>-metrics`.
+///
+/// [`ResourceNames`](stackable_operator::v2::role_group_utils::ResourceNames) has no metrics-service
+/// helper, so the `-metrics` suffix is appended to the qualified role-group name (which is also the
+/// StatefulSet name).
+fn metrics_service_name(
+    cluster: &ValidatedCluster,
+    role: &AirflowRole,
+    role_group_name: &RoleGroupName,
+) -> String {
+    format!(
+        "{qualified}-{METRICS_SERVICE_SUFFIX}",
+        qualified = cluster.resource_names(role, role_group_name).stateful_set_name()
+    )
 }
 
 fn headless_service_ports() -> Vec<ServicePort> {
