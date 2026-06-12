@@ -6,20 +6,19 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels, ObjectLabels},
     role_utils::RoleGroupRef,
+    v2::builder::meta::ownerreference_from_resource,
 };
 
-use crate::crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha2};
+use crate::{
+    controller::ValidatedCluster,
+    crd::{HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha2},
+};
 
 pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
 pub const HEADLESS_SERVICE_SUFFIX: &str = "headless";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("failed to build Metadata"))]
     MetadataBuild {
         source: stackable_operator::builder::meta::Error,
@@ -34,7 +33,7 @@ pub enum Error {
 /// The rolegroup headless [`Service`] is a service that allows direct access to the instances of a certain rolegroup
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_rolegroup_headless_service(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     selector: BTreeMap<String, String>,
@@ -42,12 +41,11 @@ pub fn build_rolegroup_headless_service(
     let ports = headless_service_ports();
 
     let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
+        .name_and_namespace(cluster)
         .name(rolegroup_headless_service_name(
             &rolegroup_ref.object_name(),
         ))
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_recommended_labels(&object_labels)
         .context(MetadataBuildSnafu)?
         .build();
@@ -71,7 +69,7 @@ pub fn build_rolegroup_headless_service(
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
 pub fn build_rolegroup_metrics_service(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     selector: BTreeMap<String, String>,
@@ -79,10 +77,9 @@ pub fn build_rolegroup_metrics_service(
     let ports = metrics_service_ports();
 
     let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
+        .name_and_namespace(cluster)
         .name(rolegroup_metrics_service_name(&rolegroup_ref.object_name()))
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_recommended_labels(&object_labels)
         .context(MetadataBuildSnafu)?
         .with_labels(prometheus_labels())

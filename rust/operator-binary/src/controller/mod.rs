@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 
+use std::str::FromStr;
+
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     kube::{Resource, ResourceExt, api::ObjectMeta},
+    v2::{HasName, HasUid, types::kubernetes::Uid},
 };
 
 use crate::crd::{
@@ -112,5 +115,24 @@ impl Resource for ValidatedCluster {
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+}
+
+impl HasName for ValidatedCluster {
+    fn to_name(&self) -> String {
+        self.name_any()
+    }
+}
+
+impl HasUid for ValidatedCluster {
+    fn to_uid(&self) -> Uid {
+        Uid::from_str(
+            &self
+                .metadata
+                .uid
+                .clone()
+                .expect("the uid is captured during validation"),
+        )
+        .expect("the uid is a valid Kubernetes UID")
     }
 }

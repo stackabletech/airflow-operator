@@ -12,6 +12,7 @@ use stackable_operator::{
         spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
     },
     role_utils::RoleGroupRef,
+    v2::builder::meta::ownerreference_from_resource,
 };
 
 use crate::{
@@ -31,11 +32,6 @@ pub enum Error {
     BuildWebserverConfig {
         source: webserver_config::Error,
         rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
-    },
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("failed to build object meta"))]
@@ -80,8 +76,7 @@ pub fn build_rolegroup_config_map(
             ObjectMetaBuilder::new()
                 .name_and_namespace(validated_cluster)
                 .name(rolegroup.object_name())
-                .ownerreference_from_resource(validated_cluster, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .ownerreference(ownerreference_from_resource(validated_cluster, None, Some(true)))
                 .with_recommended_labels(&build_recommended_labels(
                     validated_cluster,
                     AIRFLOW_CONTROLLER_NAME,

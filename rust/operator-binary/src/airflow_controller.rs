@@ -63,6 +63,7 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
+    v2::builder::meta::ownerreference_from_resource,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -126,11 +127,6 @@ pub enum Error {
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
-    },
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("failed to patch service account"))]
@@ -442,7 +438,7 @@ pub async fn reconcile_airflow(
                 && let Some(listener_group_name) = &role_config.group_listener_name
             {
                 let rg_group_listener = build_group_listener(
-                    airflow,
+                    &validated_cluster,
                     build_recommended_labels(
                         airflow,
                         AIRFLOW_CONTROLLER_NAME,
@@ -497,7 +493,7 @@ pub async fn reconcile_airflow(
             .context(LabelBuildSnafu)?;
 
             let rg_headless_service = build_rolegroup_headless_service(
-                airflow,
+                &validated_cluster,
                 &rolegroup,
                 role_group_service_recommended_labels.clone(),
                 role_group_service_selector.clone().into(),
@@ -512,7 +508,7 @@ pub async fn reconcile_airflow(
                 })?;
 
             let rg_metrics_service = build_rolegroup_metrics_service(
-                airflow,
+                &validated_cluster,
                 &rolegroup,
                 role_group_service_recommended_labels,
                 role_group_service_selector.into(),
@@ -632,8 +628,7 @@ async fn build_executor_template(
 
     let worker_pod_template_config_map = build_executor_template_config_map(
         airflow,
-        &validated_cluster.image,
-        &validated_cluster.cluster_config.authentication_config,
+        validated_cluster,
         metadata_database_connection_details,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
@@ -650,21 +645,19 @@ async fn build_executor_template(
 }
 
 fn build_rolegroup_metadata(
-    airflow: &v1alpha2::AirflowCluster,
-    resolved_product_image: &&ResolvedProductImage,
+    cluster: &ValidatedCluster,
     rolegroup: &&RoleGroupRef<v1alpha2::AirflowCluster>,
     prometheus_label: Label,
     name: String,
 ) -> Result<ObjectMeta, Error> {
     let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(airflow)
+        .name_and_namespace(cluster)
         .name(name)
-        .ownerreference_from_resource(airflow, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_recommended_labels(&build_recommended_labels(
-            airflow,
+            cluster,
             AIRFLOW_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label_value,
+            &cluster.image.app_version_label_value,
             &rolegroup.role,
             &rolegroup.role_group,
         ))
@@ -675,17 +668,16 @@ fn build_rolegroup_metadata(
 }
 
 pub fn build_group_listener(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     object_labels: ObjectLabels<v1alpha2::AirflowCluster>,
     listener_class: String,
     listener_group_name: String,
 ) -> Result<listener::v1alpha1::Listener> {
     Ok(listener::v1alpha1::Listener {
         metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(airflow)
+            .name_and_namespace(cluster)
             .name(listener_group_name)
-            .ownerreference_from_resource(airflow, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
             .with_recommended_labels(&object_labels)
             .context(ObjectMetaSnafu)?
             .build(),
@@ -978,8 +970,7 @@ fn build_server_rolegroup_statefulset(
         Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
 
     let metadata = build_rolegroup_metadata(
-        airflow,
-        &resolved_product_image,
+        validated_cluster,
         &rolegroup_ref,
         restarter_label,
         rolegroup_ref.object_name(),
@@ -1048,8 +1039,7 @@ fn build_logging_container(
 #[allow(clippy::too_many_arguments)]
 fn build_executor_template_config_map(
     airflow: &v1alpha2::AirflowCluster,
-    resolved_product_image: &ResolvedProductImage,
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
+    cluster: &ValidatedCluster,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
@@ -1058,6 +1048,9 @@ fn build_executor_template_config_map(
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<ConfigMap> {
+    let resolved_product_image = &cluster.image;
+    let authentication_config = &cluster.cluster_config.authentication_config;
+
     let mut pb = PodBuilder::new();
     let pb_metadata = ObjectMetaBuilder::new()
         .with_recommended_labels(&build_recommended_labels(
@@ -1167,8 +1160,7 @@ fn build_executor_template_config_map(
             ObjectMetaBuilder::new()
                 .name_and_namespace(airflow)
                 .name(airflow.executor_template_configmap_name())
-                .ownerreference_from_resource(airflow, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
                 .with_recommended_labels(&build_recommended_labels(
                     airflow,
                     AIRFLOW_CONTROLLER_NAME,
