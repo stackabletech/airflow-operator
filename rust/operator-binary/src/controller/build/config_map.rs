@@ -21,7 +21,9 @@ use stackable_operator::{
 use crate::{
     config::webserver_config,
     controller::ValidatedCluster,
-    crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR, v1alpha2},
+    crd::{
+        AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR, v1alpha2,
+    },
     product_logging::{LOG_CONFIG_FILE, create_airflow_config},
 };
 
@@ -75,11 +77,15 @@ pub fn build_rolegroup_config_map(
                 .name_and_namespace(validated_cluster)
                 .name(
                     validated_cluster
-                        .resource_names_for(role_name, role_group_name)
+                        .resource_names(role_name, role_group_name)
                         .role_group_config_map()
                         .to_string(),
                 )
-                .ownerreference(ownerreference_from_resource(validated_cluster, None, Some(true)))
+                .ownerreference(ownerreference_from_resource(
+                    validated_cluster,
+                    None,
+                    Some(true),
+                ))
                 .with_labels(validated_cluster.recommended_labels_for(role_name, role_group_name))
                 .build(),
         )
@@ -99,7 +105,10 @@ pub fn build_rolegroup_config_map(
 
     // Vector agent config, built by the caller (where a `RoleGroupRef` is available).
     if let Some(vector_config) = vector_config {
-        cm_builder.add_data(product_logging::framework::VECTOR_CONFIG_FILE, vector_config);
+        cm_builder.add_data(
+            product_logging::framework::VECTOR_CONFIG_FILE,
+            vector_config,
+        );
     }
 
     cm_builder.build().with_context(|_| BuildConfigMapSnafu {

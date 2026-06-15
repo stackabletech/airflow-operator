@@ -24,7 +24,7 @@ pub fn build_rolegroup_headless_service(
             .name_and_namespace(cluster)
             .name(
                 cluster
-                    .resource_names(role, role_group_name)
+                    .resource_names(&role.role_name(), role_group_name)
                     .headless_service_name()
                     .to_string(),
             )
@@ -80,7 +80,7 @@ pub fn stateful_set_service_name(
 ) -> Option<String> {
     Some(
         cluster
-            .resource_names(role, role_group_name)
+            .resource_names(&role.role_name(), role_group_name)
             .headless_service_name()
             .to_string(),
     )
@@ -98,7 +98,9 @@ fn metrics_service_name(
 ) -> String {
     format!(
         "{qualified}-{METRICS_SERVICE_SUFFIX}",
-        qualified = cluster.resource_names(role, role_group_name).stateful_set_name()
+        qualified = cluster
+            .resource_names(&role.role_name(), role_group_name)
+            .stateful_set_name()
     )
 }
 

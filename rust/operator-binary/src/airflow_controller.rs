@@ -728,7 +728,8 @@ fn build_server_rolegroup_statefulset(
         .role_group
         .parse()
         .expect("the role group name was validated during cluster validation");
-    let resource_names = validated_cluster.resource_names(airflow_role, &role_group_name);
+    let resource_names =
+        validated_cluster.resource_names(&airflow_role.role_name(), &role_group_name);
 
     let recommended_object_labels =
         validated_cluster.recommended_labels(airflow_role, &role_group_name);
@@ -1041,11 +1042,13 @@ fn build_executor_template_config_map(
     let authentication_config = &cluster.cluster_config.authentication_config;
 
     let mut pb = PodBuilder::new();
-    let pb_metadata = ObjectMetaBuilder::new()
-        .with_labels(
-            cluster.recommended_labels_for(&executor_role_name(), &executor_template_role_group_name()),
-        )
-        .build();
+    let pb_metadata =
+        ObjectMetaBuilder::new()
+            .with_labels(cluster.recommended_labels_for(
+                &executor_role_name(),
+                &executor_template_role_group_name(),
+            ))
+            .build();
 
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)

@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
@@ -20,11 +18,13 @@ use stackable_operator::{
     },
 };
 
-use crate::airflow_controller::AIRFLOW_CONTROLLER_NAME;
-use crate::crd::{
-    APP_NAME, OPERATOR_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-    authentication::AirflowClientAuthenticationDetailsResolved,
-    authorization::AirflowAuthorizationResolved, v1alpha2,
+use crate::{
+    airflow_controller::AIRFLOW_CONTROLLER_NAME,
+    crd::{
+        APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        OPERATOR_NAME, authentication::AirflowClientAuthenticationDetailsResolved,
+        authorization::AirflowAuthorizationResolved, v1alpha2,
+    },
 };
 
 pub mod build;
@@ -114,23 +114,24 @@ impl ValidatedCluster {
     ///
     /// Infallible: the combined name length was validated during cluster validation
     /// (see `validate::validate_cluster`).
-    pub fn resource_names(&self, role: &AirflowRole, role_group_name: &RoleGroupName) -> ResourceNames {
-        self.resource_names_for(&role.role_name(), role_group_name)
-    }
-
-    /// Type-safe resource names for a free-form role/role-group (e.g. the Kubernetes executor
-    /// pseudo-role). Infallible: the combined name was validated during cluster validation.
-    pub fn resource_names_for(
+    pub fn resource_names(
         &self,
         role_name: &RoleName,
         role_group_name: &RoleGroupName,
     ) -> ResourceNames {
-        ResourceNames::new(self.name.clone(), role_name.clone(), role_group_name.clone())
-            .expect("the combined resource name was validated during cluster validation")
+        ResourceNames {
+            cluster_name: self.name.clone(),
+            role_name: role_name.clone(),
+            role_group_name: role_group_name.clone(),
+        }
     }
 
     /// Recommended labels for a role-group resource.
-    pub fn recommended_labels(&self, role: &AirflowRole, role_group_name: &RoleGroupName) -> Labels {
+    pub fn recommended_labels(
+        &self,
+        role: &AirflowRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
         self.recommended_labels_for(&role.role_name(), role_group_name)
     }
 
