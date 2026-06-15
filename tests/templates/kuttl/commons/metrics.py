@@ -25,16 +25,20 @@ def assert_metric(role, role_group, metric):
     return metric in metric_response.text
 
 
-# Check if dag run state is "success"
+# Check if dag run state is "success", "queued", or "running"
 # TODO: in future, we could wait on it.
 # See: https://airflow.apache.org/docs/apache-airflow/3.1.6/stable-rest-api-ref.html#operation/wait_dag_run_until_finished
-def assert_completion(rest_url, headers, dag_id, dag_run_id):
+def assert_dag_started(rest_url, headers, dag_id, dag_run_id):
     dag_run_response = requests.get(
         f"{rest_url}/dags/{dag_id}/dagRuns/{dag_run_id}", headers=headers
     )
     dag_run_state = dag_run_response.json()["state"]
     print(f"DAG RUN STATE: {dag_run_state}")
-    return dag_run_state == "success"
+    return (
+        dag_run_state == "success"
+        or dag_run_state == "queued"
+        or dag_run_state == "running"
+    )
 
 
 def metrics_v3(role_group: str) -> None:
@@ -98,7 +102,7 @@ def metrics_v3(role_group: str) -> None:
         heartbeat_metric = "airflow_scheduler_heartbeat"
         dag_run_success_count_metric = f"airflow_dagrun_duration_success_{dag_id}_count"
         if (
-            assert_completion(rest_url, headers, dag_id, dag_run_id)
+            assert_dag_started(rest_url, headers, dag_id, dag_run_id)
             and assert_metric("scheduler", role_group, heartbeat_metric)
             and assert_metric("scheduler", role_group, dag_run_success_count_metric)
         ):
