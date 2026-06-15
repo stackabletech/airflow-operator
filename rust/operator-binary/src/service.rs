@@ -10,8 +10,6 @@ use crate::{
     crd::{AirflowRole, HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME},
 };
 
-pub const METRICS_SERVICE_SUFFIX: &str = "metrics";
-
 /// The rolegroup headless [`Service`] is a service that allows direct access to the instances of a certain rolegroup
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_rolegroup_headless_service(
@@ -96,12 +94,10 @@ fn metrics_service_name(
     role: &AirflowRole,
     role_group_name: &RoleGroupName,
 ) -> String {
-    format!(
-        "{qualified}-{METRICS_SERVICE_SUFFIX}",
-        qualified = cluster
-            .resource_names(&role.role_name(), role_group_name)
-            .stateful_set_name()
-    )
+    cluster
+        .resource_names(&role.role_name(), role_group_name)
+        .metrics_service_name()
+        .to_string()
 }
 
 fn headless_service_ports() -> Vec<ServicePort> {

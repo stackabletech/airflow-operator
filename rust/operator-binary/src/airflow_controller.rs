@@ -1,6 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -37,12 +38,12 @@ use stackable_operator::{
         },
     },
     k8s_openapi::{
-        self, DeepMerge,
+        DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, EnvVar, PersistentVolumeClaim, PodTemplateSpec, Probe, ServiceAccount,
-                TCPSocketAction,
+                ConfigMap, Container as K8sContainer, EnvVar, PersistentVolumeClaim,
+                PodTemplateSpec, Probe, ServiceAccount, TCPSocketAction,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -55,7 +56,6 @@ use stackable_operator::{
     },
     kvp::{Annotation, Label, LabelError},
     logging::controller::ReconcilerError,
-    product_logging::{self, framework::LoggingError, spec::ContainerLogConfig},
     role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
@@ -64,14 +64,21 @@ use stackable_operator::{
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::meta::ownerreference_from_resource,
-        types::operator::{RoleGroupName, RoleName},
+        builder::{meta::ownerreference_from_resource, pod::container::EnvVarSet},
+        product_logging::framework::{VectorContainerLogConfig, vector_container},
+        role_group_utils::ResourceNames,
+        types::{
+            kubernetes::{ContainerName, VolumeName},
+            operator::{RoleGroupName, RoleName},
+        },
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{AirflowRoleGroupConfig, ValidatedCluster, build::config_map},
+    controller::{
+        AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging, build::config_map, validate,
+    },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         self, APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, AirflowExecutor,
@@ -199,9 +206,6 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
-    VectorAggregatorConfigMapMissing,
-
     #[snafu(display("failed to update status"))]
     ApplyStatus {
         source: stackable_operator::client::Error,
@@ -252,9 +256,6 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
-
-    #[snafu(display("failed to configure logging"))]
-    ConfigureLogging { source: LoggingError },
 
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
@@ -476,7 +477,10 @@ pub async fn reconcile_airflow(
             }
         }
 
-        for (rolegroup_name, validated_rg_config) in role_group_configs {
+        for (rolegroup_name, validated_rg) in role_group_configs {
+            let validated_rg_config = &validated_rg.config;
+            let logging = &validated_rg.logging;
+
             let rolegroup = RoleGroupRef {
                 cluster: ObjectRef::from_obj(airflow),
                 role: role_name.clone(),
@@ -540,6 +544,7 @@ pub async fn reconcile_airflow(
                 airflow_role,
                 &rolegroup,
                 validated_rg_config,
+                logging,
                 &metadata_database_connection_details,
                 &celery_database_connection_details,
                 &rbac_sa,
@@ -707,6 +712,7 @@ fn build_server_rolegroup_statefulset(
     airflow_role: &AirflowRole,
     rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     validated_rg_config: &AirflowRoleGroupConfig,
+    logging: &ValidatedLogging,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     celery_database_connection_details: &Option<(
         CeleryDatabaseConnectionDetails,
@@ -936,26 +942,12 @@ fn build_server_rolegroup_statefulset(
         .context(AddVolumeSnafu)?;
     }
 
-    if merged_airflow_config.logging.enable_vector_agent {
-        match &airflow
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-        {
-            Some(vector_aggregator_config_map_name) => {
-                pb.add_container(build_logging_container(
-                    resolved_product_image,
-                    merged_airflow_config
-                        .logging
-                        .containers
-                        .get(&Container::Vector),
-                    vector_aggregator_config_map_name,
-                )?);
-            }
-            None => {
-                VectorAggregatorConfigMapMissingSnafu.fail()?;
-            }
-        }
+    if let Some(vector_log_config) = &logging.vector_container {
+        pb.add_container(build_logging_container(
+            resolved_product_image,
+            vector_log_config,
+            &resource_names,
+        ));
     }
     let mut pod_template = pb.build_template();
     pod_template.merge_from(validated_rg_config.pod_overrides.clone());
@@ -1005,25 +997,30 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
+stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+// Typed volume names required by the v2 `vector_container`. Their values match the `&str`
+// constants in `controller_commons` used elsewhere to build the same volumes.
+stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
+stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
+
+/// Builds the Vector log-collection sidecar container from the up-front-validated logging config.
+///
+/// The vector container's resource limits are set inside the v2 `vector_container` helper (to the
+/// same values previously hard-coded here), so this is behaviour-preserving.
 fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
-    log_config: Option<&ContainerLogConfig>,
-    vector_aggregator_config_map_name: &str,
-) -> Result<k8s_openapi::api::core::v1::Container> {
-    product_logging::framework::vector_container(
+    vector_log_config: &VectorContainerLogConfig,
+    resource_names: &ResourceNames,
+) -> K8sContainer {
+    vector_container(
+        &VECTOR_CONTAINER_NAME,
         resolved_product_image,
-        CONFIG_VOLUME_NAME,
-        LOG_VOLUME_NAME,
-        log_config,
-        ResourceRequirementsBuilder::new()
-            .with_cpu_request("250m")
-            .with_cpu_limit("500m")
-            .with_memory_request("128Mi")
-            .with_memory_limit("128Mi")
-            .build(),
-        vector_aggregator_config_map_name,
+        vector_log_config,
+        resource_names,
+        &CONFIG_VOLUME_NAME_TYPED,
+        &LOG_VOLUME_NAME_TYPED,
+        EnvVarSet::new(),
     )
-    .context(ConfigureLoggingSnafu)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1112,26 +1109,22 @@ fn build_executor_template_config_map(
     ))
     .context(AddVolumeSnafu)?;
 
-    if merged_executor_config.logging.enable_vector_agent {
-        match &airflow
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-        {
-            Some(vector_aggregator_config_map_name) => {
-                pb.add_container(build_logging_container(
-                    resolved_product_image,
-                    merged_executor_config
-                        .logging
-                        .containers
-                        .get(&Container::Vector),
-                    vector_aggregator_config_map_name,
-                )?);
-            }
-            None => {
-                VectorAggregatorConfigMapMissingSnafu.fail()?;
-            }
-        }
+    // The Kubernetes executor pod template is not an `AirflowRole` with role groups, so its logging
+    // is validated here (at build time) via the shared `validate_logging`, mirroring the role-group
+    // path in `validate`.
+    let executor_aggregator_config_map_name =
+        validate::parse_vector_aggregator_config_map_name(airflow).context(ValidateSnafu)?;
+    let executor_logging = validate::validate_logging(
+        &merged_executor_config.logging,
+        &executor_aggregator_config_map_name,
+    )
+    .context(ValidateSnafu)?;
+    if let Some(vector_log_config) = &executor_logging.vector_container {
+        pb.add_container(build_logging_container(
+            resolved_product_image,
+            vector_log_config,
+            &cluster.resource_names(&executor_role_name(), &executor_template_role_group_name()),
+        ));
     }
 
     let mut pod_template = pb.build_template();

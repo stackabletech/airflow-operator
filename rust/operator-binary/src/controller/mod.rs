@@ -7,6 +7,7 @@ use stackable_operator::{
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         kvp::label::{recommended_labels, role_group_selector},
+        product_logging::framework::VectorContainerLogConfig,
         role_group_utils::ResourceNames,
         types::{
             kubernetes::Uid,
@@ -51,6 +52,32 @@ pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupC
     AirflowConfigOverrides,
 >;
 
+/// A validated role group: the merged [`AirflowRoleGroupConfig`] paired with its up-front-validated
+/// [`ValidatedLogging`], so the build step reads both from here rather than re-deriving from the raw
+/// cluster. (Superset folds logging into a single rolegroup struct; airflow keeps the generic merged
+/// config as-is — retaining all its fields without bespoke `#[allow(dead_code)]` — and carries
+/// logging alongside it.)
+#[derive(Clone, Debug)]
+pub struct AirflowRoleGroup {
+    pub config: AirflowRoleGroupConfig,
+    pub logging: ValidatedLogging,
+}
+
+/// Validated logging configuration for the (optional) Vector container.
+///
+/// Produced up-front by [`validate::validate_logging`] (mirroring the superset-operator) so that an
+/// invalid custom log ConfigMap name or a missing Vector aggregator discovery ConfigMap name fails
+/// reconciliation during validation rather than at resource-build time.
+///
+/// Unlike superset's equivalent this carries no product-container field: superset's is never read,
+/// and airflow's `airflow` container log config is consumed leniently in the build, so validating
+/// it eagerly here could reject configurations the build currently tolerates.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedLogging {
+    pub vector_container: Option<VectorContainerLogConfig>,
+    pub enable_vector_agent: bool,
+}
+
 /// Cluster-wide configuration that applies to every role and role group.
 ///
 /// Carries the dereferenced external references, so every downstream build step reads them from
@@ -76,7 +103,7 @@ pub struct ValidatedCluster {
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroup>>,
     pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
 }
 
@@ -86,7 +113,7 @@ impl ValidatedCluster {
         name: ClusterName,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
+        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroup>>,
         role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
     ) -> Self {
         // `app_version_label_value` is constructed to be a valid label value, so it is also a valid

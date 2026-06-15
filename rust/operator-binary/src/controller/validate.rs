@@ -1,28 +1,35 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
     kube::ResourceExt,
+    product_logging::spec::Logging,
     role_utils::{GenericRoleConfig, RoleGroup},
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        product_logging::framework::{
+            VectorContainerLogConfig, validate_logging_configuration_for_container,
+        },
         role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
-        types::operator::{ClusterName, RoleGroupName},
+        types::{
+            kubernetes::ConfigMapName,
+            operator::{ClusterName, RoleGroupName},
+        },
     },
 };
 use strum::IntoEnumIterator;
 
 use super::{
-    AirflowRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
-    dereference::DereferencedObjects,
+    AirflowRoleGroup, AirflowRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig,
+    ValidatedLogging, ValidatedRoleConfig, dereference::DereferencedObjects,
 };
 use crate::{
     airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
-        v1alpha2,
+        Container, v1alpha2,
     },
 };
 
@@ -55,6 +62,21 @@ pub enum Error {
     ParseEnvVarName {
         source: stackable_operator::v2::builder::pod::container::Error,
     },
+
+    #[snafu(display("failed to validate the logging configuration"))]
+    ValidateLoggingConfig {
+        source: stackable_operator::v2::product_logging::framework::Error,
+    },
+
+    #[snafu(display(
+        "the Vector aggregator discovery ConfigMap name must be set when the Vector agent is enabled"
+    ))]
+    MissingVectorAggregatorConfigMapName,
+
+    #[snafu(display("invalid Vector aggregator discovery ConfigMap name"))]
+    ParseVectorAggregatorConfigMapName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+    },
 }
 
 pub fn validate_cluster(
@@ -76,6 +98,10 @@ pub fn validate_cluster(
         ClusterName::from_str(&airflow.name_any()).with_context(|_| ParseClusterNameSnafu {
             cluster_name: airflow.name_any(),
         })?;
+
+    // The Vector aggregator discovery ConfigMap name (validated here so an invalid name fails
+    // up-front). It is only required when the Vector agent is enabled for a role group.
+    let vector_aggregator_config_map_name = parse_vector_aggregator_config_map_name(airflow)?;
 
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
@@ -107,10 +133,12 @@ pub fn validate_cluster(
                     role_group: rolegroup_name.clone(),
                 }
             })?;
-            let validated =
+            let config =
                 validate_role_group(&resolved_role, &role_group_name, rolegroup, &default_config)?;
+            let logging =
+                validate_logging(&config.config.logging, &vector_aggregator_config_map_name)?;
 
-            group_configs.insert(role_group_name, validated);
+            group_configs.insert(role_group_name, AirflowRoleGroup { config, logging });
         }
 
         role_groups.insert(role, group_configs);
@@ -180,6 +208,50 @@ fn validate_role_group(
         cli_overrides: validated.config.cli_overrides,
         pod_overrides: validated.config.pod_overrides,
         product_specific_common_config: validated.config.product_specific_common_config,
+    })
+}
+
+/// Parses the optional Vector aggregator discovery ConfigMap name from the cluster spec into a
+/// typed [`ConfigMapName`], so an invalid name fails reconciliation up-front.
+pub(crate) fn parse_vector_aggregator_config_map_name(
+    airflow: &v1alpha2::AirflowCluster,
+) -> Result<Option<ConfigMapName>, Error> {
+    airflow
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        .as_deref()
+        .map(ConfigMapName::from_str)
+        .transpose()
+        .context(ParseVectorAggregatorConfigMapNameSnafu)
+}
+
+/// Validates the logging configuration for the (optional) Vector container.
+///
+/// `vector_aggregator_config_map_name` is the discovery ConfigMap name of the Vector aggregator;
+/// it is required (and validated) only when the Vector agent is enabled. Mirrors superset's
+/// `validate_logging`. Used both per-role-group (here) and for the Kubernetes executor pod template
+/// (which is not a [`AirflowRole`] with role groups, so it is validated from the build step).
+pub(crate) fn validate_logging(
+    logging: &Logging<Container>,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<ValidatedLogging, Error> {
+    let vector_container = if logging.enable_vector_agent {
+        let vector_aggregator_config_map_name = vector_aggregator_config_map_name
+            .clone()
+            .context(MissingVectorAggregatorConfigMapNameSnafu)?;
+        Some(VectorContainerLogConfig {
+            log_config: validate_logging_configuration_for_container(logging, &Container::Vector)
+                .context(ValidateLoggingConfigSnafu)?,
+            vector_aggregator_config_map_name,
+        })
+    } else {
+        None
+    };
+
+    Ok(ValidatedLogging {
+        vector_container,
+        enable_vector_agent: logging.enable_vector_agent,
     })
 }
 
