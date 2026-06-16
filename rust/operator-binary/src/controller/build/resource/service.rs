@@ -51,7 +51,12 @@ pub fn build_rolegroup_metrics_service(
     Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(cluster)
-            .name(metrics_service_name(cluster, role, role_group_name))
+            .name(
+                cluster
+                    .resource_names(&role.role_name(), role_group_name)
+                    .metrics_service_name()
+                    .to_string(),
+            )
             .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
             .with_labels(cluster.recommended_labels(role, role_group_name))
             .with_labels(prometheus_labels())
@@ -82,22 +87,6 @@ pub fn stateful_set_service_name(
             .headless_service_name()
             .to_string(),
     )
-}
-
-/// The metrics [`Service`] name `<cluster>-<role>-<rolegroup>-metrics`.
-///
-/// [`ResourceNames`](stackable_operator::v2::role_group_utils::ResourceNames) has no metrics-service
-/// helper, so the `-metrics` suffix is appended to the qualified role-group name (which is also the
-/// StatefulSet name).
-fn metrics_service_name(
-    cluster: &ValidatedCluster,
-    role: &AirflowRole,
-    role_group_name: &RoleGroupName,
-) -> String {
-    cluster
-        .resource_names(&role.role_name(), role_group_name)
-        .metrics_service_name()
-        .to_string()
 }
 
 fn headless_service_ports() -> Vec<ServicePort> {
