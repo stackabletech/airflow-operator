@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
+    crd::git_sync,
     database_connections::drivers::{
         celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
     },
@@ -90,6 +91,8 @@ pub struct ValidatedClusterConfig {
     pub executor: AirflowExecutor,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
+    /// The Git-sync definitions for the DAGs (`spec.clusterConfig.dagsGitSync`).
+    pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
     pub credentials_secret_name: String,
     pub load_examples: bool,
     pub expose_config: bool,

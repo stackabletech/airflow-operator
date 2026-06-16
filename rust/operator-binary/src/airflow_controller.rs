@@ -350,7 +350,7 @@ pub async fn reconcile_airflow(
             let logging = &validated_rg.logging;
 
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
-                &airflow.spec.cluster_config.dags_git_sync,
+                &validated_cluster.cluster_config.dags_git_sync,
                 &validated_cluster.image,
                 &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
                 &airflow.volume_mounts(),
@@ -469,7 +469,7 @@ async fn build_executor_template(
         })?;
 
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
-        &airflow.spec.cluster_config.dags_git_sync,
+        &validated_cluster.cluster_config.dags_git_sync,
         &validated_cluster.image,
         &env_vars_from_overrides(&common_config.env_overrides),
         &airflow.volume_mounts(),

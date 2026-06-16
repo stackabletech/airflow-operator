@@ -167,6 +167,7 @@ pub fn validate_cluster(
             executor: airflow.spec.executor.clone(),
             authentication_config,
             authorization_config,
+            dags_git_sync: airflow.spec.cluster_config.dags_git_sync.clone(),
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
             metadata_database_connection_details,
             celery_database_connection_details,
