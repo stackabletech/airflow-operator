@@ -44,7 +44,6 @@ mod controller;
 mod controller_commons;
 mod crd;
 mod env_vars;
-mod operations;
 mod util;
 mod webhooks;
 

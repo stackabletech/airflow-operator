@@ -31,12 +31,15 @@ use stackable_operator::{
 use crate::{
     controller::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
-        build::resource::{
-            pod::{
-                add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
-                build_logging_container,
+        build::{
+            graceful_shutdown::add_graceful_shutdown_config,
+            resource::{
+                pod::{
+                    add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
+                    build_logging_container,
+                },
+                service::stateful_set_service_name,
             },
-            service::stateful_set_service_name,
         },
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
@@ -46,7 +49,6 @@ use crate::{
         TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
     env_vars,
-    operations::graceful_shutdown::add_graceful_shutdown_config,
 };
 
 #[derive(Snafu, Debug)]
@@ -59,7 +61,7 @@ pub enum Error {
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
-        source: crate::operations::graceful_shutdown::Error,
+        source: crate::controller::build::graceful_shutdown::Error,
     },
 
     #[snafu(display("failed to build label"))]
