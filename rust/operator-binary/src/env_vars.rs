@@ -15,7 +15,7 @@ use stackable_operator::{
 use crate::{
     controller::ValidatedCluster,
     crd::{
-        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        AirflowExecutor, AirflowRole, ExecutorConfig, HTTP_PORT, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
@@ -636,7 +636,7 @@ fn execution_server_env_vars(cluster: &ValidatedCluster) -> BTreeMap<String, Env
             "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
             EnvVar {
                 name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                value: Some(format!("http://{webserver}:8080/execution/")),
+                value: Some(format!("http://{webserver}:{HTTP_PORT}/execution/")),
                 ..Default::default()
             },
         );
@@ -644,7 +644,7 @@ fn execution_server_env_vars(cluster: &ValidatedCluster) -> BTreeMap<String, Env
             "AIRFLOW__CORE__BASE_URL".into(),
             EnvVar {
                 name: "AIRFLOW__CORE__BASE_URL".into(),
-                value: Some(format!("http://{webserver}:8080/")),
+                value: Some(format!("http://{webserver}:{HTTP_PORT}/")),
                 ..Default::default()
             },
         );

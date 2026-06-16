@@ -445,18 +445,6 @@ impl v1alpha2::AirflowCluster {
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
     }
-
-    pub fn shared_internal_secret_secret_name(&self) -> String {
-        format!("{}-internal-secret", &self.name_any())
-    }
-
-    pub fn shared_jwt_secret_secret_name(&self) -> String {
-        format!("{}-jwt-secret", &self.name_any())
-    }
-
-    pub fn shared_fernet_key_secret_name(&self) -> String {
-        format!("{}-fernet-key", &self.name_any())
-    }
 }
 
 fn extract_role_from_webserver_config(fragment: AirflowWebserverRoleType) -> AirflowRoleType {
