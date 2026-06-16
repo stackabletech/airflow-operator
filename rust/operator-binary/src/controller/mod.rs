@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
+    k8s_openapi::api::core::v1::{Volume, VolumeMount},
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
     v2::{
@@ -10,7 +11,7 @@ use stackable_operator::{
         product_logging::framework::VectorContainerLogConfig,
         role_group_utils::ResourceNames,
         types::{
-            kubernetes::Uid,
+            kubernetes::{ConfigMapName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -90,6 +91,13 @@ pub struct ValidatedClusterConfig {
     pub credentials_secret_name: String,
     pub load_examples: bool,
     pub expose_config: bool,
+    pub database_initialization_enabled: bool,
+    /// User-supplied extra Volumes (`spec.clusterConfig.volumes`).
+    pub volumes: Vec<Volume>,
+    /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
+    pub volume_mounts: Vec<VolumeMount>,
+    /// The validated Vector aggregator discovery ConfigMap name (`None` when no aggregator is set).
+    pub vector_aggregator_config_map_name: Option<ConfigMapName>,
 }
 
 /// The validated cluster: proves that config merging succeeded for every role and
@@ -163,6 +171,21 @@ impl ValidatedCluster {
     /// The Secret holding the shared Fernet key (`<cluster>-fernet-key`).
     pub fn fernet_key_name(&self) -> String {
         format!("{}-fernet-key", self.name_any())
+    }
+
+    /// The ConfigMap holding the Kubernetes-executor pod template (`<cluster>-executor-pod-template`).
+    pub fn executor_template_configmap_name(&self) -> String {
+        format!("{}-executor-pod-template", self.name_any())
+    }
+
+    /// User-supplied extra Volumes (`spec.clusterConfig.volumes`).
+    pub fn volumes(&self) -> &Vec<Volume> {
+        &self.cluster_config.volumes
+    }
+
+    /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
+    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
+        self.cluster_config.volume_mounts.clone()
     }
 
     /// Type-safe names for the resources of a role group.

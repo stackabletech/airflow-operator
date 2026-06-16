@@ -439,7 +439,6 @@ pub async fn reconcile_airflow(
                 })?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
-                airflow,
                 &validated_cluster,
                 airflow_role,
                 rolegroup_name,
@@ -526,7 +525,6 @@ async fn build_executor_template(
     .context(InvalidGitSyncSpecSnafu)?;
 
     let worker_pod_template_config_map = build_executor_template_config_map(
-        airflow,
         validated_cluster,
         metadata_database_connection_details,
         &rbac_sa.name_unchecked(),

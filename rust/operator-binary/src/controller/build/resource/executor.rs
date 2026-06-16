@@ -35,7 +35,6 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         CONFIG_PATH, Container, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME,
-        v1alpha2,
     },
     env_vars::build_airflow_template_envs,
     operations::graceful_shutdown::add_executor_graceful_shutdown_config,
@@ -90,7 +89,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[allow(clippy::too_many_arguments)]
 pub fn build_executor_template_config_map(
-    airflow: &v1alpha2::AirflowCluster,
     cluster: &ValidatedCluster,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     sa_name: &str,
@@ -142,7 +140,7 @@ pub fn build_executor_template_config_map(
             metadata_database_connection_details,
             git_sync_resources,
         ))
-        .add_volume_mounts(airflow.volume_mounts())
+        .add_volume_mounts(cluster.volume_mounts())
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
         .context(AddVolumeMountSnafu)?
@@ -163,7 +161,7 @@ pub fn build_executor_template_config_map(
     metadata_database_connection_details.add_to_container(&mut airflow_container);
 
     pb.add_container(airflow_container.build());
-    pb.add_volumes(airflow.volumes().clone())
+    pb.add_volumes(cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
         cluster
@@ -180,11 +178,9 @@ pub fn build_executor_template_config_map(
     // The Kubernetes executor pod template is not an `AirflowRole` with role groups, so its logging
     // is validated here (at build time) via the shared `validate_logging`, mirroring the role-group
     // path in `validate`.
-    let executor_aggregator_config_map_name =
-        validate::parse_vector_aggregator_config_map_name(airflow).context(ValidateSnafu)?;
     let executor_logging = validate::validate_logging(
         &merged_executor_config.logging,
-        &executor_aggregator_config_map_name,
+        &cluster.cluster_config.vector_aggregator_config_map_name,
     )
     .context(ValidateSnafu)?;
     if let Some(vector_log_config) = &executor_logging.vector_container {
@@ -206,8 +202,8 @@ pub fn build_executor_template_config_map(
     cm_builder
         .metadata(
             ObjectMetaBuilder::new()
-                .name_and_namespace(airflow)
-                .name(airflow.executor_template_configmap_name())
+                .name_and_namespace(cluster)
+                .name(cluster.executor_template_configmap_name())
                 .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
                 .with_labels(cluster.recommended_labels_for(
                     &executor_role_name(),

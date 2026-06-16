@@ -8,7 +8,7 @@ use stackable_operator::{
         cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
-        product_image_selection::{ProductImage, ResolvedProductImage},
+        product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
             Resources, ResourcesFragment,
@@ -46,6 +46,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString};
 
 use crate::{
+    controller::ValidatedCluster,
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -416,16 +417,8 @@ impl v1alpha2::AirflowCluster {
         self.get_role(role).map(|r| r.role_config)
     }
 
-    pub fn volumes(&self) -> &Vec<Volume> {
-        &self.spec.cluster_config.volumes
-    }
-
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         self.spec.cluster_config.volume_mounts.clone()
-    }
-
-    pub fn executor_template_configmap_name(&self) -> String {
-        format!("{}-executor-pod-template", self.name_any())
     }
 
     /// Retrieve and merge resource configs for the executor template
@@ -556,12 +549,13 @@ impl AirflowRole {
     /// config file is in the Airflow home directory on all pods.
     /// Only the webserver needs to know about authentication CA's which is added via python's certify
     /// if authentication is enabled.
-    pub fn get_commands(
-        &self,
-        airflow: &v1alpha2::AirflowCluster,
-        auth_config: &AirflowClientAuthenticationDetailsResolved,
-        resolved_product_image: &ResolvedProductImage,
-    ) -> Vec<String> {
+    pub fn get_commands(&self, cluster: &ValidatedCluster) -> Vec<String> {
+        let auth_config = &cluster.cluster_config.authentication_config;
+        let resolved_product_image = &cluster.image;
+        let database_initialization_enabled =
+            cluster.cluster_config.database_initialization_enabled;
+        let has_dag_processors = cluster.has_role(&AirflowRole::DagProcessor);
+
         let mut command = vec![
             format!(
                 "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
@@ -589,7 +583,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.database_initialization.enabled {
+                    if database_initialization_enabled {
                         tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             "airflow db migrate".to_string(),
@@ -610,7 +604,7 @@ impl AirflowRole {
                         container_debug_command(),
                         "airflow scheduler &".to_string(),
                     ]);
-                    if airflow.spec.dag_processors.is_none() {
+                    if !has_dag_processors {
                         // If no dag_processors role has been specified, the
                         // process needs to be included with the scheduler
                         // (with 3.x there is no longer the possibility of
@@ -647,7 +641,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.database_initialization.enabled {
+                    if database_initialization_enabled {
                         tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259

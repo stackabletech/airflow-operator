@@ -46,7 +46,7 @@ use crate::{
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME, v1alpha2,
+        TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
     env_vars,
     operations::graceful_shutdown::add_airflow_graceful_shutdown_config,
@@ -113,7 +113,6 @@ fn build_rolegroup_metadata(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 #[allow(clippy::too_many_arguments)]
 pub fn build_server_rolegroup_statefulset(
-    airflow: &v1alpha2::AirflowCluster,
     validated_cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
     role_group_name: &RoleGroupName,
@@ -176,11 +175,7 @@ pub fn build_server_rolegroup_statefulset(
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
-    airflow_container_args.extend(airflow_role.get_commands(
-        airflow,
-        authentication_config,
-        resolved_product_image,
-    ));
+    airflow_container_args.extend(airflow_role.get_commands(validated_cluster));
 
     airflow_container
         .image_from_product_image(resolved_product_image)
@@ -206,7 +201,7 @@ pub fn build_server_rolegroup_statefulset(
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );
 
-    let volume_mounts = airflow.volume_mounts();
+    let volume_mounts = validated_cluster.volume_mounts();
     airflow_container
         .add_volume_mounts(volume_mounts)
         .context(AddVolumeMountSnafu)?;
@@ -321,7 +316,7 @@ pub fn build_server_rolegroup_statefulset(
         .build();
     pb.add_container(metrics_container);
 
-    pb.add_volumes(airflow.volumes().clone())
+    pb.add_volumes(validated_cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
         resource_names.role_group_config_map().as_ref(),
@@ -335,7 +330,7 @@ pub fn build_server_rolegroup_statefulset(
     if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         pb.add_volume(
             VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
-                .with_config_map(airflow.executor_template_configmap_name())
+                .with_config_map(validated_cluster.executor_template_configmap_name())
                 .build(),
         )
         .context(AddVolumeSnafu)?;

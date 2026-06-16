@@ -160,6 +160,14 @@ pub fn validate_cluster(
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
             load_examples: airflow.spec.cluster_config.load_examples,
             expose_config: airflow.spec.cluster_config.expose_config,
+            database_initialization_enabled: airflow
+                .spec
+                .cluster_config
+                .database_initialization
+                .enabled,
+            volumes: airflow.spec.cluster_config.volumes.clone(),
+            volume_mounts: airflow.spec.cluster_config.volume_mounts.clone(),
+            vector_aggregator_config_map_name: vector_aggregator_config_map_name.clone(),
         },
         role_groups,
         role_configs,
