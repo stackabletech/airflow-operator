@@ -46,7 +46,6 @@ mod crd;
 mod env_vars;
 mod operations;
 mod product_logging;
-mod service;
 mod util;
 mod webhooks;
 

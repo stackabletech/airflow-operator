@@ -78,7 +78,16 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     controller::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
-        build::{config_map, resource::pdb::build_pdb},
+        build::{
+            config_map,
+            resource::{
+                pdb::build_pdb,
+                service::{
+                    build_rolegroup_headless_service, build_rolegroup_metrics_service,
+                    stateful_set_service_name,
+                },
+            },
+        },
         validate,
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
@@ -99,10 +108,6 @@ use crate::{
     env_vars::{self, build_airflow_template_envs},
     operations::graceful_shutdown::{
         add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
-    },
-    service::{
-        build_rolegroup_headless_service, build_rolegroup_metrics_service,
-        stateful_set_service_name,
     },
 };
 
