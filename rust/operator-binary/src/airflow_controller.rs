@@ -29,7 +29,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage, random_secret_creation,
         rbac::build_rbac_resources,
     },
-    crd::{authentication::ldap, git_sync, listener},
+    crd::{authentication::ldap, git_sync},
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -81,6 +81,7 @@ use crate::{
         build::{
             config_map,
             resource::{
+                listener::build_group_listener,
                 pdb::build_pdb,
                 service::{
                     build_rolegroup_headless_service, build_rolegroup_metrics_service,
@@ -94,9 +95,9 @@ use crate::{
     crd::{
         self, APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, AirflowExecutor,
         AirflowExecutorCommonConfiguration, AirflowRole, CONFIG_PATH, Container, ExecutorConfig,
-        HTTP_PORT, HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR,
-        METRICS_PORT, METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION,
-        TEMPLATE_NAME, TEMPLATE_VOLUME_NAME,
+        HTTP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT,
+        METRICS_PORT_NAME, OPERATOR_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        TEMPLATE_VOLUME_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -672,43 +673,6 @@ fn build_rolegroup_metadata(
         .with_labels(cluster.recommended_labels(role, role_group_name))
         .with_label(prometheus_label)
         .build()
-}
-
-pub fn build_group_listener(
-    cluster: &ValidatedCluster,
-    role: &AirflowRole,
-    listener_class: String,
-    listener_group_name: String,
-) -> listener::v1alpha1::Listener {
-    listener::v1alpha1::Listener {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(cluster)
-            .name(listener_group_name)
-            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-            // The group listener is a role-level object, so a constant `none` role-group is used
-            // as the role-group label value.
-            .with_labels(cluster.recommended_labels_for(
-                &role.role_name(),
-                &"none".parse().expect("'none' is a valid role group name"),
-            ))
-            .build(),
-        spec: listener::v1alpha1::ListenerSpec {
-            class_name: Some(listener_class),
-            ports: Some(listener_ports()),
-            ..listener::v1alpha1::ListenerSpec::default()
-        },
-        status: None,
-    }
-}
-
-/// We only use the http port here and intentionally omit
-/// the metrics one.
-fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
-    vec![listener::v1alpha1::ListenerPort {
-        name: HTTP_PORT_NAME.to_string(),
-        port: HTTP_PORT.into(),
-        protocol: Some("TCP".to_string()),
-    }]
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
