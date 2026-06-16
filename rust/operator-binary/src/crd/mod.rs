@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -40,6 +40,7 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         role_utils::GenericCommonConfig,
+        types::kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName},
     },
     versioned::versioned,
 };
@@ -264,7 +265,7 @@ pub mod versioned {
         /// The name of the Secret object containing the admin user credentials. Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
-        pub credentials_secret_name: String,
+        pub credentials_secret_name: SecretName,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
@@ -301,7 +302,7 @@ pub mod versioned {
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
 
         /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
         #[serde(default)]
@@ -322,7 +323,7 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "webserver_default_listener_class")]
-        pub listener_class: String,
+        pub listener_class: ListenerClassName,
     }
 }
 
@@ -357,8 +358,9 @@ impl Default for v1alpha2::WebserverRoleConfig {
     }
 }
 
-fn webserver_default_listener_class() -> String {
-    "cluster-internal".to_string()
+fn webserver_default_listener_class() -> ListenerClassName {
+    ListenerClassName::from_str("cluster-internal")
+        .expect("the default listener class is a valid listener class name")
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
@@ -381,9 +383,12 @@ impl v1alpha2::AirflowCluster {
     /// The name of the group-listener provided for a specific role.
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
-    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
+    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<ListenerName> {
         match role {
-            AirflowRole::Webserver => Some(role_service_name(&self.name_any(), &role.to_string())),
+            AirflowRole::Webserver => Some(
+                ListenerName::from_str(&role_service_name(&self.name_any(), &role.to_string()))
+                    .expect("the group listener name is a valid Listener name"),
+            ),
             AirflowRole::Scheduler
             | AirflowRole::Worker
             | AirflowRole::DagProcessor
@@ -733,7 +738,10 @@ impl AirflowRole {
             .expect("an AirflowRole serialises to a valid RoleName")
     }
 
-    pub fn listener_class_name(&self, airflow: &v1alpha2::AirflowCluster) -> Option<String> {
+    pub fn listener_class_name(
+        &self,
+        airflow: &v1alpha2::AirflowCluster,
+    ) -> Option<ListenerClassName> {
         match self {
             Self::Webserver => airflow
                 .spec

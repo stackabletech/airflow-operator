@@ -240,7 +240,7 @@ pub async fn reconcile_airflow(
 
     // TODO: Move secret creation to a dedicated apply step once it exists.
     random_secret_creation::create_random_secret_if_not_exists(
-        &validated_cluster.internal_secret_name(),
+        validated_cluster.internal_secret_name().as_ref(),
         INTERNAL_SECRET_SECRET_KEY,
         256,
         airflow,
@@ -250,7 +250,7 @@ pub async fn reconcile_airflow(
     .context(InternalSecretSnafu)?;
 
     random_secret_creation::create_random_secret_if_not_exists(
-        &validated_cluster.jwt_secret_name(),
+        validated_cluster.jwt_secret_name().as_ref(),
         JWT_SECRET_SECRET_KEY,
         256,
         airflow,
@@ -264,7 +264,7 @@ pub async fn reconcile_airflow(
     // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
     random_secret_creation::create_random_secret_if_not_exists(
-        &validated_cluster.fernet_key_name(),
+        validated_cluster.fernet_key_name().as_ref(),
         FERNET_KEY_SECRET_KEY,
         32,
         airflow,
@@ -335,7 +335,7 @@ pub async fn reconcile_airflow(
                 let rg_group_listener = build_group_listener(
                     &validated_cluster,
                     airflow_role,
-                    listener_class.to_string(),
+                    listener_class.clone(),
                     listener_group_name.clone(),
                 );
                 cluster_resources

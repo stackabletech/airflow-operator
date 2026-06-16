@@ -118,7 +118,7 @@ pub fn build_airflow_statefulset_envs(
         "AIRFLOW__CORE__FERNET_KEY".into(),
         env_var_from_secret(
             "AIRFLOW__CORE__FERNET_KEY",
-            &cluster.fernet_key_name(),
+            cluster.fernet_key_name(),
             FERNET_KEY_SECRET_KEY,
         ),
     );
@@ -488,7 +488,7 @@ fn add_version_specific_env_vars(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
             env_var_from_secret(
                 "AIRFLOW__API_AUTH__JWT_SECRET",
-                &cluster.jwt_secret_name(),
+                cluster.jwt_secret_name(),
                 JWT_SECRET_SECRET_KEY,
             ),
         );

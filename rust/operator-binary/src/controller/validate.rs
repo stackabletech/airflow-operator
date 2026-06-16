@@ -79,11 +79,6 @@ pub enum Error {
         "the Vector aggregator discovery ConfigMap name must be set when the Vector agent is enabled"
     ))]
     MissingVectorAggregatorConfigMapName,
-
-    #[snafu(display("invalid Vector aggregator discovery ConfigMap name"))]
-    ParseVectorAggregatorConfigMapName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
 }
 
 pub fn validate_cluster(
@@ -106,9 +101,13 @@ pub fn validate_cluster(
             cluster_name: airflow.name_any(),
         })?;
 
-    // The Vector aggregator discovery ConfigMap name (validated here so an invalid name fails
-    // up-front). It is only required when the Vector agent is enabled for a role group.
-    let vector_aggregator_config_map_name = parse_vector_aggregator_config_map_name(airflow)?;
+    // The Vector aggregator discovery ConfigMap name. Validity is already enforced by the
+    // `ConfigMapName` type on the CRD; it is only required when the Vector agent is enabled.
+    let vector_aggregator_config_map_name = airflow
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        .clone();
 
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
@@ -126,7 +125,7 @@ pub fn validate_cluster(
                 pdb: airflow
                     .role_config(&role)
                     .map(|rc| rc.pod_disruption_budget),
-                listener_class: role.listener_class_name(airflow).map(|s| s.to_string()),
+                listener_class: role.listener_class_name(airflow),
                 group_listener_name: airflow.group_listener_name(&role),
             },
         );
@@ -291,21 +290,6 @@ fn validate_role_group(
         pod_overrides: validated.config.pod_overrides,
         product_specific_common_config: validated.config.product_specific_common_config,
     })
-}
-
-/// Parses the optional Vector aggregator discovery ConfigMap name from the cluster spec into a
-/// typed [`ConfigMapName`], so an invalid name fails reconciliation up-front.
-pub(crate) fn parse_vector_aggregator_config_map_name(
-    airflow: &v1alpha2::AirflowCluster,
-) -> Result<Option<ConfigMapName>, Error> {
-    airflow
-        .spec
-        .cluster_config
-        .vector_aggregator_config_map_name
-        .as_deref()
-        .map(ConfigMapName::from_str)
-        .transpose()
-        .context(ParseVectorAggregatorConfigMapNameSnafu)
 }
 
 /// Validates the logging configuration for the product container and the (optional) Vector

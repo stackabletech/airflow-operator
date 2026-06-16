@@ -15,7 +15,7 @@ use stackable_operator::{
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         types::{
-            kubernetes::{ConfigMapName, Uid},
+            kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -41,8 +41,8 @@ pub mod validate;
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
+    pub listener_class: Option<ListenerClassName>,
+    pub group_listener_name: Option<ListenerName>,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
@@ -91,7 +91,7 @@ pub struct ValidatedClusterConfig {
     pub authorization_config: AirflowAuthorizationResolved,
     /// The Git-sync definitions for the DAGs (`spec.clusterConfig.dagsGitSync`).
     pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
-    pub credentials_secret_name: String,
+    pub credentials_secret_name: SecretName,
     pub load_examples: bool,
     pub expose_config: bool,
     pub database_initialization_enabled: bool,
@@ -168,23 +168,27 @@ impl ValidatedCluster {
     }
 
     /// The Secret holding the shared internal secret (`<cluster>-internal-secret`).
-    pub fn internal_secret_name(&self) -> String {
-        format!("{}-internal-secret", self.name_any())
+    pub fn internal_secret_name(&self) -> SecretName {
+        SecretName::from_str(&format!("{}-internal-secret", self.name_any()))
+            .expect("the internal secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared JWT secret (`<cluster>-jwt-secret`).
-    pub fn jwt_secret_name(&self) -> String {
-        format!("{}-jwt-secret", self.name_any())
+    pub fn jwt_secret_name(&self) -> SecretName {
+        SecretName::from_str(&format!("{}-jwt-secret", self.name_any()))
+            .expect("the JWT secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared Fernet key (`<cluster>-fernet-key`).
-    pub fn fernet_key_name(&self) -> String {
-        format!("{}-fernet-key", self.name_any())
+    pub fn fernet_key_name(&self) -> SecretName {
+        SecretName::from_str(&format!("{}-fernet-key", self.name_any()))
+            .expect("the Fernet key secret name is a valid Secret name")
     }
 
     /// The ConfigMap holding the Kubernetes-executor pod template (`<cluster>-executor-pod-template`).
-    pub fn executor_template_configmap_name(&self) -> String {
-        format!("{}-executor-pod-template", self.name_any())
+    pub fn executor_template_configmap_name(&self) -> ConfigMapName {
+        ConfigMapName::from_str(&format!("{}-executor-pod-template", self.name_any()))
+            .expect("the executor pod-template ConfigMap name is a valid ConfigMap name")
     }
 
     /// User-supplied extra Volumes (`spec.clusterConfig.volumes`).

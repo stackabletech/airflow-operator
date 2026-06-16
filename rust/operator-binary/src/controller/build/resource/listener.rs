@@ -1,6 +1,10 @@
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder, crd::listener,
-    v2::builder::meta::ownerreference_from_resource,
+    builder::meta::ObjectMetaBuilder,
+    crd::listener,
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        types::kubernetes::{ListenerClassName, ListenerName},
+    },
 };
 
 use crate::{
@@ -11,8 +15,8 @@ use crate::{
 pub fn build_group_listener(
     cluster: &ValidatedCluster,
     role: &AirflowRole,
-    listener_class: String,
-    listener_group_name: String,
+    listener_class: ListenerClassName,
+    listener_group_name: ListenerName,
 ) -> listener::v1alpha1::Listener {
     listener::v1alpha1::Listener {
         metadata: ObjectMetaBuilder::new()
@@ -27,7 +31,7 @@ pub fn build_group_listener(
             ))
             .build(),
         spec: listener::v1alpha1::ListenerSpec {
-            class_name: Some(listener_class),
+            class_name: Some(listener_class.to_string()),
             ports: Some(listener_ports()),
             ..listener::v1alpha1::ListenerSpec::default()
         },

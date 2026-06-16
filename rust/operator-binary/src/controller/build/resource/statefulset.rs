@@ -241,7 +241,7 @@ pub fn build_server_rolegroup_statefulset(
         // be the case even when no class is set (and the value defaults to
         // cluster-internal) as the address should still be consistent.
         let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerName(listener_group_name),
+            &ListenerReference::ListenerName(listener_group_name.to_string()),
             &unversioned_recommended_labels,
         )
         .build_pvc(LISTENER_VOLUME_NAME.to_string())
