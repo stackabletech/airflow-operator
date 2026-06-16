@@ -11,7 +11,6 @@ use stackable_operator::{
         pod::{PodBuilder, container::ContainerBuilder, security::PodSecurityContextBuilder},
     },
     crd::git_sync,
-    database_connections::drivers::sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
     k8s_openapi::{
         DeepMerge,
         api::core::v1::{ConfigMap, PodTemplateSpec},
@@ -37,7 +36,7 @@ use crate::{
         CONFIG_PATH, Container, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME,
     },
     env_vars::build_airflow_template_envs,
-    operations::graceful_shutdown::add_executor_graceful_shutdown_config,
+    operations::graceful_shutdown::add_graceful_shutdown_config,
 };
 
 #[derive(Snafu, Debug)]
@@ -87,10 +86,8 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
@@ -116,7 +113,7 @@ pub fn build_executor_template_config_map(
         .restart_policy("Never")
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
-    add_executor_graceful_shutdown_config(merged_executor_config, &mut pb)
+    add_graceful_shutdown_config(merged_executor_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
@@ -137,7 +134,6 @@ pub fn build_executor_template_config_map(
             cluster,
             env_overrides,
             merged_executor_config,
-            metadata_database_connection_details,
             git_sync_resources,
         ))
         .add_volume_mounts(cluster.volume_mounts())
@@ -158,7 +154,10 @@ pub fn build_executor_template_config_map(
     )
     .context(PodSnafu)?;
 
-    metadata_database_connection_details.add_to_container(&mut airflow_container);
+    cluster
+        .cluster_config
+        .metadata_database_connection_details
+        .add_to_container(&mut airflow_container);
 
     pb.add_container(airflow_container.build());
     pb.add_volumes(cluster.volumes().clone())

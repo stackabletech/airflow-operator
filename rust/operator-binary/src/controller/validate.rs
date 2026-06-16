@@ -4,6 +4,13 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
+    database_connections::{
+        TemplatingMechanism,
+        drivers::{
+            celery::CeleryDatabaseConnectionDetails,
+            sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+        },
+    },
     kube::ResourceExt,
     product_logging::spec::Logging,
     role_utils::{GenericRoleConfig, RoleGroup},
@@ -28,8 +35,8 @@ use super::{
 use crate::{
     airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
-        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowRole, AirflowRoleType,
-        Container, v1alpha2,
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        AirflowRoleType, Container, v1alpha2,
     },
 };
 
@@ -149,6 +156,9 @@ pub fn validate_cluster(
         authorization_config,
     } = dereferenced;
 
+    let (metadata_database_connection_details, celery_database_connection_details) =
+        database_connection_details(airflow);
+
     Ok(ValidatedCluster::new(
         airflow,
         cluster_name,
@@ -158,6 +168,8 @@ pub fn validate_cluster(
             authentication_config,
             authorization_config,
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
+            metadata_database_connection_details,
+            celery_database_connection_details,
             load_examples: airflow.spec.cluster_config.load_examples,
             expose_config: airflow.spec.cluster_config.expose_config,
             database_initialization_enabled: airflow
@@ -172,6 +184,61 @@ pub fn validate_cluster(
         role_groups,
         role_configs,
     ))
+}
+
+/// Builds the templated metadata-database (and optional Celery result-backend/broker) connection
+/// details from the cluster spec.
+fn database_connection_details(
+    airflow: &v1alpha2::AirflowCluster,
+) -> (
+    SqlAlchemyDatabaseConnectionDetails,
+    Option<(
+        CeleryDatabaseConnectionDetails,
+        CeleryDatabaseConnectionDetails,
+    )>,
+) {
+    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+
+    let metadata_database_connection_details = airflow
+        .spec
+        .cluster_config
+        .metadata_database
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+
+    let celery_database_connection_details = if let (
+        Some(celery_results_backend),
+        Some(celery_broker),
+    ) = (
+        &airflow.spec.cluster_config.celery_results_backend,
+        &airflow.spec.cluster_config.celery_broker,
+    ) {
+        // The celery results backend and celery broker only work with configured celeryExecutors.
+        // Emit a warning if celery executors were not configured properly.
+        if !matches!(
+            &airflow.spec.executor,
+            AirflowExecutor::CeleryExecutors { .. }
+        ) {
+            tracing::warn!(
+                "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
+            )
+        }
+
+        let celery_results_backend = celery_results_backend
+            .celery_connection_details_with_templating(
+                "CELERY_RESULT_BACKEND",
+                &templating_mechanism,
+            );
+        let celery_broker = celery_broker
+            .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
+        Some((celery_results_backend, celery_broker))
+    } else {
+        None
+    };
+
+    (
+        metadata_database_connection_details,
+        celery_database_connection_details,
+    )
 }
 
 /// Validate and merge one role group against its role, via the shared

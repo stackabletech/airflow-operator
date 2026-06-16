@@ -6,9 +6,6 @@ use std::{
 use snafu::Snafu;
 use stackable_operator::{
     crd::{authentication::oidc, git_sync},
-    database_connections::drivers::{
-        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
-    },
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
@@ -78,17 +75,16 @@ pub fn build_airflow_statefulset_envs(
     cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
     env_overrides: &EnvVarSet,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
-    celery_database_connection_details: &Option<(
-        CeleryDatabaseConnectionDetails,
-        CeleryDatabaseConnectionDetails,
-    )>,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<Vec<EnvVar>, Error> {
     let executor = &cluster.cluster_config.executor;
     let auth_config = &cluster.cluster_config.authentication_config;
     let authorization_config = &cluster.cluster_config.authorization_config;
     let resolved_product_image = &cluster.image;
+    let metadata_database_connection_details =
+        &cluster.cluster_config.metadata_database_connection_details;
+    let celery_database_connection_details =
+        &cluster.cluster_config.celery_database_connection_details;
 
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let internal_secret_name = cluster.internal_secret_name();
@@ -365,7 +361,6 @@ pub fn build_airflow_template_envs(
     cluster: &ValidatedCluster,
     env_overrides: &HashMap<String, String>,
     config: &ExecutorConfig,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
@@ -374,7 +369,13 @@ pub fn build_airflow_template_envs(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         EnvVar {
             name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-            value: Some(metadata_database_connection_details.url_template.clone()),
+            value: Some(
+                cluster
+                    .cluster_config
+                    .metadata_database_connection_details
+                    .url_template
+                    .clone(),
+            ),
             ..Default::default()
         },
     );

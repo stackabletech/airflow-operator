@@ -14,9 +14,6 @@ use stackable_operator::{
         },
     },
     crd::git_sync,
-    database_connections::drivers::{
-        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
-    },
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -49,7 +46,7 @@ use crate::{
         TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
     env_vars,
-    operations::graceful_shutdown::add_airflow_graceful_shutdown_config,
+    operations::graceful_shutdown::add_graceful_shutdown_config,
 };
 
 #[derive(Snafu, Debug)]
@@ -111,18 +108,12 @@ fn build_rolegroup_metadata(
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
-#[allow(clippy::too_many_arguments)]
 pub fn build_server_rolegroup_statefulset(
     validated_cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
     role_group_name: &RoleGroupName,
     validated_rg_config: &AirflowRoleGroupConfig,
     logging: &ValidatedLogging,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
-    celery_database_connection_details: &Option<(
-        CeleryDatabaseConnectionDetails,
-        CeleryDatabaseConnectionDetails,
-    )>,
     service_account: &ServiceAccount,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
@@ -171,7 +162,7 @@ pub fn build_server_rolegroup_statefulset(
     )
     .context(PodSnafu)?;
 
-    add_airflow_graceful_shutdown_config(merged_airflow_config, &mut pb)
+    add_graceful_shutdown_config(merged_airflow_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
@@ -194,8 +185,6 @@ pub fn build_server_rolegroup_statefulset(
             validated_cluster,
             airflow_role,
             env_overrides,
-            metadata_database_connection_details,
-            celery_database_connection_details,
             git_sync_resources,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
@@ -277,8 +266,14 @@ pub fn build_server_rolegroup_statefulset(
     )
     .context(PodSnafu)?;
 
-    metadata_database_connection_details.add_to_container(&mut airflow_container);
-    if let Some((celery_result_backend, celery_broker)) = celery_database_connection_details {
+    validated_cluster
+        .cluster_config
+        .metadata_database_connection_details
+        .add_to_container(&mut airflow_container);
+    if let Some((celery_result_backend, celery_broker)) = &validated_cluster
+        .cluster_config
+        .celery_database_connection_details
+    {
         celery_result_backend.add_to_container(&mut airflow_container);
         celery_broker.add_to_container(&mut airflow_container);
     }

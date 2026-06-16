@@ -2,6 +2,9 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
+    database_connections::drivers::{
+        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+    },
     k8s_openapi::api::core::v1::{Volume, VolumeMount},
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
@@ -83,7 +86,6 @@ pub struct ValidatedLogging {
 ///
 /// Carries the dereferenced external references, so every downstream build step reads them from
 /// here rather than from the raw cluster object.
-#[derive(Clone, Debug)]
 pub struct ValidatedClusterConfig {
     pub executor: AirflowExecutor,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
@@ -92,6 +94,13 @@ pub struct ValidatedClusterConfig {
     pub load_examples: bool,
     pub expose_config: bool,
     pub database_initialization_enabled: bool,
+    /// The templated SQLAlchemy connection details for the metadata database.
+    pub metadata_database_connection_details: SqlAlchemyDatabaseConnectionDetails,
+    /// The templated Celery result-backend and broker connection details, when configured.
+    pub celery_database_connection_details: Option<(
+        CeleryDatabaseConnectionDetails,
+        CeleryDatabaseConnectionDetails,
+    )>,
     /// User-supplied extra Volumes (`spec.clusterConfig.volumes`).
     pub volumes: Vec<Volume>,
     /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
@@ -102,7 +111,6 @@ pub struct ValidatedClusterConfig {
 
 /// The validated cluster: proves that config merging succeeded for every role and
 /// role group before any resources are created.
-#[derive(Clone, Debug)]
 pub struct ValidatedCluster {
     /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
     /// struct can stand in as the owner [`Resource`] for child objects.

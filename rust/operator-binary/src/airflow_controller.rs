@@ -11,9 +11,6 @@ use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{random_secret_creation, rbac::build_rbac_resources},
     crd::git_sync,
-    database_connections::{
-        TemplatingMechanism, drivers::sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
-    },
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
         Resource, ResourceExt,
@@ -234,43 +231,6 @@ pub async fn reconcile_airflow(
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
 
-    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
-    let metadata_database_connection_details = airflow
-        .spec
-        .cluster_config
-        .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
-
-    let celery_database_connection_details = if let (
-        Some(celery_results_backend),
-        Some(celery_broker),
-    ) = (
-        &airflow.spec.cluster_config.celery_results_backend,
-        &airflow.spec.cluster_config.celery_broker,
-    ) {
-        // The celery results backend and celery broker only work with configured celeryExecutors.
-        // Emit a warning if celery executors were not configured properly.
-        if !matches!(
-            &airflow.spec.executor,
-            AirflowExecutor::CeleryExecutors { .. }
-        ) {
-            tracing::warn!(
-                "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
-            )
-        }
-
-        let celery_results_backend = celery_results_backend
-            .celery_connection_details_with_templating(
-                "CELERY_RESULT_BACKEND",
-                &templating_mechanism,
-            );
-        let celery_broker = celery_broker
-            .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
-        Some((celery_results_backend, celery_broker))
-    } else {
-        None
-    };
-
     let validated_cluster = crate::controller::validate::validate_cluster(
         airflow,
         &ctx.operator_environment.image_repository,
@@ -350,7 +310,6 @@ pub async fn reconcile_airflow(
         build_executor_template(
             airflow,
             common_configuration,
-            &metadata_database_connection_details,
             &validated_cluster,
             &mut cluster_resources,
             client,
@@ -444,8 +403,6 @@ pub async fn reconcile_airflow(
                 rolegroup_name,
                 validated_rg_config,
                 logging,
-                &metadata_database_connection_details,
-                &celery_database_connection_details,
                 &rbac_sa,
                 &git_sync_resources,
             )
@@ -485,7 +442,6 @@ pub async fn reconcile_airflow(
 async fn build_executor_template(
     airflow: &v1alpha2::AirflowCluster,
     common_config: &AirflowExecutorCommonConfiguration,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
     validated_cluster: &ValidatedCluster,
     cluster_resources: &mut ClusterResources<'_>,
     client: &stackable_operator::client::Client,
@@ -526,7 +482,6 @@ async fn build_executor_template(
 
     let worker_pod_template_config_map = build_executor_template_config_map(
         validated_cluster,
-        metadata_database_connection_details,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
         &common_config.env_overrides,
