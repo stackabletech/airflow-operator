@@ -87,6 +87,9 @@ pub struct ValidatedClusterConfig {
     pub executor: AirflowExecutor,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
+    pub credentials_secret_name: String,
+    pub load_examples: bool,
+    pub expose_config: bool,
 }
 
 /// The validated cluster: proves that config merging succeeded for every role and
@@ -135,6 +138,31 @@ impl ValidatedCluster {
             role_groups,
             role_configs,
         }
+    }
+
+    /// The cluster's namespace, captured during validation.
+    pub fn namespace(&self) -> Option<String> {
+        self.metadata.namespace.clone()
+    }
+
+    /// Whether the cluster has the given role configured (i.e. it has role groups for it).
+    pub fn has_role(&self, role: &AirflowRole) -> bool {
+        self.role_groups.contains_key(role)
+    }
+
+    /// The Secret holding the shared internal secret (`<cluster>-internal-secret`).
+    pub fn internal_secret_name(&self) -> String {
+        format!("{}-internal-secret", self.name_any())
+    }
+
+    /// The Secret holding the shared JWT secret (`<cluster>-jwt-secret`).
+    pub fn jwt_secret_name(&self) -> String {
+        format!("{}-jwt-secret", self.name_any())
+    }
+
+    /// The Secret holding the shared Fernet key (`<cluster>-fernet-key`).
+    pub fn fernet_key_name(&self) -> String {
+        format!("{}-fernet-key", self.name_any())
     }
 
     /// Type-safe names for the resources of a role group.

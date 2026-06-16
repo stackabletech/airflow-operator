@@ -132,7 +132,6 @@ pub fn build_server_rolegroup_statefulset(
 
     let resolved_product_image = &validated_cluster.image;
     let authentication_config = &validated_cluster.cluster_config.authentication_config;
-    let authorization_config = &validated_cluster.cluster_config.authorization_config;
     let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
@@ -197,16 +196,12 @@ pub fn build_server_rolegroup_statefulset(
 
     airflow_container.add_env_vars(
         env_vars::build_airflow_statefulset_envs(
-            airflow,
+            validated_cluster,
             airflow_role,
             env_overrides,
-            executor,
-            authentication_config,
-            authorization_config,
             metadata_database_connection_details,
             celery_database_connection_details,
             git_sync_resources,
-            resolved_product_image,
         )
         .context(BuildStatefulsetEnvVarsSnafu)?,
     );

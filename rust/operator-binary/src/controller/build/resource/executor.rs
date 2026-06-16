@@ -136,12 +136,11 @@ pub fn build_executor_template_config_map(
         .image_from_product_image(resolved_product_image)
         .resources(merged_executor_config.resources.clone().into())
         .add_env_vars(build_airflow_template_envs(
-            airflow,
+            cluster,
             env_overrides,
             merged_executor_config,
             metadata_database_connection_details,
             git_sync_resources,
-            resolved_product_image,
         ))
         .add_volume_mounts(airflow.volume_mounts())
         .context(AddVolumeMountSnafu)?
