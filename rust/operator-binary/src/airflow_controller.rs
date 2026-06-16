@@ -77,7 +77,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging, build::config_map, validate,
+        AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
+        build::{config_map, resource::pdb::build_pdb},
+        validate,
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
@@ -95,11 +97,8 @@ use crate::{
         v1alpha2,
     },
     env_vars::{self, build_airflow_template_envs},
-    operations::{
-        graceful_shutdown::{
-            add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
-        },
-        pdb::add_pdbs,
+    operations::graceful_shutdown::{
+        add_airflow_graceful_shutdown_config, add_executor_graceful_shutdown_config,
     },
     service::{
         build_rolegroup_headless_service, build_rolegroup_metrics_service,
@@ -239,9 +238,9 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to create PodDisruptionBudget"))]
-    FailedToCreatePdb {
-        source: crate::operations::pdb::Error,
+    #[snafu(display("failed to apply PodDisruptionBudget"))]
+    ApplyPdb {
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to configure graceful shutdown"))]
@@ -455,10 +454,13 @@ pub async fn reconcile_airflow(
         let role_name = airflow_role.to_string();
 
         if let Some(role_config) = validated_cluster.role_configs.get(airflow_role) {
-            if let Some(pdb) = &role_config.pdb {
-                add_pdbs(pdb, airflow, airflow_role, client, &mut cluster_resources)
+            if let Some(pdb_config) = &role_config.pdb
+                && let Some(pdb) = build_pdb(pdb_config, &validated_cluster, airflow_role)
+            {
+                cluster_resources
+                    .add(client, pdb)
                     .await
-                    .context(FailedToCreatePdbSnafu)?;
+                    .context(ApplyPdbSnafu)?;
             }
 
             if let Some(listener_class) = &role_config.listener_class
