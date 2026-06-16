@@ -7,6 +7,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
+    kube::runtime::reflector::ObjectRef,
     product_logging::{
         self,
         spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
@@ -21,9 +22,7 @@ use stackable_operator::{
 use crate::{
     config::webserver_config,
     controller::ValidatedCluster,
-    crd::{
-        AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR, v1alpha2,
-    },
+    crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR},
     product_logging::{LOG_CONFIG_FILE, create_airflow_config},
 };
 
@@ -118,11 +117,14 @@ pub fn build_rolegroup_config_map(
 
 /// Builds the Vector agent config (`vector.yaml`) for a role group, when the agent is enabled.
 ///
-/// This is the one remaining place that needs a [`RoleGroupRef`] (the upstream
-/// `create_vector_config` API), so it is built here by the caller and threaded into
-/// [`build_rolegroup_config_map`].
+/// This is the one remaining place that needs a [`RoleGroupRef`]: the upstream v1
+/// `create_vector_config` API still takes one (only as a type witness — it does not read the role
+/// group). It is constructed locally here so no `RoleGroupRef` leaks into the rest of the operator.
+/// This goes away entirely once logging is migrated to the v2/superset mechanism.
 pub fn build_vector_config(
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    validated_cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
     logging: &Logging<Container>,
 ) -> Option<String> {
     if logging.enable_vector_agent {
@@ -134,8 +136,13 @@ pub fn build_vector_config(
         } else {
             None
         };
+        let rolegroup_ref = RoleGroupRef {
+            cluster: ObjectRef::from_obj(validated_cluster),
+            role: role_name.to_string(),
+            role_group: role_group_name.to_string(),
+        };
         Some(product_logging::framework::create_vector_config(
-            rolegroup_ref,
+            &rolegroup_ref,
             vector_log_config,
         ))
     } else {

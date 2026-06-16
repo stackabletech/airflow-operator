@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -31,7 +31,7 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
+    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -43,7 +43,7 @@ use stackable_operator::{
     },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     crd::{
@@ -116,17 +116,8 @@ pub struct AirflowConfigOverrides {
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
-    UnknownAirflowRole { role: String, roles: Vec<String> },
-
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
-
-    #[snafu(display("Configuration/Executor conflict!"))]
-    NoRoleForExecutorFailure,
-
-    #[snafu(display("object has no associated namespace"))]
-    NoNamespace,
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -435,39 +426,6 @@ impl v1alpha2::AirflowCluster {
 
     pub fn executor_template_configmap_name(&self) -> String {
         format!("{}-executor-pod-template", self.name_any())
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    ) -> Result<AirflowConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
-
-        let role_config = role.role_config(self)?;
-
-        // Retrieve role resource config
-        let mut conf_role = role_config.config.config;
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role_config
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 
     /// Retrieve and merge resource configs for the executor template
@@ -784,10 +742,6 @@ impl AirflowRole {
         }
     }
 
-    pub fn roles() -> Vec<String> {
-        Self::iter().map(|r| r.to_string()).collect()
-    }
-
     /// The role name as a type-safe label/resource-name value.
     ///
     /// Infallible: every `AirflowRole` serialises to a short, valid role name.
@@ -806,47 +760,6 @@ impl AirflowRole {
                 .map(|webserver| webserver.role_config.listener_class),
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
         }
-    }
-
-    pub fn role_config(
-        &self,
-        airflow: &v1alpha2::AirflowCluster,
-    ) -> Result<AirflowRoleType, Error> {
-        let role = self.to_string();
-        let roles = AirflowRole::roles();
-
-        let role_config = match self {
-            AirflowRole::Webserver => &extract_role_from_webserver_config(
-                airflow
-                    .spec
-                    .webservers
-                    .to_owned()
-                    .context(UnknownAirflowRoleSnafu { role, roles })?,
-            ),
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutors { config, .. } = &airflow.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => airflow
-                .spec
-                .schedulers
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-            AirflowRole::DagProcessor => airflow
-                .spec
-                .dag_processors
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-            AirflowRole::Triggerer => airflow
-                .spec
-                .triggerers
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-        };
-        Ok(role_config.clone())
     }
 }
 
@@ -981,8 +894,6 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
-    pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
-
     pub(crate) fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: default_resources(role),

@@ -27,11 +27,10 @@ use stackable_operator::{
     kube::{
         Resource, ResourceExt,
         core::{DeserializeGuard, error_boundary},
-        runtime::{controller::Action, reflector::ObjectRef},
+        runtime::controller::Action,
     },
     kvp::{Label, LabelError},
     logging::controller::ReconcilerError,
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
@@ -116,22 +115,22 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
-    #[snafu(display("failed to apply Service for {rolegroup}"))]
+    #[snafu(display("failed to apply Service for role group {role_group}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
+        role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
+    #[snafu(display("failed to apply ConfigMap for role group {role_group}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
+        role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
+    #[snafu(display("failed to apply StatefulSet for role group {role_group}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha2::AirflowCluster>,
+        role_group: RoleGroupName,
     },
 
     #[snafu(display("failed to patch service account"))]
@@ -410,8 +409,6 @@ pub async fn reconcile_airflow(
     }
 
     for (airflow_role, role_group_configs) in &validated_cluster.role_groups {
-        let role_name = airflow_role.to_string();
-
         if let Some(role_config) = validated_cluster.role_configs.get(airflow_role) {
             if let Some(pdb_config) = &role_config.pdb
                 && let Some(pdb) = build_pdb(pdb_config, &validated_cluster, airflow_role)
@@ -442,12 +439,6 @@ pub async fn reconcile_airflow(
             let validated_rg_config = &validated_rg.config;
             let logging = &validated_rg.logging;
 
-            let rolegroup = RoleGroupRef {
-                cluster: ObjectRef::from_obj(airflow),
-                role: role_name.clone(),
-                role_group: rolegroup_name.into(),
-            };
-
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &validated_cluster.image,
@@ -468,7 +459,7 @@ pub async fn reconcile_airflow(
                 .add(client, rg_headless_service)
                 .await
                 .context(ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: rolegroup_name.clone(),
                 })?;
 
             let rg_metrics_service =
@@ -477,11 +468,15 @@ pub async fn reconcile_airflow(
                 .add(client, rg_metrics_service)
                 .await
                 .context(ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: rolegroup_name.clone(),
                 })?;
 
-            let vector_config =
-                config_map::build_vector_config(&rolegroup, &validated_rg_config.config.logging);
+            let vector_config = config_map::build_vector_config(
+                &validated_cluster,
+                &airflow_role.role_name(),
+                rolegroup_name,
+                &validated_rg_config.config.logging,
+            );
             let rg_configmap = config_map::build_rolegroup_config_map(
                 &validated_cluster,
                 &airflow_role.role_name(),
@@ -496,14 +491,14 @@ pub async fn reconcile_airflow(
                 .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: rolegroup_name.clone(),
                 })?;
 
             let rg_statefulset = build_server_rolegroup_statefulset(
                 airflow,
                 &validated_cluster,
                 airflow_role,
-                &rolegroup,
+                rolegroup_name,
                 validated_rg_config,
                 logging,
                 &metadata_database_connection_details,
@@ -517,7 +512,7 @@ pub async fn reconcile_airflow(
                     .add(client, rg_statefulset)
                     .await
                     .context(ApplyRoleGroupStatefulSetSnafu {
-                        rolegroup: rolegroup.clone(),
+                        role_group: rolegroup_name.clone(),
                     })?,
             );
         }
@@ -555,14 +550,12 @@ async fn build_executor_template(
     let merged_executor_config = airflow
         .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
-    let rolegroup = RoleGroupRef {
-        cluster: ObjectRef::from_obj(airflow),
-        role: EXECUTOR_ROLE_NAME.into(),
-        role_group: EXECUTOR_ROLE_GROUP_NAME.into(),
-    };
-
-    let vector_config =
-        config_map::build_vector_config(&rolegroup, &merged_executor_config.logging);
+    let vector_config = config_map::build_vector_config(
+        validated_cluster,
+        &executor_role_name(),
+        &executor_role_group_name(),
+        &merged_executor_config.logging,
+    );
     let rg_configmap = config_map::build_rolegroup_config_map(
         validated_cluster,
         &executor_role_name(),
@@ -579,7 +572,7 @@ async fn build_executor_template(
         .add(client, rg_configmap)
         .await
         .with_context(|_| ApplyRoleGroupConfigSnafu {
-            rolegroup: rolegroup.clone(),
+            role_group: executor_role_group_name(),
         })?;
 
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
@@ -602,7 +595,6 @@ async fn build_executor_template(
         &merged_executor_config,
         &common_config.env_overrides,
         &common_config.pod_overrides,
-        &rolegroup,
         &git_sync_resources,
     )?;
     cluster_resources
@@ -621,7 +613,6 @@ fn build_executor_template_config_map(
     merged_executor_config: &ExecutorConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<ConfigMap> {
     let resolved_product_image = &cluster.image;
@@ -690,7 +681,10 @@ fn build_executor_template_config_map(
     pb.add_volumes(airflow.volumes().clone())
         .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
-        &rolegroup_ref.object_name(),
+        cluster
+            .resource_names(&executor_role_name(), &executor_role_group_name())
+            .role_group_config_map()
+            .as_ref(),
         merged_executor_config
             .logging
             .containers

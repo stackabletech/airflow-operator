@@ -33,7 +33,6 @@ use stackable_operator::{
     },
     kube::{ResourceExt, api::ObjectMeta},
     kvp::{Annotation, Label, LabelError},
-    role_utils::RoleGroupRef,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::{meta::ownerreference_from_resource, pod::container::EnvVarSet},
@@ -132,7 +131,7 @@ pub fn build_server_rolegroup_statefulset(
     airflow: &v1alpha2::AirflowCluster,
     validated_cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
-    rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
+    role_group_name: &RoleGroupName,
     validated_rg_config: &AirflowRoleGroupConfig,
     logging: &ValidatedLogging,
     metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
@@ -152,19 +151,15 @@ pub fn build_server_rolegroup_statefulset(
     let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
-    let role_group_name: RoleGroupName = rolegroup_ref
-        .role_group
-        .parse()
-        .expect("the role group name was validated during cluster validation");
     let resource_names =
-        validated_cluster.resource_names(&airflow_role.role_name(), &role_group_name);
+        validated_cluster.resource_names(&airflow_role.role_name(), role_group_name);
 
     let recommended_object_labels =
-        validated_cluster.recommended_labels(airflow_role, &role_group_name);
+        validated_cluster.recommended_labels(airflow_role, role_group_name);
     // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
     // version keeps the labels stable across version upgrades).
     let unversioned_recommended_labels =
-        validated_cluster.unversioned_recommended_labels(airflow_role, &role_group_name);
+        validated_cluster.unversioned_recommended_labels(airflow_role, role_group_name);
 
     let pb_metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_object_labels)
@@ -380,13 +375,13 @@ pub fn build_server_rolegroup_statefulset(
     let metadata = build_rolegroup_metadata(
         validated_cluster,
         airflow_role,
-        &role_group_name,
+        role_group_name,
         restarter_label,
         resource_names.stateful_set_name().to_string(),
     );
 
     let statefulset_match_labels =
-        validated_cluster.role_group_selector(airflow_role, &role_group_name);
+        validated_cluster.role_group_selector(airflow_role, role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some(
@@ -406,7 +401,7 @@ pub fn build_server_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: stateful_set_service_name(validated_cluster, airflow_role, &role_group_name),
+        service_name: stateful_set_service_name(validated_cluster, airflow_role, role_group_name),
         template: pod_template,
         volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
