@@ -5,10 +5,9 @@ use std::fmt::Write;
 
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
-    product_logging::spec::{AutomaticContainerLogConfig, Logging},
+    product_logging::spec::AutomaticContainerLogConfig,
+    v2::product_logging::framework::ValidatedContainerLogConfigChoice,
 };
-
-use crate::crd::Container;
 
 pub const LOG_CONFIG_FILE: &str = "log_config.py";
 
@@ -23,27 +22,29 @@ pub fn vector_config_file_content() -> String {
     VECTOR_CONFIG.to_owned()
 }
 
-/// Renders the Vector agent config (`vector.yaml`).
+/// Renders `log_config.py` for the product container.
 ///
-/// Returns `None` when the Vector agent is disabled for this role group. The returned config is the
-/// vendored, env-var-parameterized `vector.yaml`; the parameterizing env vars are injected into the
-/// Vector container by the v2 `vector_container`.
-pub fn build_vector_config(logging: &Logging<Container>) -> Option<String> {
-    logging.enable_vector_agent.then(vector_config_file_content)
-}
-
+/// Returns `None` when the product container does not use the operator's automatic logging
+/// configuration (i.e. a custom log ConfigMap is referenced instead), in which case no
+/// `log_config.py` should be added to the rolegroup `ConfigMap`.
 pub fn create_airflow_config(
-    log_config: &AutomaticContainerLogConfig,
+    product_container: &ValidatedContainerLogConfigChoice,
     log_dir: &str,
     resolved_product_image: &ResolvedProductImage,
-) -> String {
-    if resolved_product_image.product_version.starts_with("2.")
+) -> Option<String> {
+    let ValidatedContainerLogConfigChoice::Automatic(log_config) = product_container else {
+        return None;
+    };
+
+    let config = if resolved_product_image.product_version.starts_with("2.")
         || resolved_product_image.product_version.starts_with("3.0.")
     {
         create_airflow_stdlib_config(log_config, log_dir, resolved_product_image)
     } else {
         create_airflow_structlog_config(log_config, log_dir)
-    }
+    };
+
+    Some(config)
 }
 
 fn create_airflow_stdlib_config(

@@ -142,8 +142,11 @@ pub fn validate_cluster(
             })?;
             let config =
                 validate_role_group(&resolved_role, &role_group_name, rolegroup, &default_config)?;
-            let logging =
-                validate_logging(&config.config.logging, &vector_aggregator_config_map_name)?;
+            let logging = validate_logging(
+                &config.config.logging,
+                &Container::Airflow,
+                &vector_aggregator_config_map_name,
+            )?;
 
             group_configs.insert(role_group_name, AirflowRoleGroup { config, logging });
         }
@@ -305,16 +308,25 @@ pub(crate) fn parse_vector_aggregator_config_map_name(
         .context(ParseVectorAggregatorConfigMapNameSnafu)
 }
 
-/// Validates the logging configuration for the (optional) Vector container.
+/// Validates the logging configuration for the product container and the (optional) Vector
+/// container.
+///
+/// `product_container` selects the product's main container (`Container::Airflow` for the role
+/// groups, `Container::Base` for the Kubernetes-executor pod template).
 ///
 /// `vector_aggregator_config_map_name` is the discovery ConfigMap name of the Vector aggregator;
-/// it is required (and validated) only when the Vector agent is enabled. Mirrors superset's
+/// it is required (and validated) only when the Vector agent is enabled. Mirrors hive's
 /// `validate_logging`. Used both per-role-group (here) and for the Kubernetes executor pod template
 /// (which is not a [`AirflowRole`] with role groups, so it is validated from the build step).
 pub(crate) fn validate_logging(
     logging: &Logging<Container>,
+    product_container: &Container,
     vector_aggregator_config_map_name: &Option<ConfigMapName>,
 ) -> Result<ValidatedLogging, Error> {
+    let product_container =
+        validate_logging_configuration_for_container(logging, product_container)
+            .context(ValidateLoggingConfigSnafu)?;
+
     let vector_container = if logging.enable_vector_agent {
         let vector_aggregator_config_map_name = vector_aggregator_config_map_name
             .clone()
@@ -329,6 +341,7 @@ pub(crate) fn validate_logging(
     };
 
     Ok(ValidatedLogging {
+        product_container,
         vector_container,
         enable_vector_agent: logging.enable_vector_agent,
     })

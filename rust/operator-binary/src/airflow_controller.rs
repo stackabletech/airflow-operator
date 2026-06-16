@@ -386,7 +386,7 @@ pub async fn reconcile_airflow(
                 &airflow_role.role_name(),
                 rolegroup_name,
                 &validated_rg_config.config_overrides,
-                &validated_rg_config.config.logging,
+                logging,
                 &Container::Airflow,
             )
             .context(BuildConfigMapSnafu)?;
@@ -450,6 +450,17 @@ async fn build_executor_template(
     let merged_executor_config = airflow
         .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
+    // The Kubernetes-executor pod template is not an `AirflowRole` with role groups, so its logging
+    // is validated here (at build time) via the shared `validate_logging`, mirroring the role-group
+    // path in `validate`. `Container::Base` is the executor's product container.
+    let executor_logging = crate::controller::validate::validate_logging(
+        &merged_executor_config.logging,
+        &Container::Base,
+        &validated_cluster
+            .cluster_config
+            .vector_aggregator_config_map_name,
+    )
+    .context(ValidateSnafu)?;
     let rg_configmap = config_map::build_rolegroup_config_map(
         validated_cluster,
         &executor_role_name(),
@@ -457,7 +468,7 @@ async fn build_executor_template(
         // The kubernetes-executor pod template does not apply webserver_config.py overrides
         // (preserves prior behaviour, which passed an empty map here).
         &AirflowConfigOverrides::default(),
-        &merged_executor_config.logging,
+        &executor_logging,
         &Container::Base,
     )
     .context(BuildConfigMapSnafu)?;
@@ -484,6 +495,7 @@ async fn build_executor_template(
         validated_cluster,
         &rbac_sa.name_unchecked(),
         &merged_executor_config,
+        &executor_logging,
         &common_config.env_overrides,
         &common_config.pod_overrides,
         &git_sync_resources,

@@ -7,10 +7,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
-    product_logging::{
-        self,
-        spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
-    },
+    product_logging::framework::VECTOR_CONFIG_FILE,
     v2::{
         builder::meta::ownerreference_from_resource,
         types::operator::{RoleGroupName, RoleName},
@@ -20,9 +17,9 @@ use stackable_operator::{
 use crate::{
     config::webserver_config,
     controller::{
-        ValidatedCluster,
+        ValidatedCluster, ValidatedLogging,
         build::properties::product_logging::{
-            LOG_CONFIG_FILE, build_vector_config, create_airflow_config,
+            LOG_CONFIG_FILE, create_airflow_config, vector_config_file_content,
         },
     },
     crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR},
@@ -49,7 +46,7 @@ pub fn build_rolegroup_config_map(
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
     config_overrides: &AirflowConfigOverrides,
-    logging: &Logging<Container>,
+    logging: &ValidatedLogging,
     container: &Container,
 ) -> Result<ConfigMap, Error> {
     // Flatten the typed `webserver_config.py` overrides into a plain map for the file writer.
@@ -84,23 +81,18 @@ pub fn build_rolegroup_config_map(
         .add_data(AIRFLOW_CONFIG_FILENAME, config_file);
 
     // Log config for the main container, when it uses an Automatic log config.
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(container)
-    {
-        let log_dir = format!("{STACKABLE_LOG_DIR}/{container}");
-        cm_builder.add_data(
-            LOG_CONFIG_FILE,
-            create_airflow_config(log_config, &log_dir, &validated_cluster.image),
-        );
+    let log_dir = format!("{STACKABLE_LOG_DIR}/{container}");
+    if let Some(log_config) = create_airflow_config(
+        &logging.product_container,
+        &log_dir,
+        &validated_cluster.image,
+    ) {
+        cm_builder.add_data(LOG_CONFIG_FILE, log_config);
     }
 
     // Vector agent config
-    if let Some(vector_config) = build_vector_config(logging) {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            vector_config,
-        );
+    if logging.enable_vector_agent {
+        cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config_file_content());
     }
 
     cm_builder.build().with_context(|_| BuildConfigMapSnafu {

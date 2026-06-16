@@ -24,12 +24,11 @@ use crate::{
         executor_role_group_name, executor_role_name, executor_template_role_group_name,
     },
     controller::{
-        ValidatedCluster,
+        ValidatedCluster, ValidatedLogging,
         build::resource::pod::{
             add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
             build_logging_container,
         },
-        validate,
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
@@ -73,11 +72,6 @@ pub enum Error {
         source: stackable_operator::builder::configmap::Error,
     },
 
-    #[snafu(display("failed to validate the executor logging configuration"))]
-    Validate {
-        source: crate::controller::validate::Error,
-    },
-
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
         source: crate::controller::build::resource::pod::Error,
@@ -90,6 +84,7 @@ pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
     sa_name: &str,
     merged_executor_config: &ExecutorConfig,
+    executor_logging: &ValidatedLogging,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
@@ -174,14 +169,6 @@ pub fn build_executor_template_config_map(
     ))
     .context(AddVolumeSnafu)?;
 
-    // The Kubernetes executor pod template is not an `AirflowRole` with role groups, so its logging
-    // is validated here (at build time) via the shared `validate_logging`, mirroring the role-group
-    // path in `validate`.
-    let executor_logging = validate::validate_logging(
-        &merged_executor_config.logging,
-        &cluster.cluster_config.vector_aggregator_config_map_name,
-    )
-    .context(ValidateSnafu)?;
     if let Some(vector_log_config) = &executor_logging.vector_container {
         pb.add_container(build_logging_container(
             resolved_product_image,

@@ -12,7 +12,7 @@ use stackable_operator::{
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         kvp::label::{recommended_labels, role_group_selector},
-        product_logging::framework::VectorContainerLogConfig,
+        product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{ConfigMapName, Uid},
@@ -68,17 +68,15 @@ pub struct AirflowRoleGroup {
     pub logging: ValidatedLogging,
 }
 
-/// Validated logging configuration for the (optional) Vector container.
+/// Validated logging configuration for the product container and the (optional) Vector container.
 ///
-/// Produced up-front by [`validate::validate_logging`] (mirroring the superset-operator) so that an
-/// invalid custom log ConfigMap name or a missing Vector aggregator discovery ConfigMap name fails
-/// reconciliation during validation rather than at resource-build time.
 ///
-/// Unlike superset's equivalent this carries no product-container field: superset's is never read,
-/// and airflow's `airflow` container log config is consumed leniently in the build, so validating
-/// it eagerly here could reject configurations the build currently tolerates.
+/// `product_container` holds the validated log-config choice of the product's main container
+/// (`Container::Airflow` for the role groups, `Container::Base` for the Kubernetes-executor pod
+/// template).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedLogging {
+    pub product_container: ValidatedContainerLogConfigChoice,
     pub vector_container: Option<VectorContainerLogConfig>,
     pub enable_vector_agent: bool,
 }
