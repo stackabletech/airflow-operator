@@ -15,11 +15,11 @@ use stackable_operator::{
 };
 
 use crate::{
-    config::webserver_config,
     controller::{
         ValidatedCluster, ValidatedLogging,
-        build::properties::product_logging::{
-            LOG_CONFIG_FILE, create_airflow_config, vector_config_file_content,
+        build::properties::{
+            product_logging::{LOG_CONFIG_FILE, create_airflow_config, vector_config_file_content},
+            webserver_config,
         },
     },
     crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR},

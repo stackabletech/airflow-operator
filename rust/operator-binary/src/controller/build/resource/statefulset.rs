@@ -33,6 +33,7 @@ use crate::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
+            properties::env_vars,
             resource::{
                 pod::{
                     add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
@@ -48,7 +49,6 @@ use crate::{
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_LOG_DIR,
         TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
-    env_vars,
 };
 
 #[derive(Snafu, Debug)]

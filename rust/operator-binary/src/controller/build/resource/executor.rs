@@ -27,6 +27,7 @@ use crate::{
         ValidatedCluster, ValidatedLogging,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
+            properties::env_vars::build_airflow_template_envs,
             resource::pod::{
                 add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
                 build_logging_container,
@@ -37,11 +38,9 @@ use crate::{
     crd::{
         CONFIG_PATH, Container, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME,
     },
-    env_vars::build_airflow_template_envs,
 };
 
 #[derive(Snafu, Debug)]
-#[snafu(visibility(pub(crate)))]
 pub enum Error {
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
