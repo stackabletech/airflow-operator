@@ -1,5 +1,3 @@
-use std::{collections::BTreeSet, str::FromStr};
-
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -15,8 +13,7 @@ use stackable_operator::{
             },
         },
     },
-    commons::product_image_selection::ResolvedProductImage,
-    crd::{authentication::ldap, git_sync},
+    crd::git_sync,
     database_connections::drivers::{
         celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
     },
@@ -24,41 +21,32 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                Container as K8sContainer, PersistentVolumeClaim, Probe, ServiceAccount,
-                TCPSocketAction,
-            },
+            core::v1::{PersistentVolumeClaim, Probe, ServiceAccount, TCPSocketAction},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{ResourceExt, api::ObjectMeta},
     kvp::{Annotation, Label, LabelError},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{
-        builder::{meta::ownerreference_from_resource, pod::container::EnvVarSet},
-        product_logging::framework::{VectorContainerLogConfig, vector_container},
-        role_group_utils::ResourceNames,
-        types::{
-            kubernetes::{ContainerName, VolumeName},
-            operator::RoleGroupName,
-        },
-    },
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
-        build::resource::service::stateful_set_service_name,
+        build::resource::{
+            pod::{
+                add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
+                build_logging_container,
+            },
+            service::stateful_set_service_name,
+        },
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
         LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
-        authentication::{
-            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-        },
-        v1alpha2,
+        TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME, v1alpha2,
     },
     env_vars,
     operations::graceful_shutdown::add_airflow_graceful_shutdown_config,
@@ -90,20 +78,17 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
-    AddLdapVolumesAndVolumeMounts { source: ldap::v1alpha1::Error },
-
-    #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
-    AddTlsVolumesAndVolumeMounts {
-        source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
-    },
-
     #[snafu(display("failed to build Statefulset environmental variables"))]
     BuildStatefulsetEnvVars { source: env_vars::Error },
 
     #[snafu(display("failed to build listener volume"))]
     BuildListenerVolume {
         source: ListenerOperatorVolumeSourceBuilderError,
+    },
+
+    #[snafu(display("failed to build shared pod resources"))]
+    Pod {
+        source: crate::controller::build::resource::pod::Error,
     },
 }
 
@@ -185,7 +170,8 @@ pub fn build_server_rolegroup_statefulset(
         authentication_config,
         &mut airflow_container,
         &mut pb,
-    )?;
+    )
+    .context(PodSnafu)?;
 
     add_airflow_graceful_shutdown_config(merged_airflow_config, &mut pb)
         .context(GracefulShutdownSnafu)?;
@@ -298,7 +284,8 @@ pub fn build_server_rolegroup_statefulset(
         git_sync_resources,
         true,
         use_git_sync_init_containers,
-    )?;
+    )
+    .context(PodSnafu)?;
 
     metadata_database_connection_details.add_to_container(&mut airflow_container);
     if let Some((celery_result_backend, celery_broker)) = celery_database_connection_details {
@@ -412,95 +399,4 @@ pub fn build_server_rolegroup_statefulset(
         spec: Some(statefulset_spec),
         status: None,
     })
-}
-
-pub(crate) fn add_authentication_volumes_and_volume_mounts(
-    authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    cb: &mut ContainerBuilder,
-    pb: &mut PodBuilder,
-) -> Result<()> {
-    // Different authentication entries can reference the same secret
-    // class or TLS certificate. It must be ensured that the volumes
-    // and volume mounts are only added once in such a case.
-
-    let mut ldap_authentication_providers = BTreeSet::new();
-    let mut tls_client_credentials = BTreeSet::new();
-
-    for auth_class_resolved in &authentication_config.authentication_classes_resolved {
-        match auth_class_resolved {
-            AirflowAuthenticationClassResolved::Ldap { provider } => {
-                ldap_authentication_providers.insert(provider);
-            }
-            AirflowAuthenticationClassResolved::Oidc { provider, .. } => {
-                tls_client_credentials.insert(&provider.tls);
-            }
-        }
-    }
-
-    for provider in ldap_authentication_providers {
-        provider
-            .add_volumes_and_mounts(pb, vec![cb])
-            .context(AddLdapVolumesAndVolumeMountsSnafu)?;
-    }
-
-    for tls in tls_client_credentials {
-        tls.add_volumes_and_mounts(pb, vec![cb])
-            .context(AddTlsVolumesAndVolumeMountsSnafu)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn add_git_sync_resources(
-    pb: &mut PodBuilder,
-    cb: &mut ContainerBuilder,
-    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
-    add_sidecar_containers: bool,
-    add_init_containers: bool,
-) -> Result<()> {
-    if add_sidecar_containers {
-        for container in git_sync_resources.git_sync_containers.iter().cloned() {
-            pb.add_container(container);
-        }
-    }
-    if add_init_containers {
-        for container in git_sync_resources.git_sync_init_containers.iter().cloned() {
-            pb.add_init_container(container);
-        }
-    }
-    pb.add_volumes(git_sync_resources.git_content_volumes.to_owned())
-        .context(AddVolumeSnafu)?;
-    pb.add_volumes(git_sync_resources.git_ssh_volumes.to_owned())
-        .context(AddVolumeSnafu)?;
-    pb.add_volumes(git_sync_resources.git_ca_cert_volumes.to_owned())
-        .context(AddVolumeSnafu)?;
-    cb.add_volume_mounts(git_sync_resources.git_content_volume_mounts.to_owned())
-        .context(AddVolumeMountSnafu)?;
-
-    Ok(())
-}
-
-stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
-// Typed volume names required by the v2 `vector_container`. Their values match the `&str`
-// constants in `controller_commons` used elsewhere to build the same volumes.
-stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
-stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
-
-/// Builds the Vector log-collection sidecar container from the up-front-validated logging config.
-///
-/// The vector container's resource limits are set inside the v2 `vector_container` helper (to the
-/// same values previously hard-coded here), so this is behaviour-preserving.
-pub(crate) fn build_logging_container(
-    resolved_product_image: &ResolvedProductImage,
-    vector_log_config: &VectorContainerLogConfig,
-    resource_names: &ResourceNames,
-) -> K8sContainer {
-    vector_container(
-        &VECTOR_CONTAINER_NAME,
-        resolved_product_image,
-        vector_log_config,
-        resource_names,
-        &CONFIG_VOLUME_NAME_TYPED,
-        &LOG_VOLUME_NAME_TYPED,
-        EnvVarSet::new(),
-    )
 }
