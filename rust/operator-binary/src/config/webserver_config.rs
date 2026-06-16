@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, io::Write};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::flask_config_writer;
 
-use super::{PYTHON_IMPORTS, add_airflow_config};
+use super::{PYTHON_IMPORTS, build_airflow_config};
 use crate::{controller::ValidatedCluster, crd::AirflowConfigOptions};
 
 /// Marks arbitrary Python code to prepend verbatim to the generated file.
@@ -35,11 +35,8 @@ pub fn build(
     validated_cluster: &ValidatedCluster,
     config_file_overrides: &BTreeMap<String, String>,
 ) -> Result<String, Error> {
-    let mut config: BTreeMap<String, String> = BTreeMap::new();
-
     // this will call default values from AirflowClientAuthenticationDetails
-    add_airflow_config(
-        &mut config,
+    let mut config = build_airflow_config(
         &validated_cluster.cluster_config.authentication_config,
         &validated_cluster.cluster_config.authorization_config,
         &validated_cluster.image.product_version,

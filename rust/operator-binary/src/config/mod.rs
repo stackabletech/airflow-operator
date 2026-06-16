@@ -39,24 +39,24 @@ pub enum Error {
     InvalidWellKnownConfigUrl { source: oidc::v1alpha1::Error },
 }
 
-pub fn add_airflow_config(
-    config: &mut BTreeMap<String, String>,
+/// Builds the operator-default `webserver_config.py` entries derived from the resolved
+/// authentication/authorization config.
+///
+/// Returns the assembled map; the caller applies user `config_overrides` on top.
+pub fn build_airflow_config(
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     product_version: &str,
-) -> Result<()> {
-    if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
-        config.insert(
-            // should default to AUTH_TYPE = AUTH_DB
-            AirflowConfigOptions::AuthType.to_string(),
-            "AUTH_DB".into(),
-        );
-    }
+) -> Result<BTreeMap<String, String>> {
+    let mut config = BTreeMap::new();
 
-    append_authentication_config(config, authentication_config)?;
-    append_authorization_config(config, authorization_config, product_version);
+    // should default to AUTH_TYPE = AUTH_DB (an authentication provider may override this below)
+    config.insert(AirflowConfigOptions::AuthType.to_string(), "AUTH_DB".into());
 
-    Ok(())
+    append_authentication_config(&mut config, authentication_config)?;
+    append_authorization_config(&mut config, authorization_config, product_version);
+
+    Ok(config)
 }
 
 fn append_authentication_config(
@@ -323,7 +323,7 @@ mod tests {
     };
 
     use crate::{
-        config::add_airflow_config,
+        config::build_airflow_config,
         crd::{
             authentication::{
                 AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
@@ -346,9 +346,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -397,9 +395,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -493,9 +489,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -565,9 +559,7 @@ mod tests {
             }),
         };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
