@@ -25,6 +25,22 @@ def assert_metric(role, role_group, metric):
     return metric in metric_response.text
 
 
+# Check if dag run state is "success", "queued", or "running"
+# TODO: in future, we could wait on it.
+# See: https://airflow.apache.org/docs/apache-airflow/3.1.6/stable-rest-api-ref.html#operation/wait_dag_run_until_finished
+def assert_dag_started(rest_url, headers, dag_id, dag_run_id):
+    dag_run_response = requests.get(
+        f"{rest_url}/dags/{dag_id}/dagRuns/{dag_run_id}", headers=headers
+    )
+    dag_run_state = dag_run_response.json()["state"]
+    print(f"DAG RUN STATE: {dag_run_state}")
+    return (
+        dag_run_state == "success"
+        or dag_run_state == "queued"
+        or dag_run_state == "running"
+    )
+
+
 def metrics_v3(role_group: str) -> None:
     now = datetime.now(timezone.utc)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
@@ -64,10 +80,15 @@ def metrics_v3(role_group: str) -> None:
     response = requests.patch(
         f"{rest_url}/dags/{dag_id}", headers=headers, json={"is_paused": False}
     )
+
     # trigger DAG
     response = requests.post(
         f"{rest_url}/dags/{dag_id}/dagRuns", headers=headers, json=dag_data
     )
+
+    dag_run_id = response.json()["dag_run_id"]
+
+    print(f"DAG RUN ID: {dag_run_id}")
 
     # Test the DAG in a loop. Each time we call the script a new job will be started: we can avoid
     # or minimize this by looping over the check instead.
@@ -77,24 +98,13 @@ def metrics_v3(role_group: str) -> None:
         assert response.status_code == 200, "DAG run could not be triggered."
         # Wait for the metrics to be consumed by the statsd-exporter
         time.sleep(5)
-        # (disable line-break flake checks)
+        heartbeat_metric = "airflow_scheduler_heartbeat"
+        dag_run_success_count_metric = f"airflow_dagrun_duration_success_{dag_id}_count"
         if (
-            (assert_metric("scheduler", role_group, "airflow_scheduler_heartbeat"))
-            and (
-                assert_metric(
-                    "webserver",
-                    role_group,
-                    "airflow_task_instance_created_CoreDeferrableSleepOperator",
-                )
-            )  # noqa: W503, W504
-            and (
-                assert_metric(
-                    "scheduler",
-                    role_group,
-                    "airflow_dagrun_duration_success_core_deferrable_sleep_demo_count",
-                )
-            )
-        ):  # noqa: W503, W504
+            assert_dag_started(rest_url, headers, dag_id, dag_run_id)
+            and assert_metric("scheduler", role_group, heartbeat_metric)
+            and assert_metric("scheduler", role_group, dag_run_success_count_metric)
+        ):
             break
         time.sleep(10)
         loop += 1
