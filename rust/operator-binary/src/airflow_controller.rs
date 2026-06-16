@@ -471,12 +471,6 @@ pub async fn reconcile_airflow(
                     role_group: rolegroup_name.clone(),
                 })?;
 
-            let vector_config = config_map::build_vector_config(
-                &validated_cluster,
-                &airflow_role.role_name(),
-                rolegroup_name,
-                &validated_rg_config.config.logging,
-            );
             let rg_configmap = config_map::build_rolegroup_config_map(
                 &validated_cluster,
                 &airflow_role.role_name(),
@@ -484,7 +478,6 @@ pub async fn reconcile_airflow(
                 &validated_rg_config.config_overrides,
                 &validated_rg_config.config.logging,
                 &Container::Airflow,
-                vector_config,
             )
             .context(BuildConfigMapSnafu)?;
             cluster_resources
@@ -550,12 +543,6 @@ async fn build_executor_template(
     let merged_executor_config = airflow
         .merged_executor_config(&common_config.config)
         .context(FailedToResolveConfigSnafu)?;
-    let vector_config = config_map::build_vector_config(
-        validated_cluster,
-        &executor_role_name(),
-        &executor_role_group_name(),
-        &merged_executor_config.logging,
-    );
     let rg_configmap = config_map::build_rolegroup_config_map(
         validated_cluster,
         &executor_role_name(),
@@ -565,7 +552,6 @@ async fn build_executor_template(
         &AirflowConfigOverrides::default(),
         &merged_executor_config.logging,
         &Container::Base,
-        vector_config,
     )
     .context(BuildConfigMapSnafu)?;
     cluster_resources

@@ -1,29 +1,36 @@
+//! Renders the logging config files (`log_config.py` and the Vector agent config)
+//! assembled into the rolegroup `ConfigMap`.
+
 use std::fmt::Write;
 
-use snafu::Snafu;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
-    product_logging::spec::AutomaticContainerLogConfig,
+    product_logging::spec::{AutomaticContainerLogConfig, Logging},
 };
 
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
-    ConfigMapNotFound {
-        source: stackable_operator::client::Error,
-        cm_name: String,
-    },
-    #[snafu(display("failed to retrieve the entry [{entry}] for ConfigMap [{cm_name}]"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-    #[snafu(display("vectorAggregatorConfigMapName must be set"))]
-    MissingVectorAggregatorAddress,
-}
+use crate::crd::Container;
 
 pub const LOG_CONFIG_FILE: &str = "log_config.py";
+
+/// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "airflow.py.json";
+
+/// The Vector agent configuration (`vector.yaml`).
+const VECTOR_CONFIG: &str = include_str!("vector.yaml");
+
+/// Returns the Vector agent config (`vector.yaml`) content.
+pub fn vector_config_file_content() -> String {
+    VECTOR_CONFIG.to_owned()
+}
+
+/// Renders the Vector agent config (`vector.yaml`).
+///
+/// Returns `None` when the Vector agent is disabled for this role group. The returned config is the
+/// vendored, env-var-parameterized `vector.yaml`; the parameterizing env vars are injected into the
+/// Vector container by the v2 `vector_container`.
+pub fn build_vector_config(logging: &Logging<Container>) -> Option<String> {
+    logging.enable_vector_agent.then(vector_config_file_content)
+}
 
 pub fn create_airflow_config(
     log_config: &AutomaticContainerLogConfig,
@@ -230,4 +237,38 @@ REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
             .to_python_expression(),
         root_log_level = log_config.root_log_level().to_python_expression(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The vendored `vector.yaml` keeps only the sources Airflow produces (Python JSON, stdout,
+    /// stderr) and drops the ones it does not (log4j/log4j2/airlift/opa/tracing). Guards against
+    /// accidental drift.
+    #[test]
+    fn test_vector_config_file_content() {
+        let content = vector_config_file_content();
+        assert!(!content.is_empty());
+        // Airflow logs JSON to `airflow.py.json`, so the Python-JSON source must be present.
+        assert!(content.contains("files_py"));
+        assert!(content.contains("*.py.json"));
+        // Sources Airflow does not emit must have been trimmed out.
+        for dropped in [
+            "files_log4j",
+            "files_log4j2",
+            "files_airlift",
+            "files_opa_json",
+            "files_tracing_rs",
+        ] {
+            assert!(
+                !content.contains(dropped),
+                "vendored vector.yaml should not contain the dropped source {dropped}"
+            );
+        }
+        // The config is env-var-parameterized (resolved at runtime by the Vector container), not
+        // baked, so the role-group identity must appear as placeholders.
+        assert!(content.contains("${ROLE_NAME}"));
+        assert!(content.contains("${VECTOR_AGGREGATOR_ADDRESS}"));
+    }
 }
