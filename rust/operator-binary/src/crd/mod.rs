@@ -54,7 +54,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString};
 
 use crate::{
-    controller::ValidatedCluster,
+    controller::{ValidatedCluster, build::properties::ConfigFileName},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -80,7 +80,6 @@ pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
-pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 
 stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
@@ -551,11 +550,10 @@ impl AirflowRole {
         let database_initialization_enabled =
             cluster.cluster_config.database_initialization_enabled;
         let has_dag_processors = cluster.has_role(&AirflowRole::DagProcessor);
+        let webserver_config = ConfigFileName::WebserverConfig;
 
         let mut command = vec![
-            format!(
-                "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
-            ),
+            format!("cp -RL {CONFIG_PATH}/{webserver_config} {AIRFLOW_HOME}/{webserver_config}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),

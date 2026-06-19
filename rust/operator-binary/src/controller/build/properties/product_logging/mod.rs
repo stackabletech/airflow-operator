@@ -9,8 +9,6 @@ use stackable_operator::{
     v2::product_logging::framework::ValidatedContainerLogConfigChoice,
 };
 
-pub const LOG_CONFIG_FILE: &str = "log_config.py";
-
 /// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "airflow.py.json";
 

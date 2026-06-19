@@ -9,10 +9,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
-    v2::{
-        builder::pod::container::EnvVarSet,
-        product_logging::framework::STACKABLE_LOG_DIR,
-    },
+    v2::{builder::pod::container::EnvVarSet, product_logging::framework::STACKABLE_LOG_DIR},
 };
 
 use crate::{

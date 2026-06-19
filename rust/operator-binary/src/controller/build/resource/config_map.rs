@@ -18,11 +18,12 @@ use crate::{
     controller::{
         ValidatedCluster, ValidatedLogging,
         build::properties::{
-            product_logging::{LOG_CONFIG_FILE, create_airflow_config, vector_config_file_content},
+            ConfigFileName,
+            product_logging::{create_airflow_config, vector_config_file_content},
             webserver_config,
         },
     },
-    crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container},
+    crd::{AirflowConfigOverrides, Container},
 };
 
 #[derive(Snafu, Debug)]
@@ -72,7 +73,7 @@ pub fn build_rolegroup_config_map(
                 )
                 .build(),
         )
-        .add_data(AIRFLOW_CONFIG_FILENAME, config_file);
+        .add_data(ConfigFileName::WebserverConfig.to_string(), config_file);
 
     // Log config for the main container, when it uses an Automatic log config.
     let log_dir = format!("{STACKABLE_LOG_DIR}/{container}");
@@ -81,7 +82,7 @@ pub fn build_rolegroup_config_map(
         &log_dir,
         &validated_cluster.image,
     ) {
-        cm_builder.add_data(LOG_CONFIG_FILE, log_config);
+        cm_builder.add_data(ConfigFileName::LogConfig.to_string(), log_config);
     }
 
     // Vector agent config
