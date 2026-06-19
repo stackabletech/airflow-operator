@@ -42,7 +42,10 @@ use stackable_operator::{
         role_utils::GenericCommonConfig,
         types::{
             common::Port,
-            kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName, VolumeName},
+            kubernetes::{
+                ConfigMapName, ContainerName, ListenerClassName, ListenerName, SecretName,
+                VolumeName,
+            },
         },
     },
     versioned::versioned,
@@ -90,6 +93,7 @@ pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
+stackable_operator::constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -826,6 +830,14 @@ pub enum Container {
     Vector,
     Base,
     GitSync,
+}
+
+impl Container {
+    /// The type-safe container name for this variant (matching its kebab-case serialization).
+    pub fn to_container_name(&self) -> ContainerName {
+        ContainerName::from_str(&self.to_string())
+            .expect("a Container variant name is a valid container name")
+    }
 }
 
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]

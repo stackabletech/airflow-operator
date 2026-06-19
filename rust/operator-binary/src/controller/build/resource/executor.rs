@@ -8,7 +8,7 @@ use stackable_operator::{
     builder::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
-        pod::{PodBuilder, container::ContainerBuilder, security::PodSecurityContextBuilder},
+        pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
     crd::git_sync,
     k8s_openapi::{
@@ -16,7 +16,7 @@ use stackable_operator::{
         api::core::v1::{ConfigMap, PodTemplateSpec},
     },
     kvp::{Label, LabelError},
-    v2::builder::meta::ownerreference_from_resource,
+    v2::builder::{meta::ownerreference_from_resource, pod::container::new_container_builder},
 };
 
 use crate::{
@@ -42,11 +42,6 @@ use crate::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::builder::pod::container::Error,
-    },
-
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::controller::build::graceful_shutdown::Error,
@@ -114,8 +109,7 @@ pub fn build_executor_template_config_map(
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/8.4.0/kubernetes_executor.html#base-image
-    let mut airflow_container =
-        ContainerBuilder::new(&Container::Base.to_string()).context(InvalidContainerNameSnafu)?;
+    let mut airflow_container = new_container_builder(&Container::Base.to_container_name());
 
     add_authentication_volumes_and_volume_mounts(
         authentication_config,

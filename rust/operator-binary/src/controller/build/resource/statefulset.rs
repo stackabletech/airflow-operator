@@ -4,7 +4,6 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{
             PodBuilder,
-            container::ContainerBuilder,
             resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
             volume::{
@@ -25,7 +24,10 @@ use stackable_operator::{
     kube::{ResourceExt, api::ObjectMeta},
     kvp::{Annotation, Label, LabelError},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::{
+        builder::{meta::ownerreference_from_resource, pod::container::new_container_builder},
+        types::operator::RoleGroupName,
+    },
 };
 
 use crate::{
@@ -46,19 +48,14 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
-        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
+        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
+        METRICS_PORT_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
 };
 
 #[derive(Snafu, Debug)]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::builder::pod::container::Error,
-    },
-
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::controller::build::graceful_shutdown::Error,
@@ -154,8 +151,7 @@ pub fn build_server_rolegroup_statefulset(
         .service_account_name(service_account.name_any())
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
-    let mut airflow_container = ContainerBuilder::new(&Container::Airflow.to_string())
-        .context(InvalidContainerNameSnafu)?;
+    let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());
 
     add_authentication_volumes_and_volume_mounts(
         authentication_config,
@@ -283,8 +279,7 @@ pub fn build_server_rolegroup_statefulset(
 
     pb.add_container(airflow_container.build());
 
-    let metrics_container = ContainerBuilder::new("metrics")
-        .context(InvalidContainerNameSnafu)?
+    let metrics_container = new_container_builder(&METRICS_CONTAINER_NAME)
         .image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
