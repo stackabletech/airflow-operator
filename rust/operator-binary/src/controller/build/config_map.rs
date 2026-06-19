@@ -5,13 +5,10 @@ use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
+    builder::configmap::ConfigMapBuilder,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
-    v2::{
-        builder::meta::ownerreference_from_resource,
-        types::operator::{RoleGroupName, RoleName},
-    },
+    v2::types::operator::{RoleGroupName, RoleName},
 };
 
 use crate::{
@@ -62,20 +59,14 @@ pub fn build_rolegroup_config_map(
 
     cm_builder
         .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(validated_cluster)
-                .name(
+            validated_cluster
+                .object_meta(
                     validated_cluster
                         .resource_names(role_name, role_group_name)
                         .role_group_config_map()
                         .to_string(),
+                    validated_cluster.recommended_labels_for(role_name, role_group_name),
                 )
-                .ownerreference(ownerreference_from_resource(
-                    validated_cluster,
-                    None,
-                    Some(true),
-                ))
-                .with_labels(validated_cluster.recommended_labels_for(role_name, role_group_name))
                 .build(),
         )
         .add_data(AIRFLOW_CONFIG_FILENAME, config_file);

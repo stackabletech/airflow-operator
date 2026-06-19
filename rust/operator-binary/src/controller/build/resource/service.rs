@@ -1,11 +1,7 @@
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     v2::{
-        builder::{
-            meta::ownerreference_from_resource,
-            service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
-        },
+        builder::service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
         types::operator::RoleGroupName,
     },
 };
@@ -23,16 +19,14 @@ pub fn build_rolegroup_headless_service(
     role_group_name: &RoleGroupName,
 ) -> Service {
     Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(cluster)
-            .name(
+        metadata: cluster
+            .object_meta(
                 cluster
                     .resource_names(&role.role_name(), role_group_name)
                     .headless_service_name()
                     .to_string(),
+                cluster.recommended_labels(role, role_group_name),
             )
-            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-            .with_labels(cluster.recommended_labels(role, role_group_name))
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -54,16 +48,14 @@ pub fn build_rolegroup_metrics_service(
     role_group_name: &RoleGroupName,
 ) -> Service {
     Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(cluster)
-            .name(
+        metadata: cluster
+            .object_meta(
                 cluster
                     .resource_names(&role.role_name(), role_group_name)
                     .metrics_service_name()
                     .to_string(),
+                cluster.recommended_labels(role, role_group_name),
             )
-            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-            .with_labels(cluster.recommended_labels(role, role_group_name))
             .with_labels(prometheus_labels(&Scraping::Enabled))
             .with_annotations(prometheus_annotations(
                 &Scraping::Enabled,

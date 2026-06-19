@@ -16,7 +16,7 @@ use stackable_operator::{
         api::core::v1::{ConfigMap, PodTemplateSpec},
     },
     kvp::{Label, LabelError},
-    v2::builder::{meta::ownerreference_from_resource, pod::container::new_container_builder},
+    v2::builder::pod::container::new_container_builder,
 };
 
 use crate::{
@@ -182,14 +182,14 @@ pub fn build_executor_template_config_map(
 
     cm_builder
         .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(cluster)
-                .name(cluster.executor_template_configmap_name())
-                .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-                .with_labels(cluster.recommended_labels_for(
-                    &executor_role_name(),
-                    &executor_template_role_group_name(),
-                ))
+            cluster
+                .object_meta(
+                    cluster.executor_template_configmap_name(),
+                    cluster.recommended_labels_for(
+                        &executor_role_name(),
+                        &executor_template_role_group_name(),
+                    ),
+                )
                 .with_label(restarter_label)
                 .build(),
         )

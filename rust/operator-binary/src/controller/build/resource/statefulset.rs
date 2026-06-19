@@ -22,12 +22,9 @@ use stackable_operator::{
     kvp::{Annotation, Label, LabelError},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::{
-            meta::ownerreference_from_resource,
-            pod::{
-                container::new_container_builder,
-                volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
-            },
+        builder::pod::{
+            container::new_container_builder,
+            volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
         },
         types::operator::RoleGroupName,
     },
@@ -95,11 +92,8 @@ fn build_rolegroup_metadata(
     prometheus_label: Label,
     name: String,
 ) -> ObjectMeta {
-    ObjectMetaBuilder::new()
-        .name_and_namespace(cluster)
-        .name(name)
-        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-        .with_labels(cluster.recommended_labels(role, role_group_name))
+    cluster
+        .object_meta(name, cluster.recommended_labels(role, role_group_name))
         .with_label(prometheus_label)
         .build()
 }

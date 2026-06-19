@@ -1,10 +1,6 @@
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     crd::listener,
-    v2::{
-        builder::meta::ownerreference_from_resource,
-        types::kubernetes::{ListenerClassName, ListenerName},
-    },
+    v2::types::kubernetes::{ListenerClassName, ListenerName},
 };
 
 use crate::{
@@ -19,16 +15,16 @@ pub fn build_group_listener(
     listener_group_name: ListenerName,
 ) -> listener::v1alpha1::Listener {
     listener::v1alpha1::Listener {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(cluster)
-            .name(listener_group_name)
-            .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-            // The group listener is a role-level object, so a constant `none` role-group is used
-            // as the role-group label value.
-            .with_labels(cluster.recommended_labels_for(
-                &role.role_name(),
-                &"none".parse().expect("'none' is a valid role group name"),
-            ))
+        metadata: cluster
+            .object_meta(
+                listener_group_name,
+                // The group listener is a role-level object, so a constant `none` role-group is
+                // used as the role-group label value.
+                cluster.recommended_labels_for(
+                    &role.role_name(),
+                    &"none".parse().expect("'none' is a valid role group name"),
+                ),
+            )
             .build(),
         spec: listener::v1alpha1::ListenerSpec {
             class_name: Some(listener_class.to_string()),

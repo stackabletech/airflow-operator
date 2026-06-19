@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
     crd::git_sync,
     database_connections::drivers::{
@@ -11,6 +12,7 @@ use stackable_operator::{
     kvp::Labels,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
@@ -274,6 +276,21 @@ impl ValidatedCluster {
         role_group_name: &RoleGroupName,
     ) -> Labels {
         role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+    }
+
+    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
+    /// reference back to this cluster, and the given recommended `labels`.
+    ///
+    /// Consolidates the metadata chain repeated by the child-resource builders. Call sites that need
+    /// extra labels or annotations chain them onto the returned builder before `.build()`.
+    pub(crate) fn object_meta(&self, name: impl Into<String>, labels: Labels) -> ObjectMetaBuilder {
+        let mut builder = ObjectMetaBuilder::new();
+        builder
+            .name_and_namespace(self)
+            .name(name)
+            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
+            .with_labels(labels);
+        builder
     }
 }
 
