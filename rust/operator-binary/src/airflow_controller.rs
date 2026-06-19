@@ -345,9 +345,8 @@ pub async fn reconcile_airflow(
             }
         }
 
-        for (rolegroup_name, validated_rg) in role_group_configs {
-            let validated_rg_config = &validated_rg.config;
-            let logging = &validated_rg.logging;
+        for (rolegroup_name, validated_rg_config) in role_group_configs {
+            let logging = &validated_rg_config.config.logging;
 
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &validated_cluster.cluster_config.dags_git_sync,
@@ -355,10 +354,7 @@ pub async fn reconcile_airflow(
                 &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
                 &airflow.volume_mounts(),
                 LOG_VOLUME_NAME.as_ref(),
-                &validated_rg_config
-                    .config
-                    .logging
-                    .for_container(&Container::GitSync),
+                &logging.git_sync_container,
             )
             .context(InvalidGitSyncSpecSnafu)?;
 

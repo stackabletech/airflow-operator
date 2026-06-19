@@ -30,7 +30,7 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use super::{
-    AirflowRoleGroup, AirflowRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig,
+    AirflowRoleGroupConfig, ValidatedAirflowConfig, ValidatedCluster, ValidatedClusterConfig,
     ValidatedLogging, ValidatedRoleConfig, dereference::DereferencedObjects,
 };
 use crate::{
@@ -152,15 +152,15 @@ pub fn validate_cluster(
                     role_group: rolegroup_name.clone(),
                 }
             })?;
-            let config =
-                validate_role_group(&resolved_role, &role_group_name, rolegroup, &default_config)?;
-            let logging = validate_logging(
-                &config.config.logging,
-                &Container::Airflow,
+            let config = validate_role_group(
+                &resolved_role,
+                &role_group_name,
+                rolegroup,
+                &default_config,
                 &vector_aggregator_config_map_name,
             )?;
 
-            group_configs.insert(role_group_name, AirflowRoleGroup { config, logging });
+            group_configs.insert(role_group_name, config);
         }
 
         role_groups.insert(role, group_configs);
@@ -274,6 +274,7 @@ fn validate_role_group(
     role_group_name: &RoleGroupName,
     rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     default_config: &AirflowConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
 ) -> Result<AirflowRoleGroupConfig, Error> {
     let validated = with_validated_config::<
         AirflowConfig,
@@ -294,9 +295,16 @@ fn validate_role_group(
         );
     }
 
+    let merged_config = validated.config.config;
+    let logging = validate_logging(
+        &merged_config.logging,
+        &Container::Airflow,
+        vector_aggregator_config_map_name,
+    )?;
+
     Ok(RoleGroupConfig {
         replicas: validated.replicas,
-        config: validated.config.config,
+        config: ValidatedAirflowConfig::from_merged(merged_config, logging),
         config_overrides: validated.config.config_overrides,
         env_overrides,
         cli_overrides: validated.config.cli_overrides,
@@ -340,6 +348,7 @@ pub(crate) fn validate_logging(
     Ok(ValidatedLogging {
         product_container,
         vector_container,
+        git_sync_container: logging.for_container(&Container::GitSync).into_owned(),
         enable_vector_agent: logging.enable_vector_agent,
     })
 }
@@ -414,6 +423,7 @@ mod tests {
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
+            &None,
         )
         .expect("validated role group");
         let config_overrides = validated.config_overrides;
@@ -511,6 +521,7 @@ mod tests {
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
+            &None,
         )
         .expect("validated role group");
 
@@ -584,6 +595,7 @@ mod tests {
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
+            &None,
         )
         .expect("validated role group");
 

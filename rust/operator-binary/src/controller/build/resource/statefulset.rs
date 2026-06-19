@@ -3,10 +3,8 @@ use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder,
-            resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder,
-            volume::VolumeBuilder,
+            PodBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
     crd::git_sync,
@@ -47,8 +45,8 @@ use crate::{
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
-        LISTENER_PVC_NAME, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
+        AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_PVC_NAME,
+        LISTENER_VOLUME_DIR, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
         METRICS_PORT_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
 };
@@ -304,10 +302,7 @@ pub fn build_server_rolegroup_statefulset(
         .context(AddVolumeSnafu)?;
     pb.add_volumes(controller_commons::create_volumes(
         resource_names.role_group_config_map().as_ref(),
-        merged_airflow_config
-            .logging
-            .containers
-            .get(&Container::Airflow),
+        &logging.product_container,
     ))
     .context(AddVolumeSnafu)?;
 

@@ -157,10 +157,7 @@ pub fn build_executor_template_config_map(
             .resource_names(&executor_role_name(), &executor_role_group_name())
             .role_group_config_map()
             .as_ref(),
-        merged_executor_config
-            .logging
-            .containers
-            .get(&Container::Airflow),
+        &executor_logging.product_container,
     ))
     .context(AddVolumeSnafu)?;
 

@@ -2,7 +2,11 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
-    commons::product_image_selection::ResolvedProductImage,
+    commons::{
+        affinity::StackableAffinity,
+        product_image_selection::ResolvedProductImage,
+        resources::{NoRuntimeLimits, Resources},
+    },
     crd::git_sync,
     database_connections::drivers::{
         celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
@@ -10,6 +14,8 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{Volume, VolumeMount},
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
+    product_logging::spec::ContainerLogConfig,
+    shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         builder::meta::ownerreference_from_resource,
@@ -32,7 +38,8 @@ use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
     crd::{
         APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        OPERATOR_NAME, authentication::AirflowClientAuthenticationDetailsResolved,
+        AirflowStorageConfig, OPERATOR_NAME,
+        authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved, v1alpha2,
     },
 };
@@ -56,32 +63,45 @@ pub struct ValidatedRoleConfig {
 /// `env_overrides`/`cli_overrides`/`pod_overrides`. The config overrides are kept typed
 /// ([`AirflowConfigOverrides`]) and flattened into the rendered config file later, in the build step.
 pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
-    AirflowConfig,
+    ValidatedAirflowConfig,
     stackable_operator::v2::role_utils::GenericCommonConfig,
     AirflowConfigOverrides,
 >;
 
-/// A validated role group: the merged [`AirflowRoleGroupConfig`] paired with its up-front-validated
-/// [`ValidatedLogging`], so the build step reads both from here rather than re-deriving from the raw
-/// cluster. (Superset folds logging into a single rolegroup struct; airflow keeps the generic merged
-/// config as-is — retaining all its fields without bespoke `#[allow(dead_code)]` — and carries
-/// logging alongside it.)
-#[derive(Clone, Debug)]
-pub struct AirflowRoleGroup {
-    pub config: AirflowRoleGroupConfig,
+/// A validated, merged Airflow role-group config: the merged [`AirflowConfig`] with its raw
+/// `logging` replaced by the up-front-validated [`ValidatedLogging`] (so an invalid custom log
+/// ConfigMap name or a missing Vector aggregator name fails reconciliation during validation).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedAirflowConfig {
+    pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
+    pub affinity: StackableAffinity,
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
-/// Validated logging configuration for the product container and the (optional) Vector container.
-///
+impl ValidatedAirflowConfig {
+    /// Builds the validated config from the merged [`AirflowConfig`], swapping in the
+    /// already-validated logging.
+    pub(crate) fn from_merged(merged: AirflowConfig, logging: ValidatedLogging) -> Self {
+        Self {
+            resources: merged.resources,
+            logging,
+            affinity: merged.affinity,
+            graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
+        }
+    }
+}
+
+/// Validated logging configuration for the containers of a role-group (or Kubernetes-executor) Pod.
 ///
 /// `product_container` holds the validated log-config choice of the product's main container
 /// (`Container::Airflow` for the role groups, `Container::Base` for the Kubernetes-executor pod
-/// template).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// template). `git_sync_container` holds the log config of the git-sync sidecar (DAG fetching).
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedLogging {
     pub product_container: ValidatedContainerLogConfigChoice,
     pub vector_container: Option<VectorContainerLogConfig>,
+    pub git_sync_container: ContainerLogConfig,
     pub enable_vector_agent: bool,
 }
 
@@ -132,7 +152,7 @@ pub struct ValidatedCluster {
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroup>>,
+    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
     pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
 }
 
@@ -143,7 +163,7 @@ impl ValidatedCluster {
         uid: Uid,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroup>>,
+        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
         role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
     ) -> Self {
         // `app_version_label_value` is constructed to be a valid label value, so it is also a valid

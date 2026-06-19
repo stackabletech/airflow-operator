@@ -3,14 +3,11 @@ use std::str::FromStr;
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
-    product_logging::{
-        self,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
-        },
+    product_logging,
+    v2::{
+        product_logging::framework::ValidatedContainerLogConfigChoice,
+        types::kubernetes::VolumeName,
     },
-    v2::types::kubernetes::VolumeName,
 };
 
 use crate::crd::MAX_LOG_FILES_SIZE;
@@ -21,7 +18,7 @@ stackable_operator::constant!(pub LOG_VOLUME_NAME: VolumeName = "log");
 
 pub fn create_volumes(
     config_map_name: &str,
-    log_config: Option<&ContainerLogConfig>,
+    product_log_config: &ValidatedContainerLogConfigChoice,
 ) -> Vec<Volume> {
     let mut volumes = Vec::new();
 
@@ -41,31 +38,22 @@ pub fn create_volumes(
         ..Volume::default()
     });
 
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = log_config
-    {
-        volumes.push(Volume {
-            name: LOG_CONFIG_VOLUME_NAME.to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: config_map.into(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    } else {
-        volumes.push(Volume {
-            name: LOG_CONFIG_VOLUME_NAME.to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: config_map_name.into(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    }
+    // A custom log config is mounted from its own ConfigMap; an automatic one is rendered into the
+    // rolegroup ConfigMap.
+    let log_config_config_map = match product_log_config {
+        ValidatedContainerLogConfigChoice::Custom(custom_config_map) => {
+            custom_config_map.to_string()
+        }
+        ValidatedContainerLogConfigChoice::Automatic(_) => config_map_name.to_string(),
+    };
+    volumes.push(Volume {
+        name: LOG_CONFIG_VOLUME_NAME.to_string(),
+        config_map: Some(ConfigMapVolumeSource {
+            name: log_config_config_map,
+            ..ConfigMapVolumeSource::default()
+        }),
+        ..Volume::default()
+    });
 
     volumes
 }
