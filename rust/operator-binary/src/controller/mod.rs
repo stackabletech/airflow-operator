@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
@@ -11,7 +14,7 @@ use stackable_operator::{
     database_connections::drivers::{
         celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
     },
-    k8s_openapi::api::core::v1::{Volume, VolumeMount},
+    k8s_openapi::api::core::v1::{PodTemplateSpec, Volume, VolumeMount},
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
     product_logging::spec::ContainerLogConfig,
@@ -38,7 +41,7 @@ use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
     crd::{
         APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        AirflowStorageConfig, OPERATOR_NAME,
+        AirflowStorageConfig, ExecutorConfig, OPERATOR_NAME,
         authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved, v1alpha2,
     },
@@ -90,6 +93,29 @@ impl ValidatedAirflowConfig {
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
         }
     }
+
+    /// Builds the validated config from the merged [`ExecutorConfig`] (Kubernetes-executor pod
+    /// template), swapping in the already-validated logging. [`ExecutorConfig`] is field-identical
+    /// to [`AirflowConfig`].
+    pub(crate) fn from_merged_executor(merged: ExecutorConfig, logging: ValidatedLogging) -> Self {
+        Self {
+            resources: merged.resources,
+            logging,
+            affinity: merged.affinity,
+            graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
+        }
+    }
+}
+
+/// The validated Kubernetes-executor pod-template config, computed during validation so the build
+/// step never merges or validates the raw cluster's executor config itself.
+pub struct ValidatedExecutorTemplate {
+    /// The merged + validated executor config (resources, affinity, logging, …).
+    pub config: ValidatedAirflowConfig,
+    /// Env-var overrides for the executor pod template (`spec.kubernetesExecutors.envOverrides`).
+    pub env_overrides: HashMap<String, String>,
+    /// Pod overrides for the executor pod template (`spec.kubernetesExecutors.podOverrides`).
+    pub pod_overrides: PodTemplateSpec,
 }
 
 /// Validated logging configuration for the containers of a role-group (or Kubernetes-executor) Pod.
@@ -111,6 +137,9 @@ pub struct ValidatedLogging {
 /// here rather than from the raw cluster object.
 pub struct ValidatedClusterConfig {
     pub executor: AirflowExecutor,
+    /// The validated Kubernetes-executor pod-template config (`None` for the Celery executor),
+    /// merged and logging-validated up-front so the build step does not touch the raw cluster.
+    pub executor_template: Option<ValidatedExecutorTemplate>,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
     /// The Git-sync definitions for the DAGs (`spec.clusterConfig.dagsGitSync`).
@@ -130,8 +159,6 @@ pub struct ValidatedClusterConfig {
     pub volumes: Vec<Volume>,
     /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
     pub volume_mounts: Vec<VolumeMount>,
-    /// The validated Vector aggregator discovery ConfigMap name (`None` when no aggregator is set).
-    pub vector_aggregator_config_map_name: Option<ConfigMapName>,
 }
 
 /// The validated cluster: proves that config merging succeeded for every role and

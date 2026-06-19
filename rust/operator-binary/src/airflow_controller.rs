@@ -30,7 +30,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        ValidatedCluster,
+        ValidatedCluster, ValidatedExecutorTemplate,
         build::{
             config_map,
             resource::{
@@ -44,8 +44,7 @@ use crate::{
     },
     controller_commons::LOG_VOLUME_NAME,
     crd::{
-        self, APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, AirflowExecutor,
-        AirflowExecutorCommonConfiguration, Container, OPERATOR_NAME,
+        APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, Container, OPERATOR_NAME,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
@@ -131,9 +130,6 @@ pub enum Error {
     BuildConfigMap {
         source: crate::controller::build::config_map::Error,
     },
-
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crd::Error },
 
     #[snafu(display("invalid git-sync specification"))]
     InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
@@ -303,13 +299,9 @@ pub async fn reconcile_airflow(
 
     // if the kubernetes executor is specified, in place of a worker role that will be in the role
     // collection there will be a pod template created to be used for pod provisioning
-    if let AirflowExecutor::KubernetesExecutors {
-        common_configuration,
-    } = &validated_cluster.cluster_config.executor
-    {
+    if let Some(executor_template) = &validated_cluster.cluster_config.executor_template {
         build_executor_template(
-            airflow,
-            common_configuration,
+            executor_template,
             &validated_cluster,
             &mut cluster_resources,
             client,
@@ -352,7 +344,7 @@ pub async fn reconcile_airflow(
                 &validated_cluster.cluster_config.dags_git_sync,
                 &validated_cluster.image,
                 &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
-                &airflow.volume_mounts(),
+                &validated_cluster.volume_mounts(),
                 LOG_VOLUME_NAME.as_ref(),
                 &logging.git_sync_container,
             )
@@ -436,27 +428,13 @@ pub async fn reconcile_airflow(
 }
 
 async fn build_executor_template(
-    airflow: &v1alpha2::AirflowCluster,
-    common_config: &AirflowExecutorCommonConfiguration,
+    executor_template: &ValidatedExecutorTemplate,
     validated_cluster: &ValidatedCluster,
     cluster_resources: &mut ClusterResources<'_>,
     client: &stackable_operator::client::Client,
     rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
 ) -> Result<(), Error> {
-    let merged_executor_config = airflow
-        .merged_executor_config(&common_config.config)
-        .context(FailedToResolveConfigSnafu)?;
-    // The Kubernetes-executor pod template is not an `AirflowRole` with role groups, so its logging
-    // is validated here (at build time) via the shared `validate_logging`, mirroring the role-group
-    // path in `validate`. `Container::Base` is the executor's product container.
-    let executor_logging = crate::controller::validate::validate_logging(
-        &merged_executor_config.logging,
-        &Container::Base,
-        &validated_cluster
-            .cluster_config
-            .vector_aggregator_config_map_name,
-    )
-    .context(ValidateSnafu)?;
+    let executor_config = &executor_template.config;
     let rg_configmap = config_map::build_rolegroup_config_map(
         validated_cluster,
         &executor_role_name(),
@@ -464,7 +442,7 @@ async fn build_executor_template(
         // The kubernetes-executor pod template does not apply webserver_config.py overrides
         // (preserves prior behaviour, which passed an empty map here).
         &AirflowConfigOverrides::default(),
-        &executor_logging,
+        &executor_config.logging,
         &Container::Base,
     )
     .context(BuildConfigMapSnafu)?;
@@ -478,22 +456,19 @@ async fn build_executor_template(
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         &validated_cluster.cluster_config.dags_git_sync,
         &validated_cluster.image,
-        &env_vars_from_overrides(&common_config.env_overrides),
-        &airflow.volume_mounts(),
+        &env_vars_from_overrides(&executor_template.env_overrides),
+        &validated_cluster.volume_mounts(),
         LOG_VOLUME_NAME.as_ref(),
-        &merged_executor_config
-            .logging
-            .for_container(&Container::GitSync),
+        &executor_config.logging.git_sync_container,
     )
     .context(InvalidGitSyncSpecSnafu)?;
 
     let worker_pod_template_config_map = build_executor_template_config_map(
         validated_cluster,
         &rbac_sa.name_unchecked(),
-        &merged_executor_config,
-        &executor_logging,
-        &common_config.env_overrides,
-        &common_config.pod_overrides,
+        executor_config,
+        &executor_template.env_overrides,
+        &executor_template.pod_overrides,
         &git_sync_resources,
     )
     .context(BuildExecutorTemplateSnafu)?;

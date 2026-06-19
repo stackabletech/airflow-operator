@@ -13,9 +13,9 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::ValidatedCluster,
+    controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, ExecutorConfig, HTTP_PORT, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
@@ -360,7 +360,7 @@ fn static_envs(
 pub fn build_airflow_template_envs(
     cluster: &ValidatedCluster,
     env_overrides: &HashMap<String, String>,
-    config: &ExecutorConfig,
+    logging: &ValidatedLogging,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
@@ -417,7 +417,7 @@ pub fn build_airflow_template_envs(
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
     // that are created and then terminated (we do a similar thing for spark-k8s).
-    if config.logging.enable_vector_agent {
+    if logging.enable_vector_agent {
         env.insert(
             "_STACKABLE_POST_HOOK".into(),
             EnvVar {

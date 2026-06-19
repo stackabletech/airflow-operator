@@ -31,7 +31,8 @@ use strum::IntoEnumIterator;
 
 use super::{
     AirflowRoleGroupConfig, ValidatedAirflowConfig, ValidatedCluster, ValidatedClusterConfig,
-    ValidatedLogging, ValidatedRoleConfig, dereference::DereferencedObjects,
+    ValidatedExecutorTemplate, ValidatedLogging, ValidatedRoleConfig,
+    dereference::DereferencedObjects,
 };
 use crate::{
     airflow_controller::CONTAINER_IMAGE_BASE_NAME,
@@ -63,6 +64,9 @@ pub enum Error {
     ResolveUid {
         source: stackable_operator::v2::controller_utils::Error,
     },
+
+    #[snafu(display("failed to merge the Kubernetes-executor pod-template config"))]
+    MergeExecutorConfig { source: crate::crd::Error },
 
     #[snafu(display("invalid role group name {role_group}"))]
     ParseRoleGroupName {
@@ -174,6 +178,30 @@ pub fn validate_cluster(
     let (metadata_database_connection_details, celery_database_connection_details) =
         database_connection_details(airflow);
 
+    // The Kubernetes-executor pod template is not an `AirflowRole` with role groups, so its config
+    // is merged and its logging validated here, up-front, rather than in the build step.
+    // `Container::Base` is the executor's product container.
+    let executor_template = match &airflow.spec.executor {
+        AirflowExecutor::KubernetesExecutors {
+            common_configuration,
+        } => {
+            let merged = airflow
+                .merged_executor_config(&common_configuration.config)
+                .context(MergeExecutorConfigSnafu)?;
+            let logging = validate_logging(
+                &merged.logging,
+                &Container::Base,
+                &vector_aggregator_config_map_name,
+            )?;
+            Some(ValidatedExecutorTemplate {
+                config: ValidatedAirflowConfig::from_merged_executor(merged, logging),
+                env_overrides: common_configuration.env_overrides.clone(),
+                pod_overrides: common_configuration.pod_overrides.clone(),
+            })
+        }
+        AirflowExecutor::CeleryExecutors { .. } => None,
+    };
+
     Ok(ValidatedCluster::new(
         cluster_name,
         namespace,
@@ -181,6 +209,7 @@ pub fn validate_cluster(
         resolved_product_image,
         ValidatedClusterConfig {
             executor: airflow.spec.executor.clone(),
+            executor_template,
             authentication_config,
             authorization_config,
             dags_git_sync: airflow.spec.cluster_config.dags_git_sync.clone(),
@@ -196,7 +225,6 @@ pub fn validate_cluster(
                 .enabled,
             volumes: airflow.spec.cluster_config.volumes.clone(),
             volume_mounts: airflow.spec.cluster_config.volume_mounts.clone(),
-            vector_aggregator_config_map_name: vector_aggregator_config_map_name.clone(),
         },
         role_groups,
         role_configs,

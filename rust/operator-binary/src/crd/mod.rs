@@ -429,10 +429,6 @@ impl v1alpha2::AirflowCluster {
         self.get_role(role).map(|r| r.role_config)
     }
 
-    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        self.spec.cluster_config.volume_mounts.clone()
-    }
-
     /// Retrieve and merge resource configs for the executor template
     pub fn merged_executor_config(
         &self,

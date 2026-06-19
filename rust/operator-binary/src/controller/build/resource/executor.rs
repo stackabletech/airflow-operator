@@ -24,7 +24,7 @@ use crate::{
         executor_role_group_name, executor_role_name, executor_template_role_group_name,
     },
     controller::{
-        ValidatedCluster, ValidatedLogging,
+        ValidatedAirflowConfig, ValidatedCluster,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
             properties::env_vars::build_airflow_template_envs,
@@ -35,9 +35,7 @@ use crate::{
         },
     },
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    crd::{
-        CONFIG_PATH, Container, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME,
-    },
+    crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME},
 };
 
 #[derive(Snafu, Debug)]
@@ -79,8 +77,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
     sa_name: &str,
-    merged_executor_config: &ExecutorConfig,
-    executor_logging: &ValidatedLogging,
+    executor_config: &ValidatedAirflowConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
@@ -99,12 +96,12 @@ pub fn build_executor_template_config_map(
 
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(&merged_executor_config.affinity)
+        .affinity(&executor_config.affinity)
         .service_account_name(sa_name)
         .restart_policy("Never")
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
-    add_graceful_shutdown_config(merged_executor_config.graceful_shutdown_timeout, &mut pb)
+    add_graceful_shutdown_config(executor_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
@@ -119,11 +116,11 @@ pub fn build_executor_template_config_map(
     .context(PodSnafu)?;
     airflow_container
         .image_from_product_image(resolved_product_image)
-        .resources(merged_executor_config.resources.clone().into())
+        .resources(executor_config.resources.clone().into())
         .add_env_vars(build_airflow_template_envs(
             cluster,
             env_overrides,
-            merged_executor_config,
+            &executor_config.logging,
             git_sync_resources,
         ))
         .add_volume_mounts(cluster.volume_mounts())
@@ -157,11 +154,11 @@ pub fn build_executor_template_config_map(
             .resource_names(&executor_role_name(), &executor_role_group_name())
             .role_group_config_map()
             .as_ref(),
-        &executor_logging.product_container,
+        &executor_config.logging.product_container,
     ))
     .context(AddVolumeSnafu)?;
 
-    if let Some(vector_log_config) = &executor_logging.vector_container {
+    if let Some(vector_log_config) = &executor_config.logging.vector_container {
         pb.add_container(build_logging_container(
             resolved_product_image,
             vector_log_config,
