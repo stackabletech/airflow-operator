@@ -67,7 +67,7 @@ pub enum Error {
 
     #[snafu(display("failed to parse an environment variable override name"))]
     ParseEnvVarName {
-        source: stackable_operator::v2::builder::pod::container::Error,
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("failed to validate the logging configuration"))]
@@ -281,8 +281,7 @@ fn validate_role_group(
     }
 
     Ok(RoleGroupConfig {
-        // Kubernetes defaults to 1 if `replicas` is not set
-        replicas: validated.replicas.unwrap_or(1),
+        replicas: validated.replicas,
         config: validated.config.config,
         config_overrides: validated.config.config_overrides,
         env_overrides,
@@ -575,7 +574,7 @@ mod tests {
         .expect("validated role group");
 
         // replicas is carried through from the role group.
-        assert_eq!(validated.replicas, 3);
+        assert_eq!(validated.replicas, Some(3));
 
         // pod_overrides is merged role←role-group (role-group wins on shared keys, both levels'
         // unique keys survive).

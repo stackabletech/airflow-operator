@@ -370,7 +370,7 @@ pub fn build_server_rolegroup_statefulset(
             }
             .to_string(),
         ),
-        replicas: Some(i32::from(validated_rg_config.replicas)),
+        replicas: validated_rg_config.replicas.map(i32::from),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
