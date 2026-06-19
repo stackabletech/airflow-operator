@@ -6,7 +6,7 @@ use stackable_operator::{
             meta::ownerreference_from_resource,
             service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
         },
-        types::{common::Port, operator::RoleGroupName},
+        types::operator::RoleGroupName,
     },
 };
 
@@ -69,7 +69,7 @@ pub fn build_rolegroup_metrics_service(
                 &Scraping::Enabled,
                 &Scheme::Http,
                 "/metrics",
-                &Port(METRICS_PORT),
+                &METRICS_PORT,
             ))
             .build(),
         spec: Some(ServiceSpec {

@@ -354,7 +354,7 @@ pub async fn reconcile_airflow(
                 &validated_cluster.image,
                 &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
                 &airflow.volume_mounts(),
-                LOG_VOLUME_NAME,
+                LOG_VOLUME_NAME.as_ref(),
                 &validated_rg_config
                     .config
                     .logging
@@ -484,7 +484,7 @@ async fn build_executor_template(
         &validated_cluster.image,
         &env_vars_from_overrides(&common_config.env_overrides),
         &airflow.volume_mounts(),
-        LOG_VOLUME_NAME,
+        LOG_VOLUME_NAME.as_ref(),
         &merged_executor_config
             .logging
             .for_container(&Container::GitSync),

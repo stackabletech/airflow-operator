@@ -40,7 +40,10 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         role_utils::GenericCommonConfig,
-        types::kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName},
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName, VolumeName},
+        },
     },
     versioned::versioned,
 };
@@ -76,17 +79,17 @@ pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 
-pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
+stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-pub const LISTENER_VOLUME_NAME: &str = "listener";
+stackable_operator::constant!(pub LISTENER_VOLUME_NAME: VolumeName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
-pub const HTTP_PORT: u16 = 8080;
+pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
-pub const METRICS_PORT: u16 = 9102;
+pub const METRICS_PORT: Port = Port(9102);
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -719,7 +722,7 @@ impl AirflowRole {
 
     /// Will be used to expose service ports and - by extension - which roles should be
     /// created as services.
-    pub fn get_http_port(&self) -> Option<u16> {
+    pub fn get_http_port(&self) -> Option<Port> {
         match &self {
             AirflowRole::Webserver => Some(HTTP_PORT),
             AirflowRole::Scheduler => None,

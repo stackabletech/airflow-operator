@@ -197,26 +197,27 @@ pub fn build_server_rolegroup_statefulset(
         .add_volume_mounts(volume_mounts)
         .context(AddVolumeMountSnafu)?;
     airflow_container
-        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
         .context(AddVolumeMountSnafu)?;
     airflow_container
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?;
     airflow_container
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?;
 
     if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         airflow_container
-            .add_volume_mount(TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
+            .add_volume_mount(&*TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
             .context(AddVolumeMountSnafu)?;
     }
 
     // for roles with an http endpoint
     if let Some(http_port) = airflow_role.get_http_port() {
+        let http_port = i32::from(http_port);
         let probe = Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(http_port.into()),
+                port: IntOrString::Int(http_port),
                 ..TCPSocketAction::default()
             }),
             initial_delay_seconds: Some(60),
@@ -226,7 +227,7 @@ pub fn build_server_rolegroup_statefulset(
         };
         airflow_container.readiness_probe(probe.clone());
         airflow_container.liveness_probe(probe);
-        airflow_container.add_container_port(HTTP_PORT_NAME, http_port.into());
+        airflow_container.add_container_port(HTTP_PORT_NAME, http_port);
     }
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
@@ -249,7 +250,7 @@ pub fn build_server_rolegroup_statefulset(
         pvcs = Some(vec![pvc]);
 
         airflow_container
-            .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+            .add_volume_mount(&*LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
             .context(AddVolumeMountSnafu)?;
     }
 
@@ -326,7 +327,7 @@ pub fn build_server_rolegroup_statefulset(
 
     if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         pb.add_volume(
-            VolumeBuilder::new(TEMPLATE_VOLUME_NAME)
+            VolumeBuilder::new(&*TEMPLATE_VOLUME_NAME)
                 .with_config_map(validated_cluster.executor_template_configmap_name())
                 .build(),
         )

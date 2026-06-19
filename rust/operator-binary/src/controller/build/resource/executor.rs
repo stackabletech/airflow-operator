@@ -134,11 +134,11 @@ pub fn build_executor_template_config_map(
         ))
         .add_volume_mounts(cluster.volume_mounts())
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_PATH)
+        .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?;
 
     add_git_sync_resources(

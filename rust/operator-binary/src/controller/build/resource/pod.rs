@@ -14,12 +14,15 @@ use stackable_operator::{
         builder::pod::container::EnvVarSet,
         product_logging::framework::{VectorContainerLogConfig, vector_container},
         role_group_utils::ResourceNames,
-        types::kubernetes::{ContainerName, VolumeName},
+        types::kubernetes::ContainerName,
     },
 };
 
-use crate::crd::authentication::{
-    AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+use crate::{
+    controller_commons::{CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    crd::authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    },
 };
 
 #[derive(Snafu, Debug)]
@@ -112,10 +115,6 @@ pub(crate) fn add_git_sync_resources(
 }
 
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
-// Typed volume names required by the v2 `vector_container`. Their values match the `&str`
-// constants in `controller_commons` used elsewhere to build the same volumes.
-stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
-stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
 
 /// Builds the Vector log-collection sidecar container from the up-front-validated logging config.
 pub(crate) fn build_logging_container(
@@ -128,8 +127,8 @@ pub(crate) fn build_logging_container(
         resolved_product_image,
         vector_log_config,
         resource_names,
-        &CONFIG_VOLUME_NAME_TYPED,
-        &LOG_VOLUME_NAME_TYPED,
+        &CONFIG_VOLUME_NAME,
+        &LOG_VOLUME_NAME,
         EnvVarSet::new(),
     )
 }
