@@ -16,7 +16,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-from-role
+  name: airflow-worker-resources-from-role
 spec:
   template:
     spec:
@@ -40,7 +40,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-from-role-group
+  name: airflow-worker-resources-from-role-group
 spec:
   template:
     spec:
@@ -64,7 +64,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airflow-worker-from-pod-overrides
+  name: airflow-worker-resources-from-pod-overrides
 spec:
   template:
     spec:

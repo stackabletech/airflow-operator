@@ -84,9 +84,9 @@ spec:
         memory:
           limit: 3001Mi
     roleGroups:
-      from-role:
+      resources-from-role:
         replicas: 1
-      from-role-group:
+      resources-from-role-group:
         config:
           resources:
             cpu:
@@ -95,7 +95,7 @@ spec:
             memory:
               limit: 3002Mi
         replicas: 1
-      from-pod-overrides:
+      resources-from-pod-overrides:
         podOverrides:
           spec:
             containers:
