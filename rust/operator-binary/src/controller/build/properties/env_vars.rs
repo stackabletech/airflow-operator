@@ -9,14 +9,16 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
-    v2::builder::pod::container::EnvVarSet,
+    v2::{
+        builder::pod::container::EnvVarSet,
+        product_logging::framework::STACKABLE_LOG_DIR,
+    },
 };
 
 use crate::{
     controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },

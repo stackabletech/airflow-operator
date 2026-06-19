@@ -39,6 +39,7 @@ use stackable_operator::{
     v2::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        product_logging::framework::STACKABLE_LOG_DIR,
         role_utils::GenericCommonConfig,
         types::{
             common::Port,
@@ -77,7 +78,6 @@ pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";

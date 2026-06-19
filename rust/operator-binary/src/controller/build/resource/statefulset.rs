@@ -24,6 +24,7 @@ use stackable_operator::{
             container::new_container_builder,
             volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
         },
+        product_logging::framework::STACKABLE_LOG_DIR,
         types::operator::RoleGroupName,
     },
 };
@@ -47,7 +48,7 @@ use crate::{
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_PVC_NAME,
         LISTENER_VOLUME_DIR, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
-        METRICS_PORT_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
+        METRICS_PORT_NAME, TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
 };
 

@@ -8,7 +8,10 @@ use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
-    v2::types::operator::{RoleGroupName, RoleName},
+    v2::{
+        product_logging::framework::STACKABLE_LOG_DIR,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 
 use crate::{
@@ -19,7 +22,7 @@ use crate::{
             webserver_config,
         },
     },
-    crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container, STACKABLE_LOG_DIR},
+    crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfigOverrides, Container},
 };
 
 #[derive(Snafu, Debug)]

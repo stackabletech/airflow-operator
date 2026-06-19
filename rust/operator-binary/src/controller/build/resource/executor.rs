@@ -16,7 +16,10 @@ use stackable_operator::{
         api::core::v1::{ConfigMap, PodTemplateSpec},
     },
     kvp::{Label, LabelError},
-    v2::builder::pod::container::new_container_builder,
+    v2::{
+        builder::pod::container::new_container_builder,
+        product_logging::framework::STACKABLE_LOG_DIR,
+    },
 };
 
 use crate::{
@@ -35,7 +38,7 @@ use crate::{
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
     },
-    crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME},
+    crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, TEMPLATE_NAME},
 };
 
 #[derive(Snafu, Debug)]
