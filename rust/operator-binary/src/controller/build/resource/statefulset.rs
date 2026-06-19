@@ -6,10 +6,7 @@ use stackable_operator::{
             PodBuilder,
             resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
-            volume::{
-                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-                ListenerReference, VolumeBuilder,
-            },
+            volume::VolumeBuilder,
         },
     },
     crd::git_sync,
@@ -25,7 +22,13 @@ use stackable_operator::{
     kvp::{Annotation, Label, LabelError},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::{meta::ownerreference_from_resource, pod::container::new_container_builder},
+        builder::{
+            meta::ownerreference_from_resource,
+            pod::{
+                container::new_container_builder,
+                volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
+            },
+        },
         types::operator::RoleGroupName,
     },
 };
@@ -48,7 +51,7 @@ use crate::{
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_VOLUME_DIR,
-        LISTENER_VOLUME_NAME, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
+        LISTENER_PVC_NAME, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
         METRICS_PORT_NAME, STACKABLE_LOG_DIR, TEMPLATE_LOCATION, TEMPLATE_VOLUME_NAME,
     },
 };
@@ -76,11 +79,6 @@ pub enum Error {
 
     #[snafu(display("failed to build Statefulset environmental variables"))]
     BuildStatefulsetEnvVars { source: env_vars::Error },
-
-    #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
 
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
@@ -237,16 +235,15 @@ pub fn build_server_rolegroup_statefulset(
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
         // cluster-internal) as the address should still be consistent.
-        let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerName(listener_group_name.to_string()),
+        let pvc = listener_operator_volume_source_builder_build_pvc(
+            &ListenerReference::Listener(listener_group_name),
             &unversioned_recommended_labels,
-        )
-        .build_pvc(LISTENER_VOLUME_NAME.to_string())
-        .context(BuildListenerVolumeSnafu)?;
+            &LISTENER_PVC_NAME,
+        );
         pvcs = Some(vec![pvc]);
 
         airflow_container
-            .add_volume_mount(&*LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+            .add_volume_mount(&*LISTENER_PVC_NAME, LISTENER_VOLUME_DIR)
             .context(AddVolumeMountSnafu)?;
     }
 

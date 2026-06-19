@@ -43,8 +43,8 @@ use stackable_operator::{
         types::{
             common::Port,
             kubernetes::{
-                ConfigMapName, ContainerName, ListenerClassName, ListenerName, SecretName,
-                VolumeName,
+                ConfigMapName, ContainerName, ListenerClassName, ListenerName,
+                PersistentVolumeClaimName, SecretName, VolumeName,
             },
         },
     },
@@ -86,7 +86,7 @@ stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-ex
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-stackable_operator::constant!(pub LISTENER_VOLUME_NAME: VolumeName = "listener");
+stackable_operator::constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
