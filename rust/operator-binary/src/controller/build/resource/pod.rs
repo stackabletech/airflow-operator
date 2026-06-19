@@ -19,7 +19,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller_commons::{CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    controller::build::volumes::{CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::authentication::{
         AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
     },

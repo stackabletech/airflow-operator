@@ -32,17 +32,17 @@ use crate::{
     controller::{
         ValidatedCluster, ValidatedExecutorTemplate,
         build::{
-            config_map,
             resource::{
+                config_map,
                 executor::build_executor_template_config_map,
                 listener::build_group_listener,
                 pdb::build_pdb,
                 service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
                 statefulset::build_server_rolegroup_statefulset,
             },
+            volumes::LOG_VOLUME_NAME,
         },
     },
-    controller_commons::LOG_VOLUME_NAME,
     crd::{
         APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, Container, OPERATOR_NAME,
         internal_secret::{
@@ -128,7 +128,7 @@ pub enum Error {
 
     #[snafu(display("failed to build rolegroup ConfigMap"))]
     BuildConfigMap {
-        source: crate::controller::build::config_map::Error,
+        source: crate::controller::build::resource::config_map::Error,
     },
 
     #[snafu(display("invalid git-sync specification"))]

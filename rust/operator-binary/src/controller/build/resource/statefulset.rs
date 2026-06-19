@@ -41,9 +41,9 @@ use crate::{
                 },
                 service::stateful_set_service_name,
             },
+            volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
     },
-    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
         AirflowExecutor, AirflowRole, CONFIG_PATH, Container, HTTP_PORT_NAME, LISTENER_PVC_NAME,
         LISTENER_VOLUME_DIR, LOG_CONFIG_DIR, METRICS_CONTAINER_NAME, METRICS_PORT,
@@ -300,7 +300,7 @@ pub fn build_server_rolegroup_statefulset(
 
     pb.add_volumes(validated_cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
-    pb.add_volumes(controller_commons::create_volumes(
+    pb.add_volumes(volumes::create_volumes(
         resource_names.role_group_config_map().as_ref(),
         &logging.product_container,
     ))

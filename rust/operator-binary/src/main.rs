@@ -40,7 +40,6 @@ use crate::{
 
 mod airflow_controller;
 mod controller;
-mod controller_commons;
 mod crd;
 mod util;
 mod webhooks;

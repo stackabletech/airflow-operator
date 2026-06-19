@@ -32,9 +32,9 @@ use crate::{
                 add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
                 build_logging_container,
             },
+            volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
     },
-    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, STACKABLE_LOG_DIR, TEMPLATE_NAME},
 };
 
@@ -149,7 +149,7 @@ pub fn build_executor_template_config_map(
     pb.add_container(airflow_container.build());
     pb.add_volumes(cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
-    pb.add_volumes(controller_commons::create_volumes(
+    pb.add_volumes(volumes::create_volumes(
         cluster
             .resource_names(&executor_role_name(), &executor_role_group_name())
             .role_group_config_map()
