@@ -16,6 +16,7 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, RoleGroup},
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
@@ -51,6 +52,16 @@ pub enum Error {
     ParseClusterName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
         cluster_name: String,
+    },
+
+    #[snafu(display("failed to resolve namespace"))]
+    ResolveNamespace {
+        source: stackable_operator::v2::controller_utils::Error,
+    },
+
+    #[snafu(display("failed to resolve uid"))]
+    ResolveUid {
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("invalid role group name {role_group}"))]
@@ -100,6 +111,8 @@ pub fn validate_cluster(
         ClusterName::from_str(&airflow.name_any()).with_context(|_| ParseClusterNameSnafu {
             cluster_name: airflow.name_any(),
         })?;
+    let namespace = get_namespace(airflow).context(ResolveNamespaceSnafu)?;
+    let uid = get_uid(airflow).context(ResolveUidSnafu)?;
 
     // The Vector aggregator discovery ConfigMap name. Validity is already enforced by the
     // `ConfigMapName` type on the CRD; it is only required when the Vector agent is enabled.
@@ -162,8 +175,9 @@ pub fn validate_cluster(
         database_connection_details(airflow);
 
     Ok(ValidatedCluster::new(
-        airflow,
         cluster_name,
+        namespace,
+        uid,
         resolved_product_image,
         ValidatedClusterConfig {
             executor: airflow.spec.executor.clone(),

@@ -17,7 +17,9 @@ use stackable_operator::{
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         types::{
-            kubernetes::{ConfigMapName, ListenerClassName, ListenerName, SecretName, Uid},
+            kubernetes::{
+                ConfigMapName, ListenerClassName, ListenerName, NamespaceName, SecretName, Uid,
+            },
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -120,6 +122,11 @@ pub struct ValidatedCluster {
     metadata: ObjectMeta,
     /// The cluster name as a type-safe value, used to build resource names and labels.
     pub name: ClusterName,
+    /// The cluster's namespace as a type-safe value, captured during validation.
+    pub namespace: NamespaceName,
+    /// The cluster's UID as a type-safe value, captured during validation (used for owner
+    /// references).
+    pub uid: Uid,
     /// The product version as a valid label value, for the recommended `app.kubernetes.io/version`
     /// label. Derived from the resolved image's app-version label value.
     pub product_version: ProductVersion,
@@ -131,8 +138,9 @@ pub struct ValidatedCluster {
 
 impl ValidatedCluster {
     pub fn new(
-        airflow: &v1alpha2::AirflowCluster,
         name: ClusterName,
+        namespace: NamespaceName,
+        uid: Uid,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
         role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroup>>,
@@ -145,23 +153,20 @@ impl ValidatedCluster {
         Self {
             // Capture only the identity fields needed to own child objects.
             metadata: ObjectMeta {
-                name: Some(airflow.name_any()),
-                namespace: airflow.namespace(),
-                uid: airflow.uid(),
+                name: Some(name.to_string()),
+                namespace: Some(namespace.to_string()),
+                uid: Some(uid.to_string()),
                 ..ObjectMeta::default()
             },
             name,
+            namespace,
+            uid,
             product_version,
             image,
             cluster_config,
             role_groups,
             role_configs,
         }
-    }
-
-    /// The cluster's namespace, captured during validation.
-    pub fn namespace(&self) -> Option<String> {
-        self.metadata.namespace.clone()
     }
 
     /// Whether the cluster has the given role configured (i.e. it has role groups for it).
@@ -356,13 +361,6 @@ impl NameIsValidLabelValue for ValidatedCluster {
 
 impl HasUid for ValidatedCluster {
     fn to_uid(&self) -> Uid {
-        Uid::from_str(
-            &self
-                .metadata
-                .uid
-                .clone()
-                .expect("the uid is captured during validation"),
-        )
-        .expect("the uid is a valid Kubernetes UID")
+        self.uid.clone()
     }
 }

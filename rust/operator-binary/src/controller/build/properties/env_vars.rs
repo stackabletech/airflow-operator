@@ -214,7 +214,7 @@ pub fn build_airflow_statefulset_envs(
             AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
             EnvVar {
                 name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-                value: cluster.namespace(),
+                value: Some(cluster.namespace.to_string()),
                 ..Default::default()
             },
         );
@@ -393,7 +393,7 @@ pub fn build_airflow_template_envs(
         AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
         EnvVar {
             name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-            value: cluster.namespace(),
+            value: Some(cluster.namespace.to_string()),
             ..Default::default()
         },
     );
