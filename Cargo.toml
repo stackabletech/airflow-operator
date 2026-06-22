@@ -13,11 +13,11 @@ repository = "https://github.com/stackabletech/airflow-operator"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", features = [
   "crds",
   "webhook",
-], tag = "stackable-operator-0.111.1" }
+], tag = "stackable-operator-0.112.0" }
 
 anyhow = "1.0"
 built = { version = "0.8", features = ["chrono", "git2"] }
-clap = "4.5"
+clap = "4.6"
 const_format = "0.2"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
@@ -29,9 +29,9 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 snafu = "0.9"
 strum = { version = "0.28", features = ["derive"] }
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 tracing = "0.1"
 
 [patch."https://github.com/stackabletech/operator-rs.git"]
-stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
+# stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
 # stackable-operator = { path = "../operator-rs/crates/stackable-operator" }
