@@ -86,10 +86,28 @@ pub fn build(
 
     let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
+    // Workaround for apache-airflow-providers-fab 3.6.x: `_search_ldap` calls
+    // `ldap.filter.escape_filter_chars` without ever importing `ldap.filter`, so every LDAP
+    // login fails with `AttributeError: module 'ldap' has no attribute 'filter'` (the
+    // `filter` submodule is not auto-loaded by `import ldap`). Importing it here registers
+    // the submodule on the `ldap` package for the whole webserver process, which makes the
+    // FAB code resolve it. Fixed upstream in FAB 3.7.0 (apache/airflow#68226); this import
+    // is a harmless no-op there and on any python-ldap version.
+    let mut imports = PYTHON_IMPORTS.to_vec();
+    let has_ldap = validated_cluster
+        .cluster_config
+        .authentication_config
+        .authentication_classes_resolved
+        .iter()
+        .any(|auth_class| matches!(auth_class, AirflowAuthenticationClassResolved::Ldap { .. }));
+    if has_ldap {
+        imports.push("import ldap.filter");
+    }
+
     flask_config_writer::write::<AirflowConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
-        PYTHON_IMPORTS,
+        &imports,
     )
     .context(WriteConfigFileSnafu)?;
 
