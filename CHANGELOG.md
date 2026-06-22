@@ -27,7 +27,7 @@
 - BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
 ￼ Users relying on the product-config `properties.yaml` file have to set these properties via the CRD.
   The `--product-config` CLI flag is now a no-op ([#804]).
-- Increase the Scheduler default resources from 1GB -> 1.2GB memory ([#804]).
+- Increase the Scheduler default resources from 1GB -> 1.5GB memory ([#804]).
 
 ### Fixed
 
