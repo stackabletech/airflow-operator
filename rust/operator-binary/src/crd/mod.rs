@@ -937,7 +937,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
                 max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("1Gi".to_owned())),
+                limit: Some(Quantity("1.2Gi".to_owned())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
