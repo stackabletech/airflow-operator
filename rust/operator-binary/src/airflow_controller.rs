@@ -56,7 +56,7 @@ pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 
 /// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
-/// [`AirflowRole`]). Used to derive its labels and ConfigMap name.
+/// AirflowRole). Used to derive its labels and ConfigMap name.
 pub const EXECUTOR_ROLE_NAME: &str = "executor";
 pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
 
@@ -440,7 +440,6 @@ async fn build_executor_template(
         &executor_role_name(),
         &executor_role_group_name(),
         // The kubernetes-executor pod template does not apply webserver_config.py overrides
-        // (preserves prior behaviour, which passed an empty map here).
         &AirflowConfigOverrides::default(),
         &executor_config.logging,
         &Container::Base,
