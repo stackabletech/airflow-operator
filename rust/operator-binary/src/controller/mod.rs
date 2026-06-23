@@ -11,8 +11,12 @@ use stackable_operator::{
         resources::{NoRuntimeLimits, Resources},
     },
     crd::git_sync,
-    database_connections::drivers::{
-        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+    database_connections::{
+        TemplatingMechanism,
+        drivers::{
+            celery::CeleryDatabaseConnectionDetails,
+            sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+        },
     },
     k8s_openapi::api::core::v1::{PodTemplateSpec, Volume, VolumeMount},
     kube::{Resource, ResourceExt, api::ObjectMeta},
@@ -43,7 +47,11 @@ use crate::{
         APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
         AirflowStorageConfig, ExecutorConfig, OPERATOR_NAME,
         authentication::AirflowClientAuthenticationDetailsResolved,
-        authorization::AirflowAuthorizationResolved, v1alpha2,
+        authorization::AirflowAuthorizationResolved,
+        databases::{
+            CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
+        },
+        v1alpha2,
     },
 };
 
@@ -148,13 +156,16 @@ pub struct ValidatedClusterConfig {
     pub load_examples: bool,
     pub expose_config: bool,
     pub database_initialization_enabled: bool,
-    /// The templated SQLAlchemy connection details for the metadata database.
-    pub metadata_database_connection_details: SqlAlchemyDatabaseConnectionDetails,
-    /// The templated Celery result-backend and broker connection details, when configured.
-    pub celery_database_connection_details: Option<(
-        CeleryDatabaseConnectionDetails,
-        CeleryDatabaseConnectionDetails,
-    )>,
+    /// The metadata database connection (`spec.clusterConfig.metadataDatabase`), as taken from the
+    /// CRD. The templated connection details are derived on demand, see
+    /// [`ValidatedCluster::metadata_database_connection_details`].
+    pub metadata_database: MetadataDatabaseConnection,
+    /// The Celery result-backend connection (`spec.clusterConfig.celeryResultsBackend`), when
+    /// configured. See [`ValidatedCluster::celery_database_connection_details`].
+    pub celery_results_backend: Option<CeleryResultBackendConnection>,
+    /// The Celery broker connection (`spec.clusterConfig.celeryBroker`), when configured. See
+    /// [`ValidatedCluster::celery_database_connection_details`].
+    pub celery_broker: Option<CeleryBrokerConnection>,
     /// User-supplied extra Volumes (`spec.clusterConfig.volumes`).
     pub volumes: Vec<Volume>,
     /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
@@ -253,6 +264,48 @@ impl ValidatedCluster {
     /// User-supplied extra VolumeMounts (`spec.clusterConfig.volumeMounts`).
     pub fn volume_mounts(&self) -> Vec<VolumeMount> {
         self.cluster_config.volume_mounts.clone()
+    }
+
+    /// The templated SQLAlchemy connection details for the metadata database, derived from the
+    /// CRD connection ([`ValidatedClusterConfig::metadata_database`]).
+    pub fn metadata_database_connection_details(&self) -> SqlAlchemyDatabaseConnectionDetails {
+        self.cluster_config
+            .metadata_database
+            .sqlalchemy_connection_details_with_templating(
+                "METADATA",
+                &TemplatingMechanism::BashEnvSubstitution,
+            )
+    }
+
+    /// The templated Celery result-backend and broker connection details, derived from the CRD
+    /// connections ([`ValidatedClusterConfig::celery_results_backend`] /
+    /// [`ValidatedClusterConfig::celery_broker`]). `Some` only when both are configured, as the
+    /// Celery executor needs both.
+    pub fn celery_database_connection_details(
+        &self,
+    ) -> Option<(
+        CeleryDatabaseConnectionDetails,
+        CeleryDatabaseConnectionDetails,
+    )> {
+        let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+        match (
+            &self.cluster_config.celery_results_backend,
+            &self.cluster_config.celery_broker,
+        ) {
+            (Some(celery_results_backend), Some(celery_broker)) => {
+                let celery_results_backend = celery_results_backend
+                    .celery_connection_details_with_templating(
+                        "CELERY_RESULT_BACKEND",
+                        &templating_mechanism,
+                    );
+                let celery_broker = celery_broker.celery_connection_details_with_templating(
+                    "CELERY_BROKER",
+                    &templating_mechanism,
+                );
+                Some((celery_results_backend, celery_broker))
+            }
+            _ => None,
+        }
     }
 
     /// Type-safe names for the resources of a role group.

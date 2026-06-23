@@ -4,13 +4,6 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
-    database_connections::{
-        TemplatingMechanism,
-        drivers::{
-            celery::CeleryDatabaseConnectionDetails,
-            sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
-        },
-    },
     kube::ResourceExt,
     product_logging::spec::Logging,
     role_utils::{GenericRoleConfig, RoleGroup},
@@ -175,8 +168,21 @@ pub fn validate_cluster(
         authorization_config,
     } = dereferenced;
 
-    let (metadata_database_connection_details, celery_database_connection_details) =
-        database_connection_details(airflow);
+    // The Celery result-backend and broker only work with configured celeryExecutors. Emit a
+    // warning if they are provided without a Celery executor. The connection details themselves are
+    // derived from the CRD later, in the build step (see
+    // `ValidatedCluster::celery_database_connection_details`).
+    if airflow.spec.cluster_config.celery_results_backend.is_some()
+        && airflow.spec.cluster_config.celery_broker.is_some()
+        && !matches!(
+            &airflow.spec.executor,
+            AirflowExecutor::CeleryExecutors { .. }
+        )
+    {
+        tracing::warn!(
+            "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
+        )
+    }
 
     // The Kubernetes-executor pod template is not an `AirflowRole` with role groups, so its config
     // is merged and its logging validated here, up-front, rather than in the build step.
@@ -214,8 +220,9 @@ pub fn validate_cluster(
             authorization_config,
             dags_git_sync: airflow.spec.cluster_config.dags_git_sync.clone(),
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
-            metadata_database_connection_details,
-            celery_database_connection_details,
+            metadata_database: airflow.spec.cluster_config.metadata_database.clone(),
+            celery_results_backend: airflow.spec.cluster_config.celery_results_backend.clone(),
+            celery_broker: airflow.spec.cluster_config.celery_broker.clone(),
             load_examples: airflow.spec.cluster_config.load_examples,
             expose_config: airflow.spec.cluster_config.expose_config,
             database_initialization_enabled: airflow
@@ -229,61 +236,6 @@ pub fn validate_cluster(
         role_groups,
         role_configs,
     ))
-}
-
-/// Builds the templated metadata-database (and optional Celery result-backend/broker) connection
-/// details from the cluster spec.
-fn database_connection_details(
-    airflow: &v1alpha2::AirflowCluster,
-) -> (
-    SqlAlchemyDatabaseConnectionDetails,
-    Option<(
-        CeleryDatabaseConnectionDetails,
-        CeleryDatabaseConnectionDetails,
-    )>,
-) {
-    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
-
-    let metadata_database_connection_details = airflow
-        .spec
-        .cluster_config
-        .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
-
-    let celery_database_connection_details = if let (
-        Some(celery_results_backend),
-        Some(celery_broker),
-    ) = (
-        &airflow.spec.cluster_config.celery_results_backend,
-        &airflow.spec.cluster_config.celery_broker,
-    ) {
-        // The celery results backend and celery broker only work with configured celeryExecutors.
-        // Emit a warning if celery executors were not configured properly.
-        if !matches!(
-            &airflow.spec.executor,
-            AirflowExecutor::CeleryExecutors { .. }
-        ) {
-            tracing::warn!(
-                "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
-            )
-        }
-
-        let celery_results_backend = celery_results_backend
-            .celery_connection_details_with_templating(
-                "CELERY_RESULT_BACKEND",
-                &templating_mechanism,
-            );
-        let celery_broker = celery_broker
-            .celery_connection_details_with_templating("CELERY_BROKER", &templating_mechanism);
-        Some((celery_results_backend, celery_broker))
-    } else {
-        None
-    };
-
-    (
-        metadata_database_connection_details,
-        celery_database_connection_details,
-    )
 }
 
 /// Validate and merge one role group against its role, via the shared

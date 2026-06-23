@@ -80,10 +80,8 @@ pub fn build_airflow_statefulset_envs(
     let auth_config = &cluster.cluster_config.authentication_config;
     let authorization_config = &cluster.cluster_config.authorization_config;
     let resolved_product_image = &cluster.image;
-    let metadata_database_connection_details =
-        &cluster.cluster_config.metadata_database_connection_details;
-    let celery_database_connection_details =
-        &cluster.cluster_config.celery_database_connection_details;
+    let metadata_database_connection_details = cluster.metadata_database_connection_details();
+    let celery_database_connection_details = cluster.celery_database_connection_details();
 
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
     let internal_secret_name = cluster.internal_secret_name();
@@ -370,8 +368,7 @@ pub fn build_airflow_template_envs(
             name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
             value: Some(
                 cluster
-                    .cluster_config
-                    .metadata_database_connection_details
+                    .metadata_database_connection_details()
                     .url_template
                     .clone(),
             ),

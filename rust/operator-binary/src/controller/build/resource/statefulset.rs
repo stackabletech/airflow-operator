@@ -256,12 +256,10 @@ pub fn build_server_rolegroup_statefulset(
     .context(PodSnafu)?;
 
     validated_cluster
-        .cluster_config
-        .metadata_database_connection_details
+        .metadata_database_connection_details()
         .add_to_container(&mut airflow_container);
-    if let Some((celery_result_backend, celery_broker)) = &validated_cluster
-        .cluster_config
-        .celery_database_connection_details
+    if let Some((celery_result_backend, celery_broker)) =
+        validated_cluster.celery_database_connection_details()
     {
         celery_result_backend.add_to_container(&mut airflow_container);
         celery_broker.add_to_container(&mut airflow_container);

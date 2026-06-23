@@ -145,8 +145,7 @@ pub fn build_executor_template_config_map(
     .context(PodSnafu)?;
 
     cluster
-        .cluster_config
-        .metadata_database_connection_details
+        .metadata_database_connection_details()
         .add_to_container(&mut airflow_container);
 
     pb.add_container(airflow_container.build());
