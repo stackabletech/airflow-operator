@@ -400,17 +400,17 @@ impl ValidatedCluster {
 }
 
 /// The product name (`airflow`) as a type-safe label value.
-fn product_name() -> ProductName {
+pub(crate) fn product_name() -> ProductName {
     ProductName::from_str(APP_NAME).expect("'airflow' is a valid product name")
 }
 
 /// The operator name as a type-safe label value.
-fn operator_name() -> OperatorName {
+pub(crate) fn operator_name() -> OperatorName {
     OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
 }
 
 /// The controller name as a type-safe label value.
-fn controller_name() -> ControllerName {
+pub(crate) fn controller_name() -> ControllerName {
     ControllerName::from_str(AIRFLOW_CONTROLLER_NAME)
         .expect("the controller name is a valid label value")
 }

@@ -13,7 +13,7 @@ use stackable_operator::{
     crd::git_sync,
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
-        Resource, ResourceExt,
+        ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
@@ -24,7 +24,10 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    v2::types::operator::{RoleGroupName, RoleName},
+    v2::{
+        cluster_resources::cluster_resources_new,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -42,6 +45,7 @@ use crate::{
             },
             volumes::LOG_VOLUME_NAME,
         },
+        controller_name, operator_name, product_name,
     },
     crd::{
         APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, Container, OPERATOR_NAME,
@@ -133,11 +137,6 @@ pub enum Error {
 
     #[snafu(display("invalid git-sync specification"))]
     InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
-
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
@@ -239,7 +238,7 @@ pub async fn reconcile_airflow(
         validated_cluster.internal_secret_name().as_ref(),
         INTERNAL_SECRET_SECRET_KEY,
         256,
-        airflow,
+        &validated_cluster,
         client,
     )
     .await
@@ -249,7 +248,7 @@ pub async fn reconcile_airflow(
         validated_cluster.jwt_secret_name().as_ref(),
         JWT_SECRET_SECRET_KEY,
         256,
-        airflow,
+        &validated_cluster,
         client,
     )
     .await
@@ -263,21 +262,22 @@ pub async fn reconcile_airflow(
         validated_cluster.fernet_key_name().as_ref(),
         FERNET_KEY_SECRET_KEY,
         32,
-        airflow,
+        &validated_cluster,
         client,
     )
     .await
     .context(InternalSecretSnafu)?;
 
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        OPERATOR_NAME,
-        AIRFLOW_CONTROLLER_NAME,
-        &airflow.object_ref(&()),
+    let mut cluster_resources = cluster_resources_new(
+        &product_name(),
+        &operator_name(),
+        &controller_name(),
+        &validated_cluster.name,
+        &validated_cluster.namespace,
+        &validated_cluster.uid,
         ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
         &airflow.spec.object_overrides,
-    )
-    .context(CreateClusterResourcesSnafu)?;
+    );
 
     let required_labels = cluster_resources
         .get_required_labels()

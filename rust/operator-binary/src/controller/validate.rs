@@ -169,18 +169,18 @@ pub fn validate_cluster(
     } = dereferenced;
 
     // The Celery result-backend and broker only work with configured celeryExecutors. Emit a
-    // warning if they are provided without a Celery executor. The connection details themselves are
+    // warning if either are provided without a Celery executor. The connection details themselves are
     // derived from the CRD later, in the build step (see
     // `ValidatedCluster::celery_database_connection_details`).
-    if airflow.spec.cluster_config.celery_results_backend.is_some()
-        && airflow.spec.cluster_config.celery_broker.is_some()
+    if (airflow.spec.cluster_config.celery_results_backend.is_some()
+        || airflow.spec.cluster_config.celery_broker.is_some())
         && !matches!(
             &airflow.spec.executor,
             AirflowExecutor::CeleryExecutors { .. }
         )
     {
         tracing::warn!(
-            "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
+            "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and/or `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
         )
     }
 
