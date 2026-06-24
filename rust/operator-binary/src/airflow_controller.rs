@@ -10,7 +10,6 @@ use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{random_secret_creation, rbac::build_rbac_resources},
-    crd::git_sync,
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
         ResourceExt,
@@ -34,16 +33,13 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     controller::{
         ValidatedCluster, ValidatedExecutorTemplate,
-        build::{
-            resource::{
-                config_map,
-                executor::build_executor_template_config_map,
-                listener::build_group_listener,
-                pdb::build_pdb,
-                service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
-                statefulset::build_server_rolegroup_statefulset,
-            },
-            volumes::LOG_VOLUME_NAME,
+        build::resource::{
+            config_map,
+            executor::build_executor_template_config_map,
+            listener::build_group_listener,
+            pdb::build_pdb,
+            service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
+            statefulset::build_server_rolegroup_statefulset,
         },
         controller_name, operator_name, product_name,
     },
@@ -134,9 +130,6 @@ pub enum Error {
     BuildConfigMap {
         source: crate::controller::build::resource::config_map::Error,
     },
-
-    #[snafu(display("invalid git-sync specification"))]
-    InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
@@ -340,16 +333,6 @@ pub async fn reconcile_airflow(
         for (rolegroup_name, validated_rg_config) in role_group_configs {
             let logging = &validated_rg_config.config.logging;
 
-            let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
-                &validated_cluster.cluster_config.dags_git_sync,
-                &validated_cluster.image,
-                &Vec::<EnvVar>::from(validated_rg_config.env_overrides.clone()),
-                &validated_cluster.volume_mounts(),
-                LOG_VOLUME_NAME.as_ref(),
-                &logging.git_sync_container,
-            )
-            .context(InvalidGitSyncSpecSnafu)?;
-
             let rg_headless_service =
                 build_rolegroup_headless_service(&validated_cluster, airflow_role, rolegroup_name);
 
@@ -392,7 +375,6 @@ pub async fn reconcile_airflow(
                 validated_rg_config,
                 logging,
                 &rbac_sa,
-                &git_sync_resources,
             )
             .context(BuildStatefulSetSnafu)?;
 
@@ -452,23 +434,12 @@ async fn build_executor_template(
             role_group: executor_role_group_name(),
         })?;
 
-    let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
-        &validated_cluster.cluster_config.dags_git_sync,
-        &validated_cluster.image,
-        &env_vars_from_overrides(&executor_template.env_overrides),
-        &validated_cluster.volume_mounts(),
-        LOG_VOLUME_NAME.as_ref(),
-        &executor_config.logging.git_sync_container,
-    )
-    .context(InvalidGitSyncSpecSnafu)?;
-
     let worker_pod_template_config_map = build_executor_template_config_map(
         validated_cluster,
         &rbac_sa.name_unchecked(),
         executor_config,
         &executor_template.env_overrides,
         &executor_template.pod_overrides,
-        &git_sync_resources,
     )
     .context(BuildExecutorTemplateSnafu)?;
     cluster_resources
@@ -492,7 +463,7 @@ pub fn error_policy(
 }
 
 /// Convert user-supplied `envOverrides` into a list of [`EnvVar`]s.
-fn env_vars_from_overrides(env_overrides: &HashMap<String, String>) -> Vec<EnvVar> {
+pub(crate) fn env_vars_from_overrides(env_overrides: &HashMap<String, String>) -> Vec<EnvVar> {
     // Collect into a `BTreeMap` first so the env vars come out in a deterministic (sorted) order;
     // `HashMap` iteration order is randomised per instance and would otherwise churn the containers
     // this feeds between reconciles. Mirrors the override handling in `env_vars.rs`.

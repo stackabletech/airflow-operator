@@ -82,35 +82,51 @@ pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupC
 /// A validated, merged Airflow role-group config: the merged [`AirflowConfig`] with its raw
 /// `logging` replaced by the up-front-validated [`ValidatedLogging`] (so an invalid custom log
 /// ConfigMap name or a missing Vector aggregator name fails reconciliation during validation).
-#[derive(Clone, Debug, PartialEq)]
+// Not `Clone`/`Debug`/`PartialEq`: `git_sync_resources` (a `GitSyncResources`) implements none of
+// them, mirroring nifi's `ValidatedNifiConfig`.
 pub struct ValidatedAirflowConfig {
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
     pub graceful_shutdown_timeout: Option<Duration>,
+    /// The git-sync resources (containers, volumes, mounts) for the DAGs, resolved up-front in the
+    /// [`validate`] step (the env vars and logging differ per role group / executor, so they are
+    /// computed there). Consumed by the StatefulSet, executor-template and env-var builders, which
+    /// read it off here rather than reconstructing it.
+    pub git_sync_resources: git_sync::v1alpha2::GitSyncResources,
 }
 
 impl ValidatedAirflowConfig {
     /// Builds the validated config from the merged [`AirflowConfig`], swapping in the
     /// already-validated logging.
-    pub(crate) fn from_merged(merged: AirflowConfig, logging: ValidatedLogging) -> Self {
+    pub(crate) fn from_merged(
+        merged: AirflowConfig,
+        logging: ValidatedLogging,
+        git_sync_resources: git_sync::v1alpha2::GitSyncResources,
+    ) -> Self {
         Self {
             resources: merged.resources,
             logging,
             affinity: merged.affinity,
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
+            git_sync_resources,
         }
     }
 
     /// Builds the validated config from the merged [`ExecutorConfig`] (Kubernetes-executor pod
     /// template), swapping in the already-validated logging. [`ExecutorConfig`] is field-identical
     /// to [`AirflowConfig`].
-    pub(crate) fn from_merged_executor(merged: ExecutorConfig, logging: ValidatedLogging) -> Self {
+    pub(crate) fn from_merged_executor(
+        merged: ExecutorConfig,
+        logging: ValidatedLogging,
+        git_sync_resources: git_sync::v1alpha2::GitSyncResources,
+    ) -> Self {
         Self {
             resources: merged.resources,
             logging,
             affinity: merged.affinity,
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
+            git_sync_resources,
         }
     }
 }
@@ -150,8 +166,6 @@ pub struct ValidatedClusterConfig {
     pub executor_template: Option<ValidatedExecutorTemplate>,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
-    /// The Git-sync definitions for the DAGs (`spec.clusterConfig.dagsGitSync`).
-    pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
     pub credentials_secret_name: SecretName,
     pub load_examples: bool,
     pub expose_config: bool,

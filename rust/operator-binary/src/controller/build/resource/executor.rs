@@ -10,7 +10,6 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
-    crd::git_sync,
     k8s_openapi::{
         DeepMerge,
         api::core::v1::{ConfigMap, PodTemplateSpec},
@@ -83,10 +82,12 @@ pub fn build_executor_template_config_map(
     executor_config: &ValidatedAirflowConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
-    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<ConfigMap> {
     let resolved_product_image = &cluster.image;
     let authentication_config = &cluster.cluster_config.authentication_config;
+    // The git-sync resources were resolved up-front during validation; read them off the validated
+    // executor config rather than reconstructing them here.
+    let git_sync_resources = &executor_config.git_sync_resources;
 
     let mut pb = PodBuilder::new();
     let pb_metadata =

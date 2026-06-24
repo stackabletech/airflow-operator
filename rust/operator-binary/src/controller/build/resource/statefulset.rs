@@ -7,7 +7,6 @@ use stackable_operator::{
             security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
-    crd::git_sync,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -105,10 +104,12 @@ pub fn build_server_rolegroup_statefulset(
     validated_rg_config: &AirflowRoleGroupConfig,
     logging: &ValidatedLogging,
     service_account: &ServiceAccount,
-    git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
 ) -> Result<StatefulSet> {
     let merged_airflow_config = &validated_rg_config.config;
     let env_overrides = &validated_rg_config.env_overrides;
+    // The git-sync resources were resolved up-front during validation; read them off the validated
+    // config rather than reconstructing them here.
+    let git_sync_resources = &merged_airflow_config.git_sync_resources;
 
     let resolved_product_image = &validated_cluster.image;
     let authentication_config = &validated_cluster.cluster_config.authentication_config;

@@ -4,6 +4,8 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
+    crd::git_sync,
+    k8s_openapi::api::core::v1::{EnvVar, VolumeMount},
     kube::ResourceExt,
     product_logging::spec::Logging,
     role_utils::{GenericRoleConfig, RoleGroup},
@@ -25,10 +27,10 @@ use strum::IntoEnumIterator;
 use super::{
     AirflowRoleGroupConfig, ValidatedAirflowConfig, ValidatedCluster, ValidatedClusterConfig,
     ValidatedExecutorTemplate, ValidatedLogging, ValidatedRoleConfig,
-    dereference::DereferencedObjects,
+    build::volumes::LOG_VOLUME_NAME, dereference::DereferencedObjects,
 };
 use crate::{
-    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
+    airflow_controller::{CONTAINER_IMAGE_BASE_NAME, env_vars_from_overrides},
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
         AirflowRoleType, Container, v1alpha2,
@@ -87,6 +89,9 @@ pub enum Error {
         "the Vector aggregator discovery ConfigMap name must be set when the Vector agent is enabled"
     ))]
     MissingVectorAggregatorConfigMapName,
+
+    #[snafu(display("invalid git-sync specification"))]
+    InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
 }
 
 pub fn validate_cluster(
@@ -155,6 +160,9 @@ pub fn validate_cluster(
                 rolegroup,
                 &default_config,
                 &vector_aggregator_config_map_name,
+                &resolved_product_image,
+                &airflow.spec.cluster_config.dags_git_sync,
+                &airflow.spec.cluster_config.volume_mounts,
             )?;
 
             group_configs.insert(role_group_name, config);
@@ -199,8 +207,22 @@ pub fn validate_cluster(
                 &Container::Base,
                 &vector_aggregator_config_map_name,
             )?;
+            // Resolve the executor's git-sync resources up-front too, mirroring the role groups.
+            let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
+                &airflow.spec.cluster_config.dags_git_sync,
+                &resolved_product_image,
+                &env_vars_from_overrides(&common_configuration.env_overrides),
+                &airflow.spec.cluster_config.volume_mounts,
+                LOG_VOLUME_NAME.as_ref(),
+                &logging.git_sync_container,
+            )
+            .context(InvalidGitSyncSpecSnafu)?;
             Some(ValidatedExecutorTemplate {
-                config: ValidatedAirflowConfig::from_merged_executor(merged, logging),
+                config: ValidatedAirflowConfig::from_merged_executor(
+                    merged,
+                    logging,
+                    git_sync_resources,
+                ),
                 env_overrides: common_configuration.env_overrides.clone(),
                 pod_overrides: common_configuration.pod_overrides.clone(),
             })
@@ -218,7 +240,6 @@ pub fn validate_cluster(
             executor_template,
             authentication_config,
             authorization_config,
-            dags_git_sync: airflow.spec.cluster_config.dags_git_sync.clone(),
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
             metadata_database: airflow.spec.cluster_config.metadata_database.clone(),
             celery_results_backend: airflow.spec.cluster_config.celery_results_backend.clone(),
@@ -249,12 +270,16 @@ pub fn validate_cluster(
 ///
 /// Note the override `Merge` semantics: a role-group `null` inherits the role-level value rather
 /// than unsetting it (config overrides), and env overrides layer role-group on top of role.
+#[allow(clippy::too_many_arguments)]
 fn validate_role_group(
     role: &AirflowRoleType,
     role_group_name: &RoleGroupName,
     rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     default_config: &AirflowConfigFragment,
     vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    image: &product_image_selection::ResolvedProductImage,
+    dags_git_sync: &[git_sync::v1alpha2::GitSync],
+    volume_mounts: &[VolumeMount],
 ) -> Result<AirflowRoleGroupConfig, Error> {
     let validated = with_validated_config::<
         AirflowConfig,
@@ -282,9 +307,21 @@ fn validate_role_group(
         vector_aggregator_config_map_name,
     )?;
 
+    // The git-sync resources depend on this role group's env-var overrides and (git-sync) logging
+    // config, so they are resolved (and validated) here, up-front, rather than at build time.
+    let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
+        dags_git_sync,
+        image,
+        &Vec::<EnvVar>::from(env_overrides.clone()),
+        volume_mounts,
+        LOG_VOLUME_NAME.as_ref(),
+        &logging.git_sync_container,
+    )
+    .context(InvalidGitSyncSpecSnafu)?;
+
     Ok(RoleGroupConfig {
         replicas: validated.replicas,
-        config: ValidatedAirflowConfig::from_merged(merged_config, logging),
+        config: ValidatedAirflowConfig::from_merged(merged_config, logging, git_sync_resources),
         config_overrides: validated.config.config_overrides,
         env_overrides,
         cli_overrides: validated.config.cli_overrides,
@@ -341,6 +378,20 @@ mod tests {
 
     use super::validate_role_group;
     use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
+
+    /// A minimal resolved product image for tests that exercise `validate_role_group` (which needs
+    /// one to resolve git-sync resources; the test role groups configure no git-sync, so the value
+    /// is otherwise unused).
+    fn test_resolved_product_image()
+    -> stackable_operator::commons::product_image_selection::ResolvedProductImage {
+        stackable_operator::commons::product_image_selection::ResolvedProductImage {
+            product_version: "3.0.6".to_string(),
+            app_version_label_value: "3.0.6".parse().expect("valid label value"),
+            image: "oci.example.org/sdp/airflow:3.0.6-stackable0.0.0-dev".to_string(),
+            image_pull_policy: "IfNotPresent".to_string(),
+            pull_secrets: None,
+        }
+    }
 
     fn test_cluster() -> v1alpha2::AirflowCluster {
         let cluster_yaml = r#"
@@ -404,6 +455,9 @@ mod tests {
             rolegroup,
             &default_config,
             &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
         )
         .expect("validated role group");
         let config_overrides = validated.config_overrides;
@@ -502,6 +556,9 @@ mod tests {
             rolegroup,
             &default_config,
             &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
         )
         .expect("validated role group");
 
@@ -576,6 +633,9 @@ mod tests {
             rolegroup,
             &default_config,
             &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
         )
         .expect("validated role group");
 
