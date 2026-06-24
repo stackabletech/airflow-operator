@@ -272,7 +272,7 @@ jobs:
           chart-version: ${{ needs.build-container-image.outputs.operator-version }}
           app-version: ${{ needs.build-container-image.outputs.operator-version }}
           publish-and-sign: ${{ !github.event.pull_request.head.repo.fork }}
-          helm-version: 3.17.4 # This is currently the latest version which supports pushing to quay.io
+          helm-version: v3.17.4 # This is currently the latest version which supports pushing to quay.io
 
   openshift-preflight-check:
     name: Run OpenShift Preflight Check for ${{ needs.build-container-image.outputs.operator-version }}-${{ matrix.arch }}
