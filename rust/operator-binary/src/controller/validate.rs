@@ -259,17 +259,7 @@ pub fn validate_cluster(
     ))
 }
 
-/// Validate and merge one role group against its role, via the shared
-/// [`with_validated_config`] from `operator-rs`, returning the generic
-/// [`stackable_operator::v2::role_utils::RoleGroupConfig`].
-///
-/// This performs the full `default → role → role-group` merge of the config fragment (then
-/// validates it) *and* the role←role-group merge of the overrides in one step. The config
-/// overrides are kept *typed* ([`AirflowConfigOverrides`]); flattening into the rendered
-/// `webserver_config.py` happens later, in the build step.
-///
-/// Note the override `Merge` semantics: a role-group `null` inherits the role-level value rather
-/// than unsetting it (config overrides), and env overrides layer role-group on top of role.
+/// Validate and merge one role group against its role.
 #[allow(clippy::too_many_arguments)]
 fn validate_role_group(
     role: &AirflowRoleType,
@@ -335,11 +325,6 @@ fn validate_role_group(
 ///
 /// `product_container` selects the product's main container (`Container::Airflow` for the role
 /// groups, `Container::Base` for the Kubernetes-executor pod template).
-///
-/// `vector_aggregator_config_map_name` is the discovery ConfigMap name of the Vector aggregator;
-/// it is required (and validated) only when the Vector agent is enabled. Mirrors hive's
-/// `validate_logging`. Used both per-role-group (here) and for the Kubernetes executor pod template
-/// (which is not a [`AirflowRole`] with role groups, so it is validated from the build step).
 pub(crate) fn validate_logging(
     logging: &Logging<Container>,
     product_container: &Container,

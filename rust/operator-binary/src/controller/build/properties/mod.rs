@@ -8,8 +8,7 @@ pub mod webserver_config;
 /// The names of the Airflow config files assembled into the rolegroup `ConfigMap`.
 ///
 /// This is the single source of truth for the on-disk file names; nothing else should hard-code
-/// them (the Vector agent config is the exception — its name comes from the upstream
-/// `product_logging::framework::VECTOR_CONFIG_FILE` constant).
+/// them (the Vector agent config is the exception).
 #[derive(Clone, Copy, Debug, strum::Display)]
 pub enum ConfigFileName {
     #[strum(serialize = "webserver_config.py")]

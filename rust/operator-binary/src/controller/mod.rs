@@ -68,11 +68,6 @@ pub struct ValidatedRoleConfig {
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
-///
-/// This is the generic [`stackable_operator::v2::role_utils::RoleGroupConfig`]: the merged config
-/// fragment in `config`, the typed `config_overrides` (role-group merged over role) and the merged
-/// `env_overrides`/`cli_overrides`/`pod_overrides`. The config overrides are kept typed
-/// ([`AirflowConfigOverrides`]) and flattened into the rendered config file later, in the build step.
 pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
     ValidatedAirflowConfig,
     stackable_operator::v2::role_utils::GenericCommonConfig,
@@ -80,19 +75,12 @@ pub type AirflowRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupC
 >;
 
 /// A validated, merged Airflow role-group config: the merged [`AirflowConfig`] with its raw
-/// `logging` replaced by the up-front-validated [`ValidatedLogging`] (so an invalid custom log
-/// ConfigMap name or a missing Vector aggregator name fails reconciliation during validation).
-// Not `Clone`/`Debug`/`PartialEq`: `git_sync_resources` (a `GitSyncResources`) implements none of
-// them, mirroring nifi's `ValidatedNifiConfig`.
+/// `logging` replaced by the up-front-validated [`ValidatedLogging`].
 pub struct ValidatedAirflowConfig {
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
     pub graceful_shutdown_timeout: Option<Duration>,
-    /// The git-sync resources (containers, volumes, mounts) for the DAGs, resolved up-front in the
-    /// [`validate`] step (the env vars and logging differ per role group / executor, so they are
-    /// computed there). Consumed by the StatefulSet, executor-template and env-var builders, which
-    /// read it off here rather than reconstructing it.
     pub git_sync_resources: git_sync::v1alpha2::GitSyncResources,
 }
 
@@ -143,10 +131,6 @@ pub struct ValidatedExecutorTemplate {
 }
 
 /// Validated logging configuration for the containers of a role-group (or Kubernetes-executor) Pod.
-///
-/// `product_container` holds the validated log-config choice of the product's main container
-/// (`Container::Airflow` for the role groups, `Container::Base` for the Kubernetes-executor pod
-/// template). `git_sync_container` holds the log config of the git-sync sidecar (DAG fetching).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedLogging {
     pub product_container: ValidatedContainerLogConfigChoice,
@@ -323,9 +307,6 @@ impl ValidatedCluster {
     }
 
     /// Type-safe names for the resources of a role group.
-    ///
-    /// Infallible: the combined name length was validated during cluster validation
-    /// (see `validate::validate_cluster`).
     pub fn resource_names(
         &self,
         role_name: &RoleName,
@@ -399,9 +380,6 @@ impl ValidatedCluster {
 
     /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
     /// reference back to this cluster, and the given recommended `labels`.
-    ///
-    /// Consolidates the metadata chain repeated by the child-resource builders. Call sites that need
-    /// extra labels or annotations chain them onto the returned builder before `.build()`.
     pub(crate) fn object_meta(&self, name: impl Into<String>, labels: Labels) -> ObjectMetaBuilder {
         let mut builder = ObjectMetaBuilder::new();
         builder
