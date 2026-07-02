@@ -1,18 +1,41 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
+use std::{collections::BTreeMap, str::FromStr};
 
-use product_config::{ProductConfigManager, types::PropertyNameKind};
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection::{self, ResolvedProductImage},
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    role_utils::RoleGroupRef,
+    commons::product_image_selection,
+    config::fragment,
+    crd::git_sync,
+    k8s_openapi::api::core::v1::{EnvVar, VolumeMount},
+    kube::ResourceExt,
+    product_logging::spec::Logging,
+    role_utils::{GenericRoleConfig, RoleGroup},
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_namespace, get_uid},
+        product_logging::framework::{
+            VectorContainerLogConfig, validate_logging_configuration_for_container,
+        },
+        role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
+        types::{
+            kubernetes::ConfigMapName,
+            operator::{ClusterName, RoleGroupName},
+        },
+    },
 };
 use strum::IntoEnumIterator;
 
-use crate::crd::{AIRFLOW_CONFIG_FILENAME, AirflowConfig, AirflowExecutor, AirflowRole, v1alpha2};
+use super::{
+    AirflowRoleGroupConfig, ValidatedAirflowConfig, ValidatedCluster, ValidatedClusterConfig,
+    ValidatedExecutorTemplate, ValidatedLogging, ValidatedRoleConfig,
+    build::volumes::LOG_VOLUME_NAME, dereference::DereferencedObjects,
+};
+use crate::{
+    airflow_controller::{CONTAINER_IMAGE_BASE_NAME, env_vars_from_overrides},
+    crd::{
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        AirflowRoleType, Container, v1alpha2,
+    },
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -21,143 +44,599 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
-    #[snafu(display("invalid product config"))]
-    InvalidProductConfig {
-        source: stackable_operator::product_config_utils::Error,
+    #[snafu(display("invalid cluster name {cluster_name}"))]
+    ParseClusterName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        cluster_name: String,
     },
 
-    #[snafu(display("failed to generate product config"))]
-    GenerateProductConfig {
-        source: stackable_operator::product_config_utils::Error,
+    #[snafu(display("failed to resolve namespace"))]
+    ResolveNamespace {
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crate::crd::Error },
-
-    #[snafu(display("could not parse Airflow role [{role}]"))]
-    UnidentifiedAirflowRole {
-        source: strum::ParseError,
-        role: String,
+    #[snafu(display("failed to resolve uid"))]
+    ResolveUid {
+        source: stackable_operator::v2::controller_utils::Error,
     },
-}
 
-/// Per-role configuration extracted during validation.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
-}
+    #[snafu(display("failed to merge the Kubernetes-executor pod-template config"))]
+    MergeExecutorConfig { source: crate::crd::Error },
 
-/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: AirflowConfig,
-    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
-}
+    #[snafu(display("invalid role group name {role_group}"))]
+    ParseRoleGroupName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role_group: String,
+    },
 
-/// The validated cluster: proves that product-config validation and config merging
-/// succeeded for every role and role group before any resources are created.
-#[derive(Clone, Debug)]
-pub struct ValidatedAirflowCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
-    pub executor: AirflowExecutor,
+    #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
+    FailedToResolveConfig {
+        source: fragment::ValidationError,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("failed to parse an environment variable override name"))]
+    ParseEnvVarName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+    },
+
+    #[snafu(display("failed to validate the logging configuration"))]
+    ValidateLoggingConfig {
+        source: stackable_operator::v2::product_logging::framework::Error,
+    },
+
+    #[snafu(display(
+        "the Vector aggregator discovery ConfigMap name must be set when the Vector agent is enabled"
+    ))]
+    MissingVectorAggregatorConfigMapName,
+
+    #[snafu(display("invalid git-sync specification"))]
+    InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
 }
 
 pub fn validate_cluster(
     airflow: &v1alpha2::AirflowCluster,
-    image_base_name: &str,
     image_repository: &str,
-    pkg_version: &str,
-    product_config_manager: &ProductConfigManager,
-) -> Result<ValidatedAirflowCluster, Error> {
+    dereferenced: DereferencedObjects,
+) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = airflow
         .spec
         .image
-        .resolve(image_base_name, image_repository, pkg_version)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
-    let mut roles = HashMap::new();
+    let cluster_name =
+        ClusterName::from_str(&airflow.name_any()).with_context(|_| ParseClusterNameSnafu {
+            cluster_name: airflow.name_any(),
+        })?;
+    let namespace = get_namespace(airflow).context(ResolveNamespaceSnafu)?;
+    let uid = get_uid(airflow).context(ResolveUidSnafu)?;
 
-    // if the kubernetes executor is specified there will be no worker role as the pods
-    // are provisioned by airflow as defined by the task (default: one pod per task)
-    for role in AirflowRole::iter() {
-        if let Some(resolved_role) = airflow.get_role(&role) {
-            roles.insert(
-                role.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::Env,
-                        PropertyNameKind::File(AIRFLOW_CONFIG_FILENAME.into()),
-                    ],
-                    resolved_role.clone(),
-                ),
-            );
-        }
-    }
-
-    let role_config = transform_all_roles_to_config(airflow, &roles);
-    let validated_role_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.product_version,
-        &role_config.context(GenerateProductConfigSnafu)?,
-        product_config_manager,
-        false,
-        false,
-    )
-    .context(InvalidProductConfigSnafu)?;
+    // The Vector aggregator discovery ConfigMap name. Validity is already enforced by the
+    // `ConfigMapName` type on the CRD; it is only required when the Vector agent is enabled.
+    let vector_aggregator_config_map_name = airflow
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        .clone();
 
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
 
-    for (role_name, rolegroup_configs) in validated_role_config.iter() {
-        let airflow_role =
-            AirflowRole::from_str(role_name).context(UnidentifiedAirflowRoleSnafu {
-                role: role_name.to_string(),
-            })?;
+    // if the kubernetes executor is specified there will be no worker role as the pods
+    // are provisioned by airflow as defined by the task (default: one pod per task)
+    for role in AirflowRole::iter() {
+        let Some(resolved_role) = airflow.get_role(&role) else {
+            continue;
+        };
 
         role_configs.insert(
-            airflow_role.clone(),
+            role.clone(),
             ValidatedRoleConfig {
                 pdb: airflow
-                    .role_config(&airflow_role)
+                    .role_config(&role)
                     .map(|rc| rc.pod_disruption_budget),
-                listener_class: airflow_role
-                    .listener_class_name(airflow)
-                    .map(|s| s.to_string()),
-                group_listener_name: airflow.group_listener_name(&airflow_role),
+                listener_class: role.listener_class_name(airflow),
+                group_listener_name: airflow.group_listener_name(&role),
             },
         );
 
+        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+
         let mut group_configs = BTreeMap::new();
-        for (rolegroup_name, rolegroup_config) in rolegroup_configs.iter() {
-            let rolegroup_ref = RoleGroupRef {
-                cluster: stackable_operator::kube::runtime::reflector::ObjectRef::from_obj(airflow),
-                role: role_name.into(),
-                role_group: rolegroup_name.into(),
-            };
+        for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
+            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role_group: rolegroup_name.clone(),
+                }
+            })?;
+            let config = validate_role_group(
+                &resolved_role,
+                &role_group_name,
+                rolegroup,
+                &default_config,
+                &vector_aggregator_config_map_name,
+                &resolved_product_image,
+                &airflow.spec.cluster_config.dags_git_sync,
+                &airflow.spec.cluster_config.volume_mounts,
+            )?;
 
-            let merged_config = airflow
-                .merged_config(&airflow_role, &rolegroup_ref)
-                .context(FailedToResolveConfigSnafu)?;
-
-            group_configs.insert(
-                rolegroup_name.clone(),
-                ValidatedRoleGroupConfig {
-                    merged_config,
-                    product_config_properties: rolegroup_config.clone(),
-                },
-            );
+            group_configs.insert(role_group_name, config);
         }
 
-        role_groups.insert(airflow_role, group_configs);
+        role_groups.insert(role, group_configs);
     }
 
-    Ok(ValidatedAirflowCluster {
-        image: resolved_product_image,
+    let DereferencedObjects {
+        authentication_config,
+        authorization_config,
+    } = dereferenced;
+
+    // The Celery result-backend and broker only work with configured celeryExecutors. Emit a
+    // warning if either are provided without a Celery executor. The connection details themselves are
+    // derived from the CRD later, in the build step (see
+    // `ValidatedCluster::celery_database_connection_details`).
+    if (airflow.spec.cluster_config.celery_results_backend.is_some()
+        || airflow.spec.cluster_config.celery_broker.is_some())
+        && !matches!(
+            &airflow.spec.executor,
+            AirflowExecutor::CeleryExecutors { .. }
+        )
+    {
+        tracing::warn!(
+            "No `spec.celeryExecutors` configured, but `spec.clusterConfig.celeryResultsBackend` and/or `spec.clusterConfig.celeryBroker` are provided. This only works in combination with a celery executor!"
+        )
+    }
+
+    // The Kubernetes-executor pod template is not an `AirflowRole` with role groups, so its config
+    // is merged and its logging validated here, up-front, rather than in the build step.
+    // `Container::Base` is the executor's product container.
+    let executor_template = match &airflow.spec.executor {
+        AirflowExecutor::KubernetesExecutors {
+            common_configuration,
+        } => {
+            let merged = airflow
+                .merged_executor_config(&common_configuration.config)
+                .context(MergeExecutorConfigSnafu)?;
+            let logging = validate_logging(
+                &merged.logging,
+                &Container::Base,
+                &vector_aggregator_config_map_name,
+            )?;
+            // Resolve the executor's git-sync resources up-front too, mirroring the role groups.
+            let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
+                &airflow.spec.cluster_config.dags_git_sync,
+                &resolved_product_image,
+                &env_vars_from_overrides(&common_configuration.env_overrides),
+                &airflow.spec.cluster_config.volume_mounts,
+                LOG_VOLUME_NAME.as_ref(),
+                &logging.git_sync_container,
+            )
+            .context(InvalidGitSyncSpecSnafu)?;
+            Some(ValidatedExecutorTemplate {
+                config: ValidatedAirflowConfig::from_merged_executor(
+                    merged,
+                    logging,
+                    git_sync_resources,
+                ),
+                env_overrides: common_configuration.env_overrides.clone(),
+                pod_overrides: common_configuration.pod_overrides.clone(),
+            })
+        }
+        AirflowExecutor::CeleryExecutors { .. } => None,
+    };
+
+    Ok(ValidatedCluster::new(
+        cluster_name,
+        namespace,
+        uid,
+        resolved_product_image,
+        ValidatedClusterConfig {
+            executor: airflow.spec.executor.clone(),
+            executor_template,
+            authentication_config,
+            authorization_config,
+            credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
+            metadata_database: airflow.spec.cluster_config.metadata_database.clone(),
+            celery_results_backend: airflow.spec.cluster_config.celery_results_backend.clone(),
+            celery_broker: airflow.spec.cluster_config.celery_broker.clone(),
+            load_examples: airflow.spec.cluster_config.load_examples,
+            expose_config: airflow.spec.cluster_config.expose_config,
+            database_initialization_enabled: airflow
+                .spec
+                .cluster_config
+                .database_initialization
+                .enabled,
+            volumes: airflow.spec.cluster_config.volumes.clone(),
+            volume_mounts: airflow.spec.cluster_config.volume_mounts.clone(),
+        },
         role_groups,
         role_configs,
-        executor: airflow.spec.executor.clone(),
+    ))
+}
+
+/// Validate and merge one role group against its role.
+#[allow(clippy::too_many_arguments)]
+fn validate_role_group(
+    role: &AirflowRoleType,
+    role_group_name: &RoleGroupName,
+    rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
+    default_config: &AirflowConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    image: &product_image_selection::ResolvedProductImage,
+    dags_git_sync: &[git_sync::v1alpha2::GitSync],
+    volume_mounts: &[VolumeMount],
+) -> Result<AirflowRoleGroupConfig, Error> {
+    let validated = with_validated_config::<
+        AirflowConfig,
+        GenericCommonConfig,
+        AirflowConfigFragment,
+        GenericRoleConfig,
+        AirflowConfigOverrides,
+    >(rolegroup, role, default_config)
+    .with_context(|_| FailedToResolveConfigSnafu {
+        role_group: role_group_name.clone(),
+    })?;
+
+    let mut env_overrides = EnvVarSet::new();
+    for (env_var_name, env_var_value) in validated.config.env_overrides {
+        env_overrides = env_overrides.with_value(
+            &EnvVarName::from_str(&env_var_name).context(ParseEnvVarNameSnafu)?,
+            env_var_value,
+        );
+    }
+
+    let merged_config = validated.config.config;
+    let logging = validate_logging(
+        &merged_config.logging,
+        &Container::Airflow,
+        vector_aggregator_config_map_name,
+    )?;
+
+    // The git-sync resources depend on this role group's env-var overrides and (git-sync) logging
+    // config, so they are resolved (and validated) here, up-front, rather than at build time.
+    let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
+        dags_git_sync,
+        image,
+        &Vec::<EnvVar>::from(env_overrides.clone()),
+        volume_mounts,
+        LOG_VOLUME_NAME.as_ref(),
+        &logging.git_sync_container,
+    )
+    .context(InvalidGitSyncSpecSnafu)?;
+
+    Ok(RoleGroupConfig {
+        replicas: validated.replicas,
+        config: ValidatedAirflowConfig::from_merged(merged_config, logging, git_sync_resources),
+        config_overrides: validated.config.config_overrides,
+        env_overrides,
+        cli_overrides: validated.config.cli_overrides,
+        pod_overrides: validated.config.pod_overrides,
+        product_specific_common_config: validated.config.product_specific_common_config,
     })
+}
+
+/// Validates the logging configuration for the product container and the (optional) Vector
+/// container.
+///
+/// `product_container` selects the product's main container (`Container::Airflow` for the role
+/// groups, `Container::Base` for the Kubernetes-executor pod template).
+pub(crate) fn validate_logging(
+    logging: &Logging<Container>,
+    product_container: &Container,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<ValidatedLogging, Error> {
+    let product_container =
+        validate_logging_configuration_for_container(logging, product_container)
+            .context(ValidateLoggingConfigSnafu)?;
+
+    let vector_container = if logging.enable_vector_agent {
+        let vector_aggregator_config_map_name = vector_aggregator_config_map_name
+            .clone()
+            .context(MissingVectorAggregatorConfigMapNameSnafu)?;
+        Some(VectorContainerLogConfig {
+            log_config: validate_logging_configuration_for_container(logging, &Container::Vector)
+                .context(ValidateLoggingConfigSnafu)?,
+            vector_aggregator_config_map_name,
+        })
+    } else {
+        None
+    };
+
+    Ok(ValidatedLogging {
+        product_container,
+        vector_container,
+        git_sync_container: logging.for_container(&Container::GitSync).into_owned(),
+        enable_vector_agent: logging.enable_vector_agent,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
+
+    use super::validate_role_group;
+    use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
+
+    /// A minimal resolved product image for tests that exercise `validate_role_group` (which needs
+    /// one to resolve git-sync resources; the test role groups configure no git-sync, so the value
+    /// is otherwise unused).
+    fn test_resolved_product_image()
+    -> stackable_operator::commons::product_image_selection::ResolvedProductImage {
+        stackable_operator::commons::product_image_selection::ResolvedProductImage {
+            product_version: "3.0.6".to_string(),
+            app_version_label_value: "3.0.6".parse().expect("valid label value"),
+            image: "oci.example.org/sdp/airflow:3.0.6-stackable0.0.0-dev".to_string(),
+            image_pull_policy: "IfNotPresent".to_string(),
+            pull_secrets: None,
+        }
+    }
+
+    fn test_cluster() -> v1alpha2::AirflowCluster {
+        let cluster_yaml = r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecretName: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+          webservers:
+            config: {}
+            configOverrides:
+              webserver_config.py:
+                AUTH_TYPE: "AUTH_OID"
+                ROLE_ONLY_KEY: "role-value"
+            envOverrides:
+              ROLE_ENV_VAR: "role-env-value"
+            roleGroups:
+              default:
+                config: {}
+                configOverrides:
+                  webserver_config.py:
+                    AUTH_TYPE: "AUTH_DB"
+                    GROUP_ONLY_KEY: "group-value"
+                envOverrides:
+                  GROUP_ENV_VAR: "group-env-value"
+          schedulers:
+            config: {}
+            roleGroups:
+              default:
+                config: {}
+          kubernetesExecutors:
+            config: {}
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap()
+    }
+
+    #[test]
+    fn role_group_overrides_merge_over_role_overrides() {
+        let cluster = test_cluster();
+        let role = cluster
+            .get_role(&AirflowRole::Webserver)
+            .expect("webserver role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
+
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+            &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
+        )
+        .expect("validated role group");
+        let config_overrides = validated.config_overrides;
+
+        // configOverrides are kept typed. The role-group AUTH_TYPE overrides the role-level one;
+        // both role-only and group-only keys are kept.
+        assert_eq!(
+            config_overrides.webserver_config_py.overrides,
+            BTreeMap::from([
+                ("AUTH_TYPE".to_string(), "AUTH_DB".to_string()),
+                ("ROLE_ONLY_KEY".to_string(), "role-value".to_string()),
+                ("GROUP_ONLY_KEY".to_string(), "group-value".to_string()),
+            ])
+        );
+
+        // env overrides layer role-group on top of role.
+        let env_overrides: BTreeMap<String, Option<String>> =
+            Vec::<EnvVar>::from(validated.env_overrides)
+                .into_iter()
+                .map(|env_var| (env_var.name, env_var.value))
+                .collect();
+        assert_eq!(env_overrides.len(), 2);
+        assert_eq!(
+            env_overrides.get("ROLE_ENV_VAR").unwrap().as_deref(),
+            Some("role-env-value")
+        );
+        assert_eq!(
+            env_overrides.get("GROUP_ENV_VAR").unwrap().as_deref(),
+            Some("group-env-value")
+        );
+    }
+
+    /// A `null` override value is rejected by the CRD. `configOverrides` values are typed as
+    /// `String` (operator-rs `KeyValueConfigOverrides`, since the `Option<String>` was removed in
+    /// operator-rs #1219), so there is no longer a way to express "unset this key" via `null` —
+    /// the previous `null`-means-inherit/unset semantics no longer exist at the type level.
+    #[test]
+    fn role_group_null_override_value_is_rejected() {
+        let cluster_yaml = r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecretName: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+          webservers:
+            config: {}
+            configOverrides:
+              webserver_config.py:
+                AUTH_TYPE: "AUTH_OID"
+            roleGroups:
+              default:
+                config: {}
+                configOverrides:
+                  webserver_config.py:
+                    AUTH_TYPE: null
+          schedulers:
+            config: {}
+            roleGroups:
+              default:
+                config: {}
+          kubernetesExecutors:
+            config: {}
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
+        let result: Result<v1alpha2::AirflowCluster, _> =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer);
+        assert!(
+            result.is_err(),
+            "a `null` configOverrides value should be rejected: values are typed as `String`"
+        );
+    }
+
+    #[test]
+    fn role_without_overrides_yields_empty() {
+        let cluster = test_cluster();
+        let role = cluster
+            .get_role(&AirflowRole::Scheduler)
+            .expect("scheduler role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
+
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+            &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
+        )
+        .expect("validated role group");
+
+        assert!(
+            validated
+                .config_overrides
+                .webserver_config_py
+                .overrides
+                .is_empty()
+        );
+        assert!(Vec::<EnvVar>::from(validated.env_overrides).is_empty());
+    }
+
+    /// `replicas` and the role←role-group merged `pod_overrides` are produced by
+    /// `with_validated_config` and must be carried on `AirflowRoleGroupConfig`, so the build
+    /// step reads them from here rather than re-deriving from the raw cluster.
+    #[test]
+    fn role_group_carries_merged_pod_overrides_and_replicas() {
+        let cluster_yaml = r#"
+        apiVersion: airflow.stackable.tech/v1alpha2
+        kind: AirflowCluster
+        metadata:
+          name: airflow
+        spec:
+          image:
+            productVersion: 3.1.6
+          clusterConfig:
+            loadExamples: false
+            exposeConfig: false
+            credentialsSecretName: airflow-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: airflow-postgresql
+                database: airflow
+                credentialsSecretName: airflow-postgresql-credentials
+          webservers:
+            config: {}
+            podOverrides:
+              metadata:
+                labels:
+                  role-label: role
+                  shared: role
+            roleGroups:
+              default:
+                replicas: 3
+                config: {}
+                podOverrides:
+                  metadata:
+                    labels:
+                      rg-label: rg
+                      shared: rg
+          schedulers:
+            config: {}
+            roleGroups:
+              default:
+                config: {}
+          kubernetesExecutors:
+            config: {}
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
+        let cluster: v1alpha2::AirflowCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let role = cluster
+            .get_role(&AirflowRole::Webserver)
+            .expect("webserver role");
+        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let rolegroup = role.role_groups.get("default").expect("default role group");
+
+        let validated = validate_role_group(
+            &role,
+            &"default".parse().expect("valid role group name"),
+            rolegroup,
+            &default_config,
+            &None,
+            &test_resolved_product_image(),
+            &[],
+            &[],
+        )
+        .expect("validated role group");
+
+        // replicas is carried through from the role group.
+        assert_eq!(validated.replicas, Some(3));
+
+        // pod_overrides is merged role←role-group (role-group wins on shared keys, both levels'
+        // unique keys survive).
+        let labels = validated
+            .pod_overrides
+            .metadata
+            .expect("pod override metadata")
+            .labels
+            .expect("pod override labels");
+        assert_eq!(labels.get("role-label"), Some(&"role".to_string()));
+        assert_eq!(labels.get("rg-label"), Some(&"rg".to_string()));
+        assert_eq!(labels.get("shared"), Some(&"rg".to_string()));
+    }
 }

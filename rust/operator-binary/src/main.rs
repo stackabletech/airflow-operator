@@ -39,14 +39,8 @@ use crate::{
 };
 
 mod airflow_controller;
-mod config;
 mod controller;
-mod controller_commons;
 mod crd;
-mod env_vars;
-mod operations;
-mod product_logging;
-mod service;
 mod util;
 mod webhooks;
 
@@ -71,11 +65,11 @@ async fn main() -> anyhow::Result<()> {
                 .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
         }
         Command::Run(RunArguments {
-            product_config,
             watch_namespace,
             operator_environment,
             maintenance,
             common,
+            ..
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
@@ -102,11 +96,6 @@ async fn main() -> anyhow::Result<()> {
                 EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, &maintenance.end_of_support)?
                     .run(sigterm_watcher.handle())
                     .map(anyhow::Ok);
-
-            let product_config = product_config.load(&[
-                "deploy/config-spec/properties.yaml",
-                "/etc/stackable/airflow-operator/config-spec/properties.yaml",
-            ])?;
 
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
@@ -183,7 +172,6 @@ async fn main() -> anyhow::Result<()> {
                     Arc::new(airflow_controller::Ctx {
                         client: client.clone(),
                         operator_environment,
-                        product_config,
                     }),
                 )
                 // We can let the reporting happen in the background

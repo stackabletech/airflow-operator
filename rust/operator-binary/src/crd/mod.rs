@@ -1,15 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::BTreeSet, str::FromStr};
 
-use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
         cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
-        product_image_selection::{ProductImage, ResolvedProductImage},
+        product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
             Resources, ResourcesFragment,
@@ -19,7 +18,6 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    config_overrides::KeyValueConfigOverrides,
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -27,26 +25,36 @@ use stackable_operator::{
         apimachinery::pkg::api::resource::Quantity,
     },
     kube::{CustomResource, ResourceExt},
-    kvp::ObjectLabels,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{self, Configuration},
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{
-        CommonConfiguration, GenericCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
-    },
+    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        product_logging::framework::STACKABLE_LOG_DIR,
+        role_utils::GenericCommonConfig,
+        types::{
+            common::Port,
+            kubernetes::{
+                ConfigMapName, ContainerName, ListenerClassName, ListenerName,
+                PersistentVolumeClaimName, SecretName, VolumeName,
+            },
+        },
+    },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
 use crate::{
+    controller::{ValidatedCluster, build::properties::ConfigFileName},
     crd::{
         affinity::{get_affinity, get_executor_affinity},
         authentication::{
@@ -70,22 +78,21 @@ pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
 pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
-pub const AIRFLOW_CONFIG_FILENAME: &str = "webserver_config.py";
 
-pub const TEMPLATE_VOLUME_NAME: &str = "airflow-executor-pod-template";
+stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-pub const LISTENER_VOLUME_NAME: &str = "listener";
+stackable_operator::constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
-pub const HTTP_PORT: u16 = 8080;
+pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
-pub const METRICS_PORT: u16 = 9102;
+pub const METRICS_PORT: Port = Port(9102);
+stackable_operator::constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -95,51 +102,30 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
-pub type AirflowRoleType = Role<AirflowConfigFragment, AirflowConfigOverrides>;
+pub type AirflowRoleType =
+    Role<AirflowConfigFragment, AirflowConfigOverrides, GenericRoleConfig, GenericCommonConfig>;
 
 pub type AirflowExecutorCommonConfiguration =
     CommonConfiguration<ExecutorConfigFragment, GenericCommonConfig, AirflowConfigOverrides>;
 
-pub type AirflowWebserverRoleType =
-    Role<AirflowConfigFragment, AirflowConfigOverrides, v1alpha2::WebserverRoleConfig>;
+pub type AirflowWebserverRoleType = Role<
+    AirflowConfigFragment,
+    AirflowConfigOverrides,
+    v1alpha2::WebserverRoleConfig,
+    GenericCommonConfig,
+>;
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AirflowConfigOverrides {
-    #[serde(
-        default,
-        rename = "webserver_config.py",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub webserver_config_py: Option<KeyValueConfigOverrides>,
-}
-
-impl stackable_operator::config_overrides::KeyValueOverridesProvider for AirflowConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            AIRFLOW_CONFIG_FILENAME => self
-                .webserver_config_py
-                .as_ref()
-                .map(|o| o.as_product_config_overrides())
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
-    }
+    #[serde(default, rename = "webserver_config.py")]
+    pub webserver_config_py: KeyValueConfigOverrides,
 }
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("Unknown Airflow role found {role}. Should be one of {roles:?}"))]
-    UnknownAirflowRole { role: String, roles: Vec<String> },
-
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
-
-    #[snafu(display("Configuration/Executor conflict!"))]
-    NoRoleForExecutorFailure,
-
-    #[snafu(display("object has no associated namespace"))]
-    NoNamespace,
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -285,7 +271,7 @@ pub mod versioned {
         /// The name of the Secret object containing the admin user credentials. Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/airflow/getting_started/first_steps)
         /// to find out more.
-        pub credentials_secret_name: String,
+        pub credentials_secret_name: SecretName,
 
         /// The `gitSync` settings allow configuring DAGs to mount via `git-sync`. Learn more in the
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
@@ -322,7 +308,7 @@ pub mod versioned {
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
 
         /// Additional volumes to define. Use together with `volumeMounts` to mount the volumes.
         #[serde(default)]
@@ -343,7 +329,7 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "webserver_default_listener_class")]
-        pub listener_class: String,
+        pub listener_class: ListenerClassName,
     }
 }
 
@@ -378,8 +364,9 @@ impl Default for v1alpha2::WebserverRoleConfig {
     }
 }
 
-fn webserver_default_listener_class() -> String {
-    "cluster-internal".to_string()
+fn webserver_default_listener_class() -> ListenerClassName {
+    ListenerClassName::from_str("cluster-internal")
+        .expect("the default listener class is a valid listener class name")
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
@@ -402,9 +389,12 @@ impl v1alpha2::AirflowCluster {
     /// The name of the group-listener provided for a specific role.
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
-    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<String> {
+    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<ListenerName> {
         match role {
-            AirflowRole::Webserver => Some(role_service_name(&self.name_any(), &role.to_string())),
+            AirflowRole::Webserver => Some(
+                ListenerName::from_str(&role_service_name(&self.name_any(), &role.to_string()))
+                    .expect("the group listener name is a valid Listener name"),
+            ),
             AirflowRole::Scheduler
             | AirflowRole::Worker
             | AirflowRole::DagProcessor
@@ -438,51 +428,6 @@ impl v1alpha2::AirflowCluster {
         self.get_role(role).map(|r| r.role_config)
     }
 
-    pub fn volumes(&self) -> &Vec<Volume> {
-        &self.spec.cluster_config.volumes
-    }
-
-    pub fn volume_mounts(&self) -> Vec<VolumeMount> {
-        self.spec.cluster_config.volume_mounts.clone()
-    }
-
-    pub fn executor_template_configmap_name(&self) -> String {
-        format!("{}-executor-pod-template", self.name_any())
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &AirflowRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha2::AirflowCluster>,
-    ) -> Result<AirflowConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = AirflowConfig::default_config(&self.name_any(), role);
-
-        let role_config = role.role_config(self)?;
-
-        // Retrieve role resource config
-        let mut conf_role = role_config.config.config;
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role_config
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
-
     /// Retrieve and merge resource configs for the executor template
     pub fn merged_executor_config(
         &self,
@@ -506,18 +451,6 @@ impl v1alpha2::AirflowCluster {
 
         tracing::debug!("Merged executor config: {:?}", conf_executor);
         fragment::validate(conf_executor).context(FragmentValidationFailureSnafu)
-    }
-
-    pub fn shared_internal_secret_secret_name(&self) -> String {
-        format!("{}-internal-secret", &self.name_any())
-    }
-
-    pub fn shared_jwt_secret_secret_name(&self) -> String {
-        format!("{}-jwt-secret", &self.name_any())
-    }
-
-    pub fn shared_fernet_key_secret_name(&self) -> String {
-        format!("{}-fernet-key", &self.name_any())
     }
 }
 
@@ -611,16 +544,16 @@ impl AirflowRole {
     /// config file is in the Airflow home directory on all pods.
     /// Only the webserver needs to know about authentication CA's which is added via python's certify
     /// if authentication is enabled.
-    pub fn get_commands(
-        &self,
-        airflow: &v1alpha2::AirflowCluster,
-        auth_config: &AirflowClientAuthenticationDetailsResolved,
-        resolved_product_image: &ResolvedProductImage,
-    ) -> Vec<String> {
+    pub fn get_commands(&self, cluster: &ValidatedCluster) -> Vec<String> {
+        let auth_config = &cluster.cluster_config.authentication_config;
+        let resolved_product_image = &cluster.image;
+        let database_initialization_enabled =
+            cluster.cluster_config.database_initialization_enabled;
+        let has_dag_processors = cluster.has_role(&AirflowRole::DagProcessor);
+        let webserver_config = ConfigFileName::WebserverConfig;
+
         let mut command = vec![
-            format!(
-                "cp -RL {CONFIG_PATH}/{AIRFLOW_CONFIG_FILENAME} {AIRFLOW_HOME}/{AIRFLOW_CONFIG_FILENAME}"
-            ),
+            format!("cp -RL {CONFIG_PATH}/{webserver_config} {AIRFLOW_HOME}/{webserver_config}"),
             // graceful shutdown part
             COMMON_BASH_TRAP_FUNCTIONS.to_string(),
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
@@ -644,7 +577,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.database_initialization.enabled {
+                    if database_initialization_enabled {
                         tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             "airflow db migrate".to_string(),
@@ -665,7 +598,7 @@ impl AirflowRole {
                         container_debug_command(),
                         "airflow scheduler &".to_string(),
                     ]);
-                    if airflow.spec.dag_processors.is_none() {
+                    if !has_dag_processors {
                         // If no dag_processors role has been specified, the
                         // process needs to be included with the scheduler
                         // (with 3.x there is no longer the possibility of
@@ -702,7 +635,7 @@ impl AirflowRole {
                     ]);
                 }
                 AirflowRole::Scheduler => {
-                    if airflow.spec.cluster_config.database_initialization.enabled {
+                    if database_initialization_enabled {
                         tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
@@ -787,7 +720,7 @@ impl AirflowRole {
 
     /// Will be used to expose service ports and - by extension - which roles should be
     /// created as services.
-    pub fn get_http_port(&self) -> Option<u16> {
+    pub fn get_http_port(&self) -> Option<Port> {
         match &self {
             AirflowRole::Webserver => Some(HTTP_PORT),
             AirflowRole::Scheduler => None,
@@ -797,11 +730,19 @@ impl AirflowRole {
         }
     }
 
-    pub fn roles() -> Vec<String> {
-        Self::iter().map(|r| r.to_string()).collect()
+    /// The role name as a type-safe label/resource-name value.
+    ///
+    /// Infallible: every `AirflowRole` serialises to a short, valid role name.
+    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
+        self.to_string()
+            .parse()
+            .expect("an AirflowRole serialises to a valid RoleName")
     }
 
-    pub fn listener_class_name(&self, airflow: &v1alpha2::AirflowCluster) -> Option<String> {
+    pub fn listener_class_name(
+        &self,
+        airflow: &v1alpha2::AirflowCluster,
+    ) -> Option<ListenerClassName> {
         match self {
             Self::Webserver => airflow
                 .spec
@@ -810,47 +751,6 @@ impl AirflowRole {
                 .map(|webserver| webserver.role_config.listener_class),
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
         }
-    }
-
-    pub fn role_config(
-        &self,
-        airflow: &v1alpha2::AirflowCluster,
-    ) -> Result<AirflowRoleType, Error> {
-        let role = self.to_string();
-        let roles = AirflowRole::roles();
-
-        let role_config = match self {
-            AirflowRole::Webserver => &extract_role_from_webserver_config(
-                airflow
-                    .spec
-                    .webservers
-                    .to_owned()
-                    .context(UnknownAirflowRoleSnafu { role, roles })?,
-            ),
-            AirflowRole::Worker => {
-                if let AirflowExecutor::CeleryExecutors { config, .. } = &airflow.spec.executor {
-                    config
-                } else {
-                    return Err(Error::NoRoleForExecutorFailure);
-                }
-            }
-            AirflowRole::Scheduler => airflow
-                .spec
-                .schedulers
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-            AirflowRole::DagProcessor => airflow
-                .spec
-                .dag_processors
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-            AirflowRole::Triggerer => airflow
-                .spec
-                .triggerers
-                .as_ref()
-                .context(UnknownAirflowRoleSnafu { role, roles })?,
-        };
-        Ok(role_config.clone())
     }
 }
 
@@ -926,6 +826,14 @@ pub enum Container {
     GitSync,
 }
 
+impl Container {
+    /// The type-safe container name for this variant (matching its kebab-case serialization).
+    pub fn to_container_name(&self) -> ContainerName {
+        ContainerName::from_str(&self.to_string())
+            .expect("a Container variant name is a valid container name")
+    }
+}
+
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -985,9 +893,7 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
-    pub const GIT_CREDENTIALS_SECRET_PROPERTY: &'static str = "gitCredentialsSecret";
-
-    fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
+    pub(crate) fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
@@ -1000,35 +906,6 @@ impl AirflowConfig {
                 AirflowRole::Worker => DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT,
             }),
         }
-    }
-}
-
-impl Configuration for AirflowConfigFragment {
-    type Configurable = v1alpha2::AirflowCluster;
-
-    fn compute_env(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        _file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
     }
 }
 
@@ -1060,7 +937,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
                 max: Some(Quantity("2".to_owned())),
             },
             MemoryLimitsFragment {
-                limit: Some(Quantity("1Gi".to_owned())),
+                limit: Some(Quantity("1.5Gi".to_owned())),
                 runtime_limits: NoRuntimeLimitsFragment {},
             },
         ),
@@ -1090,25 +967,6 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
         cpu,
         memory,
         storage: AirflowStorageConfigFragment {},
-    }
-}
-
-/// Creates recommended `ObjectLabels` to be used in deployed resources
-pub fn build_recommended_labels<'a, T>(
-    owner: &'a T,
-    controller_name: &'a str,
-    app_version: &'a str,
-    role: &'a str,
-    role_group: &'a str,
-) -> ObjectLabels<'a, T> {
-    ObjectLabels {
-        owner,
-        app_name: APP_NAME,
-        app_version,
-        operator_name: OPERATOR_NAME,
-        controller_name,
-        role,
-        role_group,
     }
 }
 

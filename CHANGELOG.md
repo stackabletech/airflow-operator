@@ -12,7 +12,7 @@
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
 - BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
-- Bump `stackable-operator` to 0.110.1, kube to 3.1.0, and snafu to 0.9 ([#775]).
+- Bump `stackable-operator` to 0.112.0, kube to 3.1.0, and snafu to 0.9 ([#775], [#804]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `webserver_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([#775], [#777]).
 - BREAKING: The `.clusterConfig.credentialsSecret` field has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#754]).
 - BREAKING: Implement generic database connection.
@@ -24,6 +24,10 @@
   The broker `spec.celeryExecutors.broker` is now `spec.clusterConfig.celeryBroker`.
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#795]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#801]).
+- BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
+￼ Users relying on the product-config `properties.yaml` file have to set these properties via the CRD.
+  The `--product-config` CLI flag is now a no-op ([#804]).
+- Increase the Scheduler default resources from 1GB -> 1.5GB memory ([#804]).
 
 ### Fixed
 
@@ -43,6 +47,7 @@
 [#795]: https://github.com/stackabletech/airflow-operator/pull/795
 [#800]: https://github.com/stackabletech/airflow-operator/pull/800
 [#801]: https://github.com/stackabletech/airflow-operator/pull/801
+[#804]: https://github.com/stackabletech/airflow-operator/pull/804
 
 ## [26.3.0] - 2026-03-16
 

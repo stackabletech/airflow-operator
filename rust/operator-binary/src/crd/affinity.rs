@@ -51,11 +51,15 @@ mod tests {
             },
             apimachinery::pkg::apis::meta::v1::LabelSelector,
         },
-        kube::runtime::reflector::ObjectRef,
-        role_utils::RoleGroupRef,
+        kube::ResourceExt,
+        role_utils::GenericRoleConfig,
+        v2::role_utils::{GenericCommonConfig, with_validated_config},
     };
 
-    use crate::crd::{AirflowExecutor, AirflowRole, v1alpha2};
+    use crate::crd::{
+        AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
+        v1alpha2,
+    };
 
     #[rstest]
     #[case(AirflowRole::Worker)]
@@ -104,11 +108,14 @@ mod tests {
         let airflow: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let rolegroup_ref = RoleGroupRef {
-            cluster: ObjectRef::from_obj(&airflow),
-            role: role.to_string(),
-            role_group: "default".to_string(),
-        };
+        let resolved_role = airflow
+            .get_role(&role)
+            .expect("the role is defined in the test cluster");
+        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+        let rolegroup = resolved_role
+            .role_groups
+            .get("default")
+            .expect("the 'default' role group is defined in the test cluster");
 
         let expected: StackableAffinity = StackableAffinity {
             node_affinity: None,
@@ -160,10 +167,17 @@ mod tests {
             }),
         };
 
-        let affinity = airflow
-            .merged_config(&role, &rolegroup_ref)
-            .unwrap()
-            .affinity;
+        let affinity = with_validated_config::<
+            AirflowConfig,
+            GenericCommonConfig,
+            AirflowConfigFragment,
+            GenericRoleConfig,
+            AirflowConfigOverrides,
+        >(rolegroup, &resolved_role, &default_config)
+        .expect("the config should merge and validate")
+        .config
+        .config
+        .affinity;
 
         assert_eq!(affinity, expected);
     }
