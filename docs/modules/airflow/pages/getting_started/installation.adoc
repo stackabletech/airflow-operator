@@ -67,7 +67,8 @@ Install the Stackable operators:
 include::example$getting_started/code/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm deploys the operators in a Kubernetes Deployment and apply the CRDs for the Airflow cluster (as well as the CRDs for the required operators).
+Helm deploys the operators in a Kubernetes Deployment.
+Each operator installs and maintains its own CRDs at startup (see xref:concepts:maintenance/crds.adoc[]).
 --
 ====
 
