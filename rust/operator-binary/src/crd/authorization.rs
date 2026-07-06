@@ -2,6 +2,7 @@ use stackable_operator::{client::Client, commons::opa::OpaApiVersion, shared::ti
 
 use crate::crd::{AirflowAuthorization, AirflowOpaConfig, v1alpha2};
 
+#[derive(Clone, Debug)]
 pub struct AirflowAuthorizationResolved {
     pub opa: Option<OpaConfigResolved>,
 }
@@ -24,6 +25,7 @@ impl AirflowAuthorizationResolved {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct OpaConfigResolved {
     pub connection_string: String,
     pub cache_entry_time_to_live: Duration,

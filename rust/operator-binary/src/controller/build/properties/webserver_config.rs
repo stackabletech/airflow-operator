@@ -1,27 +1,39 @@
-use std::collections::BTreeMap;
+//! Builds the `webserver_config.py` Flask configuration file from the resolved
+//! authentication/authorization config plus user-provided config overrides.
+
+use std::{collections::BTreeMap, io::Write};
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::tls_verification::TlsVerification,
     crd::authentication::{ldap, oidc},
+    v2::flask_config_writer,
 };
 
-use crate::crd::{
-    AirflowConfigOptions,
-    authentication::{
-        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-        DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
+use crate::{
+    controller::ValidatedCluster,
+    crd::{
+        AirflowConfigOptions,
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+            DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
+        },
+        authorization::AirflowAuthorizationResolved,
     },
-    authorization::AirflowAuthorizationResolved,
 };
 
-pub const PYTHON_IMPORTS: &[&str] = &[
+const PYTHON_IMPORTS: &[&str] = &[
     "import os",
     "from flask_appbuilder.const import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)",
     "basedir = os.path.abspath(os.path.dirname(__file__))",
     "WTF_CSRF_ENABLED = True",
 ];
+
+/// Marks arbitrary Python code to prepend verbatim to the generated file.
+const CONFIG_OVERRIDE_FILE_HEADER_KEY: &str = "FILE_HEADER";
+/// Marks arbitrary Python code to append verbatim to the generated file.
+const CONFIG_OVERRIDE_FILE_FOOTER_KEY: &str = "FILE_FOOTER";
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -35,26 +47,95 @@ pub enum Error {
 
     #[snafu(display("invalid well-known OIDC configuration URL"))]
     InvalidWellKnownConfigUrl { source: oidc::v1alpha1::Error },
+
+    #[snafu(display("failed to write the webserver config file"))]
+    WriteConfigFile {
+        source: flask_config_writer::FlaskAppConfigWriterError,
+    },
+
+    #[snafu(display("failed to write the header/footer to the webserver config file"))]
+    WriteHeaderFooter { source: std::io::Error },
 }
 
-pub fn add_airflow_config(
-    config: &mut BTreeMap<String, String>,
+/// Renders the `webserver_config.py` contents: operator defaults (derived from the
+/// resolved authentication/authorization config) with the user's `config_overrides`
+/// applied last, wrapped by the optional `FILE_HEADER`/`FILE_FOOTER` Python blocks.
+pub fn build(
+    validated_cluster: &ValidatedCluster,
+    config_file_overrides: &BTreeMap<String, String>,
+) -> Result<String, Error> {
+    // this will call default values from AirflowClientAuthenticationDetails
+    let mut config = build_airflow_config(
+        &validated_cluster.cluster_config.authentication_config,
+        &validated_cluster.cluster_config.authorization_config,
+        &validated_cluster.image.product_version,
+    )?;
+
+    let mut file_config = config_file_overrides.clone();
+
+    // now add any overrides, replacing any defaults
+    config.append(&mut file_config);
+
+    let mut config_file = Vec::new();
+
+    // By removing the keys from `config`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
+    if let Some(header) = config.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
+        writeln!(config_file, "{}", header).context(WriteHeaderFooterSnafu)?;
+    }
+
+    let temp_file_footer: Option<String> = config.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
+
+    // Workaround for apache-airflow-providers-fab 3.6.x: `_search_ldap` calls
+    // `ldap.filter.escape_filter_chars` without ever importing `ldap.filter`, so every LDAP
+    // login fails with `AttributeError: module 'ldap' has no attribute 'filter'` (the
+    // `filter` submodule is not auto-loaded by `import ldap`). Importing it here registers
+    // the submodule on the `ldap` package for the whole webserver process, which makes the
+    // FAB code resolve it. Fixed upstream in FAB 3.7.0 (apache/airflow#68226); this import
+    // is a harmless no-op there and on any python-ldap version.
+    let mut imports = PYTHON_IMPORTS.to_vec();
+    let has_ldap = validated_cluster
+        .cluster_config
+        .authentication_config
+        .authentication_classes_resolved
+        .iter()
+        .any(|auth_class| matches!(auth_class, AirflowAuthenticationClassResolved::Ldap { .. }));
+    if has_ldap {
+        imports.push("import ldap.filter");
+    }
+
+    flask_config_writer::write::<AirflowConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        &imports,
+    )
+    .context(WriteConfigFileSnafu)?;
+
+    if let Some(footer) = temp_file_footer {
+        writeln!(config_file, "{}", footer).context(WriteHeaderFooterSnafu)?;
+    }
+
+    Ok(String::from_utf8(config_file).expect("the Flask config writer only emits valid UTF-8"))
+}
+
+/// Builds the operator-default `webserver_config.py` entries derived from the resolved
+/// authentication/authorization config.
+///
+/// Returns the assembled map; the caller applies user `config_overrides` on top.
+pub fn build_airflow_config(
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
     authorization_config: &AirflowAuthorizationResolved,
     product_version: &str,
-) -> Result<()> {
-    if !config.contains_key(&*AirflowConfigOptions::AuthType.to_string()) {
-        config.insert(
-            // should default to AUTH_TYPE = AUTH_DB
-            AirflowConfigOptions::AuthType.to_string(),
-            "AUTH_DB".into(),
-        );
-    }
+) -> Result<BTreeMap<String, String>> {
+    let mut config = BTreeMap::new();
 
-    append_authentication_config(config, authentication_config)?;
-    append_authorization_config(config, authorization_config, product_version);
+    // should default to AUTH_TYPE = AUTH_DB (an authentication provider may override this below)
+    config.insert(AirflowConfigOptions::AuthType.to_string(), "AUTH_DB".into());
 
-    Ok(())
+    append_authentication_config(&mut config, authentication_config)?;
+    append_authorization_config(&mut config, authorization_config, product_version);
+
+    Ok(config)
 }
 
 fn append_authentication_config(
@@ -320,15 +401,13 @@ mod tests {
         shared::time::Duration,
     };
 
-    use crate::{
-        config::add_airflow_config,
-        crd::{
-            authentication::{
-                AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-                FlaskRolesSyncMoment, default_user_registration,
-            },
-            authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
+    use super::build_airflow_config;
+    use crate::crd::{
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+            FlaskRolesSyncMoment, default_user_registration,
         },
+        authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
     };
 
     const TEST_AIRFLOW_VERSION: &str = "3.0.6";
@@ -344,9 +423,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -395,9 +472,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -491,9 +566,7 @@ mod tests {
 
         let authorization_config = AirflowAuthorizationResolved { opa: None };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,
@@ -563,9 +636,7 @@ mod tests {
             }),
         };
 
-        let mut result = BTreeMap::new();
-        add_airflow_config(
-            &mut result,
+        let result = build_airflow_config(
             &authentication_config,
             &authorization_config,
             TEST_AIRFLOW_VERSION,

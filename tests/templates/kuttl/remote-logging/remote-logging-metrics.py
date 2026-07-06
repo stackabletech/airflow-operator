@@ -15,8 +15,40 @@ def exception_handler(exception_type, exception, traceback):
 sys.excepthook = exception_handler
 
 
-def collect_all_sources(payload):
-    # Return a flat list of every source string found in payload['content'].
+def at_least_3_2(airflow_version: str) -> bool:
+    # The log API response shape changed in Airflow 3.2 (see collect_all_sources).
+    try:
+        major, minor = (int(p) for p in airflow_version.split(".")[:2])
+    except (ValueError, IndexError):
+        # Unknown/garbled version: assume the current (>= 3.2) format.
+        return True
+    return (major, minor) >= (3, 2)
+
+
+def collect_all_sources(payload, airflow_version):
+    # Return a flat list of every log-source string found in payload['content'].
+    #
+    # Airflow >= 3.2 exposes the (remote) log location as `event` lines wrapped in a
+    # "Log message source details" group, e.g.:
+    #   {'event': '::group::Log message source details'}
+    #   {'event': 's3://my-bucket/.../attempt=1.log'}
+    #   {'event': '::endgroup::'}
+    # Older Airflow 3.x returned the locations in a `sources` list per entry instead.
+    if at_least_3_2(airflow_version):
+        sources = []
+        in_source_group = False
+        for entry in payload.get("content", []):
+            if not isinstance(entry, dict):
+                continue
+            event = entry.get("event", "")
+            if event == "::group::Log message source details":
+                in_source_group = True
+            elif event == "::endgroup::":
+                in_source_group = False
+            elif in_source_group:
+                sources.append(event)
+        return sources
+
     sources = []
     for entry in payload.get("content", []):
         if isinstance(entry, dict) and isinstance(entry.get("sources"), list):
@@ -24,7 +56,9 @@ def collect_all_sources(payload):
     return sources
 
 
-def prefix_is_matched(tasks, dag_run_id_root_url, headers, required_prefix) -> bool:
+def prefix_is_matched(
+    tasks, dag_run_id_root_url, headers, required_prefix, airflow_version
+) -> bool:
     for ti in tasks["task_instances"]:
         task_id = ti["task_id"]
         try_number = ti["try_number"]
@@ -34,7 +68,7 @@ def prefix_is_matched(tasks, dag_run_id_root_url, headers, required_prefix) -> b
             params={"full_content": "true"},
         ).json()
         print(f"Logs/full-content: {logs}")
-        all_sources = collect_all_sources(logs)
+        all_sources = collect_all_sources(logs, airflow_version)
         if not all_sources:
             print("No 'sources' arrays were found yet in the payload...")
         else:
@@ -51,7 +85,7 @@ def prefix_is_matched(tasks, dag_run_id_root_url, headers, required_prefix) -> b
     return False
 
 
-def remote_logging() -> None:
+def remote_logging(airflow_version: str) -> None:
     now = datetime.now(timezone.utc)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
@@ -123,7 +157,9 @@ def remote_logging() -> None:
                 f"{dag_run_id_root_url}",
                 headers=headers,
             ).json()
-            if prefix_is_matched(tasks, dag_run_id_root_url, headers, required_prefix):
+            if prefix_is_matched(
+                tasks, dag_run_id_root_url, headers, required_prefix, airflow_version
+            ):
                 break
         time.sleep(10)
         loop += 1
@@ -145,7 +181,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
 
     if opts.airflow_version and not opts.airflow_version.startswith("2."):
-        remote_logging()
+        remote_logging(opts.airflow_version)
     else:
         # should not happen as we are using airflow-latest
         print("Remote logging is not tested for version < 3.x!")

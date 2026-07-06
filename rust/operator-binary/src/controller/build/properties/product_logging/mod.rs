@@ -1,97 +1,48 @@
-use std::fmt::{Display, Write};
+//! Renders the logging config files (`log_config.py` and the Vector agent config)
+//! assembled into the rolegroup `ConfigMap`.
 
-use snafu::Snafu;
+use std::fmt::Write;
+
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
     commons::product_image_selection::ResolvedProductImage,
-    kube::Resource,
-    product_logging::{
-        self,
-        spec::{
-            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
-        },
-    },
-    role_utils::RoleGroupRef,
+    product_logging::spec::AutomaticContainerLogConfig,
+    v2::product_logging::framework::ValidatedContainerLogConfigChoice,
 };
 
-use crate::crd::STACKABLE_LOG_DIR;
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
-    ConfigMapNotFound {
-        source: stackable_operator::client::Error,
-        cm_name: String,
-    },
-    #[snafu(display("failed to retrieve the entry [{entry}] for ConfigMap [{cm_name}]"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-    #[snafu(display("vectorAggregatorConfigMapName must be set"))]
-    MissingVectorAggregatorAddress,
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-const LOG_CONFIG_FILE: &str = "log_config.py";
+/// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "airflow.py.json";
 
-/// Extend the ConfigMap with logging and Vector configurations
-pub fn extend_config_map_with_log_config<C, K>(
-    rolegroup: &RoleGroupRef<K>,
-    logging: &Logging<C>,
-    main_container: &C,
-    vector_container: &C,
-    cm_builder: &mut ConfigMapBuilder,
-    resolved_product_image: &ResolvedProductImage,
-) -> Result<()>
-where
-    C: Clone + Ord + Display,
-    K: Resource,
-{
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(main_container)
-    {
-        let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
-        cm_builder.add_data(
-            LOG_CONFIG_FILE,
-            create_airflow_config(log_config, &log_dir, resolved_product_image),
-        );
-    }
+/// The Vector agent configuration (`vector.yaml`).
+const VECTOR_CONFIG: &str = include_str!("vector.yaml");
 
-    let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(vector_container)
-    {
-        Some(log_config)
-    } else {
-        None
-    };
-
-    if logging.enable_vector_agent {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
-        );
-    }
-
-    Ok(())
+/// Returns the Vector agent config (`vector.yaml`) content.
+pub fn vector_config_file_content() -> String {
+    VECTOR_CONFIG.to_owned()
 }
 
-fn create_airflow_config(
-    log_config: &AutomaticContainerLogConfig,
+/// Renders `log_config.py` for the product container.
+///
+/// Returns `None` when the product container does not use the operator's automatic logging
+/// configuration (i.e. a custom log ConfigMap is referenced instead), in which case no
+/// `log_config.py` should be added to the rolegroup `ConfigMap`.
+pub fn create_airflow_config(
+    product_container: &ValidatedContainerLogConfigChoice,
     log_dir: &str,
     resolved_product_image: &ResolvedProductImage,
-) -> String {
-    if resolved_product_image.product_version.starts_with("2.")
+) -> Option<String> {
+    let ValidatedContainerLogConfigChoice::Automatic(log_config) = product_container else {
+        return None;
+    };
+
+    let config = if resolved_product_image.product_version.starts_with("2.")
         || resolved_product_image.product_version.starts_with("3.0.")
     {
         create_airflow_stdlib_config(log_config, log_dir, resolved_product_image)
     } else {
         create_airflow_structlog_config(log_config, log_dir)
-    }
+    };
+
+    Some(config)
 }
 
 fn create_airflow_stdlib_config(
@@ -285,4 +236,22 @@ REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
             .to_python_expression(),
         root_log_level = log_config.root_log_level().to_python_expression(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector_config_file_content() {
+        let content = vector_config_file_content();
+        assert!(!content.is_empty());
+        // Airflow logs JSON to `airflow.py.json`, so the Python-JSON source must be present.
+        assert!(content.contains("files_py"));
+        assert!(content.contains("*.py.json"));
+        // The config is env-var-parameterized (resolved at runtime by the Vector container), not
+        // baked, so the role-group identity must appear as placeholders.
+        assert!(content.contains("${ROLE_NAME}"));
+        assert!(content.contains("${VECTOR_AGGREGATOR_ADDRESS}"));
+    }
 }

@@ -3,23 +3,19 @@ use std::{
     path::PathBuf,
 };
 
-use product_config::types::PropertyNameKind;
 use snafu::Snafu;
 use stackable_operator::{
-    commons::product_image_selection::ResolvedProductImage,
     crd::{authentication::oidc, git_sync},
-    database_connections::drivers::{
-        celery::CeleryDatabaseConnectionDetails, sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
-    },
     k8s_openapi::api::core::v1::EnvVar,
     kube::ResourceExt,
     product_logging::framework::create_vector_shutdown_file_command,
+    v2::{builder::pod::container::EnvVarSet, product_logging::framework::STACKABLE_LOG_DIR},
 };
 
 use crate::{
+    controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, ExecutorConfig, LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -27,7 +23,6 @@ use crate::{
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
-        v1alpha2,
     },
     util::{env_var_from_secret, role_service_name},
 };
@@ -75,31 +70,25 @@ pub enum Error {
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
 /// for clusters utilizing `celeryExecutor`: for clusters using `kubernetesExecutor` a different set will be
 /// used which is defined in [`build_airflow_template_envs`]).
-#[allow(clippy::too_many_arguments)]
 pub fn build_airflow_statefulset_envs(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    executor: &AirflowExecutor,
-    auth_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
-    celery_database_connection_details: &Option<(
-        CeleryDatabaseConnectionDetails,
-        CeleryDatabaseConnectionDetails,
-    )>,
+    env_overrides: &EnvVarSet,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
-    resolved_product_image: &ResolvedProductImage,
 ) -> Result<Vec<EnvVar>, Error> {
+    let executor = &cluster.cluster_config.executor;
+    let auth_config = &cluster.cluster_config.authentication_config;
+    let authorization_config = &cluster.cluster_config.authorization_config;
+    let resolved_product_image = &cluster.image;
+    let metadata_database_connection_details = cluster.metadata_database_connection_details();
+    let celery_database_connection_details = cluster.celery_database_connection_details();
+
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
-    let internal_secret_name = airflow.shared_internal_secret_secret_name();
+    let internal_secret_name = cluster.internal_secret_name();
 
     env.extend(static_envs(git_sync_resources));
 
-    // environment variables
-    let env_vars = rolegroup_config.get(&PropertyNameKind::Env);
-
-    add_version_specific_env_vars(airflow, airflow_role, resolved_product_image, &mut env);
+    add_version_specific_env_vars(cluster, airflow_role, &mut env);
 
     // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY since 3.0.2. Can be removed when 3.0.1 is no longer supported.
     env.insert(
@@ -126,7 +115,7 @@ pub fn build_airflow_statefulset_envs(
         "AIRFLOW__CORE__FERNET_KEY".into(),
         env_var_from_secret(
             "AIRFLOW__CORE__FERNET_KEY",
-            &airflow.shared_fernet_key_secret_name(),
+            cluster.fernet_key_name(),
             FERNET_KEY_SECRET_KEY,
         ),
     );
@@ -169,7 +158,7 @@ pub fn build_airflow_statefulset_envs(
         },
     );
 
-    if airflow.spec.cluster_config.load_examples {
+    if cluster.cluster_config.load_examples {
         env.insert(
             AIRFLOW_CORE_LOAD_EXAMPLES.into(),
             EnvVar {
@@ -189,7 +178,7 @@ pub fn build_airflow_statefulset_envs(
         );
     }
 
-    if airflow.spec.cluster_config.expose_config {
+    if cluster.cluster_config.expose_config {
         env.insert(
             AIRFLOW_WEBSERVER_EXPOSE_CONFIG.into(),
             EnvVar {
@@ -222,7 +211,7 @@ pub fn build_airflow_statefulset_envs(
             AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
             EnvVar {
                 name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-                value: airflow.namespace(),
+                value: Some(cluster.namespace.to_string()),
                 ..Default::default()
             },
         );
@@ -232,7 +221,7 @@ pub fn build_airflow_statefulset_envs(
         // Database initialization is limited to the scheduler.
         // See https://github.com/stackabletech/airflow-operator/issues/259
         AirflowRole::Scheduler => {
-            let secret = &airflow.spec.cluster_config.credentials_secret_name;
+            let secret = &cluster.cluster_config.credentials_secret_name;
             env.insert(
                 ADMIN_USERNAME.into(),
                 env_var_from_secret(ADMIN_USERNAME, secret, "adminUser.username"),
@@ -265,18 +254,10 @@ pub fn build_airflow_statefulset_envs(
         _ => {}
     }
 
-    // apply overrides last of all with a fixed ordering
-    if let Some(env_vars) = env_vars {
-        for (k, v) in env_vars.iter().collect::<BTreeMap<_, _>>() {
-            env.insert(
-                k.into(),
-                EnvVar {
-                    name: k.to_string(),
-                    value: Some(v.to_string()),
-                    ..Default::default()
-                },
-            );
-        }
+    // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
+    // in a fixed (sorted-by-name) order
+    for env_var in env_overrides.clone() {
+        env.insert(env_var.name.clone(), env_var);
     }
 
     // Needed for the `containerdebug` process to log it's tracing information to.
@@ -374,12 +355,10 @@ fn static_envs(
 /// Return environment variables to be applied to the configuration map used in conjunction with
 /// the `kubernetesExecutor` worker.
 pub fn build_airflow_template_envs(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     env_overrides: &HashMap<String, String>,
-    config: &ExecutorConfig,
-    metadata_database_connection_details: &SqlAlchemyDatabaseConnectionDetails,
+    logging: &ValidatedLogging,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
-    resolved_product_image: &ResolvedProductImage,
 ) -> Vec<EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
@@ -387,7 +366,12 @@ pub fn build_airflow_template_envs(
         AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
         EnvVar {
             name: AIRFLOW_DATABASE_SQL_ALCHEMY_CONN.into(),
-            value: Some(metadata_database_connection_details.url_template.clone()),
+            value: Some(
+                cluster
+                    .metadata_database_connection_details()
+                    .url_template
+                    .clone(),
+            ),
             ..Default::default()
         },
     );
@@ -405,7 +389,7 @@ pub fn build_airflow_template_envs(
         AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
         EnvVar {
             name: AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE.into(),
-            value: airflow.namespace(),
+            value: Some(cluster.namespace.to_string()),
             ..Default::default()
         },
     );
@@ -424,17 +408,12 @@ pub fn build_airflow_template_envs(
 
     env.extend(static_envs(git_sync_resources));
 
-    add_version_specific_env_vars(
-        airflow,
-        &AirflowRole::Worker,
-        resolved_product_image,
-        &mut env,
-    );
+    add_version_specific_env_vars(cluster, &AirflowRole::Worker, &mut env);
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
     // that are created and then terminated (we do a similar thing for spark-k8s).
-    if config.logging.enable_vector_agent {
+    if logging.enable_vector_agent {
         env.insert(
             "_STACKABLE_POST_HOOK".into(),
             EnvVar {
@@ -469,13 +448,12 @@ pub fn build_airflow_template_envs(
 }
 
 fn add_version_specific_env_vars(
-    airflow: &v1alpha2::AirflowCluster,
+    cluster: &ValidatedCluster,
     airflow_role: &AirflowRole,
-    resolved_product_image: &ResolvedProductImage,
     env: &mut BTreeMap<String, EnvVar>,
 ) {
-    if resolved_product_image.product_version.starts_with("3.") {
-        env.extend(execution_server_env_vars(airflow));
+    if cluster.image.product_version.starts_with("3.") {
+        env.extend(execution_server_env_vars(cluster));
         env.insert(
             AIRFLOW_CORE_AUTH_MANAGER.into(),
             EnvVar {
@@ -506,7 +484,7 @@ fn add_version_specific_env_vars(
             "AIRFLOW__API_AUTH__JWT_SECRET".into(),
             env_var_from_secret(
                 "AIRFLOW__API_AUTH__JWT_SECRET",
-                &airflow.shared_jwt_secret_secret_name(),
+                cluster.jwt_secret_name(),
                 JWT_SECRET_SECRET_KEY,
             ),
         );
@@ -547,7 +525,7 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
-        if airflow.spec.dag_processors.is_some() {
+        if cluster.has_role(&AirflowRole::DagProcessor) {
             // In airflow 2.x the dag-processor can optionally be started as a
             // standalone process (rather then as a scheduler subprocess),
             // accompanied by this env-var being set to True.
@@ -639,34 +617,33 @@ fn authorization_env_vars(
     env
 }
 
-fn execution_server_env_vars(airflow: &v1alpha2::AirflowCluster) -> BTreeMap<String, EnvVar> {
+fn execution_server_env_vars(cluster: &ValidatedCluster) -> BTreeMap<String, EnvVar> {
     let mut env: BTreeMap<String, EnvVar> = BTreeMap::new();
 
-    if let Some(name) = airflow.metadata.name.as_ref() {
-        // The execution API server URL can be any webserver (if there
-        // are multiple ones). Parse the list of webservers in a deterministic
-        // way by iterating over a BTree map rather than the HashMap.
-        if airflow.spec.webservers.as_ref().is_some() {
-            let webserver = role_service_name(name, &AirflowRole::Webserver.to_string());
-            tracing::debug!("Webserver set [{webserver}]");
-            // These settings are new in 3.x and will have no affect with earlier versions.
-            env.insert(
-                "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                EnvVar {
-                    name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/execution/")),
-                    ..Default::default()
-                },
-            );
-            env.insert(
-                "AIRFLOW__CORE__BASE_URL".into(),
-                EnvVar {
-                    name: "AIRFLOW__CORE__BASE_URL".into(),
-                    value: Some(format!("http://{webserver}:8080/")),
-                    ..Default::default()
-                },
-            );
-        }
+    let name = cluster.name_any();
+    // The execution API server URL can be any webserver (if there
+    // are multiple ones). Parse the list of webservers in a deterministic
+    // way by iterating over a BTree map rather than the HashMap.
+    if cluster.has_role(&AirflowRole::Webserver) {
+        let webserver = role_service_name(&name, &AirflowRole::Webserver.to_string());
+        tracing::debug!("Webserver set [{webserver}]");
+        // These settings are new in 3.x and will have no affect with earlier versions.
+        env.insert(
+            "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+            EnvVar {
+                name: "AIRFLOW__CORE__EXECUTION_API_SERVER_URL".into(),
+                value: Some(format!("http://{webserver}:{HTTP_PORT}/execution/")),
+                ..Default::default()
+            },
+        );
+        env.insert(
+            "AIRFLOW__CORE__BASE_URL".into(),
+            EnvVar {
+                name: "AIRFLOW__CORE__BASE_URL".into(),
+                value: Some(format!("http://{webserver}:{HTTP_PORT}/")),
+                ..Default::default()
+            },
+        );
     }
 
     env
