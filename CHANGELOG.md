@@ -10,6 +10,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.113.3 ([#811]).
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#767], [#774]).
 - BREAKING: `configOverrides` now only accepts the known config file `webserver_config.py`. Previously, arbitrary file names were silently accepted and ignored ([#775]).
 - Bump `stackable-operator` to 0.112.0, kube to 3.1.0, and snafu to 0.9 ([#775], [#804]).
@@ -48,6 +49,7 @@
 [#800]: https://github.com/stackabletech/airflow-operator/pull/800
 [#801]: https://github.com/stackabletech/airflow-operator/pull/801
 [#804]: https://github.com/stackabletech/airflow-operator/pull/804
+[#811]: https://github.com/stackabletech/airflow-operator/pull/811
 
 ## [26.3.0] - 2026-03-16
 
