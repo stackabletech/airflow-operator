@@ -40,14 +40,20 @@ spec:
     productVersion: 3.1.6
   clusterConfig:
     authentication:
-      - authenticationClass: ldap    # <1>
-        userRegistrationRole: Admin  # <2>
+      - authenticationClass: ldap        # <1>
+        userRegistration: true           # <2>
+        userRegistrationRole: Admin      # <3>
+        syncRolesAt: Registration        # <4>
 ----
 
 <1> The reference to an AuthenticationClass called `ldap`
-<2> The default role that all users are assigned to
+<2> Whether users that are not yet in Airflow's user database are created automatically on their first login (defaults to `true`)
+<3> The default role that all users are assigned to
+<4> When user roles are synchronized with the identity provider: `Registration` (only on first login, the default) or `Login` (on every login)
 
 Users that log in with LDAP are assigned to a default {airflow-access-control-docs}[role{external-link-icon}^] which is specified with the `userRegistrationRole` property.
+
+TLS verification for the authentication connection cannot be disabled; the operator rejects an AuthenticationClass that turns it off.
 
 You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-docs}/authentication.stackable.tech/authenticationclass/v1alpha1/[AuthenticationClass reference {external-link-icon}^].
 
@@ -77,14 +83,20 @@ spec:
     - authenticationClass: keycloak                       # <1>
       oidc:
         clientCredentialsSecret: airflow-keycloak-client  # <2>
-      userRegistrationRole: User                          # <3>
+      userRegistration: true                              # <3>
+      userRegistrationRole: User                          # <4>
+      syncRolesAt: Registration                           # <5>
 ----
 
 <1> The reference to an AuthenticationClass called `keycloak`
 <2> The reference to the Secret containing the Airflow client credentials
-<3> The default role to which all users are assigned
+<3> Whether users that are not yet in Airflow's user database are created automatically on their first login (defaults to `true`)
+<4> The default role to which all users are assigned
+<5> When user roles are synchronized with the identity provider: `Registration` (only on first login, the default) or `Login` (on every login)
 
 Users that log in with OpenID Connect are assigned to a default {airflow-access-control-docs}[role{external-link-icon}^] which is specified with the `userRegistrationRole` property.
+
+TLS verification for the authentication connection cannot be disabled; the operator rejects an AuthenticationClass that turns it off.
 
 The Secret containing the Airflow client credentials:
 
