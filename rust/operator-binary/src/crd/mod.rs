@@ -210,6 +210,7 @@ pub mod versioned {
     /// The CRD contains three roles: webserver, scheduler and worker/celeryExecutor.
     /// You can use either the celeryExecutor or the kubernetesExecutor.
     #[versioned(crd(
+        doc = "An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.",
         group = "airflow.stackable.tech",
         plural = "airflowclusters",
         shortname = "airflow",
