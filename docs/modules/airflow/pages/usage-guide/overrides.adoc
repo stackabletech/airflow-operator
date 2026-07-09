@@ -16,8 +16,6 @@ Airflow exposes an environment variable for every Airflow configuration setting,
 As Airflow can be configured with python code too, arbitrary code can be added to the `webserver_config.py`.
 You can use either `FILE_HEADER` to add code to the top or `FILE_FOOTER` to add to the bottom.
 
-IMPORTANT: This is an experimental feature.
-
 [source,yaml]
 ----
 webservers:
