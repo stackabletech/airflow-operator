@@ -16,8 +16,6 @@ Airflow exposes an environment variable for every Airflow configuration setting,
 As Airflow can be configured with python code too, arbitrary code can be added to the `webserver_config.py`.
 You can use either `FILE_HEADER` to add code to the top or `FILE_FOOTER` to add to the bottom.
 
-IMPORTANT: This is an experimental feature.
-
 [source,yaml]
 ----
 webservers:
@@ -40,8 +38,8 @@ webservers:
       config: {}
 ----
 
-Although Kubernetes can override these settings in one of two ways (Configuration overrides, or Environment Variable overrides), the effect is the same
-and currently only the latter is implemented.
+Note that `configOverrides` is specifically supported for customizing `webserver_config.py`.
+To override standard Airflow configuration properties (listed in the Configuration Reference), use `envOverrides` with the `AIRFLOW__SECTION__KEY` format, as the operator injects these via environment variables rather than modifying a static config file.
 This is described in the following section.
 
 == Environment Variables
