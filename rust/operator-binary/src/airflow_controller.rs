@@ -8,7 +8,7 @@ use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
-    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    cluster_resources::ClusterResourceApplyStrategy,
     commons::{random_secret_creation, rbac::build_rbac_resources},
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
@@ -23,28 +23,14 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    v2::{
-        cluster_resources::cluster_resources_new,
-        types::operator::{RoleGroupName, RoleName},
-    },
+    v2::cluster_resources::cluster_resources_new,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{
-        ValidatedCluster, ValidatedExecutorTemplate,
-        build::resource::{
-            config_map,
-            executor::build_executor_template_config_map,
-            listener::build_group_listener,
-            pdb::build_pdb,
-            service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
-            statefulset::build_server_rolegroup_statefulset,
-        },
-        controller_name, operator_name, product_name,
-    },
+    controller::{ValidatedCluster, build, controller_name, operator_name, product_name},
     crd::{
-        APP_NAME, AirflowClusterStatus, AirflowConfigOverrides, Container, OPERATOR_NAME,
+        APP_NAME, AirflowClusterStatus, OPERATOR_NAME,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
@@ -55,32 +41,6 @@ use crate::{
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 
-/// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
-/// AirflowRole). Used to derive its labels and ConfigMap name.
-pub const EXECUTOR_ROLE_NAME: &str = "executor";
-pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
-
-/// The executor pseudo-role name (`executor`) as a type-safe value.
-pub fn executor_role_name() -> RoleName {
-    EXECUTOR_ROLE_NAME
-        .parse()
-        .expect("'executor' is a valid role name")
-}
-
-/// The executor's role-group name (`kubernetes`), used for its role-group ConfigMap.
-pub fn executor_role_group_name() -> RoleGroupName {
-    EXECUTOR_ROLE_GROUP_NAME
-        .parse()
-        .expect("'kubernetes' is a valid role group name")
-}
-
-/// The executor *pod-template* role-group name (`executor-template`), used for the template
-/// ConfigMap/pod labels.
-pub fn executor_template_role_group_name() -> RoleGroupName {
-    "executor-template"
-        .parse()
-        .expect("'executor-template' is a valid role group name")
-}
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
     concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
@@ -93,22 +53,9 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
-    #[snafu(display("failed to apply Service for role group {role_group}"))]
-    ApplyRoleGroupService {
+    #[snafu(display("failed to apply Kubernetes resource"))]
+    ApplyResource {
         source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply ConfigMap for role group {role_group}"))]
-    ApplyRoleGroupConfig {
-        source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply StatefulSet for role group {role_group}"))]
-    ApplyRoleGroupStatefulSet {
-        source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
     },
 
     #[snafu(display("failed to patch service account"))]
@@ -126,10 +73,8 @@ pub enum Error {
         source: stackable_operator::commons::rbac::Error,
     },
 
-    #[snafu(display("failed to build rolegroup ConfigMap"))]
-    BuildConfigMap {
-        source: crate::controller::build::resource::config_map::Error,
-    },
+    #[snafu(display("failed to build the Kubernetes resources"))]
+    BuildResources { source: build::Error },
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
@@ -156,37 +101,12 @@ pub enum Error {
         source: crate::controller::validate::Error,
     },
 
-    #[snafu(display("failed to apply executor template ConfigMap"))]
-    ApplyExecutorTemplateConfig {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build the executor pod-template ConfigMap"))]
-    BuildExecutorTemplate {
-        source: crate::controller::build::resource::executor::Error,
-    },
-
-    #[snafu(display("failed to apply PodDisruptionBudget"))]
-    ApplyPdb {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to build label"))]
     BuildLabel { source: LabelError },
 
     #[snafu(display("AirflowCluster object is invalid"))]
     InvalidAirflowCluster {
         source: error_boundary::InvalidObject,
-    },
-
-    #[snafu(display("failed to build the rolegroup StatefulSet"))]
-    BuildStatefulSet {
-        source: crate::controller::build::resource::statefulset::Error,
-    },
-
-    #[snafu(display("failed to apply group listener"))]
-    ApplyGroupListener {
-        source: stackable_operator::cluster_resources::Error,
     },
 }
 
@@ -226,40 +146,7 @@ pub async fn reconcile_airflow(
     )
     .context(ValidateSnafu)?;
 
-    // TODO: Move secret creation to a dedicated apply step once it exists.
-    random_secret_creation::create_random_secret_if_not_exists(
-        validated_cluster.internal_secret_name().as_ref(),
-        INTERNAL_SECRET_SECRET_KEY,
-        256,
-        &validated_cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
-
-    random_secret_creation::create_random_secret_if_not_exists(
-        validated_cluster.jwt_secret_name().as_ref(),
-        JWT_SECRET_SECRET_KEY,
-        256,
-        &validated_cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
-
-    // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
-    // does not document how long the fernet key should be, but recommends using
-    // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
-    random_secret_creation::create_random_secret_if_not_exists(
-        validated_cluster.fernet_key_name().as_ref(),
-        FERNET_KEY_SECRET_KEY,
-        32,
-        &validated_cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
+    ensure_random_secrets(client, &validated_cluster).await?;
 
     let mut cluster_resources = cluster_resources_new(
         &product_name(),
@@ -279,8 +166,12 @@ pub async fn reconcile_airflow(
     let (rbac_sa, rbac_rolebinding) =
         build_rbac_resources(airflow, APP_NAME, required_labels).context(BuildRBACObjectsSnafu)?;
 
-    let rbac_sa = cluster_resources
-        .add(client, rbac_sa.clone())
+    // The ServiceAccount name is deterministic on the built object, so the build step does not
+    // depend on the applied ServiceAccount.
+    let service_account_name = rbac_sa.name_any();
+
+    cluster_resources
+        .add(client, rbac_sa)
         .await
         .context(ApplyServiceAccountSnafu)?;
     cluster_resources
@@ -288,105 +179,44 @@ pub async fn reconcile_airflow(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
+    let resources =
+        build::build(&validated_cluster, &service_account_name).context(BuildResourcesSnafu)?;
+
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    // if the kubernetes executor is specified, in place of a worker role that will be in the role
-    // collection there will be a pod template created to be used for pod provisioning
-    if let Some(executor_template) = &validated_cluster.cluster_config.executor_template {
-        build_executor_template(
-            executor_template,
-            &validated_cluster,
-            &mut cluster_resources,
-            client,
-            &rbac_sa,
-        )
-        .await?;
+    // Apply order mirrors opensearch: everything before StatefulSets, StatefulSets last (a
+    // changed mounted ConfigMap/Secret must exist first, else Pods restart -- commons-operator#111).
+    for service in resources.services {
+        cluster_resources
+            .add(client, service)
+            .await
+            .context(ApplyResourceSnafu)?;
     }
-
-    for (airflow_role, role_group_configs) in &validated_cluster.role_groups {
-        if let Some(role_config) = validated_cluster.role_configs.get(airflow_role) {
-            if let Some(pdb_config) = &role_config.pdb
-                && let Some(pdb) = build_pdb(pdb_config, &validated_cluster, airflow_role)
-            {
-                cluster_resources
-                    .add(client, pdb)
-                    .await
-                    .context(ApplyPdbSnafu)?;
-            }
-
-            if let Some(listener_class) = &role_config.listener_class
-                && let Some(listener_group_name) = &role_config.group_listener_name
-            {
-                let rg_group_listener = build_group_listener(
-                    &validated_cluster,
-                    airflow_role,
-                    listener_class.clone(),
-                    listener_group_name.clone(),
-                );
-                cluster_resources
-                    .add(client, rg_group_listener)
-                    .await
-                    .context(ApplyGroupListenerSnafu)?;
-            }
-        }
-
-        for (rolegroup_name, validated_rg_config) in role_group_configs {
-            let logging = &validated_rg_config.config.logging;
-
-            let rg_headless_service =
-                build_rolegroup_headless_service(&validated_cluster, airflow_role, rolegroup_name);
-
+    for listener in resources.listeners {
+        cluster_resources
+            .add(client, listener)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for config_map in resources.config_maps {
+        cluster_resources
+            .add(client, config_map)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for pdb in resources.pod_disruption_budgets {
+        cluster_resources
+            .add(client, pdb)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for statefulset in resources.stateful_sets {
+        ss_cond_builder.add(
             cluster_resources
-                .add(client, rg_headless_service)
+                .add(client, statefulset)
                 .await
-                .context(ApplyRoleGroupServiceSnafu {
-                    role_group: rolegroup_name.clone(),
-                })?;
-
-            let rg_metrics_service =
-                build_rolegroup_metrics_service(&validated_cluster, airflow_role, rolegroup_name);
-            cluster_resources
-                .add(client, rg_metrics_service)
-                .await
-                .context(ApplyRoleGroupServiceSnafu {
-                    role_group: rolegroup_name.clone(),
-                })?;
-
-            let rg_configmap = config_map::build_rolegroup_config_map(
-                &validated_cluster,
-                &airflow_role.role_name(),
-                rolegroup_name,
-                &validated_rg_config.config_overrides,
-                logging,
-                &Container::Airflow,
-            )
-            .context(BuildConfigMapSnafu)?;
-            cluster_resources
-                .add(client, rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    role_group: rolegroup_name.clone(),
-                })?;
-
-            let rg_statefulset = build_server_rolegroup_statefulset(
-                &validated_cluster,
-                airflow_role,
-                rolegroup_name,
-                validated_rg_config,
-                logging,
-                &rbac_sa,
-            )
-            .context(BuildStatefulSetSnafu)?;
-
-            ss_cond_builder.add(
-                cluster_resources
-                    .add(client, rg_statefulset)
-                    .await
-                    .context(ApplyRoleGroupStatefulSetSnafu {
-                        role_group: rolegroup_name.clone(),
-                    })?,
-            );
-        }
+                .context(ApplyResourceSnafu)?,
+        );
     }
 
     cluster_resources
@@ -409,43 +239,47 @@ pub async fn reconcile_airflow(
     Ok(Action::await_change())
 }
 
-async fn build_executor_template(
-    executor_template: &ValidatedExecutorTemplate,
-    validated_cluster: &ValidatedCluster,
-    cluster_resources: &mut ClusterResources<'_>,
+/// Ensures the three shared random Secrets (internal / JWT / Fernet) exist, creating any that are
+/// missing. These are read-or-create client operations, so they cannot be part of the client-free
+/// `build()` step.
+async fn ensure_random_secrets(
     client: &stackable_operator::client::Client,
-    rbac_sa: &stackable_operator::k8s_openapi::api::core::v1::ServiceAccount,
+    cluster: &ValidatedCluster,
 ) -> Result<(), Error> {
-    let executor_config = &executor_template.config;
-    let rg_configmap = config_map::build_rolegroup_config_map(
-        validated_cluster,
-        &executor_role_name(),
-        &executor_role_group_name(),
-        // The kubernetes-executor pod template does not apply webserver_config.py overrides
-        &AirflowConfigOverrides::default(),
-        &executor_config.logging,
-        &Container::Base,
+    random_secret_creation::create_random_secret_if_not_exists(
+        cluster.internal_secret_name().as_ref(),
+        INTERNAL_SECRET_SECRET_KEY,
+        256,
+        cluster,
+        client,
     )
-    .context(BuildConfigMapSnafu)?;
-    cluster_resources
-        .add(client, rg_configmap)
-        .await
-        .with_context(|_| ApplyRoleGroupConfigSnafu {
-            role_group: executor_role_group_name(),
-        })?;
+    .await
+    .context(InternalSecretSnafu)?;
 
-    let worker_pod_template_config_map = build_executor_template_config_map(
-        validated_cluster,
-        &rbac_sa.name_unchecked(),
-        executor_config,
-        &executor_template.env_overrides,
-        &executor_template.pod_overrides,
+    random_secret_creation::create_random_secret_if_not_exists(
+        cluster.jwt_secret_name().as_ref(),
+        JWT_SECRET_SECRET_KEY,
+        256,
+        cluster,
+        client,
     )
-    .context(BuildExecutorTemplateSnafu)?;
-    cluster_resources
-        .add(client, worker_pod_template_config_map)
-        .await
-        .with_context(|_| ApplyExecutorTemplateConfigSnafu {})?;
+    .await
+    .context(InternalSecretSnafu)?;
+
+    // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
+    // does not document how long the fernet key should be, but recommends using
+    // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
+    random_secret_creation::create_random_secret_if_not_exists(
+        cluster.fernet_key_name().as_ref(),
+        FERNET_KEY_SECRET_KEY,
+        32,
+        cluster,
+        client,
+    )
+    .await
+    .context(InternalSecretSnafu)?;
+
     Ok(())
 }
 
