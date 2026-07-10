@@ -6,13 +6,10 @@
 :github: https://github.com/stackabletech/airflow-operator/
 :crd: {crd-docs-base-url}/airflow-operator/{crd-docs-version}/
 :crd-airflowcluster: {crd-docs}/airflow.stackable.tech/airflowcluster/v1alpha2/
-:feature-tracker: https://features.stackable.tech/unified
+:hub: {hub-base-url}/components/airflow
 :deferrable-operators: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html#deferrable-operators-triggers
 
-[.link-bar]
-* {github}[GitHub {external-link-icon}^]
-* {feature-tracker}[Feature Tracker {external-link-icon}^]
-* {crd}[CRD documentation {external-link-icon}^]
+include::ROOT:partial$operator-link-bar.adoc[]
 
 The Stackable operator for Apache Airflow manages {airflow}[Apache Airflow] instances on Kubernetes.
 Apache Airflow is an open-source application for creating, scheduling, and monitoring workflows.
@@ -126,5 +123,4 @@ include::partial$supported-versions.adoc[]
 == Useful links
 
 * The {github}[airflow-operator {external-link-icon}^] GitHub repository
-* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
 * The {crd-airflowcluster}[AirflowCluster {external-link-icon}^] CRD documentation
