@@ -184,7 +184,7 @@ pub async fn reconcile_airflow(
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    // Apply order is: StatefulSets last (a changed mounted ConfigMap/Secret 
+    // Apply order is: StatefulSets last (a changed mounted ConfigMap/Secret
     // must exist first, else Pods restart -- commons-operator#111).
     for service in resources.services {
         cluster_resources
