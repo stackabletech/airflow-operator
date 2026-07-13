@@ -184,7 +184,7 @@ Found 3 errors.
 == LDAP login fails after upgrading to Airflow 3.x+ ("No LDAP object found")
 
 After upgrading from Airflow 2 to Airflow 3, LDAP logins that previously worked may start failing.
-The API server logs a line like the following (note it is logged at `info` level, not as an error, so filtering for errors will miss it):
+The API server logs a line like the following (note, it is logged at `info` level, not as an error, so filtering for errors will miss it):
 
 [source,text]
 ----
