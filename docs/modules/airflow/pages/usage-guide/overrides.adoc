@@ -42,6 +42,10 @@ Note that `configOverrides` is specifically supported for customizing `webserver
 To override standard Airflow configuration properties (listed in the Configuration Reference), use `envOverrides` with the `AIRFLOW__SECTION__KEY` format, as the operator injects these via environment variables rather than modifying a static config file.
 This is described in the following section.
 
+NOTE: Do not supply your own `webserver_config.py` via a mounted file and `+AIRFLOW__WEBSERVER__CONFIG_FILE+`.
+On Airflow 3 that environment variable is no longer read (see xref:troubleshooting/index.adoc[Troubleshooting]).
+Use `configOverrides` with `FILE_HEADER`/`FILE_FOOTER` instead.
+
 == Environment Variables
 
 These can be set -- or overwritten -- at either the role level:
