@@ -181,6 +181,28 @@ Found 3 errors.
 [*] 1 fixable with the `--fix` option.
 ----
 
+== LDAP login fails after upgrading to Airflow 3.x+ ("No LDAP object found")
+
+After upgrading from Airflow 2 to Airflow 3, LDAP logins that previously worked may start failing.
+The API server logs a line like the following (note, it is logged at `info` level, not as an error, so filtering for errors will miss it):
+
+[source,text]
+----
+[info     ] No LDAP object found for: john.smith [airflow.providers.fab.auth_manager.security_manager.override] loc=override.py:1840
+----
+
+This can happen if you were side-loading your own `webserver_config.py` and pointing Airflow at it with the `+AIRFLOW__WEBSERVER__CONFIG_FILE+` environment variable (for example via `envOverrides` plus a mounted ConfigMap).
+
+In Airflow 3 the setting that selects the FAB config file https://github.com/apache/airflow/pull/50774[moved into the FAB provider]: it is now read from `+AIRFLOW__FAB__CONFIG_FILE+` (config key `[fab] config_file`, default `$AIRFLOW_HOME/webserver_config.py`) and the old `+AIRFLOW__WEBSERVER__CONFIG_FILE+` is no longer read.
+The operator generates `webserver_config.py` from your xref:usage-guide/security.adoc#_ldap[AuthenticationClass] and places it at that default path, so on Airflow 3 your custom file is silently ignored and the operator-generated LDAP configuration is used instead.
+If that generated configuration does not match your directory (for example a wrong `ldapFieldNames.uid`), the LDAP search returns no user and login fails.
+
+Mounting your own file and overriding the config-file location was never a supported setup and now breaks silently.
+To customize `webserver_config.py`, use `configOverrides` together with `FILE_HEADER` and `FILE_FOOTER` as described in xref:usage-guide/overrides.adoc#_configuration_properties[Configuration & Environment Overrides].
+All LDAP connection details themselves belong in the xref:usage-guide/security.adoc#_ldap[AuthenticationClass].
+
+TIP: You can confirm which file Airflow actually loads by running `airflow config get-value fab config_file` inside the pod.
+
 == PYTHONPATH with custom DAGs folder using python modules
 
 When a custom DAG folder (e.g. `/dags`) is defined with `envOverrides` and some DAGs contain a python module structure, then the variable `PYTHONPATH` should be explicitly defined to contain both this folder and the log config location that is set by the operator. This setting is done automatically by the operator when the default DAGs folder or gitsync are used, but is not done when this is set by the user directly.
