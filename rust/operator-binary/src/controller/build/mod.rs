@@ -186,7 +186,6 @@ mod tests {
         metadata:
           name: airflow
           namespace: default
-          uid: e6ac237d-a6d4-43a1-8135-f36506110912
         spec:
           image:
             productVersion: 3.1.6
