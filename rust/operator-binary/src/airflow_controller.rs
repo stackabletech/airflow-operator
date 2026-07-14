@@ -269,7 +269,7 @@ async fn ensure_random_secrets(
     // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
     // does not document how long the fernet key should be, but recommends using
     // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    // which returns `jUm21LuA76YZmrIa9u4eXRg0h0P24MDC9IDOmDvJbfw=`, which has 44 characters, which makes 32 bytes.
+    // which returns 32 bytes.
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.fernet_key_name().as_ref(),
         FERNET_KEY_SECRET_KEY,
