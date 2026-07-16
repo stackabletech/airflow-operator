@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [26.7.0-rc1] - 2026-07-16
+
 ### Added
 
 - BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#784]).
