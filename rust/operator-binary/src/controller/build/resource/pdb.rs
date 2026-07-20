@@ -38,7 +38,7 @@ pub fn build_pdb(
     let pdb = pod_disruption_budget_builder_with_role(
         cluster,
         &product_name(),
-        &role.role_name(),
+        &ValidatedCluster::role_name(role),
         &operator_name(),
         &controller_name(),
     )

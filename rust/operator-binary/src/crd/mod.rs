@@ -731,15 +731,6 @@ impl AirflowRole {
         }
     }
 
-    /// The role name as a type-safe label/resource-name value.
-    ///
-    /// Infallible: every `AirflowRole` serialises to a short, valid role name.
-    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
-        self.to_string()
-            .parse()
-            .expect("an AirflowRole serialises to a valid RoleName")
-    }
-
     pub fn listener_class_name(
         &self,
         airflow: &v1alpha2::AirflowCluster,

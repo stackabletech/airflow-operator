@@ -11,6 +11,7 @@ use crate::{
             executor::build_executor_template_config_map,
             listener::build_group_listener,
             pdb::build_pdb,
+            rbac::{build_role_binding, build_service_account},
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_server_rolegroup_statefulset,
         },
@@ -47,14 +48,7 @@ pub enum Error {
 /// Does not need a Kubernetes client: every reference to another Kubernetes resource is already
 /// dereferenced and validated by this point. Cluster configuration is likewise already validated,
 /// so the errors returned here are resource-assembly failures only.
-///
-/// `service_account_name` is the name of the RBAC `ServiceAccount` the role-group Pods and the
-/// Kubernetes-executor pod template run under (RBAC resources are built and applied separately,
-/// in the reconcile step).
-pub fn build(
-    cluster: &ValidatedCluster,
-    service_account_name: &str,
-) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut listeners = vec![];
@@ -81,7 +75,6 @@ pub fn build(
 
         let executor_template_config_map = build_executor_template_config_map(
             cluster,
-            service_account_name,
             &executor_template.config,
             &executor_template.env_overrides,
             &executor_template.pod_overrides,
@@ -123,7 +116,7 @@ pub fn build(
             config_maps.push(
                 config_map::build_rolegroup_config_map(
                     cluster,
-                    &role.role_name(),
+                    &ValidatedCluster::role_name(role),
                     role_group_name,
                     &rg_config.config_overrides,
                     logging,
@@ -140,7 +133,6 @@ pub fn build(
                     role_group_name,
                     rg_config,
                     logging,
-                    service_account_name,
                 )
                 .context(StatefulSetSnafu {
                     role_group: role_group_name.clone(),
@@ -155,11 +147,15 @@ pub fn build(
         listeners,
         config_maps,
         pod_disruption_budgets,
+        service_accounts: vec![build_service_account(cluster)],
+        role_bindings: vec![build_role_binding(cluster)],
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use stackable_operator::kube::Resource;
 
     use super::build;
@@ -184,7 +180,7 @@ mod tests {
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
         metadata:
-          name: airflow
+          name: my-airflow
           namespace: default
           uid: e6ac237d-a6d4-43a1-8135-f36506110912
         spec:
@@ -263,25 +259,84 @@ mod tests {
     #[test]
     fn build_produces_expected_resource_names() {
         let cluster = celery_executor_cluster();
-        let resources = build(&cluster, "airflow-serviceaccount").expect("build succeeds");
+        let resources = build(&cluster).expect("build succeeds");
 
         assert_eq!(
             sorted_names(&resources.stateful_sets),
-            ["airflow-scheduler-default", "airflow-webserver-default"]
+            [
+                "my-airflow-scheduler-default",
+                "my-airflow-webserver-default"
+            ]
         );
         // One headless and one metrics Service per role group.
         assert_eq!(resources.services.len(), 4);
         assert_eq!(
             sorted_names(&resources.config_maps),
-            ["airflow-scheduler-default", "airflow-webserver-default"]
+            [
+                "my-airflow-scheduler-default",
+                "my-airflow-webserver-default"
+            ]
         );
         // The webserver is the only role with a group Listener.
-        assert_eq!(sorted_names(&resources.listeners), ["airflow-webserver"]);
+        assert_eq!(sorted_names(&resources.listeners), ["my-airflow-webserver"]);
         // A default PDB per role (the Celery worker included).
         assert_eq!(
             sorted_names(&resources.pod_disruption_budgets),
-            ["airflow-scheduler", "airflow-webserver", "airflow-worker"]
+            [
+                "my-airflow-scheduler",
+                "my-airflow-webserver",
+                "my-airflow-worker"
+            ]
         );
+    }
+
+    /// Locks the RBAC resource names, the roleRef, and the recommended label set against
+    /// accidental drift. The fixture's cluster name deliberately differs from the product name so
+    /// that swapped `name`/`instance` label values cannot pass unnoticed.
+    #[test]
+    fn build_produces_rbac() {
+        let cluster = celery_executor_cluster();
+        let resources = build(&cluster).expect("build succeeds");
+
+        assert_eq!(
+            sorted_names(&resources.service_accounts),
+            ["my-airflow-serviceaccount"]
+        );
+        assert_eq!(
+            sorted_names(&resources.role_bindings),
+            ["my-airflow-rolebinding"]
+        );
+
+        let expected_labels = BTreeMap::from(
+            [
+                ("app.kubernetes.io/component", "none"),
+                ("app.kubernetes.io/instance", "my-airflow"),
+                (
+                    "app.kubernetes.io/managed-by",
+                    "airflow.stackable.tech_airflowcluster",
+                ),
+                ("app.kubernetes.io/name", "airflow"),
+                ("app.kubernetes.io/role-group", "none"),
+                ("app.kubernetes.io/version", "3.1.6-stackable0.0.0-dev"),
+                ("stackable.tech/vendor", "Stackable"),
+            ]
+            .map(|(key, value)| (key.to_string(), value.to_string())),
+        );
+        let service_account = resources
+            .service_accounts
+            .first()
+            .expect("a ServiceAccount is built");
+        assert_eq!(
+            service_account.metadata.labels,
+            Some(expected_labels.clone())
+        );
+
+        let role_binding = resources
+            .role_bindings
+            .first()
+            .expect("a RoleBinding is built");
+        assert_eq!(role_binding.metadata.labels, Some(expected_labels));
+        assert_eq!(role_binding.role_ref.name, "airflow-clusterrole");
     }
 
     /// The Kubernetes-executor branch of `build()` (moved here from `reconcile`) additionally emits
@@ -290,15 +345,15 @@ mod tests {
     #[test]
     fn build_kubernetes_executor_adds_pod_template_config_maps() {
         let cluster = kubernetes_executor_cluster();
-        let resources = build(&cluster, "airflow-serviceaccount").expect("build succeeds");
+        let resources = build(&cluster).expect("build succeeds");
 
         assert_eq!(
             sorted_names(&resources.config_maps),
             [
-                "airflow-executor-kubernetes",
-                "airflow-executor-pod-template",
-                "airflow-scheduler-default",
-                "airflow-webserver-default",
+                "my-airflow-executor-kubernetes",
+                "my-airflow-executor-pod-template",
+                "my-airflow-scheduler-default",
+                "my-airflow-webserver-default",
             ]
         );
     }

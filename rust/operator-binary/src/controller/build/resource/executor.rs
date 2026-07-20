@@ -76,7 +76,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
-    sa_name: &str,
     executor_config: &ValidatedAirflowConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
@@ -99,7 +98,12 @@ pub fn build_executor_template_config_map(
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&executor_config.affinity)
-        .service_account_name(sa_name)
+        .service_account_name(
+            cluster
+                .rbac_resource_names()
+                .service_account_name()
+                .to_string(),
+        )
         .restart_policy("Never")
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
