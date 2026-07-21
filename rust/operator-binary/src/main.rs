@@ -10,10 +10,7 @@ use futures::{FutureExt, StreamExt, TryFutureExt};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
-    crd::{
-        authentication::core as auth_core,
-        openlineage::{self, OpenLineageConnection, OpenLineageConnectionVersion},
-    },
+    crd::{authentication::core as auth_core, openlineage},
     eos::EndOfSupportChecker,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -65,8 +62,6 @@ async fn main() -> anyhow::Result<()> {
     match opts.cmd {
         Command::Crd => {
             AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2)?
-                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
-            OpenLineageConnection::merged_crd(OpenLineageConnectionVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
         }
         Command::Run(RunArguments {
