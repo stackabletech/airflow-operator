@@ -1,10 +1,11 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
+    crd::openlineage::{OpenLineageConnection, OpenLineageConnectionVersion},
     kube::{Client, core::crd::MergeError},
     webhook::{
         WebhookServer, WebhookServerError, WebhookServerOptions,
-        webhooks::{ConversionWebhook, ConversionWebhookOptions},
+        webhooks::{ConversionReview, ConversionWebhook, ConversionWebhookOptions},
     },
 };
 
@@ -27,10 +28,19 @@ pub async fn create_webhook_server(
     disable_crd_maintenance: bool,
     client: Client,
 ) -> Result<WebhookServer, Error> {
-    let crds_and_handlers = vec![(
-        AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2).context(MergeCrdSnafu)?,
-        AirflowCluster::try_convert,
-    )];
+    // The conversion handlers are cast to fn pointers so both CRD entries share a single element
+    // type (each `fn` item otherwise has its own unique type).
+    let crds_and_handlers = vec![
+        (
+            AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2).context(MergeCrdSnafu)?,
+            AirflowCluster::try_convert as fn(ConversionReview) -> ConversionReview,
+        ),
+        (
+            OpenLineageConnection::merged_crd(OpenLineageConnectionVersion::V1Alpha1)
+                .context(MergeCrdSnafu)?,
+            OpenLineageConnection::try_convert as fn(ConversionReview) -> ConversionReview,
+        ),
+    ];
 
     let conversion_webhook_options = ConversionWebhookOptions {
         disable_crd_maintenance,

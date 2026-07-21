@@ -133,6 +133,17 @@ rules:
       - get
       - list
       - watch
+  # Resolve OpenLineage connections referenced by spec.clusterConfig.openLineage.
+  # Watched (list + watch) to re-reconcile when an OpenLineageConnection changes,
+  # and fetched individually (get) during reconciliation to dereference a `reference`.
+  - apiGroups:
+      - openlineage.stackable.tech
+    resources:
+      - openlineageconnections
+    verbs:
+      - get
+      - list
+      - watch
   # Publish Kubernetes events for reconciliation activity
   - apiGroups:
       - events.k8s.io

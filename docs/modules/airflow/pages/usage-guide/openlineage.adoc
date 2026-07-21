@@ -1,0 +1,159 @@
+= OpenLineage
+:description: Emit OpenLineage lineage events from Airflow to an OpenLineage backend such as Marquez.
+:openlineage: https://openlineage.io/
+:airflow-openlineage: https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/
+
+Airflow can emit {openlineage}[OpenLineage] lineage events describing the datasets your DAGs read and write.
+This is implemented by the {airflow-openlineage}[Airflow OpenLineage provider], which must be installed in the product image.
+
+[NOTE]
+====
+The `apache-airflow-providers-openlineage` provider package must be present in the Airflow image.
+The Stackable images include it; if you build a custom image, make sure the provider is installed.
+====
+
+== Enabling OpenLineage
+
+Set `spec.clusterConfig.openLineage` and provide a `connection` to your OpenLineage backend.
+The connection can be defined inline:
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha2
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  clusterConfig:
+    openLineage:
+      connection:
+        inline:
+          host: marquez  # <1>
+          port: 5000     # <2>
+      namespace: production  # <3>
+----
+<1> Host of the OpenLineage backend, without protocol or port.
+<2> Port the backend listens on.
+<3> Optional OpenLineage namespace lineage is reported under. Defaults to the Kubernetes namespace of the cluster.
+
+The operator configures the transport via the OpenLineage client environment variables
+(`OPENLINEAGE__TRANSPORT__*`) and sets `AIRFLOW__OPENLINEAGE__NAMESPACE`.
+Lineage events are emitted to `\http(s)://<host>:<port>/api/v1/lineage`.
+
+== Referencing an OpenLineageConnection
+
+To share a backend definition across multiple stacklets, create an `OpenLineageConnection` resource and reference it by name.
+The referenced resource must live in the same namespace as the `AirflowCluster`.
+
+[source,yaml]
+----
+apiVersion: openlineage.stackable.tech/v1alpha1
+kind: OpenLineageConnection
+metadata:
+  name: marquez
+spec:
+  host: marquez
+  port: 5000
+----
+
+[source,yaml]
+----
+apiVersion: airflow.stackable.tech/v1alpha2
+kind: AirflowCluster
+metadata:
+  name: airflow
+spec:
+  clusterConfig:
+    openLineage:
+      connection:
+        reference: marquez  # <1>
+----
+<1> Name of the `OpenLineageConnection` resource.
+
+== TLS
+
+Configure TLS on the connection to reach a backend over HTTPS:
+
+[source,yaml]
+----
+openLineage:
+  connection:
+    inline:
+      host: marquez
+      port: 5000
+      tls:
+        verification:
+          server:
+            caCert:
+              secretClass: openlineage-tls  # <1>
+----
+<1> A xref:secret-operator:secretclass.adoc[SecretClass] providing the CA certificate used to verify the backend.
+
+When a SecretClass CA is configured, the CA certificate is mounted into the Airflow pods and the OpenLineage
+client is pointed at it via `REQUESTS_CA_BUNDLE`.
+Use `verification.server.caCert.webPki` to verify against the common public CAs instead, or
+`verification.none` to disable verification entirely (not recommended).
+
+== Authentication
+
+If the backend requires a bearer token, reference a xref:concepts:authentication.adoc[Static AuthenticationClass].
+Only the `static` provider is supported.
+
+The referenced Secret must contain the token under the fixed key `apiKey`:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openlineage-credentials
+stringData:
+  apiKey: "<your-token>"  # <1>
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: openlineage-auth
+spec:
+  provider:
+    static:
+      userCredentialsSecret:
+        name: openlineage-credentials
+----
+<1> The bearer token, under the fixed key `apiKey`.
+
+[source,yaml]
+----
+openLineage:
+  connection:
+    inline:
+      host: marquez
+      port: 5000
+      authenticationClassRef: openlineage-auth  # <1>
+----
+<1> Name of the cluster-scoped `AuthenticationClass`.
+
+The token is injected into the Airflow pods from the Secret via a `secretKeyRef` environment variable.
+It never appears in the CRD, a ConfigMap, or a plaintext environment value.
+
+== Job name (`appName`)
+
+The shared `openLineage.appName` field has no effect for Airflow: Airflow derives OpenLineage job names per
+DAG and task. The field is accepted for cross-operator consistency but ignored.
+
+== Overriding injected configuration
+
+The OpenLineage environment variables are applied to every role (and the Kubernetes-executor pod template)
+_before_ user `envOverrides`, so you can override any of them.
+For example, to disable emission for a single role group without removing the `openLineage` block:
+
+[source,yaml]
+----
+webservers:
+  roleGroups:
+    default:
+      envOverrides:
+        AIRFLOW__OPENLINEAGE__DISABLED: "true"
+----
+
+See xref:usage-guide/overrides.adoc[] for more on overrides.

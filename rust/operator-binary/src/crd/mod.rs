@@ -18,7 +18,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    crd::git_sync,
+    crd::{git_sync, openlineage},
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -282,6 +282,13 @@ pub mod versioned {
             hint(vec)
         )]
         pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,
+
+        /// Emit [OpenLineage](https://openlineage.io/) lineage events for this cluster. The
+        /// [OpenLineage provider](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/)
+        /// must be installed in the Airflow image. Learn more in the
+        /// [OpenLineage usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/openlineage).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub open_lineage: Option<openlineage::v1alpha1::OpenLineageJob>,
 
         /// For internal use only - not for production use.
         #[serde(default)]
