@@ -21,12 +21,9 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
     commons::tls_verification::TlsClientDetailsError,
-    crd::{
-        authentication::core::v1alpha1::{AuthenticationClass, AuthenticationClassProvider},
-        openlineage::{
-            ResolvedOpenLineageConnection,
-            v1alpha1::{OpenLineageError, OpenLineageJob},
-        },
+    crd::openlineage::{
+        ResolvedOpenLineageConnection,
+        v1alpha1::{OpenLineageError, OpenLineageJob},
     },
     k8s_openapi::api::core::v1::{EnvVar, Volume, VolumeMount},
 };
@@ -63,15 +60,6 @@ pub enum Error {
     #[snafu(display("failed to resolve OpenLineage connection"))]
     ResolveConnection { source: OpenLineageError },
 
-    #[snafu(display("failed to resolve OpenLineage AuthenticationClass"))]
-    ResolveAuthenticationClass { source: OpenLineageError },
-
-    #[snafu(display(
-        "the AuthenticationClass provider {provider:?} is not supported for OpenLineage. \
-         Only the 'static' provider is supported."
-    ))]
-    UnsupportedAuthenticationProvider { provider: String },
-
     #[snafu(display("failed to build TLS volumes and mounts for the OpenLineage connection"))]
     TlsVolumesAndMounts { source: TlsClientDetailsError },
 }
@@ -92,8 +80,8 @@ pub struct ResolvedOpenLineageConfig {
 }
 
 impl ResolvedOpenLineageConfig {
-    /// Resolves an [`OpenLineageJob`] (inline connection or `OpenLineageConnection` reference,
-    /// plus an optional `AuthenticationClass`) into the Airflow-specific configuration.
+    /// Resolves an [`OpenLineageJob`] (inline connection or `OpenLineageConnection` reference, plus
+    /// an optional credentials Secret) into the Airflow-specific configuration.
     pub async fn from_config(
         open_lineage: &OpenLineageJob,
         client: &Client,
@@ -106,14 +94,7 @@ impl ResolvedOpenLineageConfig {
             .await
             .context(ResolveConnectionSnafu)?;
 
-        let auth_secret_name = match connection
-            .resolve_authentication_class(client)
-            .await
-            .context(ResolveAuthenticationClassSnafu)?
-        {
-            Some(auth_class) => Some(static_provider_secret_name(&auth_class)?),
-            None => None,
-        };
+        let auth_secret_name = connection.credentials_secret_name.clone();
 
         Self::build(&connection, open_lineage, namespace, auth_secret_name)
     }
@@ -169,7 +150,7 @@ impl ResolvedOpenLineageConfig {
             env_vars.push(plain_env(OPENLINEAGE_TRANSPORT_VERIFY, "false"));
         }
 
-        // Authentication (Static AuthenticationClass only). The token is delivered from a Secret via
+        // Authentication. The token is delivered from the `credentialsSecretName` Secret via a
         // secretKeyRef so it never lands in the CRD, ConfigMap or a plaintext env value.
         if let Some(secret_name) = auth_secret_name {
             env_vars.push(plain_env(
@@ -200,20 +181,6 @@ impl ResolvedOpenLineageConfig {
     }
 }
 
-/// Extracts the user-credentials Secret name from a `static` [`AuthenticationClass`], rejecting any
-/// other provider (only the static provider is supported for OpenLineage).
-fn static_provider_secret_name(auth_class: &AuthenticationClass) -> Result<String, Error> {
-    match &auth_class.spec.provider {
-        AuthenticationClassProvider::Static(provider) => {
-            Ok(provider.user_credentials_secret.name.clone())
-        }
-        other => UnsupportedAuthenticationProviderSnafu {
-            provider: other.to_string(),
-        }
-        .fail(),
-    }
-}
-
 fn plain_env(name: &str, value: &str) -> EnvVar {
     EnvVar {
         name: name.to_string(),
@@ -228,14 +195,8 @@ mod tests {
         commons::tls_verification::{
             CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
         },
-        crd::{
-            authentication::{
-                core::v1alpha1::{AuthenticationClass, AuthenticationClassProvider},
-                ldap, r#static,
-            },
-            openlineage::v1alpha1::{
-                InlineConnectionOrReference, OpenLineageConnectionSpec, OpenLineageJob,
-            },
+        crd::openlineage::v1alpha1::{
+            InlineConnectionOrReference, OpenLineageConnectionSpec, OpenLineageJob,
         },
     };
 
@@ -248,7 +209,7 @@ mod tests {
             host: "marquez".to_string(),
             port: 5000,
             tls,
-            authentication_class_ref: None,
+            credentials_secret_name: None,
         }
     }
 
@@ -428,45 +389,5 @@ mod tests {
             .expect("api key must be a secretKeyRef");
         assert_eq!(secret_key_ref.name, "openlineage-auth-secret");
         assert_eq!(secret_key_ref.key, OPENLINEAGE_AUTH_SECRET_KEY);
-    }
-
-    #[test]
-    fn static_provider_secret_name_extracts_name() {
-        let auth_class = AuthenticationClass::new(
-            "openlineage-auth",
-            stackable_operator::crd::authentication::core::v1alpha1::AuthenticationClassSpec {
-                provider: AuthenticationClassProvider::Static(
-                    r#static::v1alpha1::AuthenticationProvider {
-                        user_credentials_secret: r#static::v1alpha1::UserCredentialsSecretRef {
-                            name: "my-secret".to_string(),
-                        },
-                    },
-                ),
-            },
-        );
-
-        assert_eq!(
-            static_provider_secret_name(&auth_class).unwrap(),
-            "my-secret"
-        );
-    }
-
-    #[test]
-    fn non_static_provider_is_rejected() {
-        let ldap_provider: ldap::v1alpha1::AuthenticationProvider =
-            serde_json::from_value(serde_json::json!({ "hostname": "my.ldap.server" }))
-                .expect("valid minimal LDAP provider");
-        let auth_class = AuthenticationClass::new(
-            "openlineage-auth",
-            stackable_operator::crd::authentication::core::v1alpha1::AuthenticationClassSpec {
-                provider: AuthenticationClassProvider::Ldap(ldap_provider),
-            },
-        );
-
-        let err = static_provider_secret_name(&auth_class).unwrap_err();
-        assert!(matches!(
-            err,
-            Error::UnsupportedAuthenticationProvider { .. }
-        ));
     }
 }

@@ -96,10 +96,9 @@ Use `verification.server.caCert.webPki` to verify against the common public CAs 
 
 == Authentication
 
-If the backend requires a bearer token, reference a xref:concepts:authentication.adoc[Static AuthenticationClass].
-Only the `static` provider is supported.
-
-The referenced Secret must contain the token under the fixed key `apiKey`:
+If the backend requires a bearer token, set `credentialsSecretName` on the connection to the name of
+a Secret containing the token. The Secret must contain the token under the fixed key `apiKey` and must
+live in the same namespace as the cluster:
 
 [source,yaml]
 ----
@@ -109,16 +108,6 @@ metadata:
   name: openlineage-credentials
 stringData:
   apiKey: "<your-token>"  # <1>
----
-apiVersion: authentication.stackable.tech/v1alpha1
-kind: AuthenticationClass
-metadata:
-  name: openlineage-auth
-spec:
-  provider:
-    static:
-      userCredentialsSecret:
-        name: openlineage-credentials
 ----
 <1> The bearer token, under the fixed key `apiKey`.
 
@@ -129,9 +118,9 @@ openLineage:
     inline:
       host: marquez
       port: 5000
-      authenticationClassRef: openlineage-auth  # <1>
+      credentialsSecretName: openlineage-credentials  # <1>
 ----
-<1> Name of the cluster-scoped `AuthenticationClass`.
+<1> Name of the Secret holding the API key.
 
 The token is injected into the Airflow pods from the Secret via a `secretKeyRef` environment variable.
 It never appears in the CRD, a ConfigMap, or a plaintext environment value.

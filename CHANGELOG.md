@@ -4,7 +4,7 @@
 
 ### Added
 
-- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage`, either with an inline connection or a reference to an `OpenLineageConnection`, with optional TLS and Static-provider API-key authentication. Requires the `apache-airflow-providers-openlineage` provider to be installed in the product image ([#XXXX]).
+- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage`, either with an inline connection or a reference to an `OpenLineageConnection`, with optional TLS and API-key authentication via a `credentialsSecretName` Secret. Requires the `apache-airflow-providers-openlineage` provider to be installed in the product image ([#XXXX]).
 - BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#784]).
 - Support for passing CAs to GitSync ([#750]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#765]).
