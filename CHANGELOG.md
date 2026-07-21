@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [26.7.0] - 2026-07-21
+
+## [26.7.0-rc1] - 2026-07-16
+
 ### Added
 
 - Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage`, either with an inline connection or a reference to an `OpenLineageConnection`, with optional TLS and API-key authentication via a `credentialsSecretName` Secret. Requires the `apache-airflow-providers-openlineage` provider to be installed in the product image ([#XXXX]).
