@@ -22,9 +22,6 @@ use stackable_operator::{
 };
 
 use crate::{
-    airflow_controller::{
-        executor_role_group_name, executor_role_name, executor_template_role_group_name,
-    },
     controller::{
         ValidatedAirflowConfig, ValidatedCluster,
         build::{
@@ -36,6 +33,7 @@ use crate::{
             },
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
+        executor_role_group_name, executor_role_name, executor_template_role_group_name,
     },
     crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, TEMPLATE_NAME},
 };
