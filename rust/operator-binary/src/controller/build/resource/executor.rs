@@ -100,7 +100,7 @@ pub fn build_executor_template_config_map(
         .affinity(&executor_config.affinity)
         .service_account_name(
             cluster
-                .rbac_resource_names()
+                .cluster_resource_names()
                 .service_account_name()
                 .to_string(),
         )
@@ -156,7 +156,7 @@ pub fn build_executor_template_config_map(
         .context(AddVolumeSnafu)?;
     pb.add_volumes(volumes::create_volumes(
         cluster
-            .resource_names(&executor_role_name(), &executor_role_group_name())
+            .role_group_resource_names(&executor_role_name(), &executor_role_group_name())
             .role_group_config_map()
             .as_ref(),
         &executor_config.logging.product_container,
@@ -167,7 +167,10 @@ pub fn build_executor_template_config_map(
         pb.add_container(build_logging_container(
             resolved_product_image,
             vector_log_config,
-            &cluster.resource_names(&executor_role_name(), &executor_template_role_group_name()),
+            &cluster.role_group_resource_names(
+                &executor_role_name(),
+                &executor_template_role_group_name(),
+            ),
         ));
     }
 

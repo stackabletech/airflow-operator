@@ -116,7 +116,7 @@ pub fn build_server_rolegroup_statefulset(
 
     let mut pb = PodBuilder::new();
     let resource_names = validated_cluster
-        .resource_names(&ValidatedCluster::role_name(airflow_role), role_group_name);
+        .role_group_resource_names(&ValidatedCluster::role_name(airflow_role), role_group_name);
 
     let recommended_object_labels =
         validated_cluster.recommended_labels(airflow_role, role_group_name);
@@ -141,7 +141,7 @@ pub fn build_server_rolegroup_statefulset(
         .affinity(&merged_airflow_config.affinity)
         .service_account_name(
             validated_cluster
-                .rbac_resource_names()
+                .cluster_resource_names()
                 .service_account_name()
                 .to_string(),
         )
