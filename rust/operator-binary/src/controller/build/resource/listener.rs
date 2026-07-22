@@ -15,7 +15,7 @@ use crate::{
 
 // The group listener is a role-level object, so a constant `none` role-group is used as the
 // role-group label value.
-stackable_operator::constant!(PLACEHOLDER_LISTENER_ROLE_GROUP: RoleGroupName = "none");
+stackable_operator::constant!(NONE_ROLE_GROUP_NAME: RoleGroupName = "none");
 
 pub fn build_group_listener(
     cluster: &ValidatedCluster,
@@ -29,7 +29,7 @@ pub fn build_group_listener(
                 listener_group_name,
                 cluster.recommended_labels_for(
                     &ValidatedCluster::role_name(role),
-                    &PLACEHOLDER_LISTENER_ROLE_GROUP,
+                    &NONE_ROLE_GROUP_NAME,
                 ),
             )
             .build(),
