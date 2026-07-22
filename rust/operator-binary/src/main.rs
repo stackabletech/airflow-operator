@@ -69,7 +69,6 @@ async fn main() -> anyhow::Result<()> {
             operator_environment,
             maintenance,
             common,
-            ..
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `AIRFLOW_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
