@@ -11,11 +11,11 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{PersistentVolumeClaim, Probe, ServiceAccount, TCPSocketAction},
+            core::v1::{PersistentVolumeClaim, Probe, TCPSocketAction},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::{ResourceExt, api::ObjectMeta},
+    kube::api::ObjectMeta,
     kvp::{Annotation, Label, LabelError},
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
@@ -103,7 +103,7 @@ pub fn build_server_rolegroup_statefulset(
     role_group_name: &RoleGroupName,
     validated_rg_config: &AirflowRoleGroupConfig,
     logging: &ValidatedLogging,
-    service_account: &ServiceAccount,
+    service_account_name: &str,
 ) -> Result<StatefulSet> {
     let merged_airflow_config = &validated_rg_config.config;
     let env_overrides = &validated_rg_config.env_overrides;
@@ -140,7 +140,7 @@ pub fn build_server_rolegroup_statefulset(
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&merged_airflow_config.affinity)
-        .service_account_name(service_account.name_any())
+        .service_account_name(service_account_name)
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());

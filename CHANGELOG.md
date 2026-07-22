@@ -6,6 +6,12 @@
 
 - Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage` ([#822]).
 
+### Changed
+
+- Internal operator refactoring: introduce a build() step in the reconciler that
+  assembles all relevant Kubernetes resources before anything is applied ([#814]).
+
+[#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#822]: https://github.com/stackabletech/airflow-operator/pull/822
 
 ## [26.7.0] - 2026-07-21

@@ -10,7 +10,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         resources::{NoRuntimeLimits, Resources},
     },
-    crd::git_sync,
+    crd::{git_sync, listener},
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -18,7 +18,11 @@ use stackable_operator::{
             sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
         },
     },
-    k8s_openapi::api::core::v1::{PodTemplateSpec, Volume, VolumeMount},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, PodTemplateSpec, Service, Volume, VolumeMount},
+        policy::v1::PodDisruptionBudget,
+    },
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
     product_logging::spec::ContainerLogConfig,
@@ -59,6 +63,15 @@ use crate::{
 pub mod build;
 pub mod dereference;
 pub mod validate;
+
+/// Every Kubernetes resource produced by the build step.
+pub struct KubernetesResources {
+    pub stateful_sets: Vec<StatefulSet>,
+    pub services: Vec<Service>,
+    pub listeners: Vec<listener::v1alpha1::Listener>,
+    pub config_maps: Vec<ConfigMap>,
+    pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
+}
 
 /// Per-role configuration extracted during validation.
 #[derive(Clone, Debug)]
@@ -408,6 +421,33 @@ pub(crate) fn operator_name() -> OperatorName {
 pub(crate) fn controller_name() -> ControllerName {
     ControllerName::from_str(AIRFLOW_CONTROLLER_NAME)
         .expect("the controller name is a valid label value")
+}
+
+/// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
+/// AirflowRole). Used to derive its labels and ConfigMap name.
+pub const EXECUTOR_ROLE_NAME: &str = "executor";
+pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
+
+/// The executor pseudo-role name (`executor`) as a type-safe value.
+pub fn executor_role_name() -> RoleName {
+    EXECUTOR_ROLE_NAME
+        .parse()
+        .expect("'executor' is a valid role name")
+}
+
+/// The executor's role-group name (`kubernetes`), used for its role-group ConfigMap.
+pub fn executor_role_group_name() -> RoleGroupName {
+    EXECUTOR_ROLE_GROUP_NAME
+        .parse()
+        .expect("'kubernetes' is a valid role group name")
+}
+
+/// The executor *pod-template* role-group name (`executor-template`), used for the template
+/// ConfigMap/pod labels.
+pub fn executor_template_role_group_name() -> RoleGroupName {
+    "executor-template"
+        .parse()
+        .expect("'executor-template' is a valid role group name")
 }
 
 /// Lets [`ValidatedCluster`] stand in for the raw [`v1alpha2::AirflowCluster`] when building owner
