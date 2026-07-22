@@ -526,3 +526,20 @@ impl HasUid for ValidatedCluster {
         self.uid.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::ValidatedCluster;
+    use crate::crd::AirflowRole;
+
+    /// Locks the invariant behind the `expect` in [`ValidatedCluster::role_name`]: every
+    /// `AirflowRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_airflow_role_serialises_to_a_valid_role_name() {
+        for role in AirflowRole::iter() {
+            ValidatedCluster::role_name(&role);
+        }
+    }
+}
