@@ -6,7 +6,6 @@ metadata:
 spec:
   group: airflow.stackable.tech
   names:
-    categories: []
     kind: AirflowCluster
     plural: airflowclusters
     shortNames:
@@ -14,8 +13,7 @@ spec:
     singular: airflowcluster
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha2
+  - name: v1alpha2
     schema:
       openAPIV3Schema:
         description: An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
@@ -6351,8 +6349,7 @@ spec:
     storage: true
     subresources:
       status: {}
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
