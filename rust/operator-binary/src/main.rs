@@ -10,7 +10,7 @@ use futures::{FutureExt, StreamExt, TryFutureExt};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
-    crd::authentication::core as auth_core,
+    crd::{authentication::core as auth_core, openlineage},
     eos::EndOfSupportChecker,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -128,6 +128,7 @@ async fn main() -> anyhow::Result<()> {
 
             let authentication_class_store = airflow_controller.store();
             let config_map_store = airflow_controller.store();
+            let open_lineage_connection_store = airflow_controller.store();
             let airflow_controller = airflow_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -161,6 +162,25 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |airflow| references_config_map(airflow, &config_map))
+                            .map(|airflow| ObjectRef::from_obj(&*airflow))
+                    },
+                )
+                .watches(
+                    watch_namespace
+                        .get_api::<DeserializeGuard<openlineage::v1alpha1::OpenLineageConnection>>(
+                            &client,
+                        ),
+                    watcher::Config::default(),
+                    move |open_lineage_connection| {
+                        open_lineage_connection_store
+                            .state()
+                            .into_iter()
+                            .filter(move |airflow| {
+                                references_open_lineage_connection(
+                                    airflow,
+                                    &open_lineage_connection,
+                                )
+                            })
                             .map(|airflow| ObjectRef::from_obj(&*airflow))
                     },
                 )
@@ -220,6 +240,24 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_open_lineage_connection(
+    airflow: &DeserializeGuard<v1alpha2::AirflowCluster>,
+    open_lineage_connection: &DeserializeGuard<openlineage::v1alpha1::OpenLineageConnection>,
+) -> bool {
+    let Ok(airflow) = &airflow.0 else {
+        return false;
+    };
+
+    match &airflow.spec.cluster_config.open_lineage {
+        Some(open_lineage) => matches!(
+            &open_lineage.connection,
+            openlineage::v1alpha1::InlineConnectionOrReference::Reference(name)
+                if name == &open_lineage_connection.name_any()
+        ),
+        None => false,
+    }
 }
 
 fn references_config_map(

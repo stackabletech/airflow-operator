@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub mod graceful_shutdown;
+pub mod openlineage;
 pub mod properties;
 pub mod resource;
 pub mod volumes;
@@ -233,6 +234,7 @@ mod tests {
                 sync_roles_at: FlaskRolesSyncMoment::default(),
             },
             authorization_config: AirflowAuthorizationResolved { opa: None },
+            resolved_open_lineage_config: None,
         };
 
         validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced)

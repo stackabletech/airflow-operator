@@ -143,6 +143,15 @@ pub fn build_executor_template_config_map(
     )
     .context(PodSnafu)?;
 
+    // Mount the OpenLineage TLS CA certificate (only present when a SecretClass CA is configured).
+    if let Some(open_lineage) = &cluster.cluster_config.open_lineage {
+        airflow_container
+            .add_volume_mounts(open_lineage.volume_mounts.clone())
+            .context(AddVolumeMountSnafu)?;
+        pb.add_volumes(open_lineage.volumes.clone())
+            .context(AddVolumeSnafu)?;
+    }
+
     cluster
         .metadata_database_connection_details()
         .add_to_container(&mut airflow_container);

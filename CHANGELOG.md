@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage` ([#822]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -9,6 +13,7 @@
 - Bump stackable-operator to 0.114.0 ([#827]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
+[#822]: https://github.com/stackabletech/airflow-operator/pull/822
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 
 ## [26.7.0] - 2026-07-21
