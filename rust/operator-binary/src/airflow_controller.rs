@@ -9,14 +9,12 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::{random_secret_creation, rbac::build_rbac_resources},
+    commons::random_secret_creation,
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
-        ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::LabelError,
     logging::controller::ReconcilerError,
     shared::time::Duration,
     status::condition::{
@@ -30,7 +28,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     controller::{ValidatedCluster, build, controller_name, operator_name, product_name},
     crd::{
-        APP_NAME, AirflowClusterStatus, OPERATOR_NAME,
+        AirflowClusterStatus, OPERATOR_NAME,
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
@@ -56,21 +54,6 @@ pub enum Error {
     #[snafu(display("failed to apply Kubernetes resource"))]
     ApplyResource {
         source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to patch service account"))]
-    ApplyServiceAccount {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to patch role binding: {source}"))]
-    ApplyRoleBinding {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build RBAC objects"))]
-    BuildRBACObjects {
-        source: stackable_operator::commons::rbac::Error,
     },
 
     #[snafu(display("failed to build the Kubernetes resources"))]
@@ -100,9 +83,6 @@ pub enum Error {
     Validate {
         source: crate::controller::validate::Error,
     },
-
-    #[snafu(display("failed to build label"))]
-    BuildLabel { source: LabelError },
 
     #[snafu(display("AirflowCluster object is invalid"))]
     InvalidAirflowCluster {
@@ -159,33 +139,25 @@ pub async fn reconcile_airflow(
         &airflow.spec.object_overrides,
     );
 
-    let required_labels = cluster_resources
-        .get_required_labels()
-        .context(BuildLabelSnafu)?;
-
-    let (rbac_sa, rbac_rolebinding) =
-        build_rbac_resources(airflow, APP_NAME, required_labels).context(BuildRBACObjectsSnafu)?;
-
-    // The ServiceAccount name is deterministic on the built object, so the build step does not
-    // depend on the applied ServiceAccount.
-    let service_account_name = rbac_sa.name_any();
-
-    cluster_resources
-        .add(client, rbac_sa)
-        .await
-        .context(ApplyServiceAccountSnafu)?;
-    cluster_resources
-        .add(client, rbac_rolebinding)
-        .await
-        .context(ApplyRoleBindingSnafu)?;
-
-    let resources =
-        build::build(&validated_cluster, &service_account_name).context(BuildResourcesSnafu)?;
+    let resources = build::build(&validated_cluster).context(BuildResourcesSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     // Apply order is: StatefulSets last (a changed mounted ConfigMap/Secret
-    // must exist first, else Pods restart -- commons-operator#111).
+    // must exist first, else Pods restart -- commons-operator#111). The ServiceAccount comes
+    // first because the Pods reference it at creation time.
+    for service_account in resources.service_accounts {
+        cluster_resources
+            .add(client, service_account)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for role_binding in resources.role_bindings {
+        cluster_resources
+            .add(client, role_binding)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
     for service in resources.services {
         cluster_resources
             .add(client, service)

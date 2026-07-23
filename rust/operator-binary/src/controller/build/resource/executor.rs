@@ -76,7 +76,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
-    sa_name: &str,
     executor_config: &ValidatedAirflowConfig,
     env_overrides: &HashMap<String, String>,
     pod_overrides: &PodTemplateSpec,
@@ -99,7 +98,12 @@ pub fn build_executor_template_config_map(
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&executor_config.affinity)
-        .service_account_name(sa_name)
+        .service_account_name(
+            cluster
+                .cluster_resource_names()
+                .service_account_name()
+                .to_string(),
+        )
         .restart_policy("Never")
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
@@ -152,7 +156,7 @@ pub fn build_executor_template_config_map(
         .context(AddVolumeSnafu)?;
     pb.add_volumes(volumes::create_volumes(
         cluster
-            .resource_names(&executor_role_name(), &executor_role_group_name())
+            .role_group_resource_names(&executor_role_name(), &executor_role_group_name())
             .role_group_config_map()
             .as_ref(),
         &executor_config.logging.product_container,
@@ -163,7 +167,10 @@ pub fn build_executor_template_config_map(
         pb.add_container(build_logging_container(
             resolved_product_image,
             vector_log_config,
-            &cluster.resource_names(&executor_role_name(), &executor_template_role_group_name()),
+            &cluster.role_group_resource_names(
+                &executor_role_name(),
+                &executor_template_role_group_name(),
+            ),
         ));
     }
 

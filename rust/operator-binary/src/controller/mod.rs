@@ -20,8 +20,9 @@ use stackable_operator::{
     },
     k8s_openapi::api::{
         apps::v1::StatefulSet,
-        core::v1::{ConfigMap, PodTemplateSpec, Service, Volume, VolumeMount},
+        core::v1::{ConfigMap, PodTemplateSpec, Service, ServiceAccount, Volume, VolumeMount},
         policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
     },
     kube::{Resource, ResourceExt, api::ObjectMeta},
     kvp::Labels,
@@ -33,6 +34,7 @@ use stackable_operator::{
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
+        role_utils,
         types::{
             kubernetes::{
                 ConfigMapName, ListenerClassName, ListenerName, NamespaceName, SecretName, Uid,
@@ -63,6 +65,9 @@ pub mod build;
 pub mod dereference;
 pub mod validate;
 
+// Placeholder version label value for resources whose labels must not change after deployment.
+stackable_operator::constant!(UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
+
 /// Every Kubernetes resource produced by the build step.
 pub struct KubernetesResources {
     pub stateful_sets: Vec<StatefulSet>,
@@ -70,6 +75,8 @@ pub struct KubernetesResources {
     pub listeners: Vec<listener::v1alpha1::Listener>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    pub service_accounts: Vec<ServiceAccount>,
+    pub role_bindings: Vec<RoleBinding>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -319,8 +326,17 @@ impl ValidatedCluster {
         }
     }
 
+    /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
+    /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
+    pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
+        role_utils::ResourceNames {
+            cluster_name: self.name.clone(),
+            product_name: product_name(),
+        }
+    }
+
     /// Type-safe names for the resources of a role group.
-    pub fn resource_names(
+    pub fn role_group_resource_names(
         &self,
         role_name: &RoleName,
         role_group_name: &RoleGroupName,
@@ -332,13 +348,22 @@ impl ValidatedCluster {
         }
     }
 
+    /// The type-safe role name for an Airflow role.
+    ///
+    /// Infallible: every `AirflowRole` serialises to a short, valid role name.
+    pub fn role_name(role: &AirflowRole) -> RoleName {
+        role.to_string()
+            .parse()
+            .expect("an AirflowRole serialises to a valid RoleName")
+    }
+
     /// Recommended labels for a role-group resource.
     pub fn recommended_labels(
         &self,
         role: &AirflowRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        self.recommended_labels_for(&role.role_name(), role_group_name)
+        self.recommended_labels_for(&Self::role_name(role), role_group_name)
     }
 
     /// Recommended labels for a resource that is not tied to a concrete [`AirflowRole`] (e.g. the
@@ -351,16 +376,16 @@ impl ValidatedCluster {
         self.recommended_labels_with(&self.product_version, role_name, role_group_name)
     }
 
-    /// Recommended labels with a constant `none` version, for PVC templates that cannot be modified
-    /// after deployment (keeps the labels stable across version upgrades).
+    /// Recommended labels with the constant [`UNVERSIONED_PRODUCT_VERSION`], for PVC templates
+    /// that cannot be modified after deployment (keeps the labels stable across version upgrades).
     pub fn unversioned_recommended_labels(
         &self,
         role: &AirflowRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
         self.recommended_labels_with(
-            &ProductVersion::from_str("none").expect("'none' is a valid product version"),
-            &role.role_name(),
+            &UNVERSIONED_PRODUCT_VERSION,
+            &Self::role_name(role),
             role_group_name,
         )
     }
@@ -388,7 +413,12 @@ impl ValidatedCluster {
         role: &AirflowRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+        role_group_selector(
+            self,
+            &product_name(),
+            &Self::role_name(role),
+            role_group_name,
+        )
     }
 
     /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
@@ -494,5 +524,22 @@ impl NameIsValidLabelValue for ValidatedCluster {
 impl HasUid for ValidatedCluster {
     fn to_uid(&self) -> Uid {
         self.uid.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::ValidatedCluster;
+    use crate::crd::AirflowRole;
+
+    /// Locks the invariant behind the `expect` in [`ValidatedCluster::role_name`]: every
+    /// `AirflowRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_airflow_role_serialises_to_a_valid_role_name() {
+        for role in AirflowRole::iter() {
+            ValidatedCluster::role_name(&role);
+        }
     }
 }

@@ -6,9 +6,12 @@
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#814]).
+- The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
+  functions and carry the full set of recommended labels ([#821]).
 - Bump stackable-operator to 0.114.0 ([#827]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
+[#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 
 ## [26.7.0] - 2026-07-21
