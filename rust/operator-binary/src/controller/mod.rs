@@ -348,7 +348,6 @@ impl ValidatedCluster {
         }
     }
 
-    /// Recommended labels for a role-group resource.
     /// The type-safe role name for an Airflow role.
     ///
     /// Infallible: every `AirflowRole` serialises to a short, valid role name.
@@ -358,6 +357,7 @@ impl ValidatedCluster {
             .expect("an AirflowRole serialises to a valid RoleName")
     }
 
+    /// Recommended labels for a role-group resource.
     pub fn recommended_labels(
         &self,
         role: &AirflowRole,
