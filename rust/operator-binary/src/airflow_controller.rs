@@ -16,10 +16,6 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
     shared::time::Duration,
-    status::condition::{
-        compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder,
-    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -27,8 +23,9 @@ use crate::{
     controller::{
         apply::{self, Applier, ensure_random_secrets},
         build,
+        update_status::{self, update_status},
     },
-    crd::{AirflowClusterStatus, OPERATOR_NAME, v1alpha2},
+    crd::{OPERATOR_NAME, v1alpha2},
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -55,10 +52,8 @@ pub enum Error {
     #[snafu(display("failed to ensure the shared random Secrets exist"))]
     EnsureSecrets { source: apply::Error },
 
-    #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
+    #[snafu(display("failed to update the cluster status"))]
+    UpdateStatus { source: update_status::Error },
 
     #[snafu(display("failed to dereference cluster resources"))]
     Dereference {
@@ -102,9 +97,6 @@ pub async fn reconcile_airflow(
         .await
         .context(DereferenceSnafu)?;
 
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
-
     let validated_cluster = crate::controller::validate::validate_cluster(
         airflow,
         &ctx.operator_environment.image_repository,
@@ -127,22 +119,9 @@ pub async fn reconcile_airflow(
     .await
     .context(ApplyResourcesSnafu)?;
 
-    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
-    for statefulset in applied.stateful_sets {
-        ss_cond_builder.add(statefulset);
-    }
-
-    let status = AirflowClusterStatus {
-        conditions: compute_conditions(
-            airflow,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
-        ),
-    };
-
-    client
-        .apply_patch_status(OPERATOR_NAME, airflow, &status)
+    update_status(client, airflow, &applied)
         .await
-        .context(ApplyStatusSnafu)?;
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }

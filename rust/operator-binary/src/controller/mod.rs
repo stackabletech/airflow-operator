@@ -65,6 +65,7 @@ use crate::{
 pub mod apply;
 pub mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 
 // Placeholder version label value for resources whose labels must not change after deployment.
