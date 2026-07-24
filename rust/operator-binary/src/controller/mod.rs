@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    marker::PhantomData,
     str::FromStr,
 };
 
@@ -61,6 +62,7 @@ use crate::{
     },
 };
 
+pub mod apply;
 pub mod build;
 pub mod dereference;
 pub mod validate;
@@ -68,8 +70,17 @@ pub mod validate;
 // Placeholder version label value for resources whose labels must not change after deployment.
 stackable_operator::constant!(UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+/// Marker for applied Kubernetes resources.
+pub struct Applied;
+
 /// Every Kubernetes resource produced by the build step.
-pub struct KubernetesResources {
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub services: Vec<Service>,
     pub listeners: Vec<listener::v1alpha1::Listener>,
@@ -77,6 +88,7 @@ pub struct KubernetesResources {
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// Per-role configuration extracted during validation.
