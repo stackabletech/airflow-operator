@@ -257,11 +257,11 @@ pub fn build_server_rolegroup_statefulset(
     .context(PodSnafu)?;
 
     // Mount the OpenLineage TLS CA certificate (only present when a SecretClass CA is configured).
-    if let Some(open_lineage) = &validated_cluster.cluster_config.open_lineage {
+    if let Some(lineage) = &validated_cluster.cluster_config.lineage {
         airflow_container
-            .add_volume_mounts(open_lineage.volume_mounts.clone())
+            .add_volume_mounts(lineage.volume_mounts.clone())
             .context(AddVolumeMountSnafu)?;
-        pb.add_volumes(open_lineage.volumes.clone())
+        pb.add_volumes(lineage.volumes.clone())
             .context(AddVolumeSnafu)?;
     }
 

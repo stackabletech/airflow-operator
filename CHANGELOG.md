@@ -4,7 +4,7 @@
 
 ### Added
 
-- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.openLineage` ([#822]).
+- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.lineage` ([#822]).
 
 ### Changed
 

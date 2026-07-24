@@ -288,7 +288,7 @@ pub mod versioned {
         /// must be installed in the Airflow image. Learn more in the
         /// [OpenLineage usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/openlineage).
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub open_lineage: Option<openlineage::v1alpha1::OpenLineageJob>,
+        pub lineage: Option<openlineage::v1alpha1::OpenLineageJob>,
 
         /// For internal use only - not for production use.
         #[serde(default)]

@@ -67,7 +67,7 @@ pub enum Error {
 /// The resolved, Airflow-specific OpenLineage configuration: the environment variables to add to
 /// every workload container, plus any TLS CA volume/mount required to trust the backend.
 #[derive(Clone, Debug, Default)]
-pub struct ResolvedOpenLineageConfig {
+pub struct ResolvedLineageConfig {
     /// Environment variables configuring the OpenLineage transport (and, when authenticated, the
     /// Secret-backed API key). Injected into the statefulset roles and the Kubernetes-executor
     /// pod template.
@@ -79,15 +79,15 @@ pub struct ResolvedOpenLineageConfig {
     pub volume_mounts: Vec<VolumeMount>,
 }
 
-impl ResolvedOpenLineageConfig {
+impl ResolvedLineageConfig {
     /// Resolves an [`OpenLineageJob`] (inline connection or `OpenLineageConnection` reference, plus
     /// an optional credentials Secret) into the Airflow-specific configuration.
     pub async fn from_config(
-        open_lineage: &OpenLineageJob,
+        lineage: &OpenLineageJob,
         client: &Client,
         namespace: &str,
     ) -> Result<Self, Error> {
-        let connection = open_lineage
+        let connection = lineage
             .connection
             .clone()
             .resolve(client, namespace)
@@ -96,14 +96,14 @@ impl ResolvedOpenLineageConfig {
 
         let auth_secret_name = connection.credentials_secret_name.clone();
 
-        Self::build(&connection, open_lineage, namespace, auth_secret_name)
+        Self::build(&connection, lineage, namespace, auth_secret_name)
     }
 
     /// Assembles the configuration from an already-resolved connection and (optional) auth Secret
     /// name. Kept separate from [`Self::from_config`] so it can be unit tested without a client.
     fn build(
         connection: &ResolvedOpenLineageConnection,
-        open_lineage: &OpenLineageJob,
+        lineage: &OpenLineageJob,
         namespace: &str,
         auth_secret_name: Option<String>,
     ) -> Result<Self, Error> {
@@ -126,7 +126,7 @@ impl ResolvedOpenLineageConfig {
         ));
 
         // Namespace: the explicit value, else the workload's Kubernetes namespace.
-        let ol_namespace = open_lineage
+        let ol_namespace = lineage
             .namespace
             .clone()
             .unwrap_or_else(|| namespace.to_string());
@@ -166,7 +166,7 @@ impl ResolvedOpenLineageConfig {
 
         // Airflow has no global OpenLineage job name (names are derived per DAG/task), so the shared
         // `jobName` field is not applicable and is ignored.
-        if open_lineage.job_name.is_some() {
+        if lineage.job_name.is_some() {
             tracing::debug!(
                 "The OpenLineage `jobName` field is not used by Airflow and will be ignored; \
                  Airflow derives OpenLineage job names per DAG/task."
@@ -221,7 +221,7 @@ mod tests {
         }
     }
 
-    fn env_value<'a>(config: &'a ResolvedOpenLineageConfig, name: &str) -> Option<&'a str> {
+    fn env_value<'a>(config: &'a ResolvedLineageConfig, name: &str) -> Option<&'a str> {
         config
             .env_vars
             .iter()
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn plain_http_transport_without_tls_or_auth() {
-        let config = ResolvedOpenLineageConfig::build(
+        let config = ResolvedLineageConfig::build(
             &connection(no_tls()),
             &job(connection(no_tls()), None),
             NAMESPACE,
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn explicit_namespace_overrides_kubernetes_namespace() {
         let conn = connection(no_tls());
-        let config = ResolvedOpenLineageConfig::build(
+        let config = ResolvedLineageConfig::build(
             &conn,
             &job(conn.clone(), Some("lineage-ns".to_string())),
             NAMESPACE,
@@ -312,8 +312,7 @@ mod tests {
     fn secret_class_tls_mounts_ca_and_sets_bundle() {
         let conn = connection(secret_class_tls());
         let config =
-            ResolvedOpenLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None)
-                .unwrap();
+            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -332,8 +331,7 @@ mod tests {
     fn web_pki_tls_uses_https_without_mounts() {
         let conn = connection(web_pki_tls());
         let config =
-            ResolvedOpenLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None)
-                .unwrap();
+            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -348,8 +346,7 @@ mod tests {
     fn tls_without_verification_disables_verify() {
         let conn = connection(no_verification_tls());
         let config =
-            ResolvedOpenLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None)
-                .unwrap();
+            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY),
@@ -362,7 +359,7 @@ mod tests {
     #[test]
     fn auth_adds_secret_backed_api_key() {
         let conn = connection(no_tls());
-        let config = ResolvedOpenLineageConfig::build(
+        let config = ResolvedLineageConfig::build(
             &conn,
             &job(conn.clone(), None),
             NAMESPACE,

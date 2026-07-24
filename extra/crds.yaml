@@ -1440,71 +1440,7 @@ spec:
                     default: false
                     description: For internal use only - not for production use.
                     type: boolean
-                  loadExamples:
-                    default: false
-                    description: |-
-                      Whether to load example DAGs or not; defaults to false. The examples are used in the
-                      [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
-                    type: boolean
-                  metadataDatabase:
-                    description: Configure the database where Airflow stores all it's internal metadata
-                    oneOf:
-                    - required:
-                      - postgresql
-                    - required:
-                      - generic
-                    properties:
-                      generic:
-                        description: |-
-                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
-
-                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
-                          first-class connection type. The complete connection URL is read from a Secret, giving the user
-                          full control over the connection string including any driver-specific options.
-                        properties:
-                          connectionUrlSecretName:
-                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
-                            type: string
-                        required:
-                        - connectionUrlSecretName
-                        type: object
-                      postgresql:
-                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
-                        properties:
-                          credentialsSecretName:
-                            description: |-
-                              Name of a Secret containing the `username` and `password` keys used to authenticate
-                              against the PostgreSQL server.
-                            type: string
-                          database:
-                            description: Name of the database (schema) to connect to.
-                            type: string
-                          host:
-                            description: Hostname or IP address of the PostgreSQL server.
-                            type: string
-                          parameters:
-                            additionalProperties:
-                              type: string
-                            default: {}
-                            description: |-
-                              Additional map of JDBC connection parameters to append to the connection URL. The given
-                              `HashMap<String, String>` will be converted to query parameters in the form of
-                              `?param1=value1&param2=value2`.
-                            type: object
-                          port:
-                            default: 5432
-                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
-                            format: uint16
-                            maximum: 65535.0
-                            minimum: 0.0
-                            type: integer
-                        required:
-                        - credentialsSecretName
-                        - database
-                        - host
-                        type: object
-                    type: object
-                  openLineage:
+                  lineage:
                     description: |-
                       Emit [OpenLineage](https://openlineage.io/) lineage events for this cluster. The
                       [OpenLineage provider](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/)
@@ -1610,6 +1546,70 @@ spec:
                         type: string
                     required:
                     - connection
+                    type: object
+                  loadExamples:
+                    default: false
+                    description: |-
+                      Whether to load example DAGs or not; defaults to false. The examples are used in the
+                      [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
+                    type: boolean
+                  metadataDatabase:
+                    description: Configure the database where Airflow stores all it's internal metadata
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URL is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
+                        properties:
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
+                            type: string
+                        required:
+                        - connectionUrlSecretName
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecretName:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecretName
+                        - database
+                        - host
+                        type: object
                     type: object
                   vectorAggregatorConfigMapName:
                     description: |-
@@ -7752,71 +7752,7 @@ spec:
                     default: false
                     description: For internal use only - not for production use.
                     type: boolean
-                  loadExamples:
-                    default: false
-                    description: |-
-                      Whether to load example DAGs or not; defaults to false. The examples are used in the
-                      [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
-                    type: boolean
-                  metadataDatabase:
-                    description: Configure the database where Airflow stores all it's internal metadata
-                    oneOf:
-                    - required:
-                      - postgresql
-                    - required:
-                      - generic
-                    properties:
-                      generic:
-                        description: |-
-                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
-
-                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
-                          first-class connection type. The complete connection URL is read from a Secret, giving the user
-                          full control over the connection string including any driver-specific options.
-                        properties:
-                          connectionUrlSecretName:
-                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
-                            type: string
-                        required:
-                        - connectionUrlSecretName
-                        type: object
-                      postgresql:
-                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
-                        properties:
-                          credentialsSecretName:
-                            description: |-
-                              Name of a Secret containing the `username` and `password` keys used to authenticate
-                              against the PostgreSQL server.
-                            type: string
-                          database:
-                            description: Name of the database (schema) to connect to.
-                            type: string
-                          host:
-                            description: Hostname or IP address of the PostgreSQL server.
-                            type: string
-                          parameters:
-                            additionalProperties:
-                              type: string
-                            default: {}
-                            description: |-
-                              Additional map of JDBC connection parameters to append to the connection URL. The given
-                              `HashMap<String, String>` will be converted to query parameters in the form of
-                              `?param1=value1&param2=value2`.
-                            type: object
-                          port:
-                            default: 5432
-                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
-                            format: uint16
-                            maximum: 65535.0
-                            minimum: 0.0
-                            type: integer
-                        required:
-                        - credentialsSecretName
-                        - database
-                        - host
-                        type: object
-                    type: object
-                  openLineage:
+                  lineage:
                     description: |-
                       Emit [OpenLineage](https://openlineage.io/) lineage events for this cluster. The
                       [OpenLineage provider](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/)
@@ -7922,6 +7858,70 @@ spec:
                         type: string
                     required:
                     - connection
+                    type: object
+                  loadExamples:
+                    default: false
+                    description: |-
+                      Whether to load example DAGs or not; defaults to false. The examples are used in the
+                      [getting started guide](https://docs.stackable.tech/home/nightly/airflow/getting_started/).
+                    type: boolean
+                  metadataDatabase:
+                    description: Configure the database where Airflow stores all it's internal metadata
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URL is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
+                        properties:
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
+                            type: string
+                        required:
+                        - connectionUrlSecretName
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecretName:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecretName
+                        - database
+                        - host
+                        type: object
                     type: object
                   vectorAggregatorConfigMapName:
                     description: |-

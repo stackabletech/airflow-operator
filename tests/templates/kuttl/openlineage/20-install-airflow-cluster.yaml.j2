@@ -90,7 +90,7 @@ spec:
         host: airflow-redis-master
         credentialsSecretName: airflow-redis-credentials
 {% endif %}
-    openLineage:
+    lineage:
       # `jobName` is not used by Airflow (job names are derived per DAG/task); set here to
       # exercise the ignore-and-document path.
       jobName: airflow-openlineage-test

@@ -14,7 +14,7 @@ The Stackable images include it; if you build a custom image, make sure the prov
 
 == Enabling OpenLineage
 
-Set `spec.clusterConfig.openLineage` and provide a `connection` to your OpenLineage backend.
+Set `spec.clusterConfig.lineage` and provide a `connection` to your OpenLineage backend.
 The connection can be defined inline:
 
 [source,yaml]
@@ -25,7 +25,7 @@ metadata:
   name: airflow
 spec:
   clusterConfig:
-    openLineage:
+    lineage:
       connection:
         inline:
           host: marquez  # <1>
@@ -64,7 +64,7 @@ metadata:
   name: airflow
 spec:
   clusterConfig:
-    openLineage:
+    lineage:
       connection:
         reference: marquez  # <1>
 ----
@@ -76,7 +76,7 @@ Configure TLS on the connection to reach a backend over HTTPS:
 
 [source,yaml]
 ----
-openLineage:
+lineage:
   connection:
     inline:
       host: marquez
@@ -113,7 +113,7 @@ stringData:
 
 [source,yaml]
 ----
-openLineage:
+lineage:
   connection:
     inline:
       host: marquez
@@ -127,14 +127,14 @@ It never appears in the CRD, a ConfigMap, or a plaintext environment value.
 
 == Job name (`jobName`)
 
-The shared `openLineage.jobName` field has no effect for Airflow: Airflow derives OpenLineage job names per
+The shared `lineage.jobName` field has no effect for Airflow: Airflow derives OpenLineage job names per
 DAG and task. The field is accepted for cross-operator consistency but ignored.
 
 == Overriding injected configuration
 
 The OpenLineage environment variables are applied to every role (and the Kubernetes-executor pod template)
 _before_ user `envOverrides`, so you can override any of them.
-For example, to disable emission for a single role group without removing the `openLineage` block:
+For example, to disable emission for a single role group without removing the `lineage` block:
 
 [source,yaml]
 ----

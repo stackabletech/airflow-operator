@@ -133,7 +133,7 @@ rules:
       - get
       - list
       - watch
-  # Resolve OpenLineage connections referenced by spec.clusterConfig.openLineage.
+  # Resolve OpenLineage connections referenced by spec.clusterConfig.lineage.
   # Watched (list + watch) to re-reconcile when an OpenLineageConnection changes,
   # and fetched individually (get) during reconciliation to dereference a `reference`.
   - apiGroups:

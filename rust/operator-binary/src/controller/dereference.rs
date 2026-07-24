@@ -2,7 +2,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::controller_utils::get_namespace;
 
 use crate::{
-    controller::build::openlineage::ResolvedOpenLineageConfig,
+    controller::build::lineage::ResolvedLineageConfig,
     crd::{
         authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved, v1alpha2,
@@ -28,7 +28,7 @@ pub enum Error {
 
     #[snafu(display("failed to resolve OpenLineage configuration"))]
     OpenLineageConfig {
-        source: crate::controller::build::openlineage::Error,
+        source: crate::controller::build::lineage::Error,
     },
 }
 
@@ -36,8 +36,8 @@ pub enum Error {
 pub struct DereferencedObjects {
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
-    /// The resolved OpenLineage configuration (`spec.clusterConfig.openLineage`), when configured.
-    pub resolved_open_lineage_config: Option<ResolvedOpenLineageConfig>,
+    /// The resolved OpenLineage configuration (`spec.clusterConfig.lineage`), when configured.
+    pub resolved_lineage_config: Option<ResolvedLineageConfig>,
 }
 
 pub async fn dereference(
@@ -59,23 +59,22 @@ pub async fn dereference(
     .await
     .context(AuthorizationConfigSnafu)?;
 
-    let resolved_open_lineage_config =
-        if let Some(open_lineage) = &airflow.spec.cluster_config.open_lineage {
-            let namespace = get_namespace(airflow)
-                .context(ResolveNamespaceSnafu)?
-                .to_string();
-            Some(
-                ResolvedOpenLineageConfig::from_config(open_lineage, client, &namespace)
-                    .await
-                    .context(OpenLineageConfigSnafu)?,
-            )
-        } else {
-            None
-        };
+    let resolved_lineage_config = if let Some(lineage) = &airflow.spec.cluster_config.lineage {
+        let namespace = get_namespace(airflow)
+            .context(ResolveNamespaceSnafu)?
+            .to_string();
+        Some(
+            ResolvedLineageConfig::from_config(lineage, client, &namespace)
+                .await
+                .context(OpenLineageConfigSnafu)?,
+        )
+    } else {
+        None
+    };
 
     Ok(DereferencedObjects {
         authentication_config,
         authorization_config,
-        resolved_open_lineage_config,
+        resolved_lineage_config,
     })
 }

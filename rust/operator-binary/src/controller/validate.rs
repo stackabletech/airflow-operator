@@ -174,7 +174,7 @@ pub fn validate_cluster(
     let DereferencedObjects {
         authentication_config,
         authorization_config,
-        resolved_open_lineage_config,
+        resolved_lineage_config,
     } = dereferenced;
 
     // The Celery result-backend and broker only work with configured celeryExecutors. Emit a
@@ -241,7 +241,7 @@ pub fn validate_cluster(
             executor_template,
             authentication_config,
             authorization_config,
-            open_lineage: resolved_open_lineage_config,
+            lineage: resolved_lineage_config,
             credentials_secret_name: airflow.spec.cluster_config.credentials_secret_name.clone(),
             metadata_database: airflow.spec.cluster_config.metadata_database.clone(),
             celery_results_backend: airflow.spec.cluster_config.celery_results_backend.clone(),

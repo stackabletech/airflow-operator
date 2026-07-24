@@ -256,8 +256,8 @@ pub fn build_airflow_statefulset_envs(
 
     // OpenLineage transport config (applied to every role), inserted before overrides so users can
     // still override individual values via `envOverrides`.
-    if let Some(open_lineage) = &cluster.cluster_config.open_lineage {
-        for env_var in &open_lineage.env_vars {
+    if let Some(lineage) = &cluster.cluster_config.lineage {
+        for env_var in &lineage.env_vars {
             env.insert(env_var.name.clone(), env_var.clone());
         }
     }
@@ -441,8 +441,8 @@ pub fn build_airflow_template_envs(
 
     // OpenLineage transport config for the tasks executed by the Kubernetes executor, inserted
     // before overrides so users can still override individual values via `envOverrides`.
-    if let Some(open_lineage) = &cluster.cluster_config.open_lineage {
-        for env_var in &open_lineage.env_vars {
+    if let Some(lineage) = &cluster.cluster_config.lineage {
+        for env_var in &lineage.env_vars {
             env.insert(env_var.name.clone(), env_var.clone());
         }
     }

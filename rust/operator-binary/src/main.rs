@@ -250,9 +250,9 @@ fn references_open_lineage_connection(
         return false;
     };
 
-    match &airflow.spec.cluster_config.open_lineage {
-        Some(open_lineage) => matches!(
-            &open_lineage.connection,
+    match &airflow.spec.cluster_config.lineage {
+        Some(lineage) => matches!(
+            &lineage.connection,
             openlineage::v1alpha1::InlineConnectionOrReference::Reference(name)
                 if name == &open_lineage_connection.name_any()
         ),
