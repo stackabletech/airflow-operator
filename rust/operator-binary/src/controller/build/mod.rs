@@ -1,11 +1,13 @@
 //! Builders that assemble Kubernetes resources from the validated cluster.
 
+use std::marker::PhantomData;
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::types::operator::RoleGroupName;
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        KubernetesResources, Prepared, ValidatedCluster,
         build::resource::{
             config_map,
             executor::build_executor_template_config_map,
@@ -48,7 +50,7 @@ pub enum Error {
 /// Does not need a Kubernetes client: every reference to another Kubernetes resource is already
 /// dereferenced and validated by this point. Cluster configuration is likewise already validated,
 /// so the errors returned here are resource-assembly failures only.
-pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut listeners = vec![];
@@ -149,6 +151,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 
