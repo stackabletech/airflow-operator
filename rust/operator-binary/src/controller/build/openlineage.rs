@@ -165,10 +165,10 @@ impl ResolvedOpenLineageConfig {
         }
 
         // Airflow has no global OpenLineage job name (names are derived per DAG/task), so the shared
-        // `appName` field is not applicable and is ignored.
-        if open_lineage.app_name.is_some() {
+        // `jobName` field is not applicable and is ignored.
+        if open_lineage.job_name.is_some() {
             tracing::debug!(
-                "The OpenLineage `appName` field is not used by Airflow and will be ignored; \
+                "The OpenLineage `jobName` field is not used by Airflow and will be ignored; \
                  Airflow derives OpenLineage job names per DAG/task."
             );
         }
@@ -217,7 +217,7 @@ mod tests {
         OpenLineageJob {
             connection: InlineConnectionOrReference::Inline(connection),
             namespace,
-            app_name: None,
+            job_name: None,
         }
     }
 

@@ -47,7 +47,7 @@ The referenced resource must live in the same namespace as the `AirflowCluster`.
 
 [source,yaml]
 ----
-apiVersion: openlineage.stackable.tech/v1alpha1
+apiVersion: lineage.stackable.tech/v1alpha1
 kind: OpenLineageConnection
 metadata:
   name: marquez
@@ -125,9 +125,9 @@ openLineage:
 The token is injected into the Airflow pods from the Secret via a `secretKeyRef` environment variable.
 It never appears in the CRD, a ConfigMap, or a plaintext environment value.
 
-== Job name (`appName`)
+== Job name (`jobName`)
 
-The shared `openLineage.appName` field has no effect for Airflow: Airflow derives OpenLineage job names per
+The shared `openLineage.jobName` field has no effect for Airflow: Airflow derives OpenLineage job names per
 DAG and task. The field is accepted for cross-operator consistency but ignored.
 
 == Overriding injected configuration

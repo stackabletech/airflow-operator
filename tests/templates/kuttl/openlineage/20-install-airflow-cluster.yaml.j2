@@ -91,9 +91,9 @@ spec:
         credentialsSecretName: airflow-redis-credentials
 {% endif %}
     openLineage:
-      # `appName` is not used by Airflow (job names are derived per DAG/task); set here to
+      # `jobName` is not used by Airflow (job names are derived per DAG/task); set here to
       # exercise the ignore-and-document path.
-      appName: airflow-openlineage-test
+      jobName: airflow-openlineage-test
       # Reference the OpenLineageConnection created in step 10 (also exercises the reference path,
       # its RBAC and the reconcile watch). TLS/auth are configured on that resource.
       connection:
