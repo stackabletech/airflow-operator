@@ -164,7 +164,8 @@ mod tests {
     use super::build;
     use crate::{
         controller::{
-            ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
+            ValidatedCluster, app_version_label, dereference::DereferencedObjects,
+            validate::validate_cluster,
         },
         crd::{
             authentication::{AirflowClientAuthenticationDetailsResolved, FlaskRolesSyncMoment},
@@ -320,7 +321,7 @@ mod tests {
                 ),
                 ("app.kubernetes.io/name", "airflow"),
                 ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "3.1.6-stackable0.0.0-dev"),
+                ("app.kubernetes.io/version", &app_version_label("3.1.6")),
                 ("stackable.tech/vendor", "Stackable"),
             ]
             .map(|(key, value)| (key.to_string(), value.to_string())),
