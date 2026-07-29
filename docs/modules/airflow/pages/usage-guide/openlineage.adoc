@@ -28,17 +28,20 @@ spec:
     lineage:
       connection:
         inline:
-          host: marquez  # <1>
-          port: 5000     # <2>
-      namespace: production  # <3>
+          http:              # <1>
+            host: marquez    # <2>
+            port: 5000       # <3>
+      namespace: production  # <4>
 ----
-<1> Host of the OpenLineage backend, without protocol or port.
-<2> Port the backend listens on.
-<3> Optional OpenLineage namespace lineage is reported under. Defaults to the Kubernetes namespace of the cluster.
+<1> The transport used to publish events. `http` is currently the only supported transport.
+<2> Host of the OpenLineage backend, without protocol or port.
+<3> Port the backend listens on.
+<4> OpenLineage namespace lineage is reported under. Defaults to `default`.
 
 The operator configures the transport via the OpenLineage client environment variables
 (`OPENLINEAGE__TRANSPORT__*`) and sets `AIRFLOW__OPENLINEAGE__NAMESPACE`.
-Lineage events are emitted to `\http(s)://<host>:<port>/api/v1/lineage`.
+Lineage events are emitted to `\http(s)://<host>:<port><path>`, where `path` defaults to
+`/api/v1/lineage`.
 
 == Referencing an OpenLineageConnection
 
@@ -52,8 +55,9 @@ kind: OpenLineageConnection
 metadata:
   name: marquez
 spec:
-  host: marquez
-  port: 5000
+  http:
+    host: marquez
+    port: 5000
 ----
 
 [source,yaml]
@@ -79,13 +83,14 @@ Configure TLS on the connection to reach a backend over HTTPS:
 lineage:
   connection:
     inline:
-      host: marquez
-      port: 5000
-      tls:
-        verification:
-          server:
-            caCert:
-              secretClass: openlineage-tls  # <1>
+      http:
+        host: marquez
+        port: 5000
+        tls:
+          verification:
+            server:
+              caCert:
+                secretClass: openlineage-tls  # <1>
 ----
 <1> A xref:secret-operator:secretclass.adoc[SecretClass] providing the CA certificate used to verify the backend.
 
@@ -116,14 +121,32 @@ stringData:
 lineage:
   connection:
     inline:
-      host: marquez
-      port: 5000
-      credentialsSecretName: openlineage-credentials  # <1>
+      http:
+        host: marquez
+        port: 5000
+        credentialsSecretName: openlineage-credentials  # <1>
 ----
 <1> Name of the Secret holding the API key.
 
 The token is injected into the Airflow pods from the Secret via a `secretKeyRef` environment variable.
 It never appears in the CRD, a ConfigMap, or a plaintext environment value.
+
+== Endpoint path
+
+By default events are sent to `/api/v1/lineage` on the backend. Set `path` on the transport to target
+a different endpoint:
+
+[source,yaml]
+----
+lineage:
+  connection:
+    inline:
+      http:
+        host: marquez
+        port: 5000
+        path: /custom/lineage  # <1>
+----
+<1> URL path of the endpoint events are sent to. Defaults to `/api/v1/lineage`.
 
 == Job name (`jobName`)
 

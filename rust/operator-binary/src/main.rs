@@ -254,7 +254,7 @@ fn references_open_lineage_connection(
         Some(lineage) => matches!(
             &lineage.connection,
             openlineage::v1alpha1::InlineConnectionOrReference::Reference(name)
-                if name == &open_lineage_connection.name_any()
+                if *name == open_lineage_connection.name_any()
         ),
         None => false,
     }

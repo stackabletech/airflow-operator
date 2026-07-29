@@ -2,7 +2,7 @@
 //!
 //! The reusable CRD and resolution types live in operator-rs
 //! ([`stackable_operator::crd::openlineage`]). This module resolves an
-//! [`OpenLineageJob`] into the Airflow-specific set of environment variables (and TLS CA volumes)
+//! [`OpenLineageConfig`] into the Airflow-specific set of environment variables (and TLS CA volumes)
 //! needed to configure the
 //! [`apache-airflow-providers-openlineage`](https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/)
 //! provider.
@@ -23,7 +23,7 @@ use stackable_operator::{
     commons::tls_verification::TlsClientDetailsError,
     crd::openlineage::{
         ResolvedOpenLineageConnection,
-        v1alpha1::{OpenLineageError, OpenLineageJob},
+        v1alpha1::{OpenLineageConfig, OpenLineageError, OpenLineageTransport},
     },
     k8s_openapi::api::core::v1::{EnvVar, Volume, VolumeMount},
 };
@@ -49,7 +49,6 @@ const AIRFLOW_OPENLINEAGE_NAMESPACE: &str = "AIRFLOW__OPENLINEAGE__NAMESPACE";
 const REQUESTS_CA_BUNDLE: &str = "REQUESTS_CA_BUNDLE";
 
 const OPENLINEAGE_TRANSPORT_TYPE_HTTP: &str = "http";
-const OPENLINEAGE_ENDPOINT_LINEAGE: &str = "api/v1/lineage";
 const OPENLINEAGE_AUTH_TYPE_API_KEY: &str = "api_key";
 
 /// Fixed Secret key that must hold the OpenLineage HTTP transport API key / bearer token.
@@ -80,10 +79,10 @@ pub struct ResolvedLineageConfig {
 }
 
 impl ResolvedLineageConfig {
-    /// Resolves an [`OpenLineageJob`] (inline connection or `OpenLineageConnection` reference, plus
-    /// an optional credentials Secret) into the Airflow-specific configuration.
+    /// Resolves an [`OpenLineageConfig`] (inline connection or `OpenLineageConnection` reference,
+    /// plus an optional credentials Secret) into the Airflow-specific configuration.
     pub async fn from_config(
-        lineage: &OpenLineageJob,
+        lineage: &OpenLineageConfig,
         client: &Client,
         namespace: &str,
     ) -> Result<Self, Error> {
@@ -94,50 +93,42 @@ impl ResolvedLineageConfig {
             .await
             .context(ResolveConnectionSnafu)?;
 
-        let auth_secret_name = connection.credentials_secret_name.clone();
-
-        Self::build(&connection, lineage, namespace, auth_secret_name)
+        Self::build(&connection, lineage)
     }
 
-    /// Assembles the configuration from an already-resolved connection and (optional) auth Secret
-    /// name. Kept separate from [`Self::from_config`] so it can be unit tested without a client.
+    /// Assembles the configuration from an already-resolved connection. Kept separate from
+    /// [`Self::from_config`] so it can be unit tested without a client.
     fn build(
         connection: &ResolvedOpenLineageConnection,
-        lineage: &OpenLineageJob,
-        namespace: &str,
-        auth_secret_name: Option<String>,
+        lineage: &OpenLineageConfig,
     ) -> Result<Self, Error> {
         let mut env_vars = Vec::new();
         let mut volumes = Vec::new();
         let mut volume_mounts = Vec::new();
+
+        let OpenLineageTransport::Http(http) = &connection.transport;
 
         // Transport (delivered via the OpenLineage Python client fallback env vars).
         env_vars.push(plain_env(
             OPENLINEAGE_TRANSPORT_TYPE,
             OPENLINEAGE_TRANSPORT_TYPE_HTTP,
         ));
-        env_vars.push(plain_env(
-            OPENLINEAGE_TRANSPORT_URL,
-            &connection.transport_url(),
-        ));
+        env_vars.push(plain_env(OPENLINEAGE_TRANSPORT_URL, &http.transport_url()));
+        // The client joins the base URL and the endpoint itself, so the leading slash of the CRD
+        // `path` is stripped to avoid a doubled separator.
         env_vars.push(plain_env(
             OPENLINEAGE_TRANSPORT_ENDPOINT,
-            OPENLINEAGE_ENDPOINT_LINEAGE,
+            http.path.trim_start_matches('/'),
         ));
 
-        // Namespace: the explicit value, else the workload's Kubernetes namespace.
-        let ol_namespace = lineage
-            .namespace
-            .clone()
-            .unwrap_or_else(|| namespace.to_string());
-        env_vars.push(plain_env(AIRFLOW_OPENLINEAGE_NAMESPACE, &ol_namespace));
+        env_vars.push(plain_env(AIRFLOW_OPENLINEAGE_NAMESPACE, &lineage.namespace));
 
         // TLS handling.
-        if connection.tls.uses_tls_verification() {
+        if http.tls.uses_tls_verification() {
             // Server verification. A public (WebPki) CA needs nothing; a SecretClass CA must be
             // mounted and trusted via REQUESTS_CA_BUNDLE.
-            if let Some(ca_cert_path) = connection.tls.tls_ca_cert_mount_path() {
-                let (tls_volumes, tls_mounts) = connection
+            if let Some(ca_cert_path) = http.tls.tls_ca_cert_mount_path() {
+                let (tls_volumes, tls_mounts) = http
                     .tls
                     .volumes_and_mounts()
                     .context(TlsVolumesAndMountsSnafu)?;
@@ -145,21 +136,21 @@ impl ResolvedLineageConfig {
                 volume_mounts.extend(tls_mounts);
                 env_vars.push(plain_env(REQUESTS_CA_BUNDLE, &ca_cert_path));
             }
-        } else if connection.tls.uses_tls() {
+        } else if http.tls.uses_tls() {
             // TLS configured but verification disabled.
             env_vars.push(plain_env(OPENLINEAGE_TRANSPORT_VERIFY, "false"));
         }
 
         // Authentication. The token is delivered from the `credentialsSecretName` Secret via a
         // secretKeyRef so it never lands in the CRD, ConfigMap or a plaintext env value.
-        if let Some(secret_name) = auth_secret_name {
+        if let Some(secret_name) = &http.credentials_secret_name {
             env_vars.push(plain_env(
                 OPENLINEAGE_TRANSPORT_AUTH_TYPE,
                 OPENLINEAGE_AUTH_TYPE_API_KEY,
             ));
             env_vars.push(env_var_from_secret(
                 OPENLINEAGE_TRANSPORT_AUTH_API_KEY,
-                &secret_name,
+                secret_name,
                 OPENLINEAGE_AUTH_SECRET_KEY,
             ));
         }
@@ -196,7 +187,7 @@ mod tests {
             CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
         },
         crd::openlineage::v1alpha1::{
-            InlineConnectionOrReference, OpenLineageConnectionSpec, OpenLineageJob,
+            HttpTransport, InlineConnectionOrReference, OpenLineageConnectionSpec,
         },
     };
 
@@ -205,18 +196,40 @@ mod tests {
     const NAMESPACE: &str = "default";
 
     fn connection(tls: TlsClientDetails) -> OpenLineageConnectionSpec {
+        connection_with_auth(tls, None)
+    }
+
+    fn connection_with_auth(
+        tls: TlsClientDetails,
+        credentials_secret_name: Option<String>,
+    ) -> OpenLineageConnectionSpec {
         OpenLineageConnectionSpec {
-            host: "marquez".to_string(),
-            port: 5000,
-            tls,
-            credentials_secret_name: None,
+            transport: OpenLineageTransport::Http(HttpTransport {
+                host: "marquez".to_string(),
+                port: 5000,
+                path: HttpTransport::DEFAULT_PATH.to_string(),
+                tls,
+                credentials_secret_name,
+            }),
         }
     }
 
-    fn job(connection: OpenLineageConnectionSpec, namespace: Option<String>) -> OpenLineageJob {
-        OpenLineageJob {
+    fn connection_with_path(tls: TlsClientDetails, path: &str) -> OpenLineageConnectionSpec {
+        OpenLineageConnectionSpec {
+            transport: OpenLineageTransport::Http(HttpTransport {
+                host: "marquez".to_string(),
+                port: 5000,
+                path: path.to_string(),
+                tls,
+                credentials_secret_name: None,
+            }),
+        }
+    }
+
+    fn job(connection: OpenLineageConnectionSpec, namespace: &str) -> OpenLineageConfig {
+        OpenLineageConfig {
             connection: InlineConnectionOrReference::Inline(connection),
-            namespace,
+            namespace: namespace.to_string(),
             job_name: None,
         }
     }
@@ -265,9 +278,7 @@ mod tests {
     fn plain_http_transport_without_tls_or_auth() {
         let config = ResolvedLineageConfig::build(
             &connection(no_tls()),
-            &job(connection(no_tls()), None),
-            NAMESPACE,
-            None,
+            &job(connection(no_tls()), NAMESPACE),
         )
         .unwrap();
 
@@ -292,15 +303,9 @@ mod tests {
     }
 
     #[test]
-    fn explicit_namespace_overrides_kubernetes_namespace() {
+    fn explicit_namespace_is_passed_through() {
         let conn = connection(no_tls());
-        let config = ResolvedLineageConfig::build(
-            &conn,
-            &job(conn.clone(), Some("lineage-ns".to_string())),
-            NAMESPACE,
-            None,
-        )
-        .unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), "lineage-ns")).unwrap();
 
         assert_eq!(
             env_value(&config, AIRFLOW_OPENLINEAGE_NAMESPACE),
@@ -311,8 +316,7 @@ mod tests {
     #[test]
     fn secret_class_tls_mounts_ca_and_sets_bundle() {
         let conn = connection(secret_class_tls());
-        let config =
-            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -330,8 +334,7 @@ mod tests {
     #[test]
     fn web_pki_tls_uses_https_without_mounts() {
         let conn = connection(web_pki_tls());
-        let config =
-            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -345,8 +348,7 @@ mod tests {
     #[test]
     fn tls_without_verification_disables_verify() {
         let conn = connection(no_verification_tls());
-        let config =
-            ResolvedLineageConfig::build(&conn, &job(conn.clone(), None), NAMESPACE, None).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY),
@@ -356,16 +358,23 @@ mod tests {
         assert!(env_value(&config, REQUESTS_CA_BUNDLE).is_none());
     }
 
+    /// The CRD `path` is passed through as the transport endpoint, with the leading slash stripped
+    /// because the OpenLineage client joins the base URL and endpoint itself.
+    #[test]
+    fn custom_path_is_used_as_transport_endpoint() {
+        let conn = connection_with_path(no_tls(), "/custom/lineage");
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+
+        assert_eq!(
+            env_value(&config, OPENLINEAGE_TRANSPORT_ENDPOINT),
+            Some("custom/lineage")
+        );
+    }
+
     #[test]
     fn auth_adds_secret_backed_api_key() {
-        let conn = connection(no_tls());
-        let config = ResolvedLineageConfig::build(
-            &conn,
-            &job(conn.clone(), None),
-            NAMESPACE,
-            Some("openlineage-auth-secret".to_string()),
-        )
-        .unwrap();
+        let conn = connection_with_auth(no_tls(), Some("openlineage-auth-secret".to_string()));
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_AUTH_TYPE),
