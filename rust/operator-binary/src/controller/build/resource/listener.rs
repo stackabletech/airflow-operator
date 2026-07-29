@@ -9,7 +9,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::ValidatedCluster,
+    controller::{ValidatedCluster, build::object_meta},
     crd::{AirflowRole, HTTP_PORT, HTTP_PORT_NAME},
 };
 
@@ -24,15 +24,13 @@ pub fn build_group_listener(
     listener_group_name: ListenerName,
 ) -> listener::v1alpha1::Listener {
     listener::v1alpha1::Listener {
-        metadata: cluster
-            .object_meta(
-                listener_group_name,
-                cluster.recommended_labels_for(
-                    &ValidatedCluster::role_name(role),
-                    &NONE_ROLE_GROUP_NAME,
-                ),
-            )
-            .build(),
+        metadata: object_meta(
+            cluster,
+            listener_group_name,
+            cluster
+                .recommended_labels_for(&ValidatedCluster::role_name(role), &NONE_ROLE_GROUP_NAME),
+        )
+        .build(),
         spec: listener::v1alpha1::ListenerSpec {
             class_name: Some(listener_class.to_string()),
             ports: Some(listener_ports()),

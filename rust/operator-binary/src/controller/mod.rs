@@ -5,7 +5,6 @@ use std::{
 };
 
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     commons::{
         affinity::StackableAffinity,
         product_image_selection::ResolvedProductImage,
@@ -31,7 +30,6 @@ use stackable_operator::{
     shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
@@ -61,19 +59,6 @@ use crate::{
         v1alpha2,
     },
 };
-
-/// The expected `app.kubernetes.io/version` label value for the given product version.
-///
-/// The `-stackable` suffix carries the operator's own version, which is `0.0.0-dev` on main
-/// but rewritten by the release process — so tests must derive it rather than hardcode it,
-/// or they fail on release branches.
-#[cfg(test)]
-pub(crate) fn app_version_label(product_version: &str) -> String {
-    format!(
-        "{product_version}-stackable{}",
-        crate::built_info::PKG_VERSION
-    )
-}
 
 pub mod apply;
 pub mod build;
@@ -445,18 +430,6 @@ impl ValidatedCluster {
             &Self::role_name(role),
             role_group_name,
         )
-    }
-
-    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
-    /// reference back to this cluster, and the given recommended `labels`.
-    pub(crate) fn object_meta(&self, name: impl Into<String>, labels: Labels) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-        builder
-            .name_and_namespace(self)
-            .name(name)
-            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
-            .with_labels(labels);
-        builder
     }
 }
 
