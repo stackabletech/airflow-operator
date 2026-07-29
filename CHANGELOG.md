@@ -11,11 +11,20 @@
 - Bump stackable-operator to 0.114.0 ([#827]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#828]).
+- The level configured for the `airflow.task` logger now sets the level of the `task` handler,
+  which is what the Airflow UI displays, instead of the level of the logger itself. It still
+  defaults to `INFO`, matching Airflow's own default. A level above `INFO` is applied to the
+  handler alone and quietens the UI without raising the logger, so the console and file handlers
+  keep receiving records that the UI no longer shows. A level below `INFO` has to be applied to
+  the logger as well, because a logger discards records before any handler can filter them, so in
+  that direction the UI and the other destinations open up together and cannot be set apart
+  ([#829]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
+[#829]: https://github.com/stackabletech/airflow-operator/pull/829
 
 ## [26.7.0] - 2026-07-21
 
