@@ -33,6 +33,7 @@ use crate::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
+            object_meta,
             properties::env_vars,
             resource::{
                 pod::{
@@ -90,10 +91,13 @@ fn build_rolegroup_metadata(
     prometheus_label: Label,
     name: String,
 ) -> ObjectMeta {
-    cluster
-        .object_meta(name, cluster.recommended_labels(role, role_group_name))
-        .with_label(prometheus_label)
-        .build()
+    object_meta(
+        cluster,
+        name,
+        cluster.recommended_labels(role, role_group_name),
+    )
+    .with_label(prometheus_label)
+    .build()
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.

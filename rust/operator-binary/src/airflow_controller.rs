@@ -9,7 +9,6 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::random_secret_creation,
     k8s_openapi::api::core::v1::EnvVar,
     kube::{
         core::{DeserializeGuard, error_boundary},
@@ -17,23 +16,16 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
     shared::time::Duration,
-    status::condition::{
-        compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder,
-    },
-    v2::cluster_resources::cluster_resources_new,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{ValidatedCluster, build, controller_name, operator_name, product_name},
-    crd::{
-        AirflowClusterStatus, OPERATOR_NAME,
-        internal_secret::{
-            FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
-        },
-        v1alpha2,
+    controller::{
+        apply::{self, Applier, ensure_random_secrets},
+        build,
+        update_status::{self, update_status},
     },
+    crd::{OPERATOR_NAME, v1alpha2},
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
@@ -51,28 +43,17 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
-    #[snafu(display("failed to apply Kubernetes resource"))]
-    ApplyResource {
-        source: stackable_operator::cluster_resources::Error,
-    },
+    #[snafu(display("failed to apply the Kubernetes resources"))]
+    ApplyResources { source: apply::Error },
 
     #[snafu(display("failed to build the Kubernetes resources"))]
     BuildResources { source: build::Error },
 
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
+    #[snafu(display("failed to ensure the shared random Secrets exist"))]
+    EnsureSecrets { source: apply::Error },
 
-    #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
-
-    #[snafu(display("failed to create internal secret"))]
-    InternalSecret {
-        source: random_secret_creation::Error,
-    },
+    #[snafu(display("failed to update the cluster status"))]
+    UpdateStatus { source: update_status::Error },
 
     #[snafu(display("failed to dereference cluster resources"))]
     Dereference {
@@ -116,9 +97,6 @@ pub async fn reconcile_airflow(
         .await
         .context(DereferenceSnafu)?;
 
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&airflow.spec.cluster_operation);
-
     let validated_cluster = crate::controller::validate::validate_cluster(
         airflow,
         &ctx.operator_environment.image_repository,
@@ -126,133 +104,26 @@ pub async fn reconcile_airflow(
     )
     .context(ValidateSnafu)?;
 
-    ensure_random_secrets(client, &validated_cluster).await?;
-
-    let mut cluster_resources = cluster_resources_new(
-        &product_name(),
-        &operator_name(),
-        &controller_name(),
-        &validated_cluster.name,
-        &validated_cluster.namespace,
-        &validated_cluster.uid,
-        ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
-        &airflow.spec.object_overrides,
-    );
-
     let resources = build::build(&validated_cluster).context(BuildResourcesSnafu)?;
 
-    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
-
-    // Apply order is: StatefulSets last (a changed mounted ConfigMap/Secret
-    // must exist first, else Pods restart -- commons-operator#111). The ServiceAccount comes
-    // first because the Pods reference it at creation time.
-    for service_account in resources.service_accounts {
-        cluster_resources
-            .add(client, service_account)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for role_binding in resources.role_bindings {
-        cluster_resources
-            .add(client, role_binding)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for service in resources.services {
-        cluster_resources
-            .add(client, service)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for listener in resources.listeners {
-        cluster_resources
-            .add(client, listener)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for config_map in resources.config_maps {
-        cluster_resources
-            .add(client, config_map)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for pdb in resources.pod_disruption_budgets {
-        cluster_resources
-            .add(client, pdb)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for statefulset in resources.stateful_sets {
-        ss_cond_builder.add(
-            cluster_resources
-                .add(client, statefulset)
-                .await
-                .context(ApplyResourceSnafu)?,
-        );
-    }
-
-    cluster_resources
-        .delete_orphaned_resources(client)
+    ensure_random_secrets(client, &validated_cluster)
         .await
-        .context(DeleteOrphanedResourcesSnafu)?;
+        .context(EnsureSecretsSnafu)?;
+    let applied = Applier::new(
+        client,
+        &validated_cluster,
+        ClusterResourceApplyStrategy::from(&airflow.spec.cluster_operation),
+        &airflow.spec.object_overrides,
+    )
+    .apply(resources)
+    .await
+    .context(ApplyResourcesSnafu)?;
 
-    let status = AirflowClusterStatus {
-        conditions: compute_conditions(
-            airflow,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
-        ),
-    };
-
-    client
-        .apply_patch_status(OPERATOR_NAME, airflow, &status)
+    update_status(client, airflow, &applied)
         .await
-        .context(ApplyStatusSnafu)?;
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-/// Ensures the three shared random Secrets (internal / JWT / Fernet) exist, creating any that are
-/// missing. These are read-or-create client operations, so they cannot be part of the client-free
-/// `build()` step.
-async fn ensure_random_secrets(
-    client: &stackable_operator::client::Client,
-    cluster: &ValidatedCluster,
-) -> Result<(), Error> {
-    random_secret_creation::create_random_secret_if_not_exists(
-        cluster.internal_secret_name().as_ref(),
-        INTERNAL_SECRET_SECRET_KEY,
-        256,
-        cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
-
-    random_secret_creation::create_random_secret_if_not_exists(
-        cluster.jwt_secret_name().as_ref(),
-        JWT_SECRET_SECRET_KEY,
-        256,
-        cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
-
-    // https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
-    // does not document how long the fernet key should be, but recommends using
-    // python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    // which returns 32 bytes.
-    random_secret_creation::create_random_secret_if_not_exists(
-        cluster.fernet_key_name().as_ref(),
-        FERNET_KEY_SECRET_KEY,
-        32,
-        cluster,
-        client,
-    )
-    .await
-    .context(InternalSecretSnafu)?;
-
-    Ok(())
 }
 
 pub fn error_policy(

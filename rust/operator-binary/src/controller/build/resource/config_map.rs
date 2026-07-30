@@ -17,10 +17,13 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster, ValidatedLogging,
-        build::properties::{
-            ConfigFileName,
-            product_logging::{create_airflow_config, vector_config_file_content},
-            webserver_config,
+        build::{
+            object_meta,
+            properties::{
+                ConfigFileName,
+                product_logging::{create_airflow_config, vector_config_file_content},
+                webserver_config,
+            },
         },
     },
     crd::{AirflowConfigOverrides, Container},
@@ -63,15 +66,15 @@ pub fn build_rolegroup_config_map(
 
     cm_builder
         .metadata(
-            validated_cluster
-                .object_meta(
-                    validated_cluster
-                        .role_group_resource_names(role_name, role_group_name)
-                        .role_group_config_map()
-                        .to_string(),
-                    validated_cluster.recommended_labels_for(role_name, role_group_name),
-                )
-                .build(),
+            object_meta(
+                validated_cluster,
+                validated_cluster
+                    .role_group_resource_names(role_name, role_group_name)
+                    .role_group_config_map()
+                    .to_string(),
+                validated_cluster.recommended_labels_for(role_name, role_group_name),
+            )
+            .build(),
         )
         .add_data(ConfigFileName::WebserverConfig.to_string(), config_file);
 

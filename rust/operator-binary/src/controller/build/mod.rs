@@ -1,13 +1,19 @@
 //! Builders that assemble Kubernetes resources from the validated cluster.
 
+use std::marker::PhantomData;
+
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::types::operator::RoleGroupName;
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    kvp::Labels,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+};
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        KubernetesResources, Prepared, ValidatedCluster,
         build::resource::{
-            config_map,
+            config_map::build_rolegroup_config_map,
             executor::build_executor_template_config_map,
             listener::build_group_listener,
             pdb::build_pdb,
@@ -48,7 +54,7 @@ pub enum Error {
 /// Does not need a Kubernetes client: every reference to another Kubernetes resource is already
 /// dereferenced and validated by this point. Cluster configuration is likewise already validated,
 /// so the errors returned here are resource-assembly failures only.
-pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut listeners = vec![];
@@ -59,7 +65,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
     // executor's workers are a regular role with its own role groups instead).
     if let Some(executor_template) = &cluster.cluster_config.executor_template {
         let executor_role_group = executor_role_group_name();
-        let executor_config_map = config_map::build_rolegroup_config_map(
+        let executor_config_map = build_rolegroup_config_map(
             cluster,
             &executor_role_name(),
             &executor_role_group,
@@ -114,7 +120,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
                 role_group_name,
             ));
             config_maps.push(
-                config_map::build_rolegroup_config_map(
+                build_rolegroup_config_map(
                     cluster,
                     &ValidatedCluster::role_name(role),
                     role_group_name,
@@ -149,16 +155,31 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 
+/// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, the resource
+/// `name`, an owner reference back to the cluster, and the given recommended `labels`.
+///
+/// Consolidates the metadata chain repeated by the child-resource builders. Call sites that
+/// need extra labels/annotations chain them onto the returned builder.
+pub(crate) fn object_meta(
+    cluster: &ValidatedCluster,
+    name: impl Into<String>,
+    labels: Labels,
+) -> ObjectMetaBuilder {
+    let mut builder = ObjectMetaBuilder::new();
+    builder
+        .name_and_namespace(cluster)
+        .name(name)
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
+        .with_labels(labels);
+    builder
+}
+
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use stackable_operator::kube::Resource;
-
-    use super::build;
+pub(crate) mod test_support {
     use crate::{
         controller::{
             ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
@@ -170,12 +191,24 @@ mod tests {
         },
     };
 
+    /// The expected `app.kubernetes.io/version` label value for the given product version.
+    ///
+    /// The `-stackable` suffix carries the operator's own version, which is `0.0.0-dev` on main
+    /// but rewritten by the release process — so tests must derive it rather than hardcode it,
+    /// or they fail on release branches.
+    pub fn app_version_label(product_version: &str) -> String {
+        format!(
+            "{product_version}-stackable{}",
+            crate::built_info::PKG_VERSION
+        )
+    }
+
     /// A validated cluster with default `webserver`/`scheduler` role groups and the given executor
     /// (its `spec` key plus config, as standalone YAML), built via `validate_cluster` from a
     /// minimal test CR (mirroring `validate::tests::test_cluster`), since `ValidatedCluster`
     /// carries several resolved types (git-sync resources, validated logging, …) that are
     /// impractical to construct by hand.
-    fn validated_cluster(executor_key: &str, executor_config: &str) -> ValidatedCluster {
+    pub fn validated_cluster(executor_key: &str, executor_config: &str) -> ValidatedCluster {
         let cluster_yaml = r#"
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
@@ -237,15 +270,27 @@ mod tests {
 
     /// Validated cluster with a Celery executor (its workers are provisioned via the queue, so no
     /// executor pod template is built).
-    fn celery_executor_cluster() -> ValidatedCluster {
+    pub fn celery_executor_cluster() -> ValidatedCluster {
         validated_cluster("celeryExecutors", "{config: {}, roleGroups: {}}")
     }
 
     /// Validated cluster with a Kubernetes executor, which builds an executor pod-template
     /// ConfigMap instead of a worker role.
-    fn kubernetes_executor_cluster() -> ValidatedCluster {
+    pub fn kubernetes_executor_cluster() -> ValidatedCluster {
         validated_cluster("kubernetesExecutors", "{config: {}}")
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use stackable_operator::kube::Resource;
+
+    use super::{
+        build,
+        test_support::{app_version_label, celery_executor_cluster, kubernetes_executor_cluster},
+    };
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -317,7 +362,7 @@ mod tests {
                 ),
                 ("app.kubernetes.io/name", "airflow"),
                 ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "3.1.6-stackable0.0.0-dev"),
+                ("app.kubernetes.io/version", &app_version_label("3.1.6")),
                 ("stackable.tech/vendor", "Stackable"),
             ]
             .map(|(key, value)| (key.to_string(), value.to_string())),

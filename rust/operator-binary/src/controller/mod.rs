@@ -1,10 +1,10 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    marker::PhantomData,
     str::FromStr,
 };
 
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     commons::{
         affinity::StackableAffinity,
         product_image_selection::ResolvedProductImage,
@@ -30,7 +30,6 @@ use stackable_operator::{
     shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
@@ -61,15 +60,26 @@ use crate::{
     },
 };
 
+pub mod apply;
 pub mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 
 // Placeholder version label value for resources whose labels must not change after deployment.
 stackable_operator::constant!(UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+/// Marker for applied Kubernetes resources.
+pub struct Applied;
+
 /// Every Kubernetes resource produced by the build step.
-pub struct KubernetesResources {
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub services: Vec<Service>,
     pub listeners: Vec<listener::v1alpha1::Listener>,
@@ -77,6 +87,7 @@ pub struct KubernetesResources {
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -419,18 +430,6 @@ impl ValidatedCluster {
             &Self::role_name(role),
             role_group_name,
         )
-    }
-
-    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
-    /// reference back to this cluster, and the given recommended `labels`.
-    pub(crate) fn object_meta(&self, name: impl Into<String>, labels: Labels) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-        builder
-            .name_and_namespace(self)
-            .name(name)
-            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
-            .with_labels(labels);
-        builder
     }
 }
 

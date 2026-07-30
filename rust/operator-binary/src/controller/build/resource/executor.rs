@@ -26,6 +26,7 @@ use crate::{
         ValidatedAirflowConfig, ValidatedCluster,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
+            object_meta,
             properties::env_vars::build_airflow_template_envs,
             resource::pod::{
                 add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
@@ -184,16 +185,16 @@ pub fn build_executor_template_config_map(
 
     cm_builder
         .metadata(
-            cluster
-                .object_meta(
-                    cluster.executor_template_configmap_name(),
-                    cluster.recommended_labels_for(
-                        &executor_role_name(),
-                        &executor_template_role_group_name(),
-                    ),
-                )
-                .with_label(restarter_label)
-                .build(),
+            object_meta(
+                cluster,
+                cluster.executor_template_configmap_name(),
+                cluster.recommended_labels_for(
+                    &executor_role_name(),
+                    &executor_template_role_group_name(),
+                ),
+            )
+            .with_label(restarter_label)
+            .build(),
         )
         .add_data(
             TEMPLATE_NAME,
