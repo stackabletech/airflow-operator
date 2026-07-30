@@ -9,10 +9,13 @@
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#821]).
 - Bump stackable-operator to 0.114.0 ([#827]).
+- The reconciler now applies resources and derives the cluster status in discrete
+  apply and update_status steps ([#828]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
+[#828]: https://github.com/stackabletech/airflow-operator/pull/828
 
 ## [26.7.0] - 2026-07-21
 
