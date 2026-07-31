@@ -66,7 +66,7 @@ pub fn build_rolegroup_config_map(
             validated_cluster
                 .object_meta(
                     validated_cluster
-                        .resource_names(role_name, role_group_name)
+                        .role_group_resource_names(role_name, role_group_name)
                         .role_group_config_map()
                         .to_string(),
                     validated_cluster.recommended_labels_for(role_name, role_group_name),

@@ -5,5 +5,6 @@ pub mod executor;
 pub mod listener;
 pub mod pdb;
 pub mod pod;
+pub mod rbac;
 pub mod service;
 pub mod statefulset;
