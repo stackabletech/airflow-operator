@@ -37,6 +37,14 @@ dimensions:
     values:
       - https
       - ssh
+  - name: openlineage-use-tls
+    values:
+      - "false"
+      - "true"
+  - name: openlineage-use-auth
+    values:
+      - "false"
+      - "true"
 tests:
   - name: smoke
     dimensions:
@@ -118,6 +126,13 @@ tests:
     dimensions:
       - airflow-latest
       - openshift
+  - name: openlineage
+    dimensions:
+      - airflow-latest
+      - openshift
+      - executor
+      - openlineage-use-tls
+      - openlineage-use-auth
 suites:
   - name: nightly
     # Run nightly with the latest airflow

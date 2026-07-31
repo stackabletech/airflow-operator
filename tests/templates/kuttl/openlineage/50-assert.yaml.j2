@@ -1,0 +1,12 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-openlineage-events
+timeout: 480
+commands:
+{% if test_scenario['values']['openlineage-use-tls'] == 'true' %}
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/check_lineage.py --receiver-url https://openlineage-receiver:5000
+{% else %}
+  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/check_lineage.py --receiver-url http://openlineage-receiver:5000
+{% endif %}

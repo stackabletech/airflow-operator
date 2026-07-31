@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.lineage` ([#822]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -14,6 +18,7 @@
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
+[#822]: https://github.com/stackabletech/airflow-operator/pull/822
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 
