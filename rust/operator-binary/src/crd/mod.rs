@@ -332,6 +332,20 @@ pub mod versioned {
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "webserver_default_listener_class")]
         pub listener_class: ListenerClassName,
+
+        /// The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+        /// (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+        ///
+        /// Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
+        /// makes the webserver take the client address and the request scheme from the headers
+        /// that the listed proxies set, which is required when the webserver is reached through an
+        /// ingress or another reverse proxy. Only list proxies you control: any peer that matches
+        /// can spoof the client address recorded in the access log.
+        ///
+        /// Learn more in the
+        /// [reverse proxy usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/reverse-proxy).
+        #[serde(default)]
+        pub trusted_proxies: Vec<String>,
     }
 }
 
@@ -361,6 +375,7 @@ impl Default for v1alpha2::WebserverRoleConfig {
     fn default() -> Self {
         v1alpha2::WebserverRoleConfig {
             listener_class: webserver_default_listener_class(),
+            trusted_proxies: Vec::new(),
             common: Default::default(),
         }
     }
@@ -1024,6 +1039,32 @@ mod tests {
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
         assert!(cluster.spec.cluster_config.database_initialization.enabled);
+    }
+
+    #[test]
+    fn webserver_role_config_defaults_to_no_trusted_proxies() {
+        let role_config: v1alpha2::WebserverRoleConfig =
+            serde_yaml::from_str("listenerClass: external-stable")
+                .expect("the role config deserialises");
+
+        assert!(role_config.trusted_proxies.is_empty());
+    }
+
+    #[test]
+    fn webserver_role_config_accepts_trusted_proxies() {
+        let role_config: v1alpha2::WebserverRoleConfig = serde_yaml::from_str(
+            "
+            trustedProxies:
+              - 10.244.0.0/16
+              - 192.168.1.1
+            ",
+        )
+        .expect("the role config deserialises");
+
+        assert_eq!(
+            role_config.trusted_proxies,
+            ["10.244.0.0/16", "192.168.1.1"]
+        );
     }
 
     impl RoundtripTestData for v1alpha1::AirflowClusterSpec {

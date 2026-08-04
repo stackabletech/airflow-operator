@@ -5648,6 +5648,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -5688,6 +5689,23 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
+                          makes the webserver take the client address and the request scheme from the headers
+                          that the listed proxies set, which is required when the webserver is reached through an
+                          ingress or another reverse proxy. Only list proxies you control: any peer that matches
+                          can spoof the client address recorded in the access log.
+
+                          Learn more in the
+                          [reverse proxy usage guide](https://docs.stackable.tech/home/nightly/airflow/usage-guide/reverse-proxy).
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:
@@ -11854,6 +11872,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -11894,6 +11913,23 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
+                          makes the webserver take the client address and the request scheme from the headers
+                          that the listed proxies set, which is required when the webserver is reached through an
+                          ingress or another reverse proxy. Only list proxies you control: any peer that matches
+                          can spoof the client address recorded in the access log.
+
+                          Learn more in the
+                          [reverse proxy usage guide](https://docs.stackable.tech/home/nightly/airflow/usage-guide/reverse-proxy).
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:
