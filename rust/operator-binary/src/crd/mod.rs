@@ -591,7 +591,10 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow api-server &".to_string(),
+                        format!(
+                            "airflow api-server{} &",
+                            Self::proxy_headers_argument(cluster)
+                        ),
                     ]);
                 }
                 AirflowRole::Scheduler => {
@@ -702,6 +705,23 @@ impl AirflowRole {
         ]);
 
         command
+    }
+
+    /// The api-server only looks at `X-Forwarded-*` headers when started with `--proxy-headers`.
+    /// Which peers those headers are trusted from is configured separately, through environment
+    /// variables — see `env_vars::add_version_specific_env_vars`. Both halves are driven by the
+    /// same `trustedProxies` field, because either one alone has no effect.
+    fn proxy_headers_argument(cluster: &ValidatedCluster) -> &'static str {
+        let has_trusted_proxies = cluster
+            .role_configs
+            .get(&AirflowRole::Webserver)
+            .is_some_and(|role_config| !role_config.trusted_proxies.is_empty());
+
+        if has_trusted_proxies {
+            " --proxy-headers"
+        } else {
+            ""
+        }
     }
 
     fn authentication_start_commands(
