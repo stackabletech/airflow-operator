@@ -1,0 +1,53 @@
+= Running behind a reverse proxy
+:description: Configure which reverse proxies the Airflow webserver trusts X-Forwarded-* headers from.
+
+When the Airflow webserver is reached through an ingress controller or another reverse proxy, every
+request arrives from the proxy rather than from the client. Unless the webserver is told to trust
+the proxy, it records the proxy's address as the client address, and it treats a TLS-terminated
+request as plain HTTP -- which, among other things, means session cookies are not marked as
+`Secure`.
+
+Set `trustedProxies` on the webserver role to the addresses your proxy sends requests from:
+
+[source,yaml]
+----
+spec:
+  webservers:
+    roleConfig:
+      listenerClass: external-stable
+      trustedProxies:
+        - 10.244.0.0/16 # <1>
+    roleGroups:
+      default:
+        replicas: 1
+----
+
+<1> IP addresses (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), and `*` are accepted.
+
+The operator then starts the api-server with `--proxy-headers` and restricts the headers to the
+listed peers. Both parts are needed: enabling the headers without restricting the peers would trust
+every client, and restricting the peers without enabling the headers would have no effect. This is
+why they are a single field rather than two.
+
+== Choosing the value
+
+Use the narrowest range that covers your proxy. For an ingress controller running in the cluster,
+that is usually the Pod CIDR, which you can read from your ingress controller's Pods:
+
+[source,bash]
+----
+kubectl get pods -n ingress-nginx -o jsonpath='{.items[*].status.podIP}'
+----
+
+`*` trusts forwarded headers from any peer that can reach the webserver. Only use it when access
+to the webserver is restricted by other means -- with a `cluster-internal` or
+`external-unstable` ListenerClass, clients reach the Pod directly and can set the headers
+themselves.
+
+WARNING: A peer that is trusted can set the client address that ends up in the webserver's access
+log. Do not list ranges wider than the proxies you operate.
+
+== Interaction with overrides
+
+The operator sets `FORWARDED_ALLOW_IPS` from this field, before `envOverrides` are applied -- so an
+`envOverrides` entry for that variable wins over the value derived from `trustedProxies`.
