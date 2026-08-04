@@ -62,6 +62,8 @@ spec:
   webservers:
     roleConfig:
       listenerClass: test-external-stable-$NAMESPACE
+      trustedProxies:
+        - 10.244.0.0/16
     config:
       resources:
         cpu:

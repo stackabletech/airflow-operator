@@ -1,0 +1,15 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  # The api-server must be started with --proxy-headers ...
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].args}' \
+        | grep -q -- '--proxy-headers'
+  # ... and told which peers to trust it from.
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="FORWARDED_ALLOW_IPS")].value}' \
+        | grep -qx '10.244.0.0/16'
