@@ -370,6 +370,38 @@ mod tests {
             .join("\n")
     }
 
+    /// The environment of the `airflow` container of the given StatefulSet, as name/value pairs.
+    fn airflow_container_env(
+        cluster: &ValidatedCluster,
+        stateful_set_name: &str,
+    ) -> BTreeMap<String, Option<String>> {
+        let resources = build(cluster).expect("build succeeds");
+        let stateful_set = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.meta().name.as_deref() == Some(stateful_set_name))
+            .expect("the StatefulSet exists");
+
+        stateful_set
+            .spec
+            .as_ref()
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .as_ref()
+            .expect("the Pod template has a spec")
+            .containers
+            .iter()
+            .find(|container| container.name == "airflow")
+            .expect("the airflow container exists")
+            .env
+            .as_ref()
+            .expect("the airflow container has env vars")
+            .iter()
+            .map(|env_var| (env_var.name.clone(), env_var.value.clone()))
+            .collect()
+    }
+
     #[test]
     fn webserver_start_command_passes_proxy_headers_when_proxies_are_trusted() {
         let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
@@ -490,5 +522,34 @@ mod tests {
                 "my-airflow-webserver-default",
             ]
         );
+    }
+
+    #[test]
+    fn trusted_proxies_are_rendered_as_a_comma_separated_list() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16", "192.168.1.1"]);
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(
+            env.get("FORWARDED_ALLOW_IPS"),
+            Some(&Some("10.244.0.0/16,192.168.1.1".to_string()))
+        );
+    }
+
+    #[test]
+    fn no_proxy_env_var_without_trusted_proxies() {
+        let cluster = celery_executor_cluster();
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// The scheduler runs no HTTP server, so it must not carry the proxy configuration even when
+    /// the webserver does.
+    #[test]
+    fn trusted_proxies_are_not_set_on_other_roles() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
+        let env = airflow_container_env(&cluster, "my-airflow-scheduler-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
     }
 }

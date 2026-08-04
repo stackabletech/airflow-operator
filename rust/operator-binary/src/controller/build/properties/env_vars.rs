@@ -23,6 +23,7 @@ use crate::{
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
+        trusted_proxies::TrustedProxy,
     },
     util::{env_var_from_secret, role_service_name},
 };
@@ -513,6 +514,38 @@ fn add_version_specific_env_vars(
                     ..Default::default()
                 },
             );
+
+            // `--proxy-headers` (added to the start command by
+            // `AirflowRole::proxy_headers_argument`) only makes the api-server *look* at
+            // `X-Forwarded-*`; this is what restricts the peers whose headers it trusts.
+            // Without it uvicorn trusts only 127.0.0.1, which no Kubernetes ingress ever is,
+            // and the flag has no effect at all.
+            //
+            // This covers the uvicorn backend, the only one the SDP image can run. With
+            // `[api] server_type = gunicorn` the variable is ignored, because Airflow passes
+            // `forwarded_allow_ips="*"` explicitly - see the plan's "Known gaps".
+            //
+            // Inserted before `envOverrides` are applied, so a user can still override it.
+            let trusted_proxies = cluster
+                .role_configs
+                .get(airflow_role)
+                .map(|role_config| role_config.trusted_proxies.as_slice())
+                .unwrap_or_default()
+                .iter()
+                .map(TrustedProxy::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+
+            if !trusted_proxies.is_empty() {
+                env.insert(
+                    "FORWARDED_ALLOW_IPS".into(),
+                    EnvVar {
+                        name: "FORWARDED_ALLOW_IPS".into(),
+                        value: Some(trusted_proxies),
+                        ..Default::default()
+                    },
+                );
+            }
         }
     } else {
         env.insert(
