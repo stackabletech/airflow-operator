@@ -37,7 +37,6 @@ pub enum Error {
 /// an opaque literal that matches no peer, which disables proxy trust without any error. Failing
 /// reconciliation instead makes the misconfiguration visible.
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(dead_code)]
 pub struct TrustedProxy(String);
 
 impl FromStr for TrustedProxy {

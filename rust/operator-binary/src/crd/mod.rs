@@ -64,6 +64,7 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
+        trusted_proxies::TrustedProxy,
     },
     util::role_service_name,
 };
@@ -760,6 +761,26 @@ impl AirflowRole {
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
         }
     }
+
+    /// The reverse proxies this role trusts `X-Forwarded-*` headers from.
+    ///
+    /// Only the webserver serves HTTP, so every other role returns an empty list regardless of
+    /// what the webserver role configured.
+    pub fn trusted_proxies(
+        &self,
+        airflow: &v1alpha2::AirflowCluster,
+    ) -> Result<Vec<TrustedProxy>, trusted_proxies::Error> {
+        match self {
+            Self::Webserver => airflow
+                .spec
+                .webservers
+                .iter()
+                .flat_map(|webserver| &webserver.role_config.trusted_proxies)
+                .map(|trusted_proxy| TrustedProxy::from_str(trusted_proxy))
+                .collect(),
+            Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => Ok(Vec::new()),
+        }
+    }
 }
 
 fn container_debug_command() -> String {
@@ -986,7 +1007,10 @@ mod tests {
         versioned::test_utils::RoundtripTestData,
     };
 
-    use crate::{v1alpha1, v1alpha2};
+    use crate::{
+        crd::{AirflowRole, trusted_proxies::TrustedProxy},
+        v1alpha1, v1alpha2,
+    };
 
     #[test]
     fn test_cluster_config() {
@@ -1064,6 +1088,102 @@ mod tests {
         assert_eq!(
             role_config.trusted_proxies,
             ["10.244.0.0/16", "192.168.1.1"]
+        );
+    }
+
+    /// A cluster CR with the given `webservers.roleConfig` block spliced in.
+    fn test_cluster_with_webserver_role_config(role_config: &str) -> v1alpha2::AirflowCluster {
+        let cluster = formatdoc! {"
+            apiVersion: airflow.stackable.tech/v1alpha2
+            kind: AirflowCluster
+            metadata:
+              name: airflow
+            spec:
+              image:
+                productVersion: 3.2.2
+              clusterConfig:
+                credentialsSecretName: airflow-admin-credentials
+                metadataDatabase:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+              webservers:
+                roleConfig:
+            {role_config}
+                roleGroups:
+                  default:
+                    config: {{}}
+              kubernetesExecutors:
+                config: {{}}
+        "};
+
+        let deserializer = serde_yaml::Deserializer::from_str(&cluster);
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+            .expect("the test CR deserialises")
+    }
+
+    #[test]
+    fn webserver_trusted_proxies_are_parsed() {
+        let cluster = test_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16\n        - 192.168.1.1",
+        );
+
+        let trusted_proxies = AirflowRole::Webserver
+            .trusted_proxies(&cluster)
+            .expect("the trusted proxies are valid");
+
+        let rendered: Vec<String> = trusted_proxies
+            .iter()
+            .map(TrustedProxy::to_string)
+            .collect();
+        assert_eq!(rendered, ["10.244.0.0/16", "192.168.1.1"]);
+    }
+
+    #[test]
+    fn an_invalid_trusted_proxy_is_rejected() {
+        let cluster = test_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - airflow.example.com",
+        );
+
+        AirflowRole::Webserver
+            .trusted_proxies(&cluster)
+            .expect_err("a hostname is not a valid trusted proxy");
+    }
+
+    /// Only the webserver serves HTTP, so no other role may pick the setting up even if a
+    /// webserver configured it.
+    #[test]
+    fn non_webserver_roles_have_no_trusted_proxies() {
+        let cluster = test_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16",
+        );
+
+        for role in [
+            AirflowRole::Scheduler,
+            AirflowRole::Worker,
+            AirflowRole::DagProcessor,
+            AirflowRole::Triggerer,
+        ] {
+            assert!(
+                role.trusted_proxies(&cluster)
+                    .expect("no proxies to parse")
+                    .is_empty(),
+                "role {role} must not have trusted proxies"
+            );
+        }
+    }
+
+    #[test]
+    fn a_webserver_without_trusted_proxies_yields_an_empty_list() {
+        let cluster =
+            test_cluster_with_webserver_role_config("      listenerClass: external-stable");
+
+        assert!(
+            AirflowRole::Webserver
+                .trusted_proxies(&cluster)
+                .expect("nothing to parse")
+                .is_empty()
         );
     }
 

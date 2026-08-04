@@ -56,6 +56,7 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
+        trusted_proxies::TrustedProxy,
         v1alpha2,
     },
 };
@@ -96,6 +97,12 @@ pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
     pub listener_class: Option<ListenerClassName>,
     pub group_listener_name: Option<ListenerName>,
+    /// The reverse proxies whose `X-Forwarded-*` headers this role trusts. Always empty for roles
+    /// other than the webserver.
+    // TODO: remove once a later task reads this field (build step wiring the webserver's
+    // `X-Forwarded-*` trust configuration).
+    #[allow(dead_code)]
+    pub trusted_proxies: Vec<TrustedProxy>,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
