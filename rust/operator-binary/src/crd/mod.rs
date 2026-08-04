@@ -73,6 +73,7 @@ pub mod authentication;
 pub mod authorization;
 pub mod databases;
 pub mod internal_secret;
+pub mod trusted_proxies;
 
 pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
