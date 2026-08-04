@@ -2,6 +2,11 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
+{% if test_scenario['values']['airflow'].startswith("2") %}
+# trustedProxies only affects the webserver start command and environment on
+# Airflow 3.x (see crd/mod.rs and env_vars.rs); on 2.x it is accepted by the
+# CRD schema but has no effect, so there is nothing to assert here.
+{% else %}
 commands:
   # The api-server must be started with --proxy-headers ...
   - script: |
@@ -13,3 +18,4 @@ commands:
       kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
         -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="FORWARDED_ALLOW_IPS")].value}' \
         | grep -qx '10.244.0.0/16'
+{% endif %}
