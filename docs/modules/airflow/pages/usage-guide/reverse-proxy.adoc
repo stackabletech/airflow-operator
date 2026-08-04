@@ -22,7 +22,9 @@ spec:
         replicas: 1
 ----
 
-<1> IP addresses (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), and `*` are accepted.
+<1> IP addresses (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), and `*` are accepted. `*` must be
+the only entry in the list: combining it with other entries is rejected, since it would silently
+degrade to trusting only those other entries.
 
 The operator then starts the api-server with `--proxy-headers` and restricts the headers to the
 listed peers. Both parts are needed: enabling the headers without restricting the peers would trust
@@ -31,13 +33,23 @@ why they are a single field rather than two.
 
 == Choosing the value
 
-Use the narrowest range that covers your proxy. For an ingress controller running in the cluster,
-that is usually the Pod CIDR, which you can read from your ingress controller's Pods:
+Use the narrowest range that covers your proxy, and give it as a network address (host bits zero,
+e.g. `10.244.0.0/16`) or as a bare host IP (no `/prefix` at all, e.g. `10.244.0.5`) -- a CIDR
+network with host bits set (`10.244.0.5/16`) is rejected, because Airflow's own parser would
+otherwise silently ignore it instead of matching any peer.
+
+For an ingress controller running in the cluster, list the Pod addresses as bare host IPs rather
+than guessing a network:
 
 [source,bash]
 ----
 kubectl get pods -n ingress-nginx -o jsonpath='{.items[*].status.podIP}'
 ----
+
+If your ingress controller's Pods share a known, stable CIDR (for example a dedicated node pool or
+a documented Pod CIDR range for that namespace), you can use that network instead -- but confirm it
+against your cluster's actual CNI configuration rather than inferring it from a single Pod IP,
+since a Pod IP alone does not tell you where the network boundary is.
 
 `*` trusts forwarded headers from any peer that can reach the webserver. Only use it when access
 to the webserver is restricted by other means -- with a `cluster-internal` or
@@ -50,4 +62,7 @@ log. Do not list ranges wider than the proxies you operate.
 == Interaction with overrides
 
 The operator sets `FORWARDED_ALLOW_IPS` from this field, before `envOverrides` are applied -- so an
-`envOverrides` entry for that variable wins over the value derived from `trustedProxies`.
+`envOverrides` entry for that variable wins over the value derived from `trustedProxies`. This
+override only takes effect while `trustedProxies` is non-empty: an empty list means the api-server
+is not started with `--proxy-headers` at all, so uvicorn never installs the middleware that reads
+`FORWARDED_ALLOW_IPS`, and the override has no effect regardless of its value.
