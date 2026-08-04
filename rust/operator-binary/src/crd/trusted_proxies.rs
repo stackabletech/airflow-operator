@@ -85,12 +85,24 @@ impl FromStr for TrustedProxy {
             })?;
 
         if let Some(prefix_length) = prefix_length {
-            let prefix_length =
-                prefix_length
-                    .parse::<u8>()
-                    .with_context(|_| InvalidPrefixLengthSnafu {
-                        value: value.to_owned(),
-                    })?;
+            // `u8::from_str` accepts a leading `+` (e.g. `+16`), but Python's `ipaddress` prefix
+            // parser accepts ASCII digits only. An entry we accept but uvicorn rejects is filed by
+            // uvicorn as an opaque string literal that matches no peer -- silently disabling proxy
+            // trust for exactly this entry. Require a non-empty run of ASCII digits up front so we
+            // reject exactly what Python's parser would reject. `chars().all(...)` is vacuously
+            // true for the empty string, so `10.0.0.0/` still needs the explicit `is_empty` check.
+            let is_invalid_prefix_length =
+                prefix_length.is_empty() || !prefix_length.chars().all(|c| c.is_ascii_digit());
+            let prefix_length = if is_invalid_prefix_length {
+                // Force a `ParseIntError` of the right shape to carry as `source`, rather than
+                // hand-rolling one.
+                "".parse::<u8>()
+            } else {
+                prefix_length.parse::<u8>()
+            }
+            .with_context(|_| InvalidPrefixLengthSnafu {
+                value: value.to_owned(),
+            })?;
 
             let maximum = match address {
                 IpAddr::V4(_) => 32,
@@ -111,15 +123,14 @@ impl FromStr for TrustedProxy {
             // to treating the whole entry as an opaque string literal that matches no peer --
             // silently disabling proxy trust for exactly this entry. Reject it here instead, and
             // suggest the masked network the user probably meant.
-            if let Some(masked) = masked_network(address, prefix_length) {
-                ensure!(
-                    masked == address,
-                    HostBitsSetSnafu {
-                        value,
-                        masked: format!("{masked}/{prefix_length}"),
-                    }
-                );
-            }
+            let masked = masked_network(address, prefix_length);
+            ensure!(
+                masked == address,
+                HostBitsSetSnafu {
+                    value,
+                    masked: format!("{masked}/{prefix_length}"),
+                }
+            );
         }
 
         Ok(Self(value.to_owned()))
@@ -128,22 +139,19 @@ impl FromStr for TrustedProxy {
 
 /// The network address for `address/prefix_length`: `address` with every bit past
 /// `prefix_length` cleared.
-///
-/// Returns `None` if `address` and `prefix_length` are not both IPv4 or both IPv6 -- which cannot
-/// happen from `FromStr`, since `prefix_length`'s maximum is derived from `address`'s family, but
-/// keeping the function total avoids relying on that invariant here.
-fn masked_network(address: IpAddr, prefix_length: u8) -> Option<IpAddr> {
+fn masked_network(address: IpAddr, prefix_length: u8) -> IpAddr {
     match address {
         IpAddr::V4(addr) => {
             let bits = u32::from(addr);
-            // A shift equal to the full width is undefined behaviour for `u32`/`u128`, so the
-            // all-bits-masked-out case (prefix length 0) is handled separately.
+            // A shift equal to the full width panics (debug) or masks the shift amount (release)
+            // rather than shifting by the full width, so the all-bits-masked-out case (prefix
+            // length 0) is handled separately.
             let mask = if prefix_length == 0 {
                 0
             } else {
                 u32::MAX << (32 - prefix_length)
             };
-            Some(IpAddr::V4(Ipv4Addr::from(bits & mask)))
+            IpAddr::V4(Ipv4Addr::from(bits & mask))
         }
         IpAddr::V6(addr) => {
             let bits = u128::from(addr);
@@ -152,7 +160,7 @@ fn masked_network(address: IpAddr, prefix_length: u8) -> Option<IpAddr> {
             } else {
                 u128::MAX << (128 - prefix_length)
             };
-            Some(IpAddr::V6(Ipv6Addr::from(bits & mask)))
+            IpAddr::V6(Ipv6Addr::from(bits & mask))
         }
     }
 }
@@ -190,6 +198,10 @@ mod tests {
     #[case("fd00::/8")]
     #[case("0.0.0.0/0")]
     #[case("*")]
+    // Leading zeros are plain ASCII digits as far as Python's `str.isdigit()` (and thus uvicorn)
+    // is concerned -- `'016'.isdigit()` is true and `int('016') == 16` -- so this must stay
+    // accepted rather than newly diverging from uvicorn in the opposite direction.
+    #[case("10.0.0.0/016")]
     fn accepts_addresses_networks_and_wildcard(#[case] value: &str) {
         let proxy = TrustedProxy::from_str(value).expect("must be accepted");
         // The string form is what is handed to Airflow, so it must survive verbatim.
@@ -212,6 +224,23 @@ mod tests {
     fn rejects_a_non_numeric_prefix_length() {
         assert!(matches!(
             TrustedProxy::from_str("10.244.0.0/sixteen"),
+            Err(Error::InvalidPrefixLength { .. })
+        ));
+    }
+
+    /// `u8::from_str` accepts a leading `+` (`"+16".parse::<u8>()` succeeds), but Python's
+    /// `ipaddress` prefix parser only accepts ASCII digits, so uvicorn would reject these and
+    /// file them as dead literals that match no peer. `10.0.0.0/+0` in particular must be
+    /// reported as an invalid prefix length rather than the misleading "did you mean 0.0.0.0/0"
+    /// host-bits suggestion that a naive `parse::<u8>() == 0` would produce.
+    #[rstest]
+    #[case("10.0.0.0/+16")]
+    #[case("10.0.0.0/+32")]
+    #[case("fd00::/+8")]
+    #[case("10.0.0.0/+0")]
+    fn rejects_a_prefix_length_with_a_leading_sign(#[case] value: &str) {
+        assert!(matches!(
+            TrustedProxy::from_str(value),
             Err(Error::InvalidPrefixLength { .. })
         ));
     }
