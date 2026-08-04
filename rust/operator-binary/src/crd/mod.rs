@@ -335,7 +335,9 @@ pub mod versioned {
         pub listener_class: ListenerClassName,
 
         /// The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
-        /// (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+        /// (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+        /// only entry in the list if used: combining it with other entries is rejected, since it
+        /// would silently degrade to trusting only those other entries.
         ///
         /// Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
         /// makes the webserver take the client address and the request scheme from the headers
@@ -593,7 +595,7 @@ impl AirflowRole {
                         container_debug_command(),
                         format!(
                             "airflow api-server{} &",
-                            Self::proxy_headers_argument(cluster)
+                            self.proxy_headers_argument(cluster)
                         ),
                     ]);
                 }
@@ -711,7 +713,15 @@ impl AirflowRole {
     /// Which peers those headers are trusted from is configured separately, through environment
     /// variables — see `env_vars::add_version_specific_env_vars`. Both halves are driven by the
     /// same `trustedProxies` field, because either one alone has no effect.
-    fn proxy_headers_argument(cluster: &ValidatedCluster) -> &'static str {
+    ///
+    /// Only the webserver runs the api-server; every other role returns the empty string,
+    /// regardless of what is configured, so that a future call from another role's match arm
+    /// cannot silently emit the flag for a role with no api-server.
+    fn proxy_headers_argument(&self, cluster: &ValidatedCluster) -> &'static str {
+        if !matches!(self, AirflowRole::Webserver) {
+            return "";
+        }
+
         let has_trusted_proxies = cluster
             .role_configs
             .get(&AirflowRole::Webserver)
@@ -791,13 +801,17 @@ impl AirflowRole {
         airflow: &v1alpha2::AirflowCluster,
     ) -> Result<Vec<TrustedProxy>, trusted_proxies::Error> {
         match self {
-            Self::Webserver => airflow
-                .spec
-                .webservers
-                .iter()
-                .flat_map(|webserver| &webserver.role_config.trusted_proxies)
-                .map(|trusted_proxy| TrustedProxy::from_str(trusted_proxy))
-                .collect(),
+            Self::Webserver => {
+                let entries: Vec<TrustedProxy> = airflow
+                    .spec
+                    .webservers
+                    .iter()
+                    .flat_map(|webserver| &webserver.role_config.trusted_proxies)
+                    .map(|trusted_proxy| TrustedProxy::from_str(trusted_proxy))
+                    .collect::<Result<_, _>>()?;
+                trusted_proxies::ensure_wildcard_is_sole_entry(&entries)?;
+                Ok(entries)
+            }
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => Ok(Vec::new()),
         }
     }
@@ -1158,6 +1172,24 @@ mod tests {
             .map(TrustedProxy::to_string)
             .collect();
         assert_eq!(rendered, ["10.244.0.0/16", "192.168.1.1"]);
+    }
+
+    #[test]
+    fn wildcard_combined_with_another_entry_is_rejected() {
+        let cluster = test_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - \"*\"\n        - 10.0.0.0/8",
+        );
+
+        let error = AirflowRole::Webserver
+            .trusted_proxies(&cluster)
+            .expect_err("* combined with another entry must be rejected");
+        assert!(
+            matches!(
+                error,
+                crate::crd::trusted_proxies::Error::WildcardMustBeSoleEntry
+            ),
+            "error was: {error:?}"
+        );
     }
 
     #[test]

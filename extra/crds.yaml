@@ -5693,7 +5693,9 @@ spec:
                         default: []
                         description: |-
                           The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
-                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
 
                           Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
                           makes the webserver take the client address and the request scheme from the headers
@@ -11917,7 +11919,9 @@ spec:
                         default: []
                         description: |-
                           The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
-                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer.
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
 
                           Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
                           makes the webserver take the client address and the request scheme from the headers

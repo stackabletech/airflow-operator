@@ -329,7 +329,7 @@ mod tests {
         build,
         test_support::{
             app_version_label, celery_executor_cluster, cluster_with_trusted_proxies,
-            kubernetes_executor_cluster,
+            kubernetes_executor_cluster, validated_cluster_with,
         },
     };
     use crate::controller::ValidatedCluster;
@@ -550,6 +550,41 @@ mod tests {
         let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
         let env = airflow_container_env(&cluster, "my-airflow-scheduler-default");
 
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// `trustedProxies` is a no-op on Airflow 2.x (only a `tracing::warn!`, exercised manually --
+    /// there is no tracing-capture fixture in this crate). This locks the *behaviour*: the field
+    /// must not turn into a validation error (the kuttl external-access test relies on 2.9.3
+    /// accepting it) and must not affect the 2.x webserver start command or environment, which has
+    /// no `--proxy-headers`/`FORWARDED_ALLOW_IPS` concept.
+    #[test]
+    fn trusted_proxies_is_a_no_op_on_airflow_2x() {
+        let cluster = validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            |cluster| {
+                cluster["spec"]["image"]["productVersion"] = serde_yaml::Value::from("2.9.3");
+                cluster["spec"]["webservers"]
+                    .as_mapping_mut()
+                    .expect("the webservers role is a mapping")
+                    .insert(
+                        "roleConfig".into(),
+                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+                            serde_yaml::Value::String("trustedProxies".to_owned()),
+                            serde_yaml::Value::Sequence(vec![serde_yaml::Value::from(
+                                "10.244.0.0/16",
+                            )]),
+                        )])),
+                    );
+            },
+        );
+
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+        assert!(args.contains("airflow webserver &"), "args were:\n{args}");
+        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
     }
 }

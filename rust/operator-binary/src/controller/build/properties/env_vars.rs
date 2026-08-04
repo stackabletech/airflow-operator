@@ -558,6 +558,27 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
+
+        // `trustedProxies` only affects the api-server that Airflow 3.x's webserver role starts;
+        // the 2.x webserver has no such switch. The field is accepted on 2.x clusters (the CRD
+        // schema does not vary by product version) so that the same CR can be reused across a
+        // 2.x-to-3.x upgrade, but it is a no-op until the cluster is on 3.x. Warn rather than fail
+        // reconciliation: unlike an unparsable entry, this is not a hole -- forwarded headers are
+        // simply ignored, same as if the field were empty.
+        if airflow_role == &AirflowRole::Webserver {
+            let has_trusted_proxies = cluster
+                .role_configs
+                .get(airflow_role)
+                .is_some_and(|role_config| !role_config.trusted_proxies.is_empty());
+            if has_trusted_proxies {
+                let product_version = &cluster.image.product_version;
+                tracing::warn!(
+                    "spec.webservers.roleConfig.trustedProxies is set but has no effect on \
+                     Airflow {product_version} -- it only takes effect on Airflow 3.x",
+                );
+            }
+        }
+
         if cluster.has_role(&AirflowRole::DagProcessor) {
             // In airflow 2.x the dag-processor can optionally be started as a
             // standalone process (rather then as a scheduler subprocess),
