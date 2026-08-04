@@ -5,6 +5,11 @@
 # sit in Terminating for the full terminationGracePeriodSeconds (300s), blocking
 # namespace deletion past kuttl's timeout.
 # The proper fix is in operator-rs (making Vector PID 1 via exec).
+#
+# FIXME: This step also runs when kuttl is called with --skip-delete, so the
+# AirflowCluster is torn down even though the namespace is kept for debugging.
+# kuttl does not expose --skip-delete to test steps, so there is no clean way to
+# guard against it from here.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 timeout: 600
