@@ -334,19 +334,14 @@ pub mod versioned {
         #[serde(default = "webserver_default_listener_class")]
         pub listener_class: ListenerClassName,
 
+        /// Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+        ///
         /// The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
         /// (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
         /// only entry in the list if used: combining it with other entries is rejected, since it
         /// would silently degrade to trusting only those other entries.
         ///
-        /// Leave this empty (the default) and forwarded headers are ignored entirely. Setting it
-        /// makes the webserver take the client address and the request scheme from the headers
-        /// that the listed proxies set, which is required when the webserver is reached through an
-        /// ingress or another reverse proxy. Only list proxies you control: any peer that matches
-        /// can spoof the client address recorded in the access log.
-        ///
-        /// Learn more in the
-        /// [reverse proxy usage guide](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/reverse-proxy).
+        /// Leave this empty (the default) and forwarded headers are ignored entirely.
         #[serde(default)]
         pub trusted_proxies: Vec<String>,
     }
