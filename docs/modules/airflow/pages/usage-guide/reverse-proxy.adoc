@@ -27,16 +27,12 @@ the only entry in the list: combining it with other entries is rejected, since i
 degrade to trusting only those other entries.
 
 The operator then starts the api-server with `--proxy-headers` and restricts the headers to the
-listed peers. Both parts are needed: enabling the headers without restricting the peers would trust
-every client, and restricting the peers without enabling the headers would have no effect. This is
-why they are a single field rather than two.
+listed peers.
 
 == Choosing the value
 
 Use the narrowest range that covers your proxy, and give it as a network address (host bits zero,
-e.g. `10.244.0.0/16`) or as a bare host IP (no `/prefix` at all, e.g. `10.244.0.5`) -- a CIDR
-network with host bits set (`10.244.0.5/16`) is rejected, because Airflow's own parser would
-otherwise silently ignore it instead of matching any peer.
+e.g. `10.244.0.0/16`) or as a bare host IP (no `/prefix` at all, e.g. `10.244.0.5`).
 
 For an ingress controller running in the cluster, list the Pod addresses as bare host IPs rather
 than guessing a network:

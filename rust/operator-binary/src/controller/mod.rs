@@ -97,8 +97,6 @@ pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
     pub listener_class: Option<ListenerClassName>,
     pub group_listener_name: Option<ListenerName>,
-    /// The reverse proxies whose `X-Forwarded-*` headers this role trusts. Always empty for roles
-    /// other than the webserver.
     pub trusted_proxies: Vec<TrustedProxy>,
 }
 
