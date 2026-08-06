@@ -212,6 +212,7 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
 import logging
 import os
 from airflow.config_templates import airflow_local_settings
+from airflow.configuration import conf
 
 os.makedirs('{log_dir}', exist_ok=True)
 
@@ -247,7 +248,9 @@ LOGGING_CONFIG = {{
             'class': 'airflow.utils.log.file_task_handler.FileTaskHandler',
             'level': {task_log_level},
             'formatter': 'airflow',
-            'base_log_folder': '{log_dir}',
+            # `serve_logs` on the workers serves task logs from this directory, so it must be
+            # the folder the Task SDK writes task logs to, not the Vector agent log directory.
+            'base_log_folder': os.path.expanduser(conf.get('logging', 'BASE_LOG_FOLDER')),
             'filters': ['mask_secrets_core']
         }}
     }},
@@ -293,6 +296,77 @@ mod tests {
     use stackable_operator::product_logging::spec::{LogLevel, LoggerConfig};
 
     use super::*;
+
+    fn resolved_image(product_version: &str) -> ResolvedProductImage {
+        ResolvedProductImage {
+            product_version: product_version.to_string(),
+            app_version_label_value: product_version.parse().expect("valid label value"),
+            image: format!("oci.example.org/sdp/airflow:{product_version}-stackable0.0.0-dev"),
+            image_pull_policy: "IfNotPresent".to_string(),
+            pull_secrets: None,
+        }
+    }
+
+    /// The Vector agent tails `{log_dir}/airflow.py.json` (see the `files_py` source in
+    /// `vector.yaml`), so every generated log config must create the log directory and write
+    /// the rotating JSON log file there.
+    #[test]
+    fn test_vector_log_file() {
+        let log_config = AutomaticContainerLogConfig::default();
+
+        for content in [
+            create_airflow_stdlib_config(
+                &log_config,
+                "/stackable/log/airflow",
+                &resolved_image("3.0.6"),
+            ),
+            create_airflow_structlog_config(&log_config, "/stackable/log/airflow"),
+        ] {
+            assert!(content.contains("os.makedirs('/stackable/log/airflow', exist_ok=True)"));
+            assert!(content.contains("'filename': '/stackable/log/airflow/airflow.py.json'"));
+        }
+    }
+
+    /// Only the last version line before the stdlib/structlog switch gets the stdlib config;
+    /// all later (including future) versions must get the structlog one.
+    #[test]
+    fn test_logging_variant_selection() {
+        // The stdlib config copies Airflow's default logging config, the structlog one
+        // defines its own `mask_secrets_core` filter.
+        let log_config =
+            ValidatedContainerLogConfigChoice::Automatic(AutomaticContainerLogConfig::default());
+        let stdlib_content = create_airflow_config(
+            &log_config,
+            "/stackable/log/airflow",
+            &resolved_image("3.0.6"),
+        )
+        .expect("automatic log config produces content");
+        let structlog_content = create_airflow_config(
+            &log_config,
+            "/stackable/log/airflow",
+            &resolved_image("3.1.6"),
+        )
+        .expect("automatic log config produces content");
+        assert!(stdlib_content.contains("deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)"));
+        assert!(structlog_content.contains("mask_secrets_core"));
+    }
+
+    #[test]
+    fn test_structlog_task_log_folder() {
+        let log_config = AutomaticContainerLogConfig::default();
+
+        let content = create_airflow_structlog_config(&log_config, "/stackable/log/airflow");
+
+        // `serve_logs` on the workers serves task logs from the `task` handler's
+        // `base_log_folder`, so it must point to the folder the Task SDK writes task logs to
+        // (`[logging] base_log_folder`), not to the Vector agent log directory.
+        assert!(content.contains(
+            "'base_log_folder': os.path.expanduser(conf.get('logging', 'BASE_LOG_FOLDER'))"
+        ));
+        assert!(!content.contains("'base_log_folder': '/stackable/log/airflow'"));
+        // The generated config must import `conf` itself.
+        assert!(content.contains("from airflow.configuration import conf"));
+    }
 
     #[test]
     fn test_vector_config_file_content() {
