@@ -19,12 +19,15 @@
   the logger as well, because a logger discards records before any handler can filter them, so in
   that direction the UI and the other destinations open up together and cannot be set apart
   ([#829]).
+- Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
+  resources they don't apply to (previously set to `none`) ([#838]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#838]: https://github.com/stackabletech/airflow-operator/pull/838
 
 ## [26.7.0] - 2026-07-21
 

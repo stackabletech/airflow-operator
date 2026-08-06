@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -18,6 +18,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    constant,
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -47,6 +48,7 @@ use stackable_operator::{
                 ConfigMapName, ContainerName, ListenerClassName, ListenerName,
                 PersistentVolumeClaimName, SecretName, VolumeName,
             },
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -101,6 +103,12 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+constant!(WEBSERVER_ROLE_NAME: RoleName = "webserver");
+constant!(SCHEDULER_ROLE_NAME: RoleName = "scheduler");
+constant!(WORKER_ROLE_NAME: RoleName = "worker");
+constant!(DAG_PROCESSOR_ROLE_NAME: RoleName = "dagprocessor");
+constant!(TRIGGERER_ROLE_NAME: RoleName = "triggerer");
 
 pub type AirflowRoleType =
     Role<AirflowConfigFragment, AirflowConfigOverrides, GenericRoleConfig, GenericCommonConfig>;
@@ -506,35 +514,12 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    Eq,
-    Hash,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    EnumString,
-)]
+#[derive(Clone, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AirflowRole {
-    #[strum(serialize = "webserver")]
     Webserver,
-
-    #[strum(serialize = "scheduler")]
     Scheduler,
-
-    #[strum(serialize = "worker")]
     Worker,
-
-    #[strum(serialize = "dagprocessor")]
     DagProcessor,
-
-    #[strum(serialize = "triggerer")]
     Triggerer,
 }
 
@@ -742,6 +727,20 @@ impl AirflowRole {
                 .to_owned()
                 .map(|webserver| webserver.role_config.listener_class),
             Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
+        }
+    }
+}
+
+impl Deref for AirflowRole {
+    type Target = RoleName;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            AirflowRole::Webserver => &WEBSERVER_ROLE_NAME,
+            AirflowRole::Scheduler => &SCHEDULER_ROLE_NAME,
+            AirflowRole::Worker => &WORKER_ROLE_NAME,
+            AirflowRole::DagProcessor => &DAG_PROCESSOR_ROLE_NAME,
+            AirflowRole::Triggerer => &TRIGGERER_ROLE_NAME,
         }
     }
 }
@@ -970,7 +969,18 @@ mod tests {
         versioned::test_utils::RoundtripTestData,
     };
 
+    use super::*;
     use crate::{v1alpha1, v1alpha2};
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *WEBSERVER_ROLE_NAME;
+        let _ = *SCHEDULER_ROLE_NAME;
+        let _ = *WORKER_ROLE_NAME;
+        let _ = *DAG_PROCESSOR_ROLE_NAME;
+        let _ = *TRIGGERER_ROLE_NAME;
+    }
 
     #[test]
     fn test_cluster_config() {

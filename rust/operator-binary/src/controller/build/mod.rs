@@ -6,12 +6,16 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     kvp::Labels,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 
 use crate::{
     controller::{
-        KubernetesResources, Prepared, ValidatedCluster,
+        CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
+        ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             executor::build_executor_template_config_map,
@@ -122,7 +126,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
             config_maps.push(
                 build_rolegroup_config_map(
                     cluster,
-                    &ValidatedCluster::role_name(role),
+                    role,
                     role_group_name,
                     &rg_config.config_overrides,
                     logging,
@@ -176,6 +180,75 @@ pub(crate) fn object_meta(
         .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_labels(labels);
     builder
+}
+
+pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
+    stackable_operator::v2::kvp::label::recommended_labels_for_cluster_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+) -> Labels {
+    stackable_operator::v2::kvp::label::recommended_labels_for_role_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    stackable_operator::v2::kvp::label::recommended_labels_for_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    stackable_operator::v2::kvp::label::recommended_labels_for_unversioned_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+/// Selector labels matching the pods of a role group.
+pub(crate) fn role_group_selector(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    stackable_operator::v2::kvp::label::role_group_selector(
+        &cluster.name,
+        &PRODUCT_NAME,
+        role_name,
+        role_group_name,
+    )
 }
 
 #[cfg(test)]
@@ -354,14 +427,12 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none"),
                 ("app.kubernetes.io/instance", "my-airflow"),
                 (
                     "app.kubernetes.io/managed-by",
                     "airflow.stackable.tech_airflowcluster",
                 ),
                 ("app.kubernetes.io/name", "airflow"),
-                ("app.kubernetes.io/role-group", "none"),
                 ("app.kubernetes.io/version", &app_version_label("3.1.6")),
                 ("stackable.tech/vendor", "Stackable"),
             ]

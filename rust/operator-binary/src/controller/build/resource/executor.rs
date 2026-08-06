@@ -28,6 +28,7 @@ use crate::{
             graceful_shutdown::add_graceful_shutdown_config,
             object_meta,
             properties::env_vars::build_airflow_template_envs,
+            recommended_labels_for_role_group_resources,
             resource::pod::{
                 add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
                 build_logging_container,
@@ -88,13 +89,13 @@ pub fn build_executor_template_config_map(
     let git_sync_resources = &executor_config.git_sync_resources;
 
     let mut pb = PodBuilder::new();
-    let pb_metadata =
-        ObjectMetaBuilder::new()
-            .with_labels(cluster.recommended_labels_for(
-                &executor_role_name(),
-                &executor_template_role_group_name(),
-            ))
-            .build();
+    let pb_metadata = ObjectMetaBuilder::new()
+        .with_labels(recommended_labels_for_role_group_resources(
+            cluster,
+            &executor_role_name(),
+            &executor_template_role_group_name(),
+        ))
+        .build();
 
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
@@ -106,7 +107,11 @@ pub fn build_executor_template_config_map(
                 .to_string(),
         )
         .restart_policy("Never")
-        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
+        .security_context(
+            PodSecurityContextBuilder::with_stackable_defaults()
+                .fs_group(1000)
+                .build(),
+        );
 
     add_graceful_shutdown_config(executor_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
@@ -188,7 +193,8 @@ pub fn build_executor_template_config_map(
             object_meta(
                 cluster,
                 cluster.executor_template_configmap_name(),
-                cluster.recommended_labels_for(
+                recommended_labels_for_role_group_resources(
+                    cluster,
                     &executor_role_name(),
                     &executor_template_role_group_name(),
                 ),
