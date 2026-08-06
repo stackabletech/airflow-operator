@@ -71,6 +71,10 @@ spec:
   webservers:
     roleConfig:
       listenerClass: external-unstable
+      # Trusts the reverse proxy installed in 45-install-reverse-proxy.yaml (its Pod address
+      # falls within the cluster's Pod CIDR); see login.py for what this is expected to enable.
+      trustedProxies:
+        - 10.244.0.0/16
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

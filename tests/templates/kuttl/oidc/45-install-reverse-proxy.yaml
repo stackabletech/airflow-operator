@@ -1,0 +1,96 @@
+---
+# A TLS-terminating reverse proxy in front of the webserver, used to exercise
+# `trustedProxies`: the webserver is told to trust this proxy's peer address
+# (see install-airflow.yaml.j2), and 60-login.yaml checks that a login done
+# through this proxy actually benefits from that trust (see login.py).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-reverse-proxy-config
+data:
+  nginx.conf: |
+    events {}
+    http {
+      server {
+        listen 8443 ssl;
+        server_name _;
+
+        ssl_certificate /stackable/tls/tls.crt;
+        ssl_certificate_key /stackable/tls/tls.key;
+
+        location / {
+          proxy_pass http://airflow-webserver:8080;
+          proxy_set_header Host $host:8443;
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header X-Forwarded-For $remote_addr;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-reverse-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-reverse-proxy
+  template:
+    metadata:
+      labels:
+        app: airflow-reverse-proxy
+    spec:
+      # The cert volume defaults to being readable only by its owning group; nginx-unprivileged
+      # runs as a non-root UID that is only granted access to it via this group membership.
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:alpine
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: tls
+              mountPath: /stackable/tls
+              readOnly: true
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+      volumes:
+        - name: config
+          configMap:
+            name: airflow-reverse-proxy-config
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+                  secrets.stackable.tech/scope: service=airflow-reverse-proxy
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-reverse-proxy
+spec:
+  selector:
+    app: airflow-reverse-proxy
+  ports:
+    - port: 8443
+      targetPort: 8443

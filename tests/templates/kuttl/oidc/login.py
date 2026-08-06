@@ -37,59 +37,110 @@ def userinfo_page(base_url: str, airflow_version: str) -> str:
         return f"{base_url}/users/userinfo/"
 
 
-session = requests.Session()
-url = "http://airflow-webserver:8080"
+def auth_cookie(session: requests.Session, airflow_version: str):
+    # Airflow 3's api-server authenticates via this JWT cookie; there is no equivalent on
+    # Airflow 2, which uses Flask's own session cookie instead.
+    if not airflow_version.startswith("3"):
+        return None
+    return next((c for c in session.cookies if c.name == "_token"), None)
 
-# Click on "Sign In with keycloak" in Airflow
-login_page = session.get(login_page(url, os.environ["AIRFLOW_VERSION"]))
 
-assert login_page.ok, "Redirection from Airflow to Keycloak failed"
+def login(url: str, airflow_version: str) -> requests.Session:
+    """Log in to Airflow via Keycloak at the given base URL and check that the OIDC data
+    Keycloak provides ends up correctly reflected in Airflow. Returns the session so callers
+    can inspect e.g. cookies afterwards."""
 
-assert_startwith(
-    login_page.url,
-    f"https://keycloak1.{os.environ['NAMESPACE']}.svc.cluster.local:8443/realms/test1/protocol/openid-connect/auth?response_type=code&client_id=airflow1",
-    "Redirection to the Keycloak login page expected",
+    session = requests.Session()
+
+    # Click on "Sign In with keycloak" in Airflow
+    login_response = session.get(login_page(url, airflow_version))
+
+    assert login_response.ok, "Redirection from Airflow to Keycloak failed"
+
+    assert_startwith(
+        login_response.url,
+        f"https://keycloak1.{os.environ['NAMESPACE']}.svc.cluster.local:8443/realms/test1/protocol/openid-connect/auth?response_type=code&client_id=airflow1",
+        "Redirection to the Keycloak login page expected",
+    )
+
+    # Enter username and password into the Keycloak login page and click on "Sign In"
+    login_response_html = BeautifulSoup(login_response.text, "html.parser")
+    authenticate_url = login_response_html.form["action"]
+    welcome_response = session.post(
+        authenticate_url, data={"username": "jane.doe", "password": "T8mn72D9"}
+    )
+
+    assert welcome_response.ok, "Login failed"
+    assert_equal(
+        welcome_response.url, f"{url}/", "Redirection to the Airflow home page expected"
+    )
+
+    # Open the user information page in Airflow
+    userinfo_url = userinfo_page(url, airflow_version)
+    userinfo_response = session.get(userinfo_url)
+
+    assert userinfo_response.ok, "Retrieving user information failed"
+    assert_equal(
+        userinfo_response.url,
+        userinfo_url,
+        "Redirection to the Airflow user info page expected",
+    )
+
+    # Expect the user data provided by Keycloak in Airflow
+    userinfo_response_html = BeautifulSoup(userinfo_response.text, "html.parser")
+    table_rows = userinfo_response_html.find_all("tr")
+    user_data = {tr.find("th").text: tr.find("td").text for tr in table_rows}
+
+    log.debug(f"{user_data=}")
+
+    assert user_data["First Name"] == "Jane", (
+        "The first name of the user in Airflow should match the one provided by Keycloak"
+    )
+    assert user_data["Last Name"] == "Doe", (
+        "The last name of the user in Airflow should match the one provided by Keycloak"
+    )
+    assert user_data["Email"] == "jane.doe@stackable.tech", (
+        "The email of the user in Airflow should match the one provided by Keycloak"
+    )
+
+    return session
+
+
+airflow_version = os.environ["AIRFLOW_VERSION"]
+
+# Log in directly against the webserver, bypassing the reverse proxy.
+direct_session = login("http://airflow-webserver:8080", airflow_version)
+log.info("Direct OIDC login test passed")
+
+# The webserver is plain HTTP here, so its auth cookie must not be marked Secure.
+direct_cookie = auth_cookie(direct_session, airflow_version)
+if airflow_version.startswith("3"):
+    assert direct_cookie is not None, "Expected an auth cookie after a successful login"
+    assert not direct_cookie.secure, (
+        "The auth cookie must not be marked Secure when accessed directly over HTTP"
+    )
+
+# Log in again through the TLS-terminating reverse proxy installed in
+# 45-install-reverse-proxy.yaml, which is covered by trustedProxies in install-airflow.yaml.j2.
+# If the webserver did not trust the proxy's forwarded headers, this either fails outright
+# (the OIDC redirect_uri would be built with the wrong scheme) or silently loses the point of
+# running behind a proxy (the auth cookie would not be marked Secure despite being sent over
+# TLS). See docs/modules/airflow/pages/usage-guide/reverse-proxy.adoc.
+proxy_url = (
+    f"https://airflow-reverse-proxy.{os.environ['NAMESPACE']}.svc.cluster.local:8443"
 )
+proxied_session = login(proxy_url, airflow_version)
+log.info("Reverse-proxied OIDC login test passed")
 
-# Enter username and password into the Keycloak login page and click on "Sign In"
-login_page_html = BeautifulSoup(login_page.text, "html.parser")
-authenticate_url = login_page_html.form["action"]
-welcome_page = session.post(
-    authenticate_url, data={"username": "jane.doe", "password": "T8mn72D9"}
-)
-
-assert welcome_page.ok, "Login failed"
-assert_equal(
-    welcome_page.url, f"{url}/", "Redirection to the Airflow home page expected"
-)
-
-# Open the user information page in Airflow
-userinfo_url = userinfo_page(url, os.environ["AIRFLOW_VERSION"])
-userinfo_page = session.get(userinfo_url)
-
-assert userinfo_page.ok, "Retrieving user information failed"
-assert_equal(
-    userinfo_page.url,
-    userinfo_url,
-    "Redirection to the Airflow user info page expected",
-)
-
-# Expect the user data provided by Keycloak in Airflow
-userinfo_page_html = BeautifulSoup(userinfo_page.text, "html.parser")
-table_rows = userinfo_page_html.find_all("tr")
-user_data = {tr.find("th").text: tr.find("td").text for tr in table_rows}
-
-log.debug(f"{user_data=}")
-
-assert user_data["First Name"] == "Jane", (
-    "The first name of the user in Airflow should match the one provided by Keycloak"
-)
-assert user_data["Last Name"] == "Doe", (
-    "The last name of the user in Airflow should match the one provided by Keycloak"
-)
-assert user_data["Email"] == "jane.doe@stackable.tech", (
-    "The email of the user in Airflow should match the one provided by Keycloak"
-)
+proxied_cookie = auth_cookie(proxied_session, airflow_version)
+if airflow_version.startswith("3"):
+    assert proxied_cookie is not None, (
+        "Expected an auth cookie after a successful login"
+    )
+    assert proxied_cookie.secure, (
+        "The auth cookie must be marked Secure when trustedProxies allows the webserver to "
+        "trust the reverse proxy's X-Forwarded-Proto: https"
+    )
 
 log.info("OIDC login test passed")
 
