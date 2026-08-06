@@ -22,14 +22,14 @@
 
 ### Fixed
 
-- Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#XXX]).
+- Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#839]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
-[#XXX]: https://github.com/stackabletech/airflow-operator/pull/XXX
+[#839]: https://github.com/stackabletech/airflow-operator/pull/839
 
 ## [26.7.0] - 2026-07-21
 
