@@ -553,17 +553,17 @@ mod tests {
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
     }
 
-    /// `trustedProxies` is a no-op on Airflow 2.x (only a `tracing::warn!`, exercised manually --
-    /// there is no tracing-capture fixture in this crate). This locks the *behaviour*: the field
-    /// must not turn into a validation error (the kuttl external-access test relies on 2.9.3
-    /// accepting it) and must not affect the 2.x webserver start command or environment, which has
-    /// no `--proxy-headers`/`FORWARDED_ALLOW_IPS` concept.
-    #[test]
-    fn trusted_proxies_is_a_no_op_on_airflow_2x() {
-        let cluster = validated_cluster_with(
+    /// Builds a 2.x Celery-executor cluster whose webserver trusts the given reverse proxies.
+    fn cluster_with_trusted_proxies_on_airflow_2x(trusted_proxies: &[&str]) -> ValidatedCluster {
+        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+            .iter()
+            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .collect();
+
+        validated_cluster_with(
             "celeryExecutors",
             "{config: {}, roleGroups: {}}",
-            |cluster| {
+            move |cluster| {
                 cluster["spec"]["image"]["productVersion"] = serde_yaml::Value::from("2.9.3");
                 cluster["spec"]["webservers"]
                     .as_mapping_mut()
@@ -572,13 +572,16 @@ mod tests {
                         "roleConfig".into(),
                         serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
                             serde_yaml::Value::String("trustedProxies".to_owned()),
-                            serde_yaml::Value::Sequence(vec![serde_yaml::Value::from(
-                                "10.244.0.0/16",
-                            )]),
+                            serde_yaml::Value::Sequence(trusted_proxies.clone()),
                         )])),
                     );
             },
-        );
+        )
+    }
+
+    #[test]
+    fn trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["10.244.0.0/16"]);
 
         let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
         assert!(args.contains("airflow webserver &"), "args were:\n{args}");
@@ -586,5 +589,34 @@ mod tests {
 
         let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&Some("True".to_string()))
+        );
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
+            Some(&Some("1".to_string()))
+        );
+    }
+
+    #[test]
+    fn wildcard_trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["*"]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&Some("True".to_string()))
+        );
+    }
+
+    /// No `trustedProxies` means no `ProxyFix` on Airflow 2.x either.
+    #[test]
+    fn no_proxy_fix_without_trusted_proxies_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&[]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"), None);
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"), None);
     }
 }

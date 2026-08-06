@@ -62,6 +62,12 @@ pub enum Error {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrustedProxy(String);
 
+impl TrustedProxy {
+    pub fn is_wildcard(&self) -> bool {
+        self.0 == WILDCARD
+    }
+}
+
 impl FromStr for TrustedProxy {
     type Err = Error;
 

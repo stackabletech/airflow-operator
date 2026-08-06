@@ -341,6 +341,10 @@ pub mod versioned {
         /// only entry in the list if used: combining it with other entries is rejected, since it
         /// would silently degrade to trusting only those other entries.
         ///
+        /// On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+        /// forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+        /// `*`, since Airflow 2.x has no way to restrict it further.
+        ///
         /// Leave this empty (the default) and forwarded headers are ignored entirely.
         #[serde(default)]
         pub trusted_proxies: Vec<String>,

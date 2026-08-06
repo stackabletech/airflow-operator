@@ -559,23 +559,42 @@ fn add_version_specific_env_vars(
             },
         );
 
-        // `trustedProxies` only affects the api-server that Airflow 3.x's webserver role starts;
-        // the 2.x webserver has no such switch. The field is accepted on 2.x clusters (the CRD
-        // schema does not vary by product version) so that the same CR can be reused across a
-        // 2.x-to-3.x upgrade, but it is a no-op until the cluster is on 3.x. Warn rather than fail
-        // reconciliation: unlike an unparsable entry, this is not a hole -- forwarded headers are
-        // simply ignored, same as if the field were empty.
+        // The 2.x uses Werkzeug's `ProxyFix` to allow forwarded-headers and it does so regardless
+        // of the peer source. The only valid value for `spec.webservers.roleConfig.trustedProxies` is `["*"]`.
         if airflow_role == &AirflowRole::Webserver {
-            let has_trusted_proxies = cluster
+            let trusted_proxies = cluster
                 .role_configs
                 .get(airflow_role)
-                .is_some_and(|role_config| !role_config.trusted_proxies.is_empty());
-            if has_trusted_proxies {
-                let product_version = &cluster.image.product_version;
-                tracing::warn!(
-                    "spec.webservers.roleConfig.trustedProxies is set but has no effect on \
-                     Airflow {product_version} -- it only takes effect on Airflow 3.x",
+                .map(|role_config| role_config.trusted_proxies.as_slice())
+                .unwrap_or_default();
+
+            if !trusted_proxies.is_empty() {
+                env.insert(
+                    "AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX".into(),
+                    EnvVar {
+                        name: "AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX".into(),
+                        value: Some("True".into()),
+                        ..Default::default()
+                    },
                 );
+                env.insert(
+                    "AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR".into(),
+                    EnvVar {
+                        name: "AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR".into(),
+                        value: Some("1".into()),
+                        ..Default::default()
+                    },
+                );
+
+                if !trusted_proxies.iter().any(TrustedProxy::is_wildcard) {
+                    let product_version = &cluster.image.product_version;
+                    tracing::warn!(
+                        "spec.webservers.roleConfig.trustedProxies lists specific addresses, but \
+                         Airflow {product_version}'s webserver has no way to restrict forwarded \
+                         headers to specific peers -- once enabled it trusts X-Forwarded-* from \
+                         any peer, the same as \"*\"",
+                    );
+                }
             }
         }
 

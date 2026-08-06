@@ -3,9 +3,16 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 {% if test_scenario['values']['airflow'].startswith("2") %}
-# trustedProxies only affects the webserver start command and environment on
-# Airflow 3.x (see crd/mod.rs and env_vars.rs); on 2.x it is accepted by the
-# CRD schema but has no effect, so there is nothing to assert here.
+commands:
+  # ProxyFix must be enabled on Airflow 2
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX")].value}' \
+        | grep -qx 'True'
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR")].value}' \
+        | grep -qx '1'
 {% else %}
 commands:
   # The api-server must be started with --proxy-headers ...
