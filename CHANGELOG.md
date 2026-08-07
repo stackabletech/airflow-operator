@@ -19,12 +19,20 @@
   the logger as well, because a logger discards records before any handler can filter them, so in
   that direction the UI and the other destinations open up together and cannot be set apart
   ([#829]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#XXX]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#XXX]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#XXX]: https://github.com/stackabletech/airflow-operator/pull/XXX
 
 ## [26.7.0] - 2026-07-21
 

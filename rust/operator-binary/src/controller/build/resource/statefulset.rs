@@ -149,7 +149,11 @@ pub fn build_server_rolegroup_statefulset(
                 .service_account_name()
                 .to_string(),
         )
-        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
+        .security_context(
+            PodSecurityContextBuilder::with_stackable_defaults()
+                .fs_group(1000)
+                .build(),
+        );
 
     let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());
 

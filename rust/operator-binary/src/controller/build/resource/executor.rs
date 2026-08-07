@@ -106,7 +106,11 @@ pub fn build_executor_template_config_map(
                 .to_string(),
         )
         .restart_policy("Never")
-        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
+        .security_context(
+            PodSecurityContextBuilder::with_stackable_defaults()
+                .fs_group(1000)
+                .build(),
+        );
 
     add_graceful_shutdown_config(executor_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
