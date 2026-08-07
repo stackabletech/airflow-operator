@@ -708,14 +708,10 @@ impl AirflowRole {
         command
     }
 
-    /// The api-server only looks at `X-Forwarded-*` headers when started with `--proxy-headers`.
-    /// Which peers those headers are trusted from is configured separately, through environment
-    /// variables — see `env_vars::add_version_specific_env_vars`. Both halves are driven by the
-    /// same `trustedProxies` field, because either one alone has no effect.
-    ///
-    /// Only the webserver runs the api-server; every other role returns the empty string,
-    /// regardless of what is configured, so that a future call from another role's match arm
-    /// cannot silently emit the flag for a role with no api-server.
+    /// Add this CLI arg to enable proxy header support.
+    /// Additional env vars are needed for the full functionality.
+    /// See `env_vars::add_version_specific_env_vars` for the counterpart function.
+    /// Only the webserver runs the api-server; every other role returns the empty string.
     fn proxy_headers_argument(&self, cluster: &ValidatedCluster) -> &'static str {
         if !matches!(self, AirflowRole::Webserver) {
             return "";

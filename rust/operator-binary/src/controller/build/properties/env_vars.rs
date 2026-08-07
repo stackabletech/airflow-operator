@@ -515,17 +515,9 @@ fn add_version_specific_env_vars(
                 },
             );
 
-            // `--proxy-headers` (added to the start command by
-            // `AirflowRole::proxy_headers_argument`) only makes the api-server *look* at
-            // `X-Forwarded-*`; this is what restricts the peers whose headers it trusts.
-            // Without it uvicorn trusts only 127.0.0.1, which no Kubernetes ingress ever is,
-            // and the flag has no effect at all.
-            //
-            // This covers the uvicorn backend, the only one the SDP image can run. With
-            // `[api] server_type = gunicorn` the variable is ignored, because Airflow passes
-            // `forwarded_allow_ips="*"` explicitly - see the plan's "Known gaps".
-            //
-            // Inserted before `envOverrides` are applied, so a user can still override it.
+            // This env var is needed in addition to `--proxy-headers` when Airflow runs
+            // behind a reverse proxy.
+            // This covers the uvicorn backend, the only one the SDP image can run.
             let trusted_proxies = cluster
                 .role_configs
                 .get(airflow_role)
