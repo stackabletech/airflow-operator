@@ -33,6 +33,11 @@ LOG_NOT_FOUND = "Log file not found"
 # A successful `runme_0` run produces far more than this; the failure mode produces none at all.
 MIN_LOG_LINES = 3
 
+# The log is fetched right after the task instance reports success, so the worker's log server
+# may not have flushed the file yet.
+LOG_FETCH_ATTEMPTS = 3
+LOG_FETCH_INTERVAL = 5
+
 
 def get_token() -> str:
     response = requests.post(
@@ -137,19 +142,40 @@ def sources(payload) -> list[str]:
     return result
 
 
-def assert_log_is_readable(headers, dag_run_id: str) -> None:
+def fetch_log(headers, dag_run_id: str):
     response = requests.get(
         f"{REST_URL}/dags/{DAG_ID}/dagRuns/{dag_run_id}/taskInstances/{TASK_ID}/logs/1",
         headers=headers,
         params={"full_content": "true"},
     )
     response.raise_for_status()
-    payload = response.json()
-    lines, text = log_lines(payload)
+    return response.json()
 
-    # The api-server reports where it read the log from in a "Log message source details" group.
+
+def print_sources(payload) -> None:
+    """Print where the api-server read the log from, as far as it reports it."""
     for source in sources(payload):
         print(f"Log source: {source}")
+
+
+def assert_log_is_readable(headers, dag_run_id: str) -> None:
+    for attempt in range(1, LOG_FETCH_ATTEMPTS + 1):
+        payload = fetch_log(headers, dag_run_id)
+        lines, text = log_lines(payload)
+
+        if LOG_NOT_FOUND not in text and len(lines) >= MIN_LOG_LINES:
+            print_sources(payload)
+            print(f"Read back {len(lines)} log lines for {DAG_ID}.{TASK_ID}")
+            return
+
+        if attempt < LOG_FETCH_ATTEMPTS:
+            print(
+                f"Log not readable yet (attempt {attempt}/{LOG_FETCH_ATTEMPTS}), retrying in "
+                f"{LOG_FETCH_INTERVAL}s"
+            )
+            time.sleep(LOG_FETCH_INTERVAL)
+
+    print_sources(payload)
 
     if LOG_NOT_FOUND in text:
         print(f"Log response: {text}")
@@ -159,10 +185,7 @@ def assert_log_is_readable(headers, dag_run_id: str) -> None:
             "the task handler's 'base_log_folder' in log_config.py matches "
             "'[logging] base_log_folder' from airflow.cfg."
         )
-    if len(lines) < MIN_LOG_LINES:
-        sys.exit(f"Expected at least {MIN_LOG_LINES} log lines, got {len(lines)}")
-
-    print(f"Read back {len(lines)} log lines for {DAG_ID}.{TASK_ID}")
+    sys.exit(f"Expected at least {MIN_LOG_LINES} log lines, got {len(lines)}")
 
 
 def main(airflow_version: str) -> None:

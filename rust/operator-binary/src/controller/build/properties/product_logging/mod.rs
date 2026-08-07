@@ -396,12 +396,7 @@ mod tests {
     }
 
     fn stdlib_config(log_config: &AutomaticContainerLogConfig) -> String {
-        let resolved_product_image = ResolvedProductImage {
-            product_version: "2.10.0".to_string(),
-            ..resolved_product_image_stub()
-        };
-
-        create_airflow_stdlib_config(log_config, "/stackable/log", &resolved_product_image)
+        create_airflow_stdlib_config(log_config, "/stackable/log", &resolved_image("2.10.0"))
     }
 
     /// The requested level paired with the `task` handler level and the `airflow.task` logger
@@ -563,15 +558,5 @@ mod tests {
             level_in_block(&content, "'airflow.task': {"),
             "logging.INFO"
         );
-    }
-
-    fn resolved_product_image_stub() -> ResolvedProductImage {
-        ResolvedProductImage {
-            product_version: "0.0.0".to_string(),
-            app_version_label_value: "0.0.0".parse().unwrap(),
-            image: "oci.example.org/product:0.0.0".to_string(),
-            image_pull_policy: "Always".to_string(),
-            pull_secrets: None,
-        }
     }
 }
