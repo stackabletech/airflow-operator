@@ -51,14 +51,6 @@ pub enum Error {
 
 /// A single entry of the trusted-proxy list: an IP address (`10.0.0.1`), a CIDR network
 /// (`10.244.0.0/16`), or `*` for every peer.
-///
-/// The value is handed to Airflow verbatim, which is why it is kept as a string rather than a
-/// parsed network: uvicorn accepts all three notations, and round-tripping through an
-/// `IpAddr`/network type would normalise the user's input for no benefit.
-///
-/// Parsing still happens up front: an entry uvicorn cannot parse is silently treated as
-/// an opaque literal that matches no peer, which disables proxy trust without any error. Failing
-/// reconciliation instead makes the misconfiguration visible.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrustedProxy(String);
 
@@ -92,11 +84,7 @@ impl FromStr for TrustedProxy {
 
         if let Some(prefix_length) = prefix_length {
             // `u8::from_str` accepts a leading `+` (e.g. `+16`), but Python's `ipaddress` prefix
-            // parser accepts ASCII digits only. An entry we accept but uvicorn rejects is filed by
-            // uvicorn as an opaque string literal that matches no peer -- silently disabling proxy
-            // trust for exactly this entry. Require a non-empty run of ASCII digits up front so we
-            // reject exactly what Python's parser would reject. `chars().all(...)` is vacuously
-            // true for the empty string, so `10.0.0.0/` still needs the explicit `is_empty` check.
+            // parser accepts ASCII digits only.
             let is_invalid_prefix_length =
                 prefix_length.is_empty() || !prefix_length.chars().all(|c| c.is_ascii_digit());
             let prefix_length = if is_invalid_prefix_length {
@@ -125,10 +113,7 @@ impl FromStr for TrustedProxy {
             );
 
             // uvicorn parses this address with `ipaddress.ip_network(host, strict=True)`, which
-            // rejects a network address with host bits set. When that happens uvicorn falls back
-            // to treating the whole entry as an opaque string literal that matches no peer --
-            // silently disabling proxy trust for exactly this entry. Reject it here instead, and
-            // suggest the masked network the user probably meant.
+            // rejects a network address with host bits set.
             let masked = masked_network(address, prefix_length);
             ensure!(
                 masked == address,
@@ -177,11 +162,7 @@ impl Display for TrustedProxy {
     }
 }
 
-/// Checks the list-level rule that a single `FromStr` call cannot see: uvicorn only ever trusts
-/// every peer when the whole trusted-hosts value is exactly `*` (`trusted_hosts in ("*", ["*"])`
-/// in uvicorn's own check), not when `*` merely appears alongside other entries. Combining `*`
-/// with anything else is accepted by `FromStr` but silently degrades to trusting only the other
-/// entries -- exactly the kind of silent surprise this feature exists to prevent.
+/// Checks that '*' is the only entry in the list.
 pub fn ensure_wildcard_is_sole_entry(entries: &[TrustedProxy]) -> Result<(), Error> {
     let has_wildcard = entries.iter().any(|entry| entry.0 == WILDCARD);
     ensure!(
