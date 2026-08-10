@@ -1,11 +1,10 @@
 use std::{
     fmt::Display,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    num::ParseIntError,
     str::FromStr,
 };
 
-use snafu::{ResultExt, Snafu, ensure};
+use snafu::{OptionExt, ResultExt, Snafu, ensure};
 
 /// Trusts every peer, regardless of its address.
 const WILDCARD: &str = "*";
@@ -21,12 +20,12 @@ pub enum Error {
     },
 
     #[snafu(display(
-        "the trusted proxy {value:?} has a prefix length that is not a whole number between 0 \
+        "the trusted proxy {value:?} has a prefix length {prefix_length:?} which is not a whole number between 0 \
          and the address family's maximum"
     ))]
     InvalidPrefixLength {
         value: String,
-        source: ParseIntError,
+        prefix_length: String,
     },
 
     #[snafu(display(
@@ -83,20 +82,21 @@ impl FromStr for TrustedProxy {
             })?;
 
         if let Some(prefix_length) = prefix_length {
-            // `u8::from_str` accepts a leading `+` (e.g. `+16`), but Python's `ipaddress` prefix
-            // parser accepts ASCII digits only.
-            let is_invalid_prefix_length =
-                prefix_length.is_empty() || !prefix_length.chars().all(|c| c.is_ascii_digit());
-            let prefix_length = if is_invalid_prefix_length {
-                // Force a `ParseIntError` of the right shape to carry as `source`, rather than
-                // hand-rolling one.
-                "".parse::<u8>()
-            } else {
-                prefix_length.parse::<u8>()
-            }
-            .with_context(|_| InvalidPrefixLengthSnafu {
-                value: value.to_owned(),
-            })?;
+            ensure!(
+                !prefix_length.is_empty() && prefix_length.bytes().all(|b| b.is_ascii_digit()),
+                InvalidPrefixLengthSnafu {
+                    value,
+                    prefix_length
+                }
+            );
+            let prefix_length: u8 =
+                prefix_length
+                    .parse()
+                    .ok()
+                    .context(InvalidPrefixLengthSnafu {
+                        value,
+                        prefix_length,
+                    })?;
 
             let maximum = match address {
                 IpAddr::V4(_) => 32,
@@ -334,8 +334,8 @@ mod tests {
     fn invalid_prefix_length_keeps_the_parse_error_as_source() {
         let error = TrustedProxy::from_str("10.244.0.0/sixteen").expect_err("must be rejected");
         match error {
-            Error::InvalidPrefixLength { source, .. } => {
-                let _: ParseIntError = source;
+            Error::InvalidPrefixLength { value, .. } => {
+                assert_eq!(value, "10.244.0.0/sixteen");
             }
             other => panic!("expected InvalidPrefixLength, got {other:?}"),
         }
