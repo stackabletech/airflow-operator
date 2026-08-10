@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from, via `spec.webservers.roleConfig.trustedProxies` ([#835]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -32,6 +36,7 @@
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#835]: https://github.com/stackabletech/airflow-operator/pull/835
 [#840]: https://github.com/stackabletech/airflow-operator/pull/840
 
 ## [26.7.0] - 2026-07-21

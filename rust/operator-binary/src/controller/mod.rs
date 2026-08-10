@@ -56,6 +56,7 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
+        trusted_proxies::TrustedProxy,
         v1alpha2,
     },
 };
@@ -96,6 +97,7 @@ pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
     pub listener_class: Option<ListenerClassName>,
     pub group_listener_name: Option<ListenerName>,
+    pub trusted_proxies: Vec<TrustedProxy>,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.

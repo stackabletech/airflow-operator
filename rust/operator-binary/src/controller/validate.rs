@@ -92,6 +92,11 @@ pub enum Error {
 
     #[snafu(display("invalid git-sync specification"))]
     InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
+
+    #[snafu(display("failed to parse the trusted proxies configured for the webserver role"))]
+    ParseTrustedProxies {
+        source: crate::crd::trusted_proxies::Error,
+    },
 }
 
 pub fn validate_cluster(
@@ -142,6 +147,9 @@ pub fn validate_cluster(
                     .map(|rc| rc.pod_disruption_budget),
                 listener_class: role.listener_class_name(airflow),
                 group_listener_name: airflow.group_listener_name(&role),
+                trusted_proxies: role
+                    .trusted_proxies(airflow)
+                    .context(ParseTrustedProxiesSnafu)?,
             },
         );
 

@@ -23,6 +23,7 @@ use crate::{
         internal_secret::{
             FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
         },
+        trusted_proxies::TrustedProxy,
     },
     util::{env_var_from_secret, role_service_name},
 };
@@ -513,6 +514,30 @@ fn add_version_specific_env_vars(
                     ..Default::default()
                 },
             );
+
+            // This env var is needed in addition to `--proxy-headers` when Airflow runs
+            // behind a reverse proxy.
+            // This covers the uvicorn backend, the only one the SDP image can run.
+            let trusted_proxies = cluster
+                .role_configs
+                .get(airflow_role)
+                .map(|role_config| role_config.trusted_proxies.as_slice())
+                .unwrap_or_default()
+                .iter()
+                .map(TrustedProxy::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+
+            if !trusted_proxies.is_empty() {
+                env.insert(
+                    "FORWARDED_ALLOW_IPS".into(),
+                    EnvVar {
+                        name: "FORWARDED_ALLOW_IPS".into(),
+                        value: Some(trusted_proxies),
+                        ..Default::default()
+                    },
+                );
+            }
         }
     } else {
         env.insert(
@@ -525,6 +550,46 @@ fn add_version_specific_env_vars(
                 ..Default::default()
             },
         );
+
+        // The 2.x uses Werkzeug's `ProxyFix` to allow forwarded-headers and it does so regardless
+        // of the peer source. The only valid value for `spec.webservers.roleConfig.trustedProxies` is `["*"]`.
+        if airflow_role == &AirflowRole::Webserver {
+            let trusted_proxies = cluster
+                .role_configs
+                .get(airflow_role)
+                .map(|role_config| role_config.trusted_proxies.as_slice())
+                .unwrap_or_default();
+
+            if !trusted_proxies.is_empty() {
+                env.insert(
+                    "AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX".into(),
+                    EnvVar {
+                        name: "AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX".into(),
+                        value: Some("True".into()),
+                        ..Default::default()
+                    },
+                );
+                env.insert(
+                    "AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR".into(),
+                    EnvVar {
+                        name: "AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR".into(),
+                        value: Some("1".into()),
+                        ..Default::default()
+                    },
+                );
+
+                if !trusted_proxies.iter().any(TrustedProxy::is_wildcard) {
+                    let product_version = &cluster.image.product_version;
+                    tracing::warn!(
+                        "spec.webservers.roleConfig.trustedProxies lists specific addresses, but \
+                         Airflow {product_version}'s webserver has no way to restrict forwarded \
+                         headers to specific peers -- once enabled it trusts X-Forwarded-* from \
+                         any peer, the same as \"*\"",
+                    );
+                }
+            }
+        }
+
         if cluster.has_role(&AirflowRole::DagProcessor) {
             // In airflow 2.x the dag-processor can optionally be started as a
             // standalone process (rather then as a scheduler subprocess),

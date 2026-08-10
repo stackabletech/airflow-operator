@@ -1,0 +1,78 @@
+= Running behind a reverse proxy
+:description: Configure which reverse proxies the Airflow webserver trusts X-Forwarded-* headers from.
+
+When the Airflow webserver is reached through an ingress controller or another reverse proxy, every
+request arrives from the proxy rather than from the client. Unless the webserver is told to trust
+the proxy, it records the proxy's address as the client address, and it treats a TLS-terminated
+request as plain HTTP -- which, among other things, means session cookies are not marked as
+`Secure`.
+
+Set `trustedProxies` on the webserver role to the addresses your proxy sends requests from:
+
+[source,yaml]
+----
+spec:
+  webservers:
+    roleConfig:
+      listenerClass: external-stable
+      trustedProxies:
+        - 10.244.0.0/16 # <1>
+    roleGroups:
+      default:
+        replicas: 1
+----
+
+<1> IP addresses (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), and `*` are accepted. `*` must be
+the only entry in the list: combining it with other entries is rejected, since it would silently
+degrade to trusting only those other entries.
+
+On Airflow 3.x the operator starts the api-server with `--proxy-headers` and restricts the headers
+to the listed peers. Airflow 2.x has no equivalent restriction: see
+<<airflow-2-x-has-no-peer-restriction>>.
+
+== Choosing the value
+
+Use the narrowest range that covers your proxy, and give it as a network address (host bits zero,
+e.g. `10.244.0.0/16`) or as a bare host IP (no `/prefix` at all, e.g. `10.244.0.5`).
+
+For an ingress controller running in the cluster, list the Pod addresses as bare host IPs rather
+than guessing a network:
+
+[source,bash]
+----
+kubectl get pods -n ingress-nginx -o jsonpath='{.items[*].status.podIP}'
+----
+
+If your ingress controller's Pods share a known, stable CIDR (for example a dedicated node pool or
+a documented Pod CIDR range for that namespace), you can use that network instead -- but confirm it
+against your cluster's actual CNI configuration rather than inferring it from a single Pod IP,
+since a Pod IP alone does not tell you where the network boundary is.
+
+`*` trusts forwarded headers from any peer that can reach the webserver. Only use it when access
+to the webserver is restricted by other means -- with a `cluster-internal` or
+`external-unstable` ListenerClass, clients reach the Pod directly and can set the headers
+themselves.
+
+WARNING: A peer that is trusted can set the client address that ends up in the webserver's access
+log. Do not list ranges wider than the proxies you operate.
+
+[#airflow-2-x-has-no-peer-restriction]
+== Airflow 2.x has no peer restriction
+
+Airflow 2.x's webserver has no analogue support for trusted network addresses. Once enabled, it
+unconditionally trusts `X-Forwarded-*` from *any* peer, the same as `trustedProxies: ["*"]` on 3.x.
+
+This means that for Airflow 2.x, `trustedProxies: ["*"]` is the only valid configuration. Using
+any other value than `*` will lead the operator to reject reconciliation.
+
+== Interaction with overrides
+
+On Airflow 3.x, the operator sets `FORWARDED_ALLOW_IPS` from this field, before `envOverrides` are
+applied -- so an `envOverrides` entry for that variable wins over the value derived from
+`trustedProxies`. This override only takes effect while `trustedProxies` is non-empty: an empty
+list means the api-server is not started with `--proxy-headers` at all, so uvicorn never installs
+the middleware that reads `FORWARDED_ALLOW_IPS`, and the override has no effect regardless of its
+value.
+
+On Airflow 2.x, the same applies to `AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX` and
+`AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR`.
