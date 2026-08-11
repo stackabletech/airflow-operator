@@ -250,7 +250,7 @@ LOGGING_CONFIG = {{
             'formatter': 'airflow',
             # `serve_logs` on the workers serves task logs from this directory, so it must be
             # the folder the Task SDK writes task logs to, not the Vector agent log directory.
-            'base_log_folder': os.path.expanduser(conf.get('logging', 'BASE_LOG_FOLDER')),
+            'base_log_folder': os.path.expanduser(conf.get_mandatory_value('logging', 'BASE_LOG_FOLDER')),
             'filters': ['mask_secrets_core']
         }}
     }},
@@ -361,7 +361,7 @@ mod tests {
         // `base_log_folder`, so it must point to the folder the Task SDK writes task logs to
         // (`[logging] base_log_folder`), not to the Vector agent log directory.
         assert!(content.contains(
-            "'base_log_folder': os.path.expanduser(conf.get('logging', 'BASE_LOG_FOLDER'))"
+            "'base_log_folder': os.path.expanduser(conf.get_mandatory_value('logging', 'BASE_LOG_FOLDER'))"
         ));
         assert!(!content.contains("'base_log_folder': '/stackable/log/airflow'"));
         // The generated config must import `conf` itself.
