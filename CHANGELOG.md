@@ -30,12 +30,14 @@
 - Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#840]).
+- Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#834]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#834]: https://github.com/stackabletech/airflow-operator/pull/834
 [#835]: https://github.com/stackabletech/airflow-operator/pull/835
 [#840]: https://github.com/stackabletech/airflow-operator/pull/840
 
