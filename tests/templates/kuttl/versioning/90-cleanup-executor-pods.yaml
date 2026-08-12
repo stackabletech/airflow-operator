@@ -1,40 +1,8 @@
 ---
-# Force-delete KubernetesExecutor DAG task pods before kuttl deletes the namespace.
-# Their Vector sidecar does not respond to SIGTERM (it is not PID 1), so these pods
-# sit in Terminating for the full terminationGracePeriodSeconds (300s), blocking
-# namespace deletion past kuttl's timeout.
-# The proper fix is in operator-rs (making Vector PID 1 via exec).
-#
-# When kuttl runs with --skip-delete the namespace is kept for debugging, so this
-# teardown must not run. kuttl does not expose the flag to test steps, so it is read
-# from the command line of the kuttl process that invoked this step.
+# Force-delete leftover KubernetesExecutor DAG task pods so that kuttl can delete the
+# namespace within its timeout. See the script for the details.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 timeout: 600
 commands:
-  - script: |
-      # Walk up the process tree (this script is a child of kuttl) and bail out if kuttl
-      # was started with --skip-delete.
-      pid=$PPID
-      while [ "${pid:-0}" -ge 1 ]; do
-        args=$(ps -o args= -p "$pid" 2>/dev/null)
-        case "$args" in
-          *kuttl*)
-            case "$args" in
-              *--skip-delete*)
-                echo "kuttl was started with --skip-delete, keeping the AirflowCluster"
-                exit 0
-                ;;
-            esac
-            ;;
-        esac
-        pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]')
-      done
-
-      kubectl delete airflowcluster airflow -n $NAMESPACE --wait=false 2>/dev/null || true
-
-      if kubectl wait --for=delete pod -l app.kubernetes.io/name=airflow -n $NAMESPACE --timeout=120s 2>/dev/null; then
-        exit 0
-      fi
-      kubectl delete pods -l app.kubernetes.io/name=airflow -n $NAMESPACE --grace-period=0 --force 2>/dev/null || true
-      kubectl wait --for=delete pod -l app.kubernetes.io/name=airflow -n $NAMESPACE --timeout=300s
+  - script: sh ../../../../templates/kuttl/commons/cleanup-executor-pods.sh
