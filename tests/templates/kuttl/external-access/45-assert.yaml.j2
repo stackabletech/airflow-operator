@@ -1,0 +1,28 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+{% if test_scenario['values']['airflow'].startswith("2") %}
+commands:
+  # ProxyFix must be enabled on Airflow 2
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX")].value}' \
+        | grep -qx 'True'
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR")].value}' \
+        | grep -qx '1'
+{% else %}
+commands:
+  # The api-server must be started with --proxy-headers ...
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].args}' \
+        | grep -q -- '--proxy-headers'
+  # ... and told which peers to trust it from.
+  - script: |
+      kubectl -n $NAMESPACE get statefulset airflow-webserver-default \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="airflow")].env[?(@.name=="FORWARDED_ALLOW_IPS")].value}' \
+        | grep -qx '\*'
+{% endif %}

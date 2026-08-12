@@ -282,6 +282,16 @@ pub(crate) mod test_support {
     /// carries several resolved types (git-sync resources, validated logging, …) that are
     /// impractical to construct by hand.
     pub fn validated_cluster(executor_key: &str, executor_config: &str) -> ValidatedCluster {
+        validated_cluster_with(executor_key, executor_config, |_| {})
+    }
+
+    /// As [`validated_cluster`], but `patch` may modify the parsed CR before it is validated —
+    /// used to add role-level config that the base fixture does not carry.
+    pub fn validated_cluster_with(
+        executor_key: &str,
+        executor_config: &str,
+        patch: impl FnOnce(&mut serde_yaml::Value),
+    ) -> ValidatedCluster {
         let cluster_yaml = r#"
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
@@ -323,6 +333,9 @@ pub(crate) mod test_support {
                 executor_key.into(),
                 serde_yaml::from_str(executor_config).expect("the executor config is valid YAML"),
             );
+
+        patch(&mut cluster_value);
+
         let cluster: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(cluster_value)
                 .expect("the test CR deserialises");
@@ -339,6 +352,31 @@ pub(crate) mod test_support {
 
         validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced)
             .expect("test cluster validates")
+    }
+
+    /// A Celery-executor cluster whose webserver trusts the given reverse proxies.
+    pub fn cluster_with_trusted_proxies(trusted_proxies: &[&str]) -> ValidatedCluster {
+        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+            .iter()
+            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .collect();
+
+        validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            |cluster| {
+                cluster["spec"]["webservers"]
+                    .as_mapping_mut()
+                    .expect("the webservers role is a mapping")
+                    .insert(
+                        "roleConfig".into(),
+                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+                            serde_yaml::Value::String("trustedProxies".to_owned()),
+                            serde_yaml::Value::Sequence(trusted_proxies),
+                        )])),
+                    );
+            },
+        )
     }
 
     /// Validated cluster with a Celery executor (its workers are provisioned via the queue, so no
@@ -362,8 +400,12 @@ mod tests {
 
     use super::{
         build,
-        test_support::{app_version_label, celery_executor_cluster, kubernetes_executor_cluster},
+        test_support::{
+            app_version_label, celery_executor_cluster, cluster_with_trusted_proxies,
+            kubernetes_executor_cluster, validated_cluster_with,
+        },
     };
+    use crate::controller::ValidatedCluster;
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -372,6 +414,85 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    /// The bash arguments of the `airflow` container of the given role group's StatefulSet.
+    fn airflow_container_args(cluster: &ValidatedCluster, stateful_set_name: &str) -> String {
+        let resources = build(cluster).expect("build succeeds");
+        let stateful_set = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.meta().name.as_deref() == Some(stateful_set_name))
+            .expect("the StatefulSet exists");
+
+        stateful_set
+            .spec
+            .as_ref()
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .as_ref()
+            .expect("the Pod template has a spec")
+            .containers
+            .iter()
+            .find(|container| container.name == "airflow")
+            .expect("the airflow container exists")
+            .args
+            .as_ref()
+            .expect("the airflow container has args")
+            .join("\n")
+    }
+
+    /// The environment of the `airflow` container of the given StatefulSet, as name/value pairs.
+    fn airflow_container_env(
+        cluster: &ValidatedCluster,
+        stateful_set_name: &str,
+    ) -> BTreeMap<String, Option<String>> {
+        let resources = build(cluster).expect("build succeeds");
+        let stateful_set = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.meta().name.as_deref() == Some(stateful_set_name))
+            .expect("the StatefulSet exists");
+
+        stateful_set
+            .spec
+            .as_ref()
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .as_ref()
+            .expect("the Pod template has a spec")
+            .containers
+            .iter()
+            .find(|container| container.name == "airflow")
+            .expect("the airflow container exists")
+            .env
+            .as_ref()
+            .expect("the airflow container has env vars")
+            .iter()
+            .map(|env_var| (env_var.name.clone(), env_var.value.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn webserver_start_command_passes_proxy_headers_when_proxies_are_trusted() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+
+        assert!(
+            args.contains("airflow api-server --proxy-headers &"),
+            "args were:\n{args}"
+        );
+    }
+
+    #[test]
+    fn webserver_start_command_omits_proxy_headers_by_default() {
+        let cluster = celery_executor_cluster();
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+
+        assert!(args.contains("airflow api-server &"), "args were:\n{args}");
+        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
     }
 
     #[test]
@@ -472,5 +593,101 @@ mod tests {
                 "my-airflow-webserver-default",
             ]
         );
+    }
+
+    #[test]
+    fn trusted_proxies_are_rendered_as_a_comma_separated_list() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16", "192.168.1.1"]);
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(
+            env.get("FORWARDED_ALLOW_IPS"),
+            Some(&Some("10.244.0.0/16,192.168.1.1".to_string()))
+        );
+    }
+
+    #[test]
+    fn no_proxy_env_var_without_trusted_proxies() {
+        let cluster = celery_executor_cluster();
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// The scheduler runs no HTTP server, so it must not carry the proxy configuration even when
+    /// the webserver does.
+    #[test]
+    fn trusted_proxies_are_not_set_on_other_roles() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
+        let env = airflow_container_env(&cluster, "my-airflow-scheduler-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// Builds a 2.x Celery-executor cluster whose webserver trusts the given reverse proxies.
+    fn cluster_with_trusted_proxies_on_airflow_2x(trusted_proxies: &[&str]) -> ValidatedCluster {
+        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+            .iter()
+            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .collect();
+
+        validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            move |cluster| {
+                cluster["spec"]["image"]["productVersion"] = serde_yaml::Value::from("2.9.3");
+                cluster["spec"]["webservers"]
+                    .as_mapping_mut()
+                    .expect("the webservers role is a mapping")
+                    .insert(
+                        "roleConfig".into(),
+                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+                            serde_yaml::Value::String("trustedProxies".to_owned()),
+                            serde_yaml::Value::Sequence(trusted_proxies.clone()),
+                        )])),
+                    );
+            },
+        )
+    }
+
+    #[test]
+    fn trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["10.244.0.0/16"]);
+
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+        assert!(args.contains("airflow webserver &"), "args were:\n{args}");
+        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&Some("True".to_string()))
+        );
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
+            Some(&Some("1".to_string()))
+        );
+    }
+
+    #[test]
+    fn wildcard_trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["*"]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&Some("True".to_string()))
+        );
+    }
+
+    /// No `trustedProxies` means no `ProxyFix` on Airflow 2.x either.
+    #[test]
+    fn no_proxy_fix_without_trusted_proxies_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&[]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"), None);
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"), None);
     }
 }

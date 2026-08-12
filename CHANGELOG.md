@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from, via `spec.webservers.roleConfig.trustedProxies` ([#835]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -21,13 +25,24 @@
   ([#829]).
 - Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
   resources they don't apply to (previously set to `none`) ([#838]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#840]).
+- Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#834]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#834]: https://github.com/stackabletech/airflow-operator/pull/834
+[#835]: https://github.com/stackabletech/airflow-operator/pull/835
 [#838]: https://github.com/stackabletech/airflow-operator/pull/838
+[#840]: https://github.com/stackabletech/airflow-operator/pull/840
 
 ## [26.7.0] - 2026-07-21
 

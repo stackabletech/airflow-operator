@@ -5646,6 +5646,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -5686,6 +5687,24 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
+
+                          On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+                          forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+                          `*`, since Airflow 2.x has no way to restrict it further.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely.
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:
@@ -11851,6 +11870,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -11891,6 +11911,24 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
+
+                          On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+                          forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+                          `*`, since Airflow 2.x has no way to restrict it further.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely.
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:

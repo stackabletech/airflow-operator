@@ -62,6 +62,15 @@ spec:
   webservers:
     roleConfig:
       listenerClass: test-external-stable-$NAMESPACE
+      # Ideally this would be scoped to the cluster's Pod CIDR instead of "*", but that CIDR
+      # varies by cluster/CNI (e.g. 10.244.0.0/16 for kind/Calico, 10.208.0.0/16 for
+      # OpenShift's OVN-Kubernetes here) and there's no portable way to look it up from a
+      # kuttl test. To find it for a real cluster:
+      #   kubectl get network.config.openshift.io/cluster -o jsonpath='{.spec.clusterNetwork}' # OpenShift
+      #   kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'                              # kubeadm/kind
+      # See 45-assert.yaml.j2, which checks that this ends up in the webserver's env vars.
+      trustedProxies:
+        - "*"
     config:
       resources:
         cpu:
