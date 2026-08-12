@@ -5,6 +5,10 @@ version: "0.0.0-dev"
 appVersion: "0.0.0-dev"
 description: "Kubernetes operator for Apache Airflow. Deploy and run Airflow with the Stackable Data Platform (SDP)."
 home: https://github.com/stackabletech/airflow-operator
+# One known use of this is the Artifact Hub (AH) listing which shows the logo.
+# AH downloads the logo and re-hosts it.
+# We opted to not use the project logos (e.g. the Apache Spark logo) here due to trademark concerns.
+icon: https://raw.githubusercontent.com/stackabletech/airflow-operator/main/.readme/static/borrowed/Icon_Stackable.svg
 sources:
   - https://github.com/stackabletech/airflow-operator
 keywords: ["apache-airflow", "airflow", "workflow-orchestration", "kubernetes", "operator", "big-data"]
@@ -21,3 +25,9 @@ annotations:
       url: https://docs.stackable.tech/home/stable/airflow/
     - name: support
       url: https://github.com/stackabletech/airflow-operator/issues
+  artifacthub.io/crds: |-
+    - kind: AirflowCluster
+      version: v1alpha2
+      name: airflowclusters.airflow.stackable.tech
+      displayName: AirflowCluster
+      description: An Airflow cluster stacklet. This resource is managed by the Stackable operator for Apache Airflow.
