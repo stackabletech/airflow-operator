@@ -31,6 +31,7 @@
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#840]).
 - Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#834]).
+- Avoid Python import race conditions by pre-cloning the git repo not only for Celery-based stacklets, but also for Kubernetes executor-based setups ([#844]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
@@ -40,6 +41,7 @@
 [#834]: https://github.com/stackabletech/airflow-operator/pull/834
 [#835]: https://github.com/stackabletech/airflow-operator/pull/835
 [#840]: https://github.com/stackabletech/airflow-operator/pull/840
+[#844]: https://github.com/stackabletech/airflow-operator/pull/844
 
 ## [26.7.0] - 2026-07-21
 
