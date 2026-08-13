@@ -37,8 +37,8 @@ use crate::{
             properties::env_vars,
             resource::{
                 pod::{
-                    add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
-                    build_logging_container,
+                    GitSyncSidecarsAddition, add_authentication_volumes_and_volume_mounts,
+                    add_git_sync_resources, build_logging_container,
                 },
                 service::stateful_set_service_name,
             },
@@ -253,9 +253,14 @@ pub fn build_server_rolegroup_statefulset(
             .context(AddVolumeMountSnafu)?;
     }
 
-    // We need a git-sync sidecar to keep the git contents up-to-date
-    add_git_sync_resources(&mut pb, &mut airflow_container, git_sync_resources, true)
-        .context(PodSnafu)?;
+    add_git_sync_resources(
+        &mut pb,
+        &mut airflow_container,
+        git_sync_resources,
+        // We need a git-sync sidecar to keep the git contents up-to-date
+        &GitSyncSidecarsAddition::Add,
+    )
+    .context(PodSnafu)?;
 
     validated_cluster
         .metadata_database_connection_details()

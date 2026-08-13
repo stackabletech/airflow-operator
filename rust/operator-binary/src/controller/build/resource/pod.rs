@@ -85,6 +85,12 @@ pub(crate) fn add_authentication_volumes_and_volume_mounts(
     Ok(())
 }
 
+#[derive(PartialEq, Eq)]
+pub enum GitSyncSidecarsAddition {
+    Add,
+    Skip,
+}
+
 /// Adds the needed git-sync init-container and (optionally) sidecar.
 ///
 /// If the DAG is modularized we may encounter a timing issue whereby the main process
@@ -100,9 +106,9 @@ pub(crate) fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
-    add_sidecar_containers: bool,
+    add_sidecar_containers: &GitSyncSidecarsAddition,
 ) -> Result<()> {
-    if add_sidecar_containers {
+    if add_sidecar_containers == &GitSyncSidecarsAddition::Add {
         for container in git_sync_resources.git_sync_containers.iter().cloned() {
             pb.add_container(container);
         }
