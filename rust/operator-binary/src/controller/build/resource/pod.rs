@@ -85,23 +85,31 @@ pub(crate) fn add_authentication_volumes_and_volume_mounts(
     Ok(())
 }
 
+/// Adds the needed git-sync init-container and (optionally) sidecar.
+///
+/// If the DAG is modularized we may encounter a timing issue whereby the main process
+/// has started *before* all modules referenced by the DAG have been fetched by gitsync
+/// and registered. This will result in ModuleNotFoundError errors. This can be avoided
+/// by running a one-off git-sync process in an init-container so that all DAG
+/// dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
+///
+/// For that reason, we always add a init-container that clones the repo initially. All Pods (except
+/// the Kubernetes operators) additionally use a sidecar to keep the git contents up-to-date.
 pub(crate) fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
     git_sync_resources: &git_sync::v1alpha2::GitSyncResources,
     add_sidecar_containers: bool,
-    add_init_containers: bool,
 ) -> Result<()> {
     if add_sidecar_containers {
         for container in git_sync_resources.git_sync_containers.iter().cloned() {
             pb.add_container(container);
         }
     }
-    if add_init_containers {
-        for container in git_sync_resources.git_sync_init_containers.iter().cloned() {
-            pb.add_init_container(container);
-        }
+    for container in git_sync_resources.git_sync_init_containers.iter().cloned() {
+        pb.add_init_container(container);
     }
+
     pb.add_volumes(git_sync_resources.git_content_volumes.to_owned())
         .context(AddVolumeSnafu)?;
     pb.add_volumes(git_sync_resources.git_ssh_volumes.to_owned())

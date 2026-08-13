@@ -143,14 +143,10 @@ pub fn build_executor_template_config_map(
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?;
 
-    add_git_sync_resources(
-        &mut pb,
-        &mut airflow_container,
-        git_sync_resources,
-        false,
-        true,
-    )
-    .context(PodSnafu)?;
+    // We don't need a git-sync sidecar, an initial clone via the init-container is sufficient for
+    // Kubernetes executors, as they are short-lived.
+    add_git_sync_resources(&mut pb, &mut airflow_container, git_sync_resources, false)
+        .context(PodSnafu)?;
 
     cluster
         .metadata_database_connection_details()

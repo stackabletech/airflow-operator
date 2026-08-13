@@ -253,20 +253,9 @@ pub fn build_server_rolegroup_statefulset(
             .context(AddVolumeMountSnafu)?;
     }
 
-    // If the DAG is modularized we may encounter a timing issue whereby the celery worker
-    // has started *before* all modules referenced by the DAG have been fetched by gitsync
-    // and registered. This will result in ModuleNotFoundError errors. This can be avoided
-    // by running a one-off git-sync process in an init-container so that all DAG
-    // dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
-    let use_git_sync_init_containers = matches!(executor, AirflowExecutor::CeleryExecutors { .. });
-    add_git_sync_resources(
-        &mut pb,
-        &mut airflow_container,
-        git_sync_resources,
-        true,
-        use_git_sync_init_containers,
-    )
-    .context(PodSnafu)?;
+    // We need a git-sync sidecar to keep the git contents up-to-date
+    add_git_sync_resources(&mut pb, &mut airflow_container, git_sync_resources, true)
+        .context(PodSnafu)?;
 
     validated_cluster
         .metadata_database_connection_details()
