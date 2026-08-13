@@ -42,7 +42,8 @@ For multiple DAGs, it is easier to expose them via `gitsync`, as shown below.
 
 == Via `git-sync`
 
-{git-sync}[git-sync] is a command that pulls a git repository into a local directory and is supplied as a sidecar container for use within Kubernetes.
+{git-sync}[git-sync] is a command that pulls a git repository into a local directory.
+The operator runs it twice in each Pod: once in an init container, so that the repository is fully cloned before any Airflow process starts, and again as a sidecar container that keeps the clone up to date (Pods for the Kubernetes executor are short-lived and only get the init container).
 The Stackable Airflow images already ship with git-sync included, and the operator takes care of calling the tool and mounting volumes, so that only the repository and synchronization details are required:
 
 .git-sync usage example: https

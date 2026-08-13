@@ -218,16 +218,26 @@ NOTE: Generally speaking it is https://airflow.apache.org/docs/apache-airflow/st
 
 == GitSync race condition
 
-Sometimes a race condition can arise when the long-running Python process started by the Airflow dag-processor caches python submodules before the gitsync fetch is complete. This is indeterminate but can be avoided by adding the following lines to the top of each DAG file that references submodules:
+The operator runs a one-off `git-sync` process in an init container in every Pod, so the repository is guaranteed to be fully cloned before any Airflow process starts.
+A `git-sync` sidecar container then keeps the cloned repository up to date while the Pod is running.
+A race condition can still arise for content that is added to the repository *after* a Pod has started and is delivered by the sidecar: the long-running Python process started by the Airflow dag-processor has cached python submodules and a newly synced submodule may therefore not be found, even though it is already present on disk.
+This is indeterminate but can be avoided by adding the following lines to the top of each DAG file that references submodules:
 
 [source,python]
 ----
 import importlib
 import site
 
-# invalidate cache due to race condition when using dag-processor
+# invalidate import caches so that modules synced after process start are found
 importlib.reload(site)
 importlib.invalidate_caches()
 ----
 
-This will add some overhead that should be minimal in comparison to parsing the DAG as a whole.
+These lines run whenever the DAG file is parsed by the dag-processor or re-parsed for task execution on workers, and add some overhead that should be minimal in comparison to parsing the DAG as a whole.
+
+[NOTE]
+====
+This workaround does not cover the triggerer: the triggerer does not parse DAG files, but imports trigger classes and callables directly at runtime, so code placed in a DAG file never runs in that process.
+If a deferred task references a module that was added to the repository after the triggerer Pod started and fails with `ModuleNotFoundError`, then restarting the triggerer may resolve this.
+This starts a fresh Python process with no stale import caches, and the init container guarantees the repository is fully synced before it starts.
+====
