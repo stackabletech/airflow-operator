@@ -93,8 +93,9 @@ pub(crate) fn add_authentication_volumes_and_volume_mounts(
 /// by running a one-off git-sync process in an init-container so that all DAG
 /// dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
 ///
-/// For that reason, we always add a init-container that clones the repo initially. All Pods (except
-/// the Kubernetes operators) additionally use a sidecar to keep the git contents up-to-date.
+/// For that reason, we always add an init-container that clones the repo initially. All Pods
+/// (except the Kubernetes executors) additionally use a sidecar to keep the git contents
+/// up-to-date.
 pub(crate) fn add_git_sync_resources(
     pb: &mut PodBuilder,
     cb: &mut ContainerBuilder,
