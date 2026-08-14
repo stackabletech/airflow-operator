@@ -444,10 +444,13 @@ mod tests {
     }
 
     /// The environment of the `airflow` container of the given StatefulSet, as name/value pairs.
+    ///
+    /// This reads the rendered `EnvVar`s straight off the built container rather than going through
+    /// `EnvVarSet`, keeping the test helper lean and focused on the values it asserts on.
     fn airflow_container_env(
         cluster: &ValidatedCluster,
         stateful_set_name: &str,
-    ) -> BTreeMap<String, Option<String>> {
+    ) -> BTreeMap<String, String> {
         let resources = build(cluster).expect("build succeeds");
         let stateful_set = resources
             .stateful_sets
@@ -471,7 +474,12 @@ mod tests {
             .as_ref()
             .expect("the airflow container has env vars")
             .iter()
-            .map(|env_var| (env_var.name.clone(), env_var.value.clone()))
+            .filter_map(|env_var| {
+                env_var
+                    .value
+                    .as_ref()
+                    .map(|value| (env_var.name.clone(), value.clone()))
+            })
             .collect()
     }
 
@@ -602,7 +610,7 @@ mod tests {
 
         assert_eq!(
             env.get("FORWARDED_ALLOW_IPS"),
-            Some(&Some("10.244.0.0/16,192.168.1.1".to_string()))
+            Some(&"10.244.0.0/16,192.168.1.1".to_owned())
         );
     }
 
@@ -662,11 +670,11 @@ mod tests {
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
-            Some(&Some("True".to_string()))
+            Some(&"True".to_owned())
         );
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
-            Some(&Some("1".to_string()))
+            Some(&"1".to_owned())
         );
     }
 
@@ -677,7 +685,7 @@ mod tests {
         let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
-            Some(&Some("True".to_string()))
+            Some(&"True".to_owned())
         );
     }
 

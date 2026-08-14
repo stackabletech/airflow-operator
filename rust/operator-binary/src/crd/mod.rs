@@ -32,7 +32,7 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -41,7 +41,7 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         product_logging::framework::STACKABLE_LOG_DIR,
-        role_utils::GenericCommonConfig,
+        role_utils::{CommonConfiguration, GenericCommonConfig, Role, RoleGroup},
         types::{
             common::Port,
             kubernetes::{

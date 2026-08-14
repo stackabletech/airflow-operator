@@ -76,9 +76,6 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to build Statefulset environmental variables"))]
-    BuildStatefulsetEnvVars { source: env_vars::Error },
-
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
         source: crate::controller::build::resource::pod::Error,
@@ -190,15 +187,12 @@ pub fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    airflow_container.add_env_vars(
-        env_vars::build_airflow_statefulset_envs(
-            validated_cluster,
-            airflow_role,
-            env_overrides,
-            git_sync_resources,
-        )
-        .context(BuildStatefulsetEnvVarsSnafu)?,
-    );
+    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
+        validated_cluster,
+        airflow_role,
+        env_overrides,
+        git_sync_resources,
+    ));
 
     let volume_mounts = validated_cluster.volume_mounts();
     airflow_container

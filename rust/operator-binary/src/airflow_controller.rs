@@ -1,15 +1,11 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha2::AirflowCluster`]
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
-    k8s_openapi::api::core::v1::EnvVar,
     kube::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
@@ -136,50 +132,5 @@ pub fn error_policy(
         Error::InvalidAirflowCluster { .. } => Action::await_change(),
 
         _ => Action::requeue(*Duration::from_secs(10)),
-    }
-}
-
-/// Convert user-supplied `envOverrides` into a list of [`EnvVar`]s.
-pub(crate) fn env_vars_from_overrides(env_overrides: &HashMap<String, String>) -> Vec<EnvVar> {
-    // Collect into a `BTreeMap` first so the env vars come out in a deterministic (sorted) order;
-    // `HashMap` iteration order is randomised per instance and would otherwise churn the containers
-    // this feeds between reconciles. Mirrors the override handling in `env_vars.rs`.
-    env_overrides
-        .iter()
-        .collect::<BTreeMap<_, _>>()
-        .into_iter()
-        .map(|(k, v)| EnvVar {
-            name: k.clone(),
-            value: Some(v.clone()),
-            ..EnvVar::default()
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use super::env_vars_from_overrides;
-
-    /// The env vars must come out in a deterministic (sorted-by-name) order. `env_overrides` is a
-    /// `HashMap`, whose iteration order is randomised per instance, so iterating it directly would
-    /// vary the rendered env array between reconciles and churn the git-sync containers it feeds.
-    #[test]
-    fn env_vars_from_overrides_are_sorted_by_name() {
-        let overrides = HashMap::from([
-            ("CHARLIE".to_string(), "3".to_string()),
-            ("ALPHA".to_string(), "1".to_string()),
-            ("ECHO".to_string(), "5".to_string()),
-            ("BRAVO".to_string(), "2".to_string()),
-            ("DELTA".to_string(), "4".to_string()),
-        ]);
-
-        let names: Vec<String> = env_vars_from_overrides(&overrides)
-            .into_iter()
-            .map(|env_var| env_var.name)
-            .collect();
-
-        assert_eq!(names, ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"]);
     }
 }

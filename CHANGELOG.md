@@ -12,7 +12,7 @@
   assembles all relevant Kubernetes resources before anything is applied ([#814]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#821]).
-- Bump stackable-operator to 0.114.0 ([#827]).
+- Bump stackable-operator to 0.116.0 ([#827], [#838]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#828]).
 - The level configured for the `airflow.task` logger now sets the level of the `task` handler,
@@ -26,6 +26,12 @@
 - Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
   resources they don't apply to (previously set to `none`) ([#838]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
+- Environment variable overrides (`envOverrides`) are now applied after all environment
+  variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
+  overridden, whereas previously the operator's value always took precedence ([#838]).
+- Environment variable names in `envOverrides` are now validated to be valid environment variable
+  names for all roles, whereas previously this was only enforced for role-group-level overrides
+  ([#838]).
 
 ### Fixed
 

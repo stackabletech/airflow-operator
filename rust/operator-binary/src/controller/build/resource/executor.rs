@@ -1,8 +1,6 @@
 //! Builds the Kubernetes-executor pod-template [`ConfigMap`]: a `ConfigMap` whose single entry is
 //! the serialized Pod template Airflow uses to provision one Pod per task.
 
-use std::collections::HashMap;
-
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -16,7 +14,7 @@ use stackable_operator::{
     },
     kvp::{Label, LabelError},
     v2::{
-        builder::pod::container::new_container_builder,
+        builder::pod::container::{EnvVarSet, new_container_builder},
         product_logging::framework::STACKABLE_LOG_DIR,
     },
 };
@@ -79,7 +77,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
     executor_config: &ValidatedAirflowConfig,
-    env_overrides: &HashMap<String, String>,
+    env_overrides: &EnvVarSet,
     pod_overrides: &PodTemplateSpec,
 ) -> Result<ConfigMap> {
     let resolved_product_image = &cluster.image;

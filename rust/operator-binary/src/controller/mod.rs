@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    marker::PhantomData,
-    str::FromStr,
-};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 
 use stackable_operator::{
     commons::{
@@ -30,6 +26,7 @@ use stackable_operator::{
     shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarSet,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         role_utils,
@@ -159,7 +156,7 @@ pub struct ValidatedExecutorTemplate {
     /// The merged + validated executor config (resources, affinity, logging, …).
     pub config: ValidatedAirflowConfig,
     /// Env-var overrides for the executor pod template (`spec.kubernetesExecutors.envOverrides`).
-    pub env_overrides: HashMap<String, String>,
+    pub env_overrides: EnvVarSet,
     /// Pod overrides for the executor pod template (`spec.kubernetesExecutors.podOverrides`).
     pub pod_overrides: PodTemplateSpec,
 }

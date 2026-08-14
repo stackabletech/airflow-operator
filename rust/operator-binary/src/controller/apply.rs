@@ -135,7 +135,7 @@ impl<'a> Applier<'a> {
 pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) -> Result<()> {
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.internal_secret_name().as_ref(),
-        INTERNAL_SECRET_SECRET_KEY,
+        &INTERNAL_SECRET_SECRET_KEY.to_string(),
         256,
         cluster,
         client,
@@ -145,7 +145,7 @@ pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) 
 
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.jwt_secret_name().as_ref(),
-        JWT_SECRET_SECRET_KEY,
+        &JWT_SECRET_SECRET_KEY.to_string(),
         256,
         cluster,
         client,
@@ -159,7 +159,7 @@ pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) 
     // which returns 32 bytes.
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.fernet_key_name().as_ref(),
-        FERNET_KEY_SECRET_KEY,
+        &FERNET_KEY_SECRET_KEY.to_string(),
         32,
         cluster,
         client,
