@@ -1,0 +1,41 @@
+---
+# The scheduler process was killed in the previous step. The start script ends in
+# `wait_for_termination $!`, so the container must exit and be restarted by Kubernetes.
+# If `$!` is not the scheduler (e.g. because a dag-processor is backgrounded after it),
+# the container keeps running with nothing scheduling DAGs and this assert fails.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-scheduler-is-supervised
+timeout: 75
+commands:
+  # The restart was observed to happen within 2-6 seconds, so 40 seconds of polling is
+  # ample. The loop polls rather than letting kuttl retry the whole script, so that the
+  # diagnosis at the end is printed exactly once.
+  - script: |
+      for _ in $(seq 20); do
+          restart_count=$(kubectl -n $NAMESPACE get pod airflow-scheduler-default-0 \
+              -o jsonpath='{.status.containerStatuses[?(@.name=="airflow")].restartCount}')
+
+          if [ "${restart_count:-0}" -ge 1 ]; then
+              exit 0
+          fi
+
+          sleep 2
+      done
+
+      echo "The scheduler died but its container was not restarted."
+      echo "Kubernetes considers the Pod healthy:"
+      kubectl -n $NAMESPACE get pod airflow-scheduler-default-0
+
+      echo "Airflow does not:"
+      kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- python - <<'EOF'
+      import requests
+
+      health = requests.get("http://airflow-webserver:8080/api/v2/monitor/health", timeout=10).json()
+
+      print(f"  scheduler:     {health['scheduler']}")
+      print(f"  dag_processor: {health['dag_processor']}")
+      EOF
+
+      exit 1
