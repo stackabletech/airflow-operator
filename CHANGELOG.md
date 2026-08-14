@@ -26,12 +26,13 @@
 - Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
   resources they don't apply to (previously set to `none`) ([#838]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#838]).
+- Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
+  resources they don't apply to (previously set to `none` or a placeholder value) ([#838]).
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
   overridden, whereas previously the operator's value always took precedence ([#838]).
-- Environment variable names in `envOverrides` are now validated to be valid environment variable
-  names for all roles, whereas previously this was only enforced for role-group-level overrides
-  ([#838]).
 
 ### Fixed
 
