@@ -603,16 +603,20 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow scheduler &".to_string(),
                     ]);
                     if !has_dag_processors {
                         // If no dag_processors role has been specified, the
                         // process needs to be included with the scheduler
                         // (with 3.x there is no longer the possibility of
                         // starting it as a subprocess, so it has to be
-                        // explicitly started *somewhere*)
+                        // explicitly started *somewhere*).
+                        // It is started before the scheduler because the
+                        // trailing `wait_for_termination $!` binds to the
+                        // process that was backgrounded last, and that must be
+                        // the scheduler.
                         command.extend(vec!["airflow dag-processor &".to_string()]);
                     }
+                    command.extend(vec!["airflow scheduler &".to_string()]);
                 }
                 AirflowRole::DagProcessor => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
@@ -1034,9 +1038,10 @@ mod tests {
         commons::product_image_selection::ResolvedProductImage,
         versioned::test_utils::RoundtripTestData,
     };
+    use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::{v1alpha1, v1alpha2};
+    use crate::{controller::build::test_support::validated_cluster, v1alpha1, v1alpha2};
 
     #[test]
     fn test_constants() {
@@ -1238,6 +1243,52 @@ mod tests {
                 .trusted_proxies(&cluster)
                 .expect("nothing to parse")
                 .is_empty()
+        );
+    }
+
+    /// The commands that background a process, i.e. the candidates for `$!`.
+    fn backgrounded_commands(role: &AirflowRole, cluster: &ValidatedCluster) -> Vec<String> {
+        role.get_commands(cluster)
+            .into_iter()
+            .filter(|command| command.ends_with(" &"))
+            .collect()
+    }
+
+    #[test]
+    fn every_role_backgrounds_its_own_process_last() {
+        let cluster = validated_cluster("kubernetesExecutors", "{config: {}}");
+
+        assert!(
+            cluster.image.product_version.starts_with("3."),
+            "the test cluster must run Airflow 3.x for this to test anything"
+        );
+        assert!(!cluster.has_role(&AirflowRole::DagProcessor));
+
+        for role in AirflowRole::iter() {
+            let own_process = match role {
+                AirflowRole::Webserver => "airflow api-server &",
+                AirflowRole::Scheduler => "airflow scheduler &",
+                AirflowRole::Worker => "airflow celery worker &",
+                AirflowRole::DagProcessor => "airflow dag-processor &",
+                AirflowRole::Triggerer => "airflow triggerer &",
+            };
+
+            assert_eq!(
+                backgrounded_commands(&role, &cluster).last(),
+                Some(&own_process.to_string()),
+                "{role:?} must background its own process last"
+            );
+        }
+    }
+
+    #[test]
+    fn a_scheduler_without_a_dag_processor_role_starts_the_dag_processor() {
+        let cluster = validated_cluster("kubernetesExecutors", "{config: {}}");
+        let backgrounded = backgrounded_commands(&AirflowRole::Scheduler, &cluster);
+
+        assert!(
+            backgrounded.contains(&"airflow dag-processor &".to_string()),
+            "the scheduler must start the dag-processor, but backgrounds only: {backgrounded:?}"
         );
     }
 
