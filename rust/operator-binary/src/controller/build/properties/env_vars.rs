@@ -489,6 +489,54 @@ mod tests {
     use crate::crd::authorization::OpaConfigResolved;
 
     #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *ADMIN_EMAIL;
+        let _ = *ADMIN_EMAIL_SECRET_KEY;
+        let _ = *ADMIN_FIRSTNAME;
+        let _ = *ADMIN_FIRSTNAME_SECRET_KEY;
+        let _ = *ADMIN_LASTNAME;
+        let _ = *ADMIN_LASTNAME_SECRET_KEY;
+        let _ = *ADMIN_PASSWORD;
+        let _ = *ADMIN_PASSWORD_SECRET_KEY;
+        let _ = *ADMIN_USERNAME;
+        let _ = *ADMIN_USERNAME_SECRET_KEY;
+        let _ = *AIRFLOW_API_AUTH_BACKENDS;
+        let _ = *AIRFLOW_API_AUTH_JWT_SECRET;
+        let _ = *AIRFLOW_API_SECRET_KEY;
+        let _ = *AIRFLOW_API_WORKERS;
+        let _ = *AIRFLOW_CELERY_BROKER_URL;
+        let _ = *AIRFLOW_CELERY_RESULT_BACKEND;
+        let _ = *AIRFLOW_CORE_AUTH_MANAGER;
+        let _ = *AIRFLOW_CORE_AUTH_OPA_CACHE_MAXSIZE;
+        let _ = *AIRFLOW_CORE_AUTH_OPA_CACHE_TTL_IN_SEC;
+        let _ = *AIRFLOW_CORE_AUTH_OPA_REQUEST_URL;
+        let _ = *AIRFLOW_CORE_BASE_URL;
+        let _ = *AIRFLOW_CORE_DAGS_FOLDER;
+        let _ = *AIRFLOW_CORE_EXECUTION_API_SERVER_URL;
+        let _ = *AIRFLOW_CORE_EXECUTOR;
+        let _ = *AIRFLOW_CORE_FERNET_KEY;
+        let _ = *AIRFLOW_CORE_LOAD_EXAMPLES;
+        let _ = *AIRFLOW_DATABASE_SQL_ALCHEMY_CONN;
+        let _ = *AIRFLOW_FAB_UPDATE_FAB_PERMS;
+        let _ = *AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE;
+        let _ = *AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE;
+        let _ = *AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS;
+        let _ = *AIRFLOW_METRICS_STATSD_HOST;
+        let _ = *AIRFLOW_METRICS_STATSD_ON;
+        let _ = *AIRFLOW_METRICS_STATSD_PORT;
+        let _ = *AIRFLOW_SCHEDULER_STANDALONE_DAG_PROCESSOR;
+        let _ = *AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX;
+        let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
+        let _ = *AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR;
+        let _ = *AIRFLOW_WEBSERVER_SECRET_KEY;
+        let _ = *CONTAINERDEBUG_LOG_DIRECTORY;
+        let _ = *FORWARDED_ALLOW_IPS;
+        let _ = *PYTHONPATH;
+        let _ = *STACKABLE_POST_HOOK;
+    }
+
+    #[test]
     fn test_airflow_2_authorization_env_vars() {
         let authorization_config = get_test_authorization_config();
         let authorization_env_vars = authorization_env_vars(&authorization_config, "2.10.5");

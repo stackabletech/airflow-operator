@@ -14,3 +14,16 @@ constant!(pub JWT_SECRET_SECRET_KEY: SecretKey = "JWT_SECRET");
 // Used for env-var: AIRFLOW__CORE__FERNET_KEY
 // See https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/fernet.html#security-fernet
 constant!(pub FERNET_KEY_SECRET_KEY: SecretKey = "FERNET_KEY");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *FERNET_KEY_SECRET_KEY;
+        let _ = *INTERNAL_SECRET_SECRET_KEY;
+        let _ = *JWT_SECRET_SECRET_KEY;
+    }
+}
