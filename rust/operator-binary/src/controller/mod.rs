@@ -63,7 +63,6 @@ pub mod dereference;
 pub mod update_status;
 pub mod validate;
 
-// Placeholder version label value for resources whose labels must not change after deployment.
 constant!(PRODUCT_NAME: ProductName = APP_NAME);
 constant!(OPERATOR_NAME: OperatorName = crd::OPERATOR_NAME);
 constant!(CONTROLLER_NAME: ControllerName = AIRFLOW_CONTROLLER_NAME);
