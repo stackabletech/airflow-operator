@@ -30,8 +30,8 @@ use crate::{
             properties::env_vars::build_airflow_template_envs,
             recommended_labels_for_role_group_resources,
             resource::pod::{
-                add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
-                build_logging_container,
+                GitSyncSidecarsAddition, add_authentication_volumes_and_volume_mounts,
+                add_git_sync_resources, build_logging_container,
             },
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
@@ -148,8 +148,9 @@ pub fn build_executor_template_config_map(
         &mut pb,
         &mut airflow_container,
         git_sync_resources,
-        false,
-        true,
+        // We don't need a git-sync sidecar, an initial clone via the init-container is sufficient for
+        // Kubernetes executors, as they are short-lived.
+        &GitSyncSidecarsAddition::Skip,
     )
     .context(PodSnafu)?;
 

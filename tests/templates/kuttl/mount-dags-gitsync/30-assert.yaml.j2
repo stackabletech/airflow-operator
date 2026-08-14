@@ -9,6 +9,11 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-webserver-default
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-sync-0-init
 status:
   readyReplicas: 1
   replicas: 1
@@ -18,6 +23,11 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-worker-default
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-sync-0-init
 status:
   readyReplicas: 1
   replicas: 1
@@ -27,6 +37,37 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: airflow-scheduler-default
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-sync-0-init
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-dagprocessor-default
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-sync-0-init
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-triggerer-default
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-sync-0-init
 status:
   readyReplicas: 1
   replicas: 1

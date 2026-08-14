@@ -2,7 +2,6 @@ tests/_work/
 debug/
 target/
 **/*.rs.bk
-__pycache__/
 
 .idea/
 *.iws
