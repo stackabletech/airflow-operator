@@ -15,8 +15,8 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
-        ValidatedCluster,
+        CONTROLLER_NAME, EXECUTOR_ROLE_GROUP_NAME, EXECUTOR_ROLE_NAME, KubernetesResources,
+        OPERATOR_NAME, PRODUCT_NAME, Prepared, ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             executor::build_executor_template_config_map,
@@ -26,7 +26,6 @@ use crate::{
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_server_rolegroup_statefulset,
         },
-        executor_role_group_name, executor_role_name,
     },
     crd::{AirflowConfigOverrides, Container},
 };
@@ -69,10 +68,10 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
     // The Kubernetes-executor pod template (only built for the Kubernetes executor; the Celery
     // executor's workers are a regular role with its own role groups instead).
     if let Some(executor_template) = &cluster.cluster_config.executor_template {
-        let executor_role_group = executor_role_group_name();
+        let executor_role_group = EXECUTOR_ROLE_GROUP_NAME.clone();
         let executor_config_map = build_rolegroup_config_map(
             cluster,
-            &executor_role_name(),
+            &EXECUTOR_ROLE_NAME,
             &executor_role_group,
             // The Kubernetes-executor pod template does not apply webserver_config.py overrides.
             &AirflowConfigOverrides::default(),

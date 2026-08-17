@@ -359,32 +359,13 @@ impl ValidatedCluster {
     }
 }
 
-/// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
-/// AirflowRole). Used to derive its labels and ConfigMap name.
-pub const EXECUTOR_ROLE_NAME: &str = "executor";
-pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
+// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
+// AirflowRole). Used to derive its labels and ConfigMap name.
+constant!(pub EXECUTOR_ROLE_NAME: RoleName = "executor");
+constant!(pub EXECUTOR_ROLE_GROUP_NAME: RoleGroupName = "kubernetes");
 
-/// The executor pseudo-role name (`executor`) as a type-safe value.
-pub fn executor_role_name() -> RoleName {
-    EXECUTOR_ROLE_NAME
-        .parse()
-        .expect("'executor' is a valid role name")
-}
-
-/// The executor's role-group name (`kubernetes`), used for its role-group ConfigMap.
-pub fn executor_role_group_name() -> RoleGroupName {
-    EXECUTOR_ROLE_GROUP_NAME
-        .parse()
-        .expect("'kubernetes' is a valid role group name")
-}
-
-/// The executor *pod-template* role-group name (`executor-template`), used for the template
-/// ConfigMap/pod labels.
-pub fn executor_template_role_group_name() -> RoleGroupName {
-    "executor-template"
-        .parse()
-        .expect("'executor-template' is a valid role group name")
-}
+// The executor *pod-template* role-group name, used for the template ConfigMap/pod labels.
+constant!(pub EXECUTOR_TEMPLATE_ROLE_GROUP_NAME: RoleGroupName = "executor-template");
 
 /// Lets [`ValidatedCluster`] stand in for the raw [`v1alpha2::AirflowCluster`] when building owner
 /// references and metadata for child objects. Kind/group/version are delegated to the CRD; the
@@ -446,5 +427,8 @@ mod tests {
         let _ = *PRODUCT_NAME;
         let _ = *OPERATOR_NAME;
         let _ = *CONTROLLER_NAME;
+        let _ = *EXECUTOR_ROLE_NAME;
+        let _ = *EXECUTOR_ROLE_GROUP_NAME;
+        let _ = *EXECUTOR_TEMPLATE_ROLE_GROUP_NAME;
     }
 }
