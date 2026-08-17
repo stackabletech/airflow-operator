@@ -126,8 +126,8 @@ pub fn build_server_rolegroup_statefulset(
         airflow_role,
         role_group_name,
     );
-    // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
-    // version keeps the labels stable across version upgrades).
+    // Used for PVC templates, which cannot be modified once they are deployed. The version label
+    // is omitted so the labels stay stable across version upgrades.
     let unversioned_recommended_labels = recommended_labels_for_unversioned_role_group_resources(
         validated_cluster,
         airflow_role,
