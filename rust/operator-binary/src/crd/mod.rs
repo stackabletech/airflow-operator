@@ -1041,7 +1041,10 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::{controller::build::test_support::validated_cluster, v1alpha1, v1alpha2};
+    use crate::{
+        controller::build::test_support::{validated_cluster, validated_cluster_with},
+        v1alpha1, v1alpha2,
+    };
 
     #[test]
     fn test_constants() {
@@ -1289,6 +1292,33 @@ mod tests {
         assert!(
             backgrounded.contains(&"airflow dag-processor &".to_string()),
             "the scheduler must start the dag-processor, but backgrounds only: {backgrounded:?}"
+        );
+    }
+
+    #[test]
+    fn a_scheduler_with_a_dag_processor_role_does_not_start_the_dag_processor() {
+        let cluster = validated_cluster_with("kubernetesExecutors", "{config: {}}", |cluster| {
+            cluster["spec"]
+                .as_mapping_mut()
+                .expect("the test CR has a spec mapping")
+                .insert(
+                    "dagProcessors".into(),
+                    serde_yaml::from_str("{config: {}, roleGroups: {default: {config: {}}}}")
+                        .expect("the dag-processor role is valid YAML"),
+                );
+        });
+
+        assert!(
+            cluster.has_role(&AirflowRole::DagProcessor),
+            "the fixture must declare a dag-processor role for this to test anything"
+        );
+
+        let backgrounded = backgrounded_commands(&AirflowRole::Scheduler, &cluster);
+
+        assert!(
+            !backgrounded.contains(&"airflow dag-processor &".to_string()),
+            "the dedicated dag-processor role runs the process, so the scheduler must not \
+             start a second one, but backgrounds: {backgrounded:?}"
         );
     }
 

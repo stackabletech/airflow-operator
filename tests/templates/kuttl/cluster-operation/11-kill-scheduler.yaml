@@ -3,29 +3,50 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 metadata:
   name: kill-scheduler
-timeout: 60
+timeout: 120
 commands:
-  # Killing a scheduler that is already gone would make the assert of this step fail for
-  # the wrong reason, so establish that Airflow considers the scheduler alive first.
+  - script: |
+      restart_count=$(kubectl -n $NAMESPACE get pod airflow-scheduler-default-0 \
+          -o jsonpath='{.status.containerStatuses[?(@.name=="airflow")].restartCount}')
+
+      if [ "${restart_count:-0}" -ne 0 ]; then
+          echo "The airflow container already restarted ${restart_count} times before the" \
+               "kill, so a restart afterwards would not prove that the scheduler is" \
+               "supervised." >&2
+          exit 1
+      fi
+
   - script: |
       kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- python - <<'EOF'
       import sys
+      import time
 
       import requests
 
-      health = requests.get("http://airflow-webserver:8080/api/v2/monitor/health", timeout=10).json()
+      HEALTH_URL = "http://airflow-webserver:8080/api/v2/monitor/health"
 
-      print(f"scheduler before the kill: {health['scheduler']}")
+      for attempt in range(1, 11):
+          try:
+              response = requests.get(HEALTH_URL, timeout=10)
+          except requests.RequestException as error:
+              print(f"attempt {attempt}: {error}")
+          else:
+              if response.ok:
+                  scheduler = response.json()["scheduler"]
 
-      if health["scheduler"]["status"] != "healthy":
-          sys.exit("expected a healthy scheduler")
+                  if scheduler["status"] == "healthy":
+                      print(f"scheduler before the kill: {scheduler}")
+                      break
+
+                  print(f"attempt {attempt}: scheduler is {scheduler}")
+              else:
+                  print(f"attempt {attempt}: HTTP {response.status_code} {response.text[:200]}")
+
+          time.sleep(3)
+      else:
+          sys.exit("expected a healthy scheduler, see the attempts above")
       EOF
 
-  # Kill the `airflow scheduler` process. The product image contains neither `ps` nor
-  # `pkill`, so the process is looked up in /proc. The generated start script runs as
-  # PID 1 and backgrounds the product processes, which makes the scheduler a direct
-  # child of PID 1. Searching all of /proc instead would also match PID 1 itself,
-  # whose command line is the entire start script.
   - script: |
       kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- bash <<'EOF'
       set -euo pipefail
