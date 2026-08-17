@@ -39,7 +39,6 @@ constant!(AIRFLOW_LOGGING_LOGGING_CONFIG_CLASS: EnvVarName = "AIRFLOW__LOGGING__
 constant!(AIRFLOW_METRICS_STATSD_ON: EnvVarName = "AIRFLOW__METRICS__STATSD_ON");
 constant!(AIRFLOW_METRICS_STATSD_HOST: EnvVarName = "AIRFLOW__METRICS__STATSD_HOST");
 constant!(AIRFLOW_METRICS_STATSD_PORT: EnvVarName = "AIRFLOW__METRICS__STATSD_PORT");
-constant!(AIRFLOW_WEBSERVER_SECRET_KEY: EnvVarName = "AIRFLOW__WEBSERVER__SECRET_KEY");
 constant!(AIRFLOW_API_SECRET_KEY: EnvVarName = "AIRFLOW__API__SECRET_KEY");
 constant!(AIRFLOW_CORE_FERNET_KEY: EnvVarName = "AIRFLOW__CORE__FERNET_KEY");
 constant!(AIRFLOW_CELERY_RESULT_BACKEND: EnvVarName = "AIRFLOW__CELERY__RESULT_BACKEND");
@@ -110,12 +109,6 @@ pub fn build_airflow_statefulset_envs(
 
     let mut env_vars = static_envs(git_sync_resources)
         .merge(add_version_specific_env_vars(cluster, airflow_role))
-        // N.B. this has been deprecated and replaced with AIRFLOW__API__SECRET_KEY since 3.0.2. Can be removed when 3.0.1 is no longer supported.
-        .with_secret_key_ref(
-            &AIRFLOW_WEBSERVER_SECRET_KEY,
-            &internal_secret_name,
-            &INTERNAL_SECRET_SECRET_KEY,
-        )
         // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
         .with_secret_key_ref(
             &AIRFLOW_API_SECRET_KEY,
@@ -529,7 +522,6 @@ mod tests {
         let _ = *AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX;
         let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
         let _ = *AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR;
-        let _ = *AIRFLOW_WEBSERVER_SECRET_KEY;
         let _ = *CONTAINERDEBUG_LOG_DIRECTORY;
         let _ = *FORWARDED_ALLOW_IPS;
         let _ = *PYTHONPATH;
