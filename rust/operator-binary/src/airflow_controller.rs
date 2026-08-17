@@ -21,14 +21,14 @@ use crate::{
         build,
         update_status::{self, update_status},
     },
-    crd::{OPERATOR_NAME, v1alpha2},
+    crd::{AIRFLOW_OPERATOR_NAME, v1alpha2},
 };
 
 pub const AIRFLOW_CONTROLLER_NAME: &str = "airflowcluster";
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "airflow";
 
 pub const AIRFLOW_FULL_CONTROLLER_NAME: &str =
-    concatcp!(AIRFLOW_CONTROLLER_NAME, '.', OPERATOR_NAME);
+    concatcp!(AIRFLOW_CONTROLLER_NAME, '.', AIRFLOW_OPERATOR_NAME);
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,

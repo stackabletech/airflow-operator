@@ -8,6 +8,7 @@ use stackable_operator::{
     kvp::Labels,
     v2::{
         builder::meta::ownerreference_from_resource,
+        kvp::label,
         types::operator::{RoleGroupName, RoleName},
     },
 };
@@ -183,7 +184,7 @@ pub(crate) fn object_meta(
 }
 
 pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
-    stackable_operator::v2::kvp::label::recommended_labels_for_cluster_resources(
+    label::recommended_labels_for_cluster_resources(
         &cluster.name,
         &PRODUCT_NAME,
         &cluster.product_version,
@@ -196,7 +197,7 @@ pub(crate) fn recommended_labels_for_role_resources(
     cluster: &ValidatedCluster,
     role_name: &RoleName,
 ) -> Labels {
-    stackable_operator::v2::kvp::label::recommended_labels_for_role_resources(
+    label::recommended_labels_for_role_resources(
         &cluster.name,
         &PRODUCT_NAME,
         &cluster.product_version,
@@ -211,7 +212,7 @@ pub(crate) fn recommended_labels_for_role_group_resources(
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
 ) -> Labels {
-    stackable_operator::v2::kvp::label::recommended_labels_for_role_group_resources(
+    label::recommended_labels_for_role_group_resources(
         &cluster.name,
         &PRODUCT_NAME,
         &cluster.product_version,
@@ -227,7 +228,7 @@ pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
 ) -> Labels {
-    stackable_operator::v2::kvp::label::recommended_labels_for_unversioned_role_group_resources(
+    label::recommended_labels_for_unversioned_role_group_resources(
         &cluster.name,
         &PRODUCT_NAME,
         &OPERATOR_NAME,
@@ -243,12 +244,7 @@ pub(crate) fn role_group_selector(
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
 ) -> Labels {
-    stackable_operator::v2::kvp::label::role_group_selector(
-        &cluster.name,
-        &PRODUCT_NAME,
-        role_name,
-        role_group_name,
-    )
+    label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
 }
 
 #[cfg(test)]

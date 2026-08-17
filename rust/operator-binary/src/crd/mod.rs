@@ -80,23 +80,23 @@ pub mod trusted_proxies;
 
 pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
-pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
+pub const AIRFLOW_OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 
-stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
+constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-stackable_operator::constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
+constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
-stackable_operator::constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
+constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);

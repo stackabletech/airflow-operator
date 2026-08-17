@@ -45,8 +45,8 @@ use stackable_operator::{
 use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
     crd::{
-        self, APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        AirflowStorageConfig, ExecutorConfig,
+        AIRFLOW_OPERATOR_NAME, APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor,
+        AirflowRole, AirflowStorageConfig, ExecutorConfig,
         authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved,
         databases::{
@@ -64,7 +64,7 @@ pub mod update_status;
 pub mod validate;
 
 constant!(PRODUCT_NAME: ProductName = APP_NAME);
-constant!(OPERATOR_NAME: OperatorName = crd::OPERATOR_NAME);
+constant!(OPERATOR_NAME: OperatorName = AIRFLOW_OPERATOR_NAME);
 constant!(CONTROLLER_NAME: ControllerName = AIRFLOW_CONTROLLER_NAME);
 
 /// Marker for prepared Kubernetes resources which are not applied yet.

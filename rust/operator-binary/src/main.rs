@@ -34,7 +34,7 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_FULL_CONTROLLER_NAME,
-    crd::{AirflowCluster, AirflowClusterVersion, OPERATOR_NAME, v1alpha1, v1alpha2},
+    crd::{AIRFLOW_OPERATOR_NAME, AirflowCluster, AirflowClusterVersion, v1alpha1, v1alpha2},
     webhooks::conversion::create_webhook_server,
 };
 
@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
                     .map(anyhow::Ok);
 
             let client = stackable_operator::client::initialize_operator(
-                Some(OPERATOR_NAME.to_string()),
+                Some(AIRFLOW_OPERATOR_NAME.to_string()),
                 &common.cluster_info,
             )
             .await?;

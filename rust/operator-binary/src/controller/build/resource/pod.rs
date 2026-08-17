@@ -8,6 +8,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::{PodBuilder, container::ContainerBuilder},
     commons::product_image_selection::ResolvedProductImage,
+    constant,
     crd::{authentication::ldap, git_sync},
     k8s_openapi::api::core::v1::Container as K8sContainer,
     v2::{
@@ -129,7 +130,7 @@ pub(crate) fn add_git_sync_resources(
     Ok(())
 }
 
-stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 
 /// Builds the Vector log-collection sidecar container from the up-front-validated logging config.
 pub(crate) fn build_logging_container(
