@@ -12,7 +12,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{Applied, KubernetesResources},
-    crd::{AirflowClusterStatus, OPERATOR_NAME, v1alpha2},
+    crd::{AIRFLOW_OPERATOR_NAME, AirflowClusterStatus, v1alpha2},
 };
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -50,7 +50,7 @@ pub async fn update_status(
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, airflow, &status)
+        .apply_patch_status(AIRFLOW_OPERATOR_NAME, airflow, &status)
         .await
         .context(ApplyStatusSnafu)?;
 

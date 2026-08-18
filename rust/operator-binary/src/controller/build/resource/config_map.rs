@@ -24,6 +24,7 @@ use crate::{
                 product_logging::{create_airflow_config, vector_config_file_content},
                 webserver_config,
             },
+            recommended_labels_for_role_group_resources,
         },
     },
     crd::{AirflowConfigOverrides, Container},
@@ -72,7 +73,11 @@ pub fn build_rolegroup_config_map(
                     .role_group_resource_names(role_name, role_group_name)
                     .role_group_config_map()
                     .to_string(),
-                validated_cluster.recommended_labels_for(role_name, role_group_name),
+                recommended_labels_for_role_group_resources(
+                    validated_cluster,
+                    role_name,
+                    role_group_name,
+                ),
             )
             .build(),
         )

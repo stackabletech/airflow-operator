@@ -1,21 +1,15 @@
-use std::str::FromStr;
-
 use stackable_operator::{
     crd::listener,
-    v2::types::{
-        kubernetes::{ListenerClassName, ListenerName},
-        operator::RoleGroupName,
-    },
+    v2::types::kubernetes::{ListenerClassName, ListenerName},
 };
 
 use crate::{
-    controller::{ValidatedCluster, build::object_meta},
+    controller::{
+        ValidatedCluster,
+        build::{object_meta, recommended_labels_for_role_resources},
+    },
     crd::{AirflowRole, HTTP_PORT, HTTP_PORT_NAME},
 };
-
-// The group listener is a role-level object, so a constant `none` role-group is used as the
-// role-group label value.
-stackable_operator::constant!(NONE_ROLE_GROUP_NAME: RoleGroupName = "none");
 
 pub fn build_group_listener(
     cluster: &ValidatedCluster,
@@ -27,8 +21,7 @@ pub fn build_group_listener(
         metadata: object_meta(
             cluster,
             listener_group_name,
-            cluster
-                .recommended_labels_for(&ValidatedCluster::role_name(role), &NONE_ROLE_GROUP_NAME),
+            recommended_labels_for_role_resources(cluster, role),
         )
         .build(),
         spec: listener::v1alpha1::ListenerSpec {

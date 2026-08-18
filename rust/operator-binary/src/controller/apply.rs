@@ -14,8 +14,8 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        Applied, KubernetesResources, Prepared, ValidatedCluster, controller_name, operator_name,
-        product_name,
+        Applied, CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
+        ValidatedCluster,
     },
     crd::internal_secret::{
         FERNET_KEY_SECRET_KEY, INTERNAL_SECRET_SECRET_KEY, JWT_SECRET_SECRET_KEY,
@@ -60,9 +60,9 @@ impl<'a> Applier<'a> {
         object_overrides: &'a ObjectOverrides,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
-            &product_name(),
-            &operator_name(),
-            &controller_name(),
+            &PRODUCT_NAME,
+            &OPERATOR_NAME,
+            &CONTROLLER_NAME,
             &cluster.name,
             &cluster.namespace,
             &cluster.uid,
@@ -135,7 +135,7 @@ impl<'a> Applier<'a> {
 pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) -> Result<()> {
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.internal_secret_name().as_ref(),
-        INTERNAL_SECRET_SECRET_KEY,
+        &INTERNAL_SECRET_SECRET_KEY.to_string(),
         256,
         cluster,
         client,
@@ -145,7 +145,7 @@ pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) 
 
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.jwt_secret_name().as_ref(),
-        JWT_SECRET_SECRET_KEY,
+        &JWT_SECRET_SECRET_KEY.to_string(),
         256,
         cluster,
         client,
@@ -159,7 +159,7 @@ pub async fn ensure_random_secrets(client: &Client, cluster: &ValidatedCluster) 
     // which returns 32 bytes.
     random_secret_creation::create_random_secret_if_not_exists(
         cluster.fernet_key_name().as_ref(),
-        FERNET_KEY_SECRET_KEY,
+        &FERNET_KEY_SECRET_KEY.to_string(),
         32,
         cluster,
         client,

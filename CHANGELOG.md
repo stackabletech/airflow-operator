@@ -12,7 +12,7 @@
   assembles all relevant Kubernetes resources before anything is applied ([#814]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#821]).
-- Bump stackable-operator to 0.114.0 ([#827]).
+- Bump stackable-operator to 0.116.0 ([#827], [#838]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#828]).
 - The level configured for the `airflow.task` logger now sets the level of the `task` handler,
@@ -23,7 +23,17 @@
   the logger as well, because a logger discards records before any handler can filter them, so in
   that direction the UI and the other destinations open up together and cannot be set apart
   ([#829]).
+- BREAKING: Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels
+  from the resources they don't apply to (previously set to `none` or a placeholder value).
+  StatefulSets created by older operator versions cannot be updated in place: after the
+  operator upgrade, delete each StatefulSet so that the operator immediately recreates it with
+  the new labels ([#838]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#838]).
+- Environment variable overrides (`envOverrides`) are now applied after all environment
+  variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
+  overridden, whereas previously the operator's value always took precedence ([#838]).
 
 ### Fixed
 
@@ -40,6 +50,7 @@
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
 [#834]: https://github.com/stackabletech/airflow-operator/pull/834
 [#835]: https://github.com/stackabletech/airflow-operator/pull/835
+[#838]: https://github.com/stackabletech/airflow-operator/pull/838
 [#840]: https://github.com/stackabletech/airflow-operator/pull/840
 [#844]: https://github.com/stackabletech/airflow-operator/pull/844
 

@@ -5,17 +5,17 @@ use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
     crd::git_sync,
-    k8s_openapi::api::core::v1::{EnvVar, VolumeMount},
+    k8s_openapi::api::core::v1::VolumeMount,
     kube::ResourceExt,
     product_logging::spec::Logging,
-    role_utils::{GenericRoleConfig, RoleGroup},
+    role_utils::GenericRoleConfig,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
+        builder::pod::container::EnvVarSet,
         controller_utils::{get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
-        role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
+        role_utils::{GenericCommonConfig, RoleGroup, RoleGroupConfig, with_validated_config},
         types::{
             kubernetes::ConfigMapName,
             operator::{ClusterName, RoleGroupName},
@@ -30,7 +30,7 @@ use super::{
     build::volumes::LOG_VOLUME_NAME, dereference::DereferencedObjects,
 };
 use crate::{
-    airflow_controller::{CONTAINER_IMAGE_BASE_NAME, env_vars_from_overrides},
+    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
         AirflowRoleType, Container, v1alpha2,
@@ -73,11 +73,6 @@ pub enum Error {
     FailedToResolveConfig {
         source: fragment::ValidationError,
         role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to parse an environment variable override name"))]
-    ParseEnvVarName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("failed to validate the logging configuration"))]
@@ -215,11 +210,14 @@ pub fn validate_cluster(
                 &Container::Base,
                 &vector_aggregator_config_map_name,
             )?;
+
+            let env_overrides: EnvVarSet = common_configuration.env_overrides.clone().into();
+
             // Resolve the executor's git-sync resources up-front too, mirroring the role groups.
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &resolved_product_image,
-                &env_vars_from_overrides(&common_configuration.env_overrides),
+                &env_overrides.clone().into_iter().collect::<Vec<_>>(),
                 &airflow.spec.cluster_config.volume_mounts,
                 LOG_VOLUME_NAME.as_ref(),
                 &logging.git_sync_container,
@@ -231,7 +229,7 @@ pub fn validate_cluster(
                     logging,
                     git_sync_resources,
                 ),
-                env_overrides: common_configuration.env_overrides.clone(),
+                env_overrides,
                 pod_overrides: common_configuration.pod_overrides.clone(),
             })
         }
@@ -290,14 +288,6 @@ fn validate_role_group(
         role_group: role_group_name.clone(),
     })?;
 
-    let mut env_overrides = EnvVarSet::new();
-    for (env_var_name, env_var_value) in validated.config.env_overrides {
-        env_overrides = env_overrides.with_value(
-            &EnvVarName::from_str(&env_var_name).context(ParseEnvVarNameSnafu)?,
-            env_var_value,
-        );
-    }
-
     let merged_config = validated.config.config;
     let logging = validate_logging(
         &merged_config.logging,
@@ -305,12 +295,14 @@ fn validate_role_group(
         vector_aggregator_config_map_name,
     )?;
 
+    let env_overrides: EnvVarSet = validated.config.env_overrides.clone().into();
+
     // The git-sync resources depend on this role group's env-var overrides and (git-sync) logging
     // config, so they are resolved (and validated) here, up-front, rather than at build time.
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         dags_git_sync,
         image,
-        &Vec::<EnvVar>::from(env_overrides.clone()),
+        &env_overrides.clone().into_iter().collect::<Vec<_>>(),
         volume_mounts,
         LOG_VOLUME_NAME.as_ref(),
         &logging.git_sync_container,
@@ -367,7 +359,7 @@ pub(crate) fn validate_logging(
 mod tests {
     use std::collections::BTreeMap;
 
-    use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
+    use stackable_operator::v2::builder::pod::container::{EnvVarName, EnvVarSet};
 
     use super::validate_role_group;
     use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
@@ -467,19 +459,17 @@ mod tests {
         );
 
         // env overrides layer role-group on top of role.
-        let env_overrides: BTreeMap<String, Option<String>> =
-            Vec::<EnvVar>::from(validated.env_overrides)
-                .into_iter()
-                .map(|env_var| (env_var.name, env_var.value))
-                .collect();
-        assert_eq!(env_overrides.len(), 2);
         assert_eq!(
-            env_overrides.get("ROLE_ENV_VAR").unwrap().as_deref(),
-            Some("role-env-value")
-        );
-        assert_eq!(
-            env_overrides.get("GROUP_ENV_VAR").unwrap().as_deref(),
-            Some("group-env-value")
+            validated.env_overrides,
+            EnvVarSet::new()
+                .with_value(
+                    &EnvVarName::from_str_unsafe("ROLE_ENV_VAR"),
+                    "role-env-value"
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("GROUP_ENV_VAR"),
+                    "group-env-value"
+                )
         );
     }
 
@@ -562,7 +552,7 @@ mod tests {
                 .overrides
                 .is_empty()
         );
-        assert!(Vec::<EnvVar>::from(validated.env_overrides).is_empty());
+        assert_eq!(validated.env_overrides, EnvVarSet::new());
     }
 
     /// `replicas` and the role←role-group merged `pod_overrides` are produced by

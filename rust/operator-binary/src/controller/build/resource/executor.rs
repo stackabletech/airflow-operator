@@ -1,8 +1,6 @@
 //! Builds the Kubernetes-executor pod-template [`ConfigMap`]: a `ConfigMap` whose single entry is
 //! the serialized Pod template Airflow uses to provision one Pod per task.
 
-use std::collections::HashMap;
-
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -16,25 +14,26 @@ use stackable_operator::{
     },
     kvp::{Label, LabelError},
     v2::{
-        builder::pod::container::new_container_builder,
+        builder::pod::container::{EnvVarSet, new_container_builder},
         product_logging::framework::STACKABLE_LOG_DIR,
     },
 };
 
 use crate::{
     controller::{
+        EXECUTOR_ROLE_GROUP_NAME, EXECUTOR_ROLE_NAME, EXECUTOR_TEMPLATE_ROLE_GROUP_NAME,
         ValidatedAirflowConfig, ValidatedCluster,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
             object_meta,
             properties::env_vars::build_airflow_template_envs,
+            recommended_labels_for_role_group_resources,
             resource::pod::{
                 GitSyncSidecarsAddition, add_authentication_volumes_and_volume_mounts,
                 add_git_sync_resources, build_logging_container,
             },
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
-        executor_role_group_name, executor_role_name, executor_template_role_group_name,
     },
     crd::{CONFIG_PATH, Container, LOG_CONFIG_DIR, TEMPLATE_NAME},
 };
@@ -78,7 +77,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_executor_template_config_map(
     cluster: &ValidatedCluster,
     executor_config: &ValidatedAirflowConfig,
-    env_overrides: &HashMap<String, String>,
+    env_overrides: &EnvVarSet,
     pod_overrides: &PodTemplateSpec,
 ) -> Result<ConfigMap> {
     let resolved_product_image = &cluster.image;
@@ -88,13 +87,13 @@ pub fn build_executor_template_config_map(
     let git_sync_resources = &executor_config.git_sync_resources;
 
     let mut pb = PodBuilder::new();
-    let pb_metadata =
-        ObjectMetaBuilder::new()
-            .with_labels(cluster.recommended_labels_for(
-                &executor_role_name(),
-                &executor_template_role_group_name(),
-            ))
-            .build();
+    let pb_metadata = ObjectMetaBuilder::new()
+        .with_labels(recommended_labels_for_role_group_resources(
+            cluster,
+            &EXECUTOR_ROLE_NAME,
+            &EXECUTOR_TEMPLATE_ROLE_GROUP_NAME,
+        ))
+        .build();
 
     pb.metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
@@ -162,7 +161,7 @@ pub fn build_executor_template_config_map(
         .context(AddVolumeSnafu)?;
     pb.add_volumes(volumes::create_volumes(
         cluster
-            .role_group_resource_names(&executor_role_name(), &executor_role_group_name())
+            .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_ROLE_GROUP_NAME)
             .role_group_config_map()
             .as_ref(),
         &executor_config.logging.product_container,
@@ -173,10 +172,8 @@ pub fn build_executor_template_config_map(
         pb.add_container(build_logging_container(
             resolved_product_image,
             vector_log_config,
-            &cluster.role_group_resource_names(
-                &executor_role_name(),
-                &executor_template_role_group_name(),
-            ),
+            &cluster
+                .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_TEMPLATE_ROLE_GROUP_NAME),
         ));
     }
 
@@ -193,9 +190,10 @@ pub fn build_executor_template_config_map(
             object_meta(
                 cluster,
                 cluster.executor_template_configmap_name(),
-                cluster.recommended_labels_for(
-                    &executor_role_name(),
-                    &executor_template_role_group_name(),
+                recommended_labels_for_role_group_resources(
+                    cluster,
+                    &EXECUTOR_ROLE_NAME,
+                    &EXECUTOR_TEMPLATE_ROLE_GROUP_NAME,
                 ),
             )
             .with_label(restarter_label)

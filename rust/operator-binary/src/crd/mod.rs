@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -18,6 +18,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    constant,
     crd::git_sync,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -31,7 +32,7 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -40,13 +41,14 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         product_logging::framework::STACKABLE_LOG_DIR,
-        role_utils::GenericCommonConfig,
+        role_utils::{CommonConfiguration, GenericCommonConfig, Role, RoleGroup},
         types::{
             common::Port,
             kubernetes::{
                 ConfigMapName, ContainerName, ListenerClassName, ListenerName,
                 PersistentVolumeClaimName, SecretName, VolumeName,
             },
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -78,23 +80,23 @@ pub mod trusted_proxies;
 
 pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
-pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
+pub const AIRFLOW_OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 
-stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
+constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-stackable_operator::constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
+constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
-stackable_operator::constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
+constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -103,6 +105,12 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+constant!(WEBSERVER_ROLE_NAME: RoleName = "webserver");
+constant!(SCHEDULER_ROLE_NAME: RoleName = "scheduler");
+constant!(WORKER_ROLE_NAME: RoleName = "worker");
+constant!(DAG_PROCESSOR_ROLE_NAME: RoleName = "dagprocessor");
+constant!(TRIGGERER_ROLE_NAME: RoleName = "triggerer");
 
 pub type AirflowRoleType =
     Role<AirflowConfigFragment, AirflowConfigOverrides, GenericRoleConfig, GenericCommonConfig>;
@@ -524,35 +532,12 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    Eq,
-    Hash,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    EnumString,
-)]
+#[derive(Clone, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AirflowRole {
-    #[strum(serialize = "webserver")]
     Webserver,
-
-    #[strum(serialize = "scheduler")]
     Scheduler,
-
-    #[strum(serialize = "worker")]
     Worker,
-
-    #[strum(serialize = "dagprocessor")]
     DagProcessor,
-
-    #[strum(serialize = "triggerer")]
     Triggerer,
 }
 
@@ -812,6 +797,20 @@ impl AirflowRole {
     }
 }
 
+impl Deref for AirflowRole {
+    type Target = RoleName;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            AirflowRole::Webserver => &WEBSERVER_ROLE_NAME,
+            AirflowRole::Scheduler => &SCHEDULER_ROLE_NAME,
+            AirflowRole::Worker => &WORKER_ROLE_NAME,
+            AirflowRole::DagProcessor => &DAG_PROCESSOR_ROLE_NAME,
+            AirflowRole::Triggerer => &TRIGGERER_ROLE_NAME,
+        }
+    }
+}
+
 fn container_debug_command() -> String {
     format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
 }
@@ -1036,10 +1035,18 @@ mod tests {
         versioned::test_utils::RoundtripTestData,
     };
 
-    use crate::{
-        crd::{AirflowRole, trusted_proxies::TrustedProxy},
-        v1alpha1, v1alpha2,
-    };
+    use super::*;
+    use crate::{v1alpha1, v1alpha2};
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *WEBSERVER_ROLE_NAME;
+        let _ = *SCHEDULER_ROLE_NAME;
+        let _ = *WORKER_ROLE_NAME;
+        let _ = *DAG_PROCESSOR_ROLE_NAME;
+        let _ = *TRIGGERER_ROLE_NAME;
+    }
 
     #[test]
     fn test_cluster_config() {
@@ -1216,7 +1223,7 @@ mod tests {
                 role.trusted_proxies(&cluster)
                     .expect("no proxies to parse")
                     .is_empty(),
-                "role {role} must not have trusted proxies"
+                "role {role:?} must not have trusted proxies"
             );
         }
     }

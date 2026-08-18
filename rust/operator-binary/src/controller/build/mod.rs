@@ -6,12 +6,17 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     kvp::Labels,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        kvp::label,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 
 use crate::{
     controller::{
-        KubernetesResources, Prepared, ValidatedCluster,
+        CONTROLLER_NAME, EXECUTOR_ROLE_GROUP_NAME, EXECUTOR_ROLE_NAME, KubernetesResources,
+        OPERATOR_NAME, PRODUCT_NAME, Prepared, ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             executor::build_executor_template_config_map,
@@ -21,7 +26,6 @@ use crate::{
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_server_rolegroup_statefulset,
         },
-        executor_role_group_name, executor_role_name,
     },
     crd::{AirflowConfigOverrides, Container},
 };
@@ -64,10 +68,10 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
     // The Kubernetes-executor pod template (only built for the Kubernetes executor; the Celery
     // executor's workers are a regular role with its own role groups instead).
     if let Some(executor_template) = &cluster.cluster_config.executor_template {
-        let executor_role_group = executor_role_group_name();
+        let executor_role_group = EXECUTOR_ROLE_GROUP_NAME.clone();
         let executor_config_map = build_rolegroup_config_map(
             cluster,
-            &executor_role_name(),
+            &EXECUTOR_ROLE_NAME,
             &executor_role_group,
             // The Kubernetes-executor pod template does not apply webserver_config.py overrides.
             &AirflowConfigOverrides::default(),
@@ -122,7 +126,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
             config_maps.push(
                 build_rolegroup_config_map(
                     cluster,
-                    &ValidatedCluster::role_name(role),
+                    role,
                     role_group_name,
                     &rg_config.config_overrides,
                     logging,
@@ -176,6 +180,70 @@ pub(crate) fn object_meta(
         .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_labels(labels);
     builder
+}
+
+pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
+    label::recommended_labels_for_cluster_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+) -> Labels {
+    label::recommended_labels_for_role_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_unversioned_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+/// Selector labels matching the pods of a role group.
+pub(crate) fn role_group_selector(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
 }
 
 #[cfg(test)]
@@ -371,10 +439,13 @@ mod tests {
     }
 
     /// The environment of the `airflow` container of the given StatefulSet, as name/value pairs.
+    ///
+    /// This reads the rendered `EnvVar`s straight off the built container rather than going through
+    /// `EnvVarSet`, keeping the test helper lean and focused on the values it asserts on.
     fn airflow_container_env(
         cluster: &ValidatedCluster,
         stateful_set_name: &str,
-    ) -> BTreeMap<String, Option<String>> {
+    ) -> BTreeMap<String, String> {
         let resources = build(cluster).expect("build succeeds");
         let stateful_set = resources
             .stateful_sets
@@ -398,7 +469,12 @@ mod tests {
             .as_ref()
             .expect("the airflow container has env vars")
             .iter()
-            .map(|env_var| (env_var.name.clone(), env_var.value.clone()))
+            .filter_map(|env_var| {
+                env_var
+                    .value
+                    .as_ref()
+                    .map(|value| (env_var.name.clone(), value.clone()))
+            })
             .collect()
     }
 
@@ -475,14 +551,12 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none"),
                 ("app.kubernetes.io/instance", "my-airflow"),
                 (
                     "app.kubernetes.io/managed-by",
                     "airflow.stackable.tech_airflowcluster",
                 ),
                 ("app.kubernetes.io/name", "airflow"),
-                ("app.kubernetes.io/role-group", "none"),
                 ("app.kubernetes.io/version", &app_version_label("3.1.6")),
                 ("stackable.tech/vendor", "Stackable"),
             ]
@@ -531,7 +605,7 @@ mod tests {
 
         assert_eq!(
             env.get("FORWARDED_ALLOW_IPS"),
-            Some(&Some("10.244.0.0/16,192.168.1.1".to_string()))
+            Some(&"10.244.0.0/16,192.168.1.1".to_owned())
         );
     }
 
@@ -591,11 +665,11 @@ mod tests {
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
-            Some(&Some("True".to_string()))
+            Some(&"True".to_owned())
         );
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
-            Some(&Some("1".to_string()))
+            Some(&"1".to_owned())
         );
     }
 
@@ -606,7 +680,7 @@ mod tests {
         let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
         assert_eq!(
             env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
-            Some(&Some("True".to_string()))
+            Some(&"True".to_owned())
         );
     }
 

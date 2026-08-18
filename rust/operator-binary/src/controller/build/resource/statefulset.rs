@@ -35,6 +35,8 @@ use crate::{
             graceful_shutdown::add_graceful_shutdown_config,
             object_meta,
             properties::env_vars,
+            recommended_labels_for_role_group_resources,
+            recommended_labels_for_unversioned_role_group_resources,
             resource::{
                 pod::{
                     GitSyncSidecarsAddition, add_authentication_volumes_and_volume_mounts,
@@ -42,6 +44,7 @@ use crate::{
                 },
                 service::stateful_set_service_name,
             },
+            role_group_selector,
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
     },
@@ -73,9 +76,6 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to build Statefulset environmental variables"))]
-    BuildStatefulsetEnvVars { source: env_vars::Error },
-
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
         source: crate::controller::build::resource::pod::Error,
@@ -94,7 +94,7 @@ fn build_rolegroup_metadata(
     object_meta(
         cluster,
         name,
-        cluster.recommended_labels(role, role_group_name),
+        recommended_labels_for_role_group_resources(cluster, role, role_group_name),
     )
     .with_label(prometheus_label)
     .build()
@@ -119,15 +119,20 @@ pub fn build_server_rolegroup_statefulset(
     let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
-    let resource_names = validated_cluster
-        .role_group_resource_names(&ValidatedCluster::role_name(airflow_role), role_group_name);
+    let resource_names = validated_cluster.role_group_resource_names(airflow_role, role_group_name);
 
-    let recommended_object_labels =
-        validated_cluster.recommended_labels(airflow_role, role_group_name);
-    // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
-    // version keeps the labels stable across version upgrades).
-    let unversioned_recommended_labels =
-        validated_cluster.unversioned_recommended_labels(airflow_role, role_group_name);
+    let recommended_object_labels = recommended_labels_for_role_group_resources(
+        validated_cluster,
+        airflow_role,
+        role_group_name,
+    );
+    // Used for PVC templates, which cannot be modified once they are deployed. The version label
+    // is omitted so the labels stay stable across version upgrades.
+    let unversioned_recommended_labels = recommended_labels_for_unversioned_role_group_resources(
+        validated_cluster,
+        airflow_role,
+        role_group_name,
+    );
 
     let pb_metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_object_labels)
@@ -182,15 +187,12 @@ pub fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    airflow_container.add_env_vars(
-        env_vars::build_airflow_statefulset_envs(
-            validated_cluster,
-            airflow_role,
-            env_overrides,
-            git_sync_resources,
-        )
-        .context(BuildStatefulsetEnvVarsSnafu)?,
-    );
+    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
+        validated_cluster,
+        airflow_role,
+        env_overrides,
+        git_sync_resources,
+    ));
 
     let volume_mounts = validated_cluster.volume_mounts();
     airflow_container
@@ -343,7 +345,7 @@ pub fn build_server_rolegroup_statefulset(
     );
 
     let statefulset_match_labels =
-        validated_cluster.role_group_selector(airflow_role, role_group_name);
+        role_group_selector(validated_cluster, airflow_role, role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some(

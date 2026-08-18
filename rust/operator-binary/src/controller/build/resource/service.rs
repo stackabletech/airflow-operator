@@ -7,7 +7,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{ValidatedCluster, build::object_meta},
+    controller::{
+        ValidatedCluster,
+        build::{object_meta, recommended_labels_for_role_group_resources, role_group_selector},
+    },
     crd::{AirflowRole, HTTP_PORT, HTTP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME},
 };
 
@@ -22,10 +25,10 @@ pub fn build_rolegroup_headless_service(
         metadata: object_meta(
             cluster,
             cluster
-                .role_group_resource_names(&ValidatedCluster::role_name(role), role_group_name)
+                .role_group_resource_names(role, role_group_name)
                 .headless_service_name()
                 .to_string(),
-            cluster.recommended_labels(role, role_group_name),
+            recommended_labels_for_role_group_resources(cluster, role, role_group_name),
         )
         .build(),
         spec: Some(ServiceSpec {
@@ -33,7 +36,7 @@ pub fn build_rolegroup_headless_service(
             type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(headless_service_ports()),
-            selector: Some(cluster.role_group_selector(role, role_group_name).into()),
+            selector: Some(role_group_selector(cluster, role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -51,10 +54,10 @@ pub fn build_rolegroup_metrics_service(
         metadata: object_meta(
             cluster,
             cluster
-                .role_group_resource_names(&ValidatedCluster::role_name(role), role_group_name)
+                .role_group_resource_names(role, role_group_name)
                 .metrics_service_name()
                 .to_string(),
-            cluster.recommended_labels(role, role_group_name),
+            recommended_labels_for_role_group_resources(cluster, role, role_group_name),
         )
         .with_labels(prometheus_labels(&Scraping::Enabled))
         .with_annotations(prometheus_annotations(
@@ -69,7 +72,7 @@ pub fn build_rolegroup_metrics_service(
             type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(metrics_service_ports()),
-            selector: Some(cluster.role_group_selector(role, role_group_name).into()),
+            selector: Some(role_group_selector(cluster, role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -85,7 +88,7 @@ pub fn stateful_set_service_name(
 ) -> Option<String> {
     Some(
         cluster
-            .role_group_resource_names(&ValidatedCluster::role_name(role), role_group_name)
+            .role_group_resource_names(role, role_group_name)
             .headless_service_name()
             .to_string(),
     )
