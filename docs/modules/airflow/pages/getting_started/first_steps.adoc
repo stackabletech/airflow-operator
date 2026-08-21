@@ -41,7 +41,7 @@ An Airflow cluster is made up of several components, two of which are optional:
 * `executors`: the CeleryExecutor or KubernetesExecutor nodes over which the job workload is distributed by the scheduler
 * `scheduler`: responsible for triggering jobs and persisting their metadata to the backend database
 * `dagProcessors`: (Optional) responsible for monitoring, parsing and preparing DAGs for processing.
-If this role is not specified then the process will be started as a scheduler subprocess (Airflow 2.x), or as a standalone process in the same container as the scheduler (Airflow 3.x+)
+If this role is not specified then the process will be started as a scheduler subprocess (Airflow 2.x), or as a standalone process in the same container as the scheduler (Airflow 3.x+). We recommend specifying this role for production settings as running multiple processes in the same container complicates proper supervision.
 * `triggerers`: (Optional) DAGs making use of deferrable operators can be used together with one or more triggerer processes to free up worker slots.
 This deferral process is also useful for providing a measure of high availability
 
