@@ -42,6 +42,7 @@
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#840]).
 - Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#834]).
 - Avoid Python import race conditions by pre-cloning the git repo not only for Celery-based stacklets, but also for Kubernetes executor-based setups ([#844]).
+- The Airflow 3.x scheduler container now supervises the scheduler instead of the dag-processor. Before, a dead scheduler left the Pod `Running` and `Ready` with nothing scheduling DAGs ([#847]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
@@ -53,6 +54,7 @@
 [#838]: https://github.com/stackabletech/airflow-operator/pull/838
 [#840]: https://github.com/stackabletech/airflow-operator/pull/840
 [#844]: https://github.com/stackabletech/airflow-operator/pull/844
+[#847]: https://github.com/stackabletech/airflow-operator/pull/847
 
 ## [26.7.0] - 2026-07-21
 

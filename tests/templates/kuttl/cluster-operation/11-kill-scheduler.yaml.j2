@@ -1,0 +1,56 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: kill-scheduler
+timeout: 120
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+{% set airflow_version = test_scenario['values']['airflow-latest'].split(',')[0] %}
+{% else %}
+{% set airflow_version = test_scenario['values']['airflow-latest'] %}
+{% endif %}
+commands:
+  - script: |
+      restart_count=$(kubectl -n $NAMESPACE get pod airflow-scheduler-default-0 \
+          -o jsonpath='{.status.containerStatuses[?(@.name=="airflow")].restartCount}')
+
+      if [ "${restart_count:-0}" -ne 0 ]; then
+          echo "The airflow container already restarted ${restart_count} times before the" \
+               "kill, so a restart afterwards would not prove that the scheduler is" \
+               "supervised." >&2
+          exit 1
+      fi
+
+  # Killing an already dead scheduler would not prove anything, so wait for it
+  # to be up. The script is piped in rather than copied with `kubectl cp`, which
+  # would need `tar` in the Airflow image.
+  - script: |
+      kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- python - \
+          --airflow-version "{{ airflow_version }}" \
+          --component scheduler \
+          --timeout 60 \
+          < ../../../../templates/kuttl/commons/health.py
+
+  - script: |
+      kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- bash <<'EOF'
+      set -euo pipefail
+
+      scheduler_killed=false
+
+      for pid in $(cat /proc/1/task/1/children); do
+          command_line=$(tr '\0' ' ' < "/proc/$pid/cmdline")
+
+          case "$command_line" in
+          *"airflow scheduler"*)
+              echo "Killing the scheduler (PID $pid)"
+              kill -9 "$pid"
+              scheduler_killed=true
+              ;;
+          esac
+      done
+
+      if [ "$scheduler_killed" = false ]; then
+          echo "No scheduler process found" >&2
+          exit 1
+      fi
+      EOF

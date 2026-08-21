@@ -4,12 +4,21 @@ kind: TestAssert
 metadata:
   name: test-airflow-webserver-health-check
 timeout: 480
-commands:
 {% if test_scenario['values']['airflow'].find(",") > 0 %}
 {% set airflow_version = test_scenario['values']['airflow'].split(',')[0] %}
 {% else %}
 {% set airflow_version = test_scenario['values']['airflow'] %}
 {% endif %}
+{% set components = "--component scheduler" %}
+{% if airflow_version.startswith("3") %}
+{# With 3.x the scheduler container also runs the dag-processor. #}
+{% set components = components ~ " --component dag_processor" %}
+{% endif %}
+commands:
+  # Called twice so that the webserver logs more than one request, which the
+  # log aggregation is asserted on further down.
   - script: |
-      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ airflow_version }}"
-      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ airflow_version }}"
+      for _ in 1 2; do
+          kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py \
+              --airflow-version "{{ airflow_version }}" {{ components }}
+      done

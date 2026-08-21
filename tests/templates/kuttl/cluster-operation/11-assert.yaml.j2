@@ -1,0 +1,51 @@
+---
+# The scheduler process was killed in the previous step. The start script ends in
+# `wait_for_termination $!`, so the container must exit and be restarted by Kubernetes.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-scheduler-is-supervised
+timeout: 120
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+{% set airflow_version = test_scenario['values']['airflow-latest'].split(',')[0] %}
+{% else %}
+{% set airflow_version = test_scenario['values']['airflow-latest'] %}
+{% endif %}
+commands:
+  - script: |
+      for _ in $(seq 15); do
+          restart_count=$(kubectl -n $NAMESPACE get pod airflow-scheduler-default-0 \
+              -o jsonpath='{.status.containerStatuses[?(@.name=="airflow")].restartCount}')
+
+          if [ "${restart_count:-0}" -ge 1 ]; then
+              exit 0
+          fi
+
+          sleep 2
+      done
+
+      echo "The scheduler died but its container was not restarted."
+      echo "Kubernetes considers the Pod healthy:"
+      kubectl -n $NAMESPACE get pod airflow-scheduler-default-0
+
+      echo "Airflow does not:"
+      kubectl -n $NAMESPACE exec -i airflow-webserver-default-0 -c airflow -- python - \
+          --airflow-version "{{ airflow_version }}" \
+          --component scheduler \
+          --component dag_processor \
+          --timeout 1 \
+          < ../../../../templates/kuttl/commons/health.py || true
+
+      exit 1
+
+  # The restarted container must bring both processes back. Requiring a
+  # heartbeat that differs from the first one observed rules out a scheduler or
+  # dag-processor that reports healthy on a stale heartbeat.
+  - script: |
+      kubectl -n $NAMESPACE exec -i airflow-webserver-default-0 -c airflow -- python - \
+          --airflow-version "{{ airflow_version }}" \
+          --component scheduler \
+          --component dag_processor \
+          --heartbeat-changed \
+          --timeout 60 \
+          < ../../../../templates/kuttl/commons/health.py
