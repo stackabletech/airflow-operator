@@ -4,9 +4,17 @@ kind: TestAssert
 metadata:
   name: test-airflow-webserver-health-check
 timeout: 480
-commands:
 {% if test_scenario['values']['airflow'].find(",") > 0 %}
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ test_scenario['values']['airflow'].split(',')[0] }}"
+{% set airflow_version = test_scenario['values']['airflow'].split(',')[0] %}
 {% else %}
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ test_scenario['values']['airflow'] }}"
+{% set airflow_version = test_scenario['values']['airflow'] %}
 {% endif %}
+{% set components = "--component scheduler --component triggerer" %}
+{% if airflow_version.startswith("3") %}
+{# Only 3.x runs the dag-processor as a process of its own. #}
+{% set components = components ~ " --component dag_processor" %}
+{% endif %}
+commands:
+  - script: |
+      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py \
+          --airflow-version "{{ airflow_version }}" {{ components }}

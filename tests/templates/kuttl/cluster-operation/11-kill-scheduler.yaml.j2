@@ -4,6 +4,11 @@ kind: TestStep
 metadata:
   name: kill-scheduler
 timeout: 120
+{% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
+{% set airflow_version = test_scenario['values']['airflow-latest'].split(',')[0] %}
+{% else %}
+{% set airflow_version = test_scenario['values']['airflow-latest'] %}
+{% endif %}
 commands:
   - script: |
       restart_count=$(kubectl -n $NAMESPACE get pod airflow-scheduler-default-0 \
@@ -16,36 +21,15 @@ commands:
           exit 1
       fi
 
+  # Killing an already dead scheduler would not prove anything, so wait for it
+  # to be up. The script is piped in rather than copied with `kubectl cp`, which
+  # would need `tar` in the Airflow image.
   - script: |
-      kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- python - <<'EOF'
-      import sys
-      import time
-
-      import requests
-
-      HEALTH_URL = "http://airflow-webserver:8080/api/v2/monitor/health"
-
-      for attempt in range(1, 11):
-          try:
-              response = requests.get(HEALTH_URL, timeout=10)
-          except requests.RequestException as error:
-              print(f"attempt {attempt}: {error}")
-          else:
-              if response.ok:
-                  scheduler = response.json()["scheduler"]
-
-                  if scheduler["status"] == "healthy":
-                      print(f"scheduler before the kill: {scheduler}")
-                      break
-
-                  print(f"attempt {attempt}: scheduler is {scheduler}")
-              else:
-                  print(f"attempt {attempt}: HTTP {response.status_code} {response.text[:200]}")
-
-          time.sleep(3)
-      else:
-          sys.exit("expected a healthy scheduler, see the attempts above")
-      EOF
+      kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- python - \
+          --airflow-version "{{ airflow_version }}" \
+          --component scheduler \
+          --timeout 60 \
+          < ../../../../templates/kuttl/commons/health.py
 
   - script: |
       kubectl -n $NAMESPACE exec -i airflow-scheduler-default-0 -c airflow -- bash <<'EOF'
