@@ -1,0 +1,181 @@
+---
+# The recreated StatefulSets must bring the cluster back to ready, and the recreated
+# objects must carry an owner reference back to the AirflowCluster so that garbage
+# collection still works for them. The worker is at three replicas here: 10-pause raised
+# it while reconciliation was paused, and 30-restart let that take effect.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: recreate-owned-resources
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available airflowclusters.airflow.stackable.tech/airflow --timeout 601s
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-webserver-default
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-worker-default
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+status:
+  readyReplicas: 3
+  replicas: 3
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow-scheduler-default
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airflow-serviceaccount
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-rolebinding
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-webserver
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-worker
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airflow-scheduler
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  name: airflow-webserver
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-worker-default
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-default-headless
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-default-metrics
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-worker-default-headless
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-worker-default-metrics
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-scheduler-default-headless
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-scheduler-default-metrics
+  ownerReferences:
+    - apiVersion: airflow.stackable.tech/v1alpha2
+      controller: true
+      kind: AirflowCluster
+      name: airflow
