@@ -1,16 +1,19 @@
 ---
 # Every resource the operator applies carries an ownerReference and a `.owns()` watch
-# (main.rs); deleting it must trigger a reconcile of the AirflowCluster, which re-applies
-# it. This step checks that chain — the ClusterRole's `watch` verbs plus the `.owns()`
-# routing — and lives here because this test already cycles the pods. The `.watches()`
-# registrations (AuthenticationClass, and ConfigMaps referenced but not owned) can't be
-# tested by deletion: the operator never recreates what it didn't apply.
+# (main.rs): deleting it must trigger a reconcile of the AirflowCluster that re-applies it,
+# proving the `.owns()` routing and the ClusterRole `watch` verbs end to end.
+# `.watches()` registrations can't be tested this way: the operator never recreates
+# what it didn't apply.
 #
-# Recreation is proven by UID change: mere existence could pass without any deletion.
-# TestStep commands run exactly once (no kuttl retry loop), so the polling stays quiet.
+# Resources are discovered by label (ClusterResources::add enforces the labels on
+# everything the operator applies), so new resources and kinds are covered
+# automatically. Labels over-match on derived objects, so each match must also carry
+# a controller ownerReference pointing at the AirflowCluster; kinds that can never pass that
+# gate are excluded up front. Recreation is proven by UID change, and a floor guard
+# catches a selector that silently matches nothing.
 #
-# The random Secrets are deliberately absent. They carry an ownerReference but are
-# intentionally not `.owns()`-registered: nothing reads their contents.
+# Secrets are excluded: the random Secrets are intentionally not `.owns()`-registered
+# (nothing reads their contents), so deleting them would not trigger a recreation.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 metadata:
@@ -21,37 +24,41 @@ commands:
       set -eu
 
       delete_and_await_recreation() {
-        kind=$1
-        name=$2
-        old_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}')
-        kubectl delete -n "$NAMESPACE" "$kind" "$name" --wait=false
+        resource=$1
+        old_uid=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.uid}')
+        kubectl delete -n "$NAMESPACE" "$resource" --wait=false
         # Recreation is a single reconcile away, so this normally succeeds on the
         # first iteration; 30s is a generous upper bound well below the step timeout.
         for _ in $(seq 1 30); do
-          new_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+          new_uid=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
           if [ -n "$new_uid" ] && [ "$new_uid" != "$old_uid" ]; then
             return 0
           fi
           sleep 1
         done
-        echo "$kind/$name was not recreated (old uid: $old_uid, current: '${new_uid:-}')" >&2
+        echo "$resource was not recreated (old uid: $old_uid, current: '${new_uid:-}')" >&2
         return 1
       }
 
-      delete_and_await_recreation serviceaccount       airflow-serviceaccount
-      delete_and_await_recreation rolebinding          airflow-rolebinding
-      delete_and_await_recreation poddisruptionbudget  airflow-webserver
-      delete_and_await_recreation poddisruptionbudget  airflow-worker
-      delete_and_await_recreation poddisruptionbudget  airflow-scheduler
-      # Same name as the webserver PodDisruptionBudget above; the kinds keep them apart.
-      delete_and_await_recreation listener             airflow-webserver
-      delete_and_await_recreation configmap            airflow-worker-default
-      delete_and_await_recreation service              airflow-webserver-default-headless
-      delete_and_await_recreation service              airflow-webserver-default-metrics
-      delete_and_await_recreation service              airflow-worker-default-headless
-      delete_and_await_recreation service              airflow-worker-default-metrics
-      delete_and_await_recreation service              airflow-scheduler-default-headless
-      delete_and_await_recreation service              airflow-scheduler-default-metrics
-      delete_and_await_recreation statefulset          airflow-webserver-default
-      delete_and_await_recreation statefulset          airflow-worker-default
-      delete_and_await_recreation statefulset          airflow-scheduler-default
+      selector="app.kubernetes.io/instance=airflow,app.kubernetes.io/managed-by=airflow.stackable.tech_airflowcluster"
+      excluded="^(pods|persistentvolumeclaims|endpoints|events|secrets)$|^endpointslices\.|^controllerrevisions\.|^events\."
+
+      deleted=0
+      for kind in $(kubectl api-resources --verbs=list --namespaced -o name | grep -Ev "$excluded" | sort); do
+        for resource in $(kubectl get -n "$NAMESPACE" "$kind" -l "$selector" -o name 2>/dev/null); do
+          owner=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.ownerReferences[?(@.controller==true)].kind}/{.metadata.ownerReferences[?(@.controller==true)].name}' 2>/dev/null || true)
+          if [ "$owner" != "AirflowCluster/airflow" ]; then
+            echo "skipping $resource: controller owner is '${owner:-none}', not the AirflowCluster"
+            continue
+          fi
+          delete_and_await_recreation "$resource"
+          deleted=$((deleted + 1))
+        done
+      done
+
+      # Guard against the sweep silently matching nothing (wrong selector, renamed
+      # labels): the fixture is known to produce well over this many owned resources.
+      if [ "$deleted" -lt 8 ]; then
+        echo "only $deleted labelled resources were swept - the label selector is broken" >&2
+        exit 1
+      fi
