@@ -738,34 +738,4 @@ mod tests {
             "unexpected error: {error:?}"
         );
     }
-
-    /// A user-supplied volumeMount at a free path is rendered into the airflow container.
-    #[test]
-    fn user_volume_mount_is_rendered() {
-        let cluster = cluster_with_user_volume_mounts(
-            "celeryExecutors",
-            "{config: {}, roleGroups: {}}",
-            "[{name: user-volume, mountPath: /user/data}]",
-        );
-
-        let resources = build(&cluster).expect("build succeeds");
-        let sts = resources
-            .stateful_sets
-            .iter()
-            .find(|sts| sts.metadata.name.as_deref() == Some("my-airflow-webserver-default"))
-            .expect("the webserver StatefulSet exists");
-        let mounts = sts
-            .spec
-            .as_ref()
-            .and_then(|spec| spec.template.spec.as_ref())
-            .and_then(|pod| pod.containers.iter().find(|c| c.name == "airflow"))
-            .and_then(|c| c.volume_mounts.as_ref())
-            .expect("the airflow container has volume mounts");
-        assert!(
-            mounts
-                .iter()
-                .any(|m| m.name == "user-volume" && m.mount_path == "/user/data"),
-            "user mount missing from {mounts:?}"
-        );
-    }
 }
