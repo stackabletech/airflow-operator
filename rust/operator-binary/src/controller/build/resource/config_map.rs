@@ -37,12 +37,6 @@ pub enum Error {
         source: webserver_config::Error,
         role_group: RoleGroupName,
     },
-
-    #[snafu(display("failed to build ConfigMap for role group {role_group}"))]
-    BuildConfigMap {
-        source: stackable_operator::builder::configmap::Error,
-        role_group: RoleGroupName,
-    },
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
@@ -98,7 +92,7 @@ pub fn build_rolegroup_config_map(
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config_file_content());
     }
 
-    cm_builder.build().with_context(|_| BuildConfigMapSnafu {
-        role_group: role_group_name.clone(),
-    })
+    Ok(cm_builder
+        .build()
+        .expect("The ConfigMap metadata is set in this function."))
 }

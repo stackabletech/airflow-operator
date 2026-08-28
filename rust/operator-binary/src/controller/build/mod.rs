@@ -693,4 +693,79 @@ mod tests {
         assert_eq!(env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"), None);
         assert_eq!(env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"), None);
     }
+
+    /// A cluster with the given `spec.clusterConfig.volumeMounts` (as standalone YAML).
+    fn cluster_with_user_volume_mounts(
+        executor_key: &str,
+        executor_config: &str,
+        volume_mounts: &str,
+    ) -> ValidatedCluster {
+        validated_cluster_with(executor_key, executor_config, |cluster| {
+            cluster["spec"]["clusterConfig"]
+                .as_mapping_mut()
+                .expect("clusterConfig is a mapping")
+                .insert(
+                    "volumeMounts".into(),
+                    serde_yaml::from_str(volume_mounts).expect("valid volumeMounts YAML"),
+                );
+        })
+    }
+
+    /// A user-supplied volumeMount that collides with an operator-managed mount path must be
+    /// reported as an error (the operator's own mounts are added first and are infallible).
+    #[test]
+    fn user_volume_mount_colliding_with_config_path_is_an_error() {
+        let cluster = cluster_with_user_volume_mounts(
+            "kubernetesExecutors",
+            "{config: {}}",
+            "[{name: user-volume, mountPath: /stackable/app/config}]",
+        );
+
+        let Err(error) = build(&cluster) else {
+            panic!("the colliding mount must be rejected");
+        };
+        assert!(
+            matches!(
+                error,
+                super::Error::StatefulSet {
+                    source:
+                        crate::controller::build::resource::statefulset::Error::AddVolumeMount { .. },
+                    ..
+                } | super::Error::ExecutorTemplate {
+                    source: crate::controller::build::resource::executor::Error::AddVolumeMount { .. },
+                }
+            ),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    /// A user-supplied volumeMount at a free path is rendered into the airflow container.
+    #[test]
+    fn user_volume_mount_is_rendered() {
+        let cluster = cluster_with_user_volume_mounts(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            "[{name: user-volume, mountPath: /user/data}]",
+        );
+
+        let resources = build(&cluster).expect("build succeeds");
+        let sts = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.metadata.name.as_deref() == Some("my-airflow-webserver-default"))
+            .expect("the webserver StatefulSet exists");
+        let mounts = sts
+            .spec
+            .as_ref()
+            .and_then(|spec| spec.template.spec.as_ref())
+            .and_then(|pod| pod.containers.iter().find(|c| c.name == "airflow"))
+            .and_then(|c| c.volume_mounts.as_ref())
+            .expect("the airflow container has volume mounts");
+        assert!(
+            mounts
+                .iter()
+                .any(|m| m.name == "user-volume" && m.mount_path == "/user/data"),
+            "user mount missing from {mounts:?}"
+        );
+    }
 }
