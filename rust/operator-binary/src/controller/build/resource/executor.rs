@@ -110,12 +110,6 @@ pub fn build_executor_template_config_map(
     // See https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/8.4.0/kubernetes_executor.html#base-image
     let mut airflow_container = new_container_builder(&Container::Base.to_container_name());
 
-    add_authentication_volumes_and_volume_mounts(
-        authentication_config,
-        &mut airflow_container,
-        &mut pb,
-    )
-    .context(PodSnafu)?;
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(executor_config.resources.clone().into())
@@ -125,15 +119,36 @@ pub fn build_executor_template_config_map(
             &executor_config.logging,
             git_sync_resources,
         ))
-        // Operator-managed mounts first: their names and paths are constants, so they cannot
-        // collide with each other.
+        // Statically named operator mounts first: their names and paths are distinct
+        // constants, so they cannot collide with each other.
         .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
         .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .expect("The mount paths are statically defined and there should be no duplicates.")
-        // User-supplied mounts last: these can collide with the ones above, so this stays fallible.
+        .expect("The mount paths are statically defined and there should be no duplicates.");
+
+    // Statically named operator volumes first, for the same reason.
+    pb.add_volumes(volumes::create_volumes(
+        cluster
+            .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_ROLE_GROUP_NAME)
+            .role_group_config_map()
+            .as_ref(),
+        &executor_config.logging.product_container,
+    ))
+    .expect("The volume names are statically defined and there should be no duplicates.");
+
+    // Authentication mounts and volumes next: their names derive from the AuthenticationClass
+    // contents, so a collision with the static names above surfaces as an error, not a panic.
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    )
+    .context(PodSnafu)?;
+
+    // User-supplied mounts last: these can collide with the ones above, so this stays fallible.
+    airflow_container
         .add_volume_mounts(cluster.volume_mounts())
         .context(AddVolumeMountSnafu)?;
 
@@ -152,15 +167,8 @@ pub fn build_executor_template_config_map(
         .add_to_container(&mut airflow_container);
 
     pb.add_container(airflow_container.build());
-    // Operator-managed volumes first (static names), user-supplied volumes last (fallible).
-    pb.add_volumes(volumes::create_volumes(
-        cluster
-            .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_ROLE_GROUP_NAME)
-            .role_group_config_map()
-            .as_ref(),
-        &executor_config.logging.product_container,
-    ))
-    .expect("The volume names are statically defined and there should be no duplicates.");
+    // User-supplied volumes last (fallible); operator-managed and authentication volumes were
+    // added above.
     pb.add_volumes(cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
 
