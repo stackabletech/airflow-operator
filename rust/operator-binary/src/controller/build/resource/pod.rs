@@ -148,3 +148,14 @@ pub(crate) fn build_logging_container(
         EnvVarSet::new(),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *VECTOR_CONTAINER_NAME;
+    }
+}

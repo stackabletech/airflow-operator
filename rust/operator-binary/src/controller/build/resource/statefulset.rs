@@ -7,6 +7,7 @@ use stackable_operator::{
             security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -16,7 +17,7 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::api::ObjectMeta,
-    kvp::{Annotation, Label, LabelError},
+    kvp::Annotation,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::pod::{
@@ -63,9 +64,6 @@ pub enum Error {
         source: crate::controller::build::graceful_shutdown::Error,
     },
 
-    #[snafu(display("failed to build label"))]
-    BuildLabel { source: LabelError },
-
     #[snafu(display("failed to add needed volume"))]
     AddVolume {
         source: stackable_operator::builder::pod::Error,
@@ -88,7 +86,6 @@ fn build_rolegroup_metadata(
     cluster: &ValidatedCluster,
     role: &AirflowRole,
     role_group_name: &RoleGroupName,
-    prometheus_label: Label,
     name: String,
 ) -> ObjectMeta {
     object_meta(
@@ -96,7 +93,7 @@ fn build_rolegroup_metadata(
         name,
         recommended_labels_for_role_group_resources(cluster, role, role_group_name),
     )
-    .with_label(prometheus_label)
+    .with_label(RESTART_CONTROLLER_ENABLED_LABEL.clone())
     .build()
 }
 
@@ -162,13 +159,6 @@ pub fn build_server_rolegroup_statefulset(
 
     let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());
 
-    add_authentication_volumes_and_volume_mounts(
-        authentication_config,
-        &mut airflow_container,
-        &mut pb,
-    )
-    .context(PodSnafu)?;
-
     add_graceful_shutdown_config(merged_airflow_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
 
@@ -194,24 +184,21 @@ pub fn build_server_rolegroup_statefulset(
         git_sync_resources,
     ));
 
-    let volume_mounts = validated_cluster.volume_mounts();
-    airflow_container
-        .add_volume_mounts(volume_mounts)
-        .context(AddVolumeMountSnafu)?;
+    // Statically named operator mounts first: their names and paths are distinct constants, so
+    // they cannot collide with each other. Everything derived from user input (authentication,
+    // user-supplied mounts) is added afterwards and stays fallible.
     airflow_container
         .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
-        .context(AddVolumeMountSnafu)?;
-    airflow_container
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?;
-    airflow_container
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?;
+        .expect("The mount paths are statically defined and there should be no duplicates.");
 
     if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         airflow_container
             .add_volume_mount(&*TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
     // for roles with an http endpoint
@@ -252,8 +239,38 @@ pub fn build_server_rolegroup_statefulset(
 
         airflow_container
             .add_volume_mount(&*LISTENER_PVC_NAME, LISTENER_VOLUME_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
+
+    // Statically named operator volumes first, for the same reason.
+    pb.add_volumes(volumes::create_volumes(
+        resource_names.role_group_config_map().as_ref(),
+        &logging.product_container,
+    ))
+    .expect("The volume names are statically defined and there should be no duplicates.");
+
+    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
+        pb.add_volume(
+            VolumeBuilder::new(&*TEMPLATE_VOLUME_NAME)
+                .with_config_map(validated_cluster.executor_template_configmap_name())
+                .build(),
+        )
+        .expect("The volume names are statically defined and there should be no duplicates.");
+    }
+
+    // Authentication mounts and volumes next: their names derive from the AuthenticationClass
+    // contents, so a collision with the static names above surfaces as an error, not a panic.
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    )
+    .context(PodSnafu)?;
+
+    // User-supplied mounts can collide with the operator-managed ones above, so this stays fallible.
+    airflow_container
+        .add_volume_mounts(validated_cluster.volume_mounts())
+        .context(AddVolumeMountSnafu)?;
 
     add_git_sync_resources(
         &mut pb,
@@ -306,22 +323,10 @@ pub fn build_server_rolegroup_statefulset(
         .build();
     pb.add_container(metrics_container);
 
+    // User-supplied volumes last (fallible); operator-managed and authentication volumes were
+    // added above.
     pb.add_volumes(validated_cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
-    pb.add_volumes(volumes::create_volumes(
-        resource_names.role_group_config_map().as_ref(),
-        &logging.product_container,
-    ))
-    .context(AddVolumeSnafu)?;
-
-    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
-        pb.add_volume(
-            VolumeBuilder::new(&*TEMPLATE_VOLUME_NAME)
-                .with_config_map(validated_cluster.executor_template_configmap_name())
-                .build(),
-        )
-        .context(AddVolumeSnafu)?;
-    }
 
     if let Some(vector_log_config) = &logging.vector_container {
         pb.add_container(build_logging_container(
@@ -333,14 +338,10 @@ pub fn build_server_rolegroup_statefulset(
     let mut pod_template = pb.build_template();
     pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
-    let restarter_label =
-        Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
-
     let metadata = build_rolegroup_metadata(
         validated_cluster,
         airflow_role,
         role_group_name,
-        restarter_label,
         resource_names.stateful_set_name().to_string(),
     );
 

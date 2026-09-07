@@ -8,11 +8,11 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
         api::core::v1::{ConfigMap, PodTemplateSpec},
     },
-    kvp::{Label, LabelError},
     v2::{
         builder::pod::container::{EnvVarSet, new_container_builder},
         product_logging::framework::STACKABLE_LOG_DIR,
@@ -55,16 +55,8 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to build label"))]
-    BuildLabel { source: LabelError },
-
     #[snafu(display("pod template serialization"))]
     PodTemplateSerde { source: serde_yaml::Error },
-
-    #[snafu(display("failed to build the pod template config map"))]
-    PodTemplateConfigMap {
-        source: stackable_operator::builder::configmap::Error,
-    },
 
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
@@ -118,12 +110,6 @@ pub fn build_executor_template_config_map(
     // See https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/8.4.0/kubernetes_executor.html#base-image
     let mut airflow_container = new_container_builder(&Container::Base.to_container_name());
 
-    add_authentication_volumes_and_volume_mounts(
-        authentication_config,
-        &mut airflow_container,
-        &mut pb,
-    )
-    .context(PodSnafu)?;
     airflow_container
         .image_from_product_image(resolved_product_image)
         .resources(executor_config.resources.clone().into())
@@ -133,13 +119,37 @@ pub fn build_executor_template_config_map(
             &executor_config.logging,
             git_sync_resources,
         ))
-        .add_volume_mounts(cluster.volume_mounts())
-        .context(AddVolumeMountSnafu)?
+        // Statically named operator mounts first: their names and paths are distinct
+        // constants, so they cannot collide with each other.
         .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .expect("The mount paths are statically defined and there should be no duplicates.");
+
+    // Statically named operator volumes first, for the same reason.
+    pb.add_volumes(volumes::create_volumes(
+        cluster
+            .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_ROLE_GROUP_NAME)
+            .role_group_config_map()
+            .as_ref(),
+        &executor_config.logging.product_container,
+    ))
+    .expect("The volume names are statically defined and there should be no duplicates.");
+
+    // Authentication mounts and volumes next: their names derive from the AuthenticationClass
+    // contents, so a collision with the static names above surfaces as an error, not a panic.
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    )
+    .context(PodSnafu)?;
+
+    // User-supplied mounts last: these can collide with the ones above, so this stays fallible.
+    airflow_container
+        .add_volume_mounts(cluster.volume_mounts())
         .context(AddVolumeMountSnafu)?;
 
     add_git_sync_resources(
@@ -157,16 +167,10 @@ pub fn build_executor_template_config_map(
         .add_to_container(&mut airflow_container);
 
     pb.add_container(airflow_container.build());
+    // User-supplied volumes last (fallible); operator-managed and authentication volumes were
+    // added above.
     pb.add_volumes(cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
-    pb.add_volumes(volumes::create_volumes(
-        cluster
-            .role_group_resource_names(&EXECUTOR_ROLE_NAME, &EXECUTOR_ROLE_GROUP_NAME)
-            .role_group_config_map()
-            .as_ref(),
-        &executor_config.logging.product_container,
-    ))
-    .context(AddVolumeSnafu)?;
 
     if let Some(vector_log_config) = &executor_config.logging.vector_container {
         pb.add_container(build_logging_container(
@@ -182,9 +186,6 @@ pub fn build_executor_template_config_map(
 
     let mut cm_builder = ConfigMapBuilder::new();
 
-    let restarter_label =
-        Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
-
     cm_builder
         .metadata(
             object_meta(
@@ -196,7 +197,7 @@ pub fn build_executor_template_config_map(
                     &EXECUTOR_TEMPLATE_ROLE_GROUP_NAME,
                 ),
             )
-            .with_label(restarter_label)
+            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.clone())
             .build(),
         )
         .add_data(
@@ -204,5 +205,7 @@ pub fn build_executor_template_config_map(
             serde_yaml::to_string(&pod_template).context(PodTemplateSerdeSnafu)?,
         );
 
-    cm_builder.build().context(PodTemplateConfigMapSnafu)
+    Ok(cm_builder
+        .build()
+        .expect("The ConfigMap metadata is set in this function."))
 }

@@ -1054,6 +1054,9 @@ mod tests {
         let _ = *WORKER_ROLE_NAME;
         let _ = *DAG_PROCESSOR_ROLE_NAME;
         let _ = *TRIGGERER_ROLE_NAME;
+        let _ = *TEMPLATE_VOLUME_NAME;
+        let _ = *LISTENER_PVC_NAME;
+        let _ = *METRICS_CONTAINER_NAME;
     }
 
     #[test]

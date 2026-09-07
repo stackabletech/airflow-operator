@@ -262,25 +262,56 @@ impl ValidatedCluster {
 
     /// The Secret holding the shared internal secret (`<cluster>-internal-secret`).
     pub fn internal_secret_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-internal-secret", self.name_any()))
+        const SUFFIX: &str = "-internal-secret";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-internal-secret` must not exceed the limit of Secret names."
+        );
+        // A ClusterName is an RFC 1035 label, so appending an alphanumeric-terminated suffix keeps
+        // it a valid RFC 1123 subdomain.
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the internal secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared JWT secret (`<cluster>-jwt-secret`).
     pub fn jwt_secret_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-jwt-secret", self.name_any()))
+        const SUFFIX: &str = "-jwt-secret";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-jwt-secret` must not exceed the limit of Secret names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the JWT secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared Fernet key (`<cluster>-fernet-key`).
     pub fn fernet_key_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-fernet-key", self.name_any()))
+        const SUFFIX: &str = "-fernet-key";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-fernet-key` must not exceed the limit of Secret names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the Fernet key secret name is a valid Secret name")
     }
 
     /// The ConfigMap holding the Kubernetes-executor pod template (`<cluster>-executor-pod-template`).
     pub fn executor_template_configmap_name(&self) -> ConfigMapName {
-        ConfigMapName::from_str(&format!("{}-executor-pod-template", self.name_any()))
+        const SUFFIX: &str = "-executor-pod-template";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= ConfigMapName::MAX_LENGTH,
+            "The string `<cluster_name>-executor-pod-template` must not exceed the limit of \
+            ConfigMap names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        ConfigMapName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the executor pod-template ConfigMap name is a valid ConfigMap name")
     }
 
