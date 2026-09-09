@@ -57,7 +57,10 @@ jobs:
         with:
           key: udeps
           cache-all-crates: "true"
-      - uses: stackabletech/cargo-install-action@cargo-udeps
+      - name: Install cargo-udeps
+        uses: stackabletech/cargo-install-action@e3e2dcf8d0f0e5bdbc619bf6ee7560dd68152d3c
+        with:
+          crate: cargo-udeps
       - run: cargo udeps --workspace --all-targets
 
   # This job evaluates the github environment to determine why this action is running and decides if
