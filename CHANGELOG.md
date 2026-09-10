@@ -34,7 +34,7 @@
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
   overridden, whereas previously the operator's value always took precedence ([#838]).
-- Make operations infallible where appropriate ([#852]).
+- Make operations infallible where appropriate ([#852], [#860]).
 
 ### Fixed
 
@@ -60,6 +60,7 @@
 [#847]: https://github.com/stackabletech/airflow-operator/pull/847
 [#849]: https://github.com/stackabletech/airflow-operator/pull/849
 [#852]: https://github.com/stackabletech/airflow-operator/pull/852
+[#860]: https://github.com/stackabletech/airflow-operator/pull/860
 
 ## [26.7.0] - 2026-07-21
 

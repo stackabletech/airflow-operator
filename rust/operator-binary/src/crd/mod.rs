@@ -96,6 +96,8 @@ pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
+// The metrics container has no logging configuration, so it is not a `Container` variant and
+// carries its name directly.
 constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
@@ -887,11 +889,22 @@ pub enum Container {
     GitSync,
 }
 
+// Typed container names. They must match the strum `Display` (kebab-case) of the variants above,
+// which is pinned by a unit test.
+constant!(AIRFLOW_CONTAINER_NAME: ContainerName = "airflow");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+constant!(BASE_CONTAINER_NAME: ContainerName = "base");
+constant!(GIT_SYNC_CONTAINER_NAME: ContainerName = "git-sync");
+
 impl Container {
-    /// The type-safe container name for this variant (matching its kebab-case serialization).
-    pub fn to_container_name(&self) -> ContainerName {
-        ContainerName::from_str(&self.to_string())
-            .expect("a Container variant name is a valid container name")
+    /// The typed container name of this variant.
+    pub fn name(&self) -> &'static ContainerName {
+        match self {
+            Container::Airflow => &AIRFLOW_CONTAINER_NAME,
+            Container::Vector => &VECTOR_CONTAINER_NAME,
+            Container::Base => &BASE_CONTAINER_NAME,
+            Container::GitSync => &GIT_SYNC_CONTAINER_NAME,
+        }
     }
 }
 
@@ -1057,6 +1070,19 @@ mod tests {
         let _ = *TEMPLATE_VOLUME_NAME;
         let _ = *LISTENER_PVC_NAME;
         let _ = *METRICS_CONTAINER_NAME;
+        let _ = *AIRFLOW_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
+        let _ = *BASE_CONTAINER_NAME;
+        let _ = *GIT_SYNC_CONTAINER_NAME;
+    }
+
+    /// The typed container names returned by `name` must agree with the strum `Display`
+    /// of `Container`, which the logging configuration still uses as the per-container key.
+    #[test]
+    fn container_names_match_display() {
+        for container in Container::iter() {
+            assert_eq!(container.name().to_string(), container.to_string());
+        }
     }
 
     #[test]

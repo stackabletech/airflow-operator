@@ -2,27 +2,28 @@
 //! and the Kubernetes-executor pod template): authentication volumes, git-sync resources and the
 //! Vector log-collection sidecar.
 
-use std::{collections::BTreeSet, str::FromStr};
+use std::collections::BTreeSet;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::{PodBuilder, container::ContainerBuilder},
     commons::product_image_selection::ResolvedProductImage,
-    constant,
     crd::{authentication::ldap, git_sync},
     k8s_openapi::api::core::v1::Container as K8sContainer,
     v2::{
         builder::pod::container::EnvVarSet,
         product_logging::framework::{VectorContainerLogConfig, vector_container},
         role_group_utils::ResourceNames,
-        types::kubernetes::ContainerName,
     },
 };
 
 use crate::{
     controller::build::volumes::{CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    crd::authentication::{
-        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+    crd::{
+        Container,
+        authentication::{
+            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        },
     },
 };
 
@@ -130,8 +131,6 @@ pub(crate) fn add_git_sync_resources(
     Ok(())
 }
 
-constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
-
 /// Builds the Vector log-collection sidecar container from the up-front-validated logging config.
 pub(crate) fn build_logging_container(
     resolved_product_image: &ResolvedProductImage,
@@ -139,7 +138,7 @@ pub(crate) fn build_logging_container(
     resource_names: &ResourceNames,
 ) -> K8sContainer {
     vector_container(
-        &VECTOR_CONTAINER_NAME,
+        Container::Vector.name(),
         resolved_product_image,
         vector_log_config,
         resource_names,
@@ -147,15 +146,4 @@ pub(crate) fn build_logging_container(
         &LOG_VOLUME_NAME,
         EnvVarSet::new(),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_constants() {
-        // Test that dereferencing the constants does not panic.
-        let _ = *VECTOR_CONTAINER_NAME;
-    }
 }
