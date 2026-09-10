@@ -157,7 +157,7 @@ pub fn build_server_rolegroup_statefulset(
                 .build(),
         );
 
-    let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());
+    let mut airflow_container = new_container_builder(&Container::Airflow);
 
     add_graceful_shutdown_config(merged_airflow_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;

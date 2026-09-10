@@ -108,7 +108,7 @@ pub fn build_executor_template_config_map(
 
     // N.B. this "base" name is an airflow requirement and should not be changed!
     // See https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/8.4.0/kubernetes_executor.html#base-image
-    let mut airflow_container = new_container_builder(&Container::Base.to_container_name());
+    let mut airflow_container = new_container_builder(&Container::Base);
 
     airflow_container
         .image_from_product_image(resolved_product_image)

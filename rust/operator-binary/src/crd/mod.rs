@@ -887,11 +887,23 @@ pub enum Container {
     GitSync,
 }
 
-impl Container {
-    /// The type-safe container name for this variant (matching its kebab-case serialization).
-    pub fn to_container_name(&self) -> ContainerName {
-        ContainerName::from_str(&self.to_string())
-            .expect("a Container variant name is a valid container name")
+// Typed container names. They must match the strum `Display` (kebab-case) of the variants above,
+// which is pinned by a unit test.
+constant!(AIRFLOW_CONTAINER_NAME: ContainerName = "airflow");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+constant!(BASE_CONTAINER_NAME: ContainerName = "base");
+constant!(GIT_SYNC_CONTAINER_NAME: ContainerName = "git-sync");
+
+impl Deref for Container {
+    type Target = ContainerName;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Container::Airflow => &AIRFLOW_CONTAINER_NAME,
+            Container::Vector => &VECTOR_CONTAINER_NAME,
+            Container::Base => &BASE_CONTAINER_NAME,
+            Container::GitSync => &GIT_SYNC_CONTAINER_NAME,
+        }
     }
 }
 
@@ -1057,6 +1069,20 @@ mod tests {
         let _ = *TEMPLATE_VOLUME_NAME;
         let _ = *LISTENER_PVC_NAME;
         let _ = *METRICS_CONTAINER_NAME;
+        let _ = *AIRFLOW_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
+        let _ = *BASE_CONTAINER_NAME;
+        let _ = *GIT_SYNC_CONTAINER_NAME;
+    }
+
+    /// The typed container names behind `Container`'s `Deref` must agree with its strum
+    /// `Display`, which the logging configuration still uses as the per-container key.
+    #[test]
+    fn container_names_match_display() {
+        for container in Container::iter() {
+            let container_name: &ContainerName = &container;
+            assert_eq!(container_name.to_string(), container.to_string());
+        }
     }
 
     #[test]
