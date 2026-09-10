@@ -894,10 +894,9 @@ constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 constant!(BASE_CONTAINER_NAME: ContainerName = "base");
 constant!(GIT_SYNC_CONTAINER_NAME: ContainerName = "git-sync");
 
-impl Deref for Container {
-    type Target = ContainerName;
-
-    fn deref(&self) -> &Self::Target {
+impl Container {
+    /// The typed container name of this variant.
+    pub fn name(&self) -> &'static ContainerName {
         match self {
             Container::Airflow => &AIRFLOW_CONTAINER_NAME,
             Container::Vector => &VECTOR_CONTAINER_NAME,
@@ -1075,13 +1074,12 @@ mod tests {
         let _ = *GIT_SYNC_CONTAINER_NAME;
     }
 
-    /// The typed container names behind `Container`'s `Deref` must agree with its strum
-    /// `Display`, which the logging configuration still uses as the per-container key.
+    /// The typed container names returned by `name` must agree with the strum `Display`
+    /// of `Container`, which the logging configuration still uses as the per-container key.
     #[test]
     fn container_names_match_display() {
         for container in Container::iter() {
-            let container_name: &ContainerName = &container;
-            assert_eq!(container_name.to_string(), container.to_string());
+            assert_eq!(container.name().to_string(), container.to_string());
         }
     }
 

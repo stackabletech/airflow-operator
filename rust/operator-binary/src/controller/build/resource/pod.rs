@@ -138,7 +138,7 @@ pub(crate) fn build_logging_container(
     resource_names: &ResourceNames,
 ) -> K8sContainer {
     vector_container(
-        &Container::Vector,
+        Container::Vector.name(),
         resolved_product_image,
         vector_log_config,
         resource_names,
