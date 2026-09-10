@@ -96,6 +96,8 @@ pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
+// The metrics container has no logging configuration, so it is not a `Container` variant and
+// carries its name directly.
 constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
