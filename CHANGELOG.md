@@ -4,6 +4,7 @@
 
 ### Added
 
+- Support floating tag in product image selection ([#862]).
 - Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from, via `spec.webservers.roleConfig.trustedProxies` ([#835]).
 
 ### Changed
@@ -61,6 +62,7 @@
 [#849]: https://github.com/stackabletech/airflow-operator/pull/849
 [#852]: https://github.com/stackabletech/airflow-operator/pull/852
 [#860]: https://github.com/stackabletech/airflow-operator/pull/860
+[#862]: https://github.com/stackabletech/airflow-operator/pull/862
 
 ## [26.7.0] - 2026-07-21
 
