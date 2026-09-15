@@ -4,16 +4,22 @@
 
 ### Added
 
-- Support floating tag in product image selection ([#862]).
-- Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from, via `spec.webservers.roleConfig.trustedProxies` ([#835]).
+- Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
+  ([#862]).
+- Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
+  via `spec.webservers.roleConfig.trustedProxies` ([#835]).
 
 ### Changed
 
+- BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
+  Abbreviated values such as `26.7` are no longer accepted ([#862]).
+- BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
+  always defaulting to `Always` ([#862]).
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#814]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#821]).
-- Bump stackable-operator to 0.116.0 ([#827], [#838]).
+- Bump stackable-operator to 0.118.0 ([#827], [#838], [#862]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#828]).
 - The level configured for the `airflow.task` logger now sets the level of the `task` handler,
