@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "operator.fullname" . }}-clusterrole
+  name: {{ include "airflow-operator.fullname" . }}-clusterrole
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "airflow-operator.labels" . | nindent 4 }}
 rules:
   # For automatic cluster domain detection
   - apiGroups:
@@ -52,7 +52,7 @@ rules:
     verbs:
       - bind
     resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
+      - {{ include "airflow-operator.name" . }}-clusterrole
   # StatefulSets for each role group (webserver, scheduler, worker, triggerer, dag-processor).
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
@@ -111,18 +111,18 @@ rules:
   # Primary reconciliation target: the controller watches AirflowCluster resources (list + watch)
   # and reads them during reconciliation (get).
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "airflow-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters
+      - {{ include "airflow-operator.name" . }}clusters
     verbs:
       - get
       - list
       - watch
   # Write reconciliation status conditions back to AirflowCluster objects
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "airflow-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters/status
+      - {{ include "airflow-operator.name" . }}clusters/status
     verbs:
       - patch
   # Resolve TLS and authentication provider configuration.

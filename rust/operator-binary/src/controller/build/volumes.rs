@@ -58,3 +58,16 @@ pub fn create_volumes(
 
     volumes
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *CONFIG_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+    }
+}
