@@ -95,6 +95,13 @@ include::example$example-spark-dag.py[]
 <6> the subsequent task to monitor the job
 <7> the jobs are chained together in the correct order
 
+[NOTE]
+====
+The sensor only tracks the `status.phase` of the SparkApplication.
+It cannot copy the Spark driver log into the Airflow task log: the Spark operator deletes the driver Pod as soon as the application reaches `Succeeded` or `Failed`, and the SparkApplication status does not reference the driver Pod.
+To keep driver and executor logs, enable log aggregation for the SparkApplication as described in xref:spark-k8s:usage-guide/logging.adoc[], or use the xref:spark-k8s:usage-guide/history-server.adoc[Spark history server] for event logs.
+====
+
 Once this DAG is xref:usage-guide/mounting-dags.adoc[mounted] in the DAG folder it can be called and its progress viewed from within the Webserver UI:
 
 image::airflow_dag_graph.png[Airflow Connections]
@@ -109,7 +116,7 @@ TIP: A full example of the above is used as an integration test https://github.c
 
 == Logging
 
-As mentioned above, the logs are available from the webserver UI if the jobs run with the `celeryExecutor`.
+As mentioned above, the Airflow task logs are available from the webserver UI if the jobs run with the `celeryExecutor`.
 If the SDP logging mechanism has been deployed, log information can also be retrieved from the vector backend (e.g. Opensearch):
 
 image::airflow_dag_log_opensearch.png[Opensearch]
