@@ -1123,7 +1123,13 @@ mod tests {
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec
             .image
-            .resolve("airflow", "oci.example.org", "0.0.0-dev")
+            .resolve(
+                "airflow",
+                "oci.example.org",
+                &"0.0.0-dev"
+                    .parse()
+                    .expect("static semantic version must parse"),
+            )
             .expect("test: resolved product image is always valid");
 
         assert_eq!("3.1.6", &resolved_airflow_image.product_version);
