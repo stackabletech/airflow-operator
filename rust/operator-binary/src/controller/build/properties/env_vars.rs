@@ -540,7 +540,7 @@ mod tests {
     #[test]
     fn test_airflow_3_authorization_env_vars() {
         let authorization_config = get_test_authorization_config();
-        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.0.6");
+        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.3.1");
         let authorization_env_vars = authorization_env_vars
             .into_iter()
             .map(|env| (env.name, env.value.expect("env var value must be present")))

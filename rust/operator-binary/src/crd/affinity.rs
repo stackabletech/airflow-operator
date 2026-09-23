@@ -73,7 +73,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             credentialsSecretName: airflow-admin-credentials
             metadataDatabase:
@@ -191,7 +191,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             credentialsSecretName: airflow-admin-credentials
             metadataDatabase:
