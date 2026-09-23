@@ -8,6 +8,7 @@
   ([#862]).
 - Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
   via `spec.webservers.roleConfig.trustedProxies` ([#835]).
+- Added airflow `3.3.1` ([#865]).
 
 ### Changed
 
@@ -42,6 +43,7 @@
   variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
   overridden, whereas previously the operator's value always took precedence ([#838]).
 - Make operations infallible where appropriate ([#852], [#860]).
+- Deprecated airflow `3.2.2` ([#865]).
 
 ### Fixed
 
@@ -53,6 +55,10 @@
 - The Airflow 3.x scheduler container now supervises the scheduler instead of the dag-processor. Before, a dead scheduler left the Pod `Running` and `Ready` with nothing scheduling DAGs ([#847]).
 - The operator now watches all resources that it creates and early-exits the reconcile action when the
   cluster is marked for deletion ([#849]).
+
+### Removed
+
+- Removed airflow `3.1.6` ([#865]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
@@ -69,6 +75,7 @@
 [#852]: https://github.com/stackabletech/airflow-operator/pull/852
 [#860]: https://github.com/stackabletech/airflow-operator/pull/860
 [#862]: https://github.com/stackabletech/airflow-operator/pull/862
+[#865]: https://github.com/stackabletech/airflow-operator/pull/865
 
 ## [26.7.0] - 2026-07-21
 

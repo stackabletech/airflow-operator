@@ -410,7 +410,7 @@ mod tests {
         authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
     };
 
-    const TEST_AIRFLOW_VERSION: &str = "3.0.6";
+    const TEST_AIRFLOW_VERSION: &str = "3.3.1";
 
     #[test]
     fn test_auth_db_config() {
