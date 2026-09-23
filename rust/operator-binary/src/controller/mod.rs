@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
+        pdb::PdbConfig,
         product_image_selection::ResolvedProductImage,
         resources::{NoRuntimeLimits, Resources},
     },
@@ -87,14 +88,19 @@ pub struct KubernetesResources<T> {
     pub role_bindings: Vec<RoleBinding>,
     pub status: PhantomData<T>,
 }
+// Webserver role only — all non-Option
+#[derive(Clone, Debug)]
+pub struct ValidatedWebserverRoleConfig {
+    pub pdb: PdbConfig,
+    pub listener_class: ListenerClassName,
+    pub group_listener_name: ListenerName,
+    pub trusted_proxies: Vec<TrustedProxy>,
+}
 
-/// Per-role configuration extracted during validation.
+// Other roles: scheduler, worker, dagprocessor, triggerer
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<ListenerClassName>,
-    pub group_listener_name: Option<ListenerName>,
-    pub trusted_proxies: Vec<TrustedProxy>,
+    pub pdb: PdbConfig,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
@@ -218,20 +224,60 @@ pub struct ValidatedCluster {
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+    pub webserver_config: Option<ValidatedWebserverRoleConfig>,
+    pub webserver_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub scheduler_config: Option<ValidatedRoleConfig>,
+    pub scheduler_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub dagprocessor_config: Option<ValidatedRoleConfig>,
+    pub dagprocessor_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub triggerer_config: Option<ValidatedRoleConfig>,
+    pub triggerer_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+}
+
+/// The non-derived inputs to [`ValidatedCluster::new`].
+///
+/// Named fields, so the five same-typed role-group maps — and the four
+/// `Option<ValidatedRoleConfig>` — cannot be swapped silently.
+pub struct ValidatedClusterParams {
+    pub name: ClusterName,
+    pub namespace: NamespaceName,
+    pub uid: Uid,
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub webserver_config: Option<ValidatedWebserverRoleConfig>,
+    pub webserver_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub scheduler_config: Option<ValidatedRoleConfig>,
+    pub scheduler_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub dagprocessor_config: Option<ValidatedRoleConfig>,
+    pub dagprocessor_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub triggerer_config: Option<ValidatedRoleConfig>,
+    pub triggerer_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
-    pub fn new(
-        name: ClusterName,
-        namespace: NamespaceName,
-        uid: Uid,
-        image: ResolvedProductImage,
-        cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
-        role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
-    ) -> Self {
+    pub fn new(params: ValidatedClusterParams) -> Self {
+        let ValidatedClusterParams {
+            name,
+            namespace,
+            uid,
+            image,
+            cluster_config,
+            webserver_config,
+            webserver_role_group_configs,
+            scheduler_config,
+            scheduler_role_group_configs,
+            dagprocessor_config,
+            dagprocessor_role_group_configs,
+            triggerer_config,
+            triggerer_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
+        } = params;
+
         // `app_version_label_value` is constructed to be a valid label value, so it is also a valid
         // `ProductVersion`.
         let product_version = ProductVersion::from_str(&image.app_version_label_value)
@@ -250,14 +296,73 @@ impl ValidatedCluster {
             product_version,
             image,
             cluster_config,
-            role_groups,
-            role_configs,
+            webserver_config,
+            webserver_role_group_configs,
+            scheduler_config,
+            scheduler_role_group_configs,
+            dagprocessor_config,
+            dagprocessor_role_group_configs,
+            triggerer_config,
+            triggerer_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
         }
     }
 
-    /// Whether the cluster has the given role configured (i.e. it has role groups for it).
+    /// Whether the cluster declares the given role.
     pub fn has_role(&self, role: &AirflowRole) -> bool {
-        self.role_groups.contains_key(role)
+        match role {
+            AirflowRole::Webserver => self.webserver_config.is_some(),
+            AirflowRole::Scheduler => self.scheduler_config.is_some(),
+            AirflowRole::Worker => self.worker_config.is_some(),
+            AirflowRole::DagProcessor => self.dagprocessor_config.is_some(),
+            AirflowRole::Triggerer => self.triggerer_config.is_some(),
+        }
+    }
+
+    /// The PodDisruptionBudget config of `role`, or `None` if the cluster does not declare it.
+    pub(crate) fn pdb(&self, role: &AirflowRole) -> Option<&PdbConfig> {
+        match role {
+            AirflowRole::Webserver => self.webserver_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::Scheduler => self.scheduler_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::Worker => self.worker_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::DagProcessor => {
+                self.dagprocessor_config.as_ref().map(|config| &config.pdb)
+            }
+            AirflowRole::Triggerer => self.triggerer_config.as_ref().map(|config| &config.pdb),
+        }
+    }
+
+    /// The name of the group Listener provided for `role`, if the role serves the web UI.
+    pub(crate) fn group_listener_name(&self, role: &AirflowRole) -> Option<&ListenerName> {
+        match role {
+            AirflowRole::Webserver => self
+                .webserver_config
+                .as_ref()
+                .map(|config| &config.group_listener_name),
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::DagProcessor
+            | AirflowRole::Triggerer => None,
+        }
+    }
+
+    /// The reverse proxies `role` trusts `X-Forwarded-*` headers from.
+    ///
+    /// Empty for every role but the webserver, which alone serves the web UI — and empty for the
+    /// webserver too when the cluster declares no webserver role, or it trusts no proxies.
+    pub(crate) fn trusted_proxies(&self, role: &AirflowRole) -> &[TrustedProxy] {
+        match role {
+            AirflowRole::Webserver => self
+                .webserver_config
+                .as_ref()
+                .map(|config| config.trusted_proxies.as_slice())
+                .unwrap_or_default(),
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::DagProcessor
+            | AirflowRole::Triggerer => &[],
+        }
     }
 
     /// The Secret holding the shared internal secret (`<cluster>-internal-secret`).
@@ -450,7 +555,12 @@ impl HasUid for ValidatedCluster {
 
 #[cfg(test)]
 mod tests {
+    use indoc::formatdoc;
+
     use super::*;
+    use crate::controller::{
+        build::test_support::dereferenced_objects, validate::validate_cluster,
+    };
 
     #[test]
     fn test_constants() {
@@ -461,5 +571,98 @@ mod tests {
         let _ = *EXECUTOR_ROLE_NAME;
         let _ = *EXECUTOR_ROLE_GROUP_NAME;
         let _ = *EXECUTOR_TEMPLATE_ROLE_GROUP_NAME;
+    }
+
+    #[test]
+    fn webserver_trusted_proxies_are_parsed() {
+        let cluster = validated_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16\n        - 192.168.1.1",
+        );
+
+        let trusted_proxies = cluster.trusted_proxies(&AirflowRole::Webserver);
+
+        let rendered: Vec<String> = trusted_proxies
+            .iter()
+            .map(TrustedProxy::to_string)
+            .collect();
+        assert_eq!(rendered, ["10.244.0.0/16", "192.168.1.1"]);
+    }
+
+    /// Only the webserver serves HTTP, so no other role may pick the setting up even if a
+    /// webserver configured it.
+    #[test]
+    fn non_webserver_roles_have_no_trusted_proxies() {
+        let cluster = validated_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16",
+        );
+
+        for role in [
+            AirflowRole::Scheduler,
+            AirflowRole::Worker,
+            AirflowRole::DagProcessor,
+            AirflowRole::Triggerer,
+        ] {
+            assert!(
+                cluster.trusted_proxies(&role).is_empty(),
+                "role {role:?} must not have trusted proxies"
+            );
+        }
+    }
+
+    #[test]
+    fn a_webserver_without_trusted_proxies_yields_an_empty_list() {
+        let cluster =
+            validated_cluster_with_webserver_role_config("      listenerClass: external-stable");
+
+        assert!(cluster.trusted_proxies(&AirflowRole::Webserver).is_empty());
+    }
+
+    /// The validated cluster for a CR with the given `webservers.roleConfig` block spliced in.
+    ///
+    /// The `roleConfig` must be one the webserver accepts: the trusted proxies are parsed and
+    /// checked by `validate_cluster`, not by [`ValidatedCluster::trusted_proxies`], which only
+    /// hands back what validation already accepted. The rejection cases live in
+    /// [`crate::crd::trusted_proxies`], next to the parsing they exercise.
+    fn validated_cluster_with_webserver_role_config(role_config: &str) -> ValidatedCluster {
+        validate_cluster(
+            &test_cluster_with_webserver_role_config(role_config),
+            "oci.stackable.tech/sdp",
+            dereferenced_objects(),
+        )
+        .expect("test cluster validates")
+    }
+
+    /// A cluster CR with the given `webservers.roleConfig` block spliced in.
+    fn test_cluster_with_webserver_role_config(role_config: &str) -> v1alpha2::AirflowCluster {
+        let cluster = formatdoc! {"
+            apiVersion: airflow.stackable.tech/v1alpha2
+            kind: AirflowCluster
+            metadata:
+              name: airflow
+              namespace: default
+              uid: e6ac237d-a6d4-43a1-8135-f36506110912
+            spec:
+              image:
+                productVersion: 3.3.1
+              clusterConfig:
+                credentialsSecretName: airflow-admin-credentials
+                metadataDatabase:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+              webservers:
+                roleConfig:
+            {role_config}
+                roleGroups:
+                  default:
+                    config: {{}}
+              kubernetesExecutors:
+                config: {{}}
+        "};
+
+        let deserializer = serde_yaml::Deserializer::from_str(&cluster);
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+            .expect("the test CR deserialises")
     }
 }
