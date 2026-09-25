@@ -1,0 +1,50 @@
+{% if test_scenario['values']['executor'] == 'celery' %}
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: task-log-aggregation
+# The script polls the aggregator itself, so it should not be retried, thus TestStep.
+timeout: 600
+commands:
+  # Show that the task logs are on disk, and which files the Vector agent looks at. Step 52
+  # results in a succeeded task, thus logs have been written.
+  - script: |
+      set -eu
+
+      FOUND=""
+
+      for POD in airflow-worker-automatic-log-config-0 airflow-worker-custom-log-config-0; do
+        # Airflow >= 3.1 writes attempt logs below "[logging] base_log_folder" from airflow.cfg
+        # ($AIRFLOW_HOME/logs), earlier versions below the "task" handler's base_log_folder from
+        # the operator-generated log_config.py (/stackable/log/airflow). Both are searched so that
+        # this works for every supported Airflow version.
+        # Issues around base_log_path are documented in
+        # https://github.com/stackabletech/airflow-operator/pull/834.
+        TASK_LOGS=$(
+          kubectl exec -n "$NAMESPACE" "$POD" -c airflow -- sh -c \
+            'find "$AIRFLOW_HOME/logs" /stackable/log/airflow \
+               \( -name "attempt=*.log" -o -name "[0-9]*.log" \) 2>/dev/null' || true
+        )
+        if [ -n "$TASK_LOGS" ]; then
+          echo "Task-attempt logs written by $POD:"
+          echo "$TASK_LOGS"
+          FOUND=yes
+        fi
+      done
+
+      if [ -z "$FOUND" ]; then
+        echo "No worker wrote a task-attempt log, so nothing can be said about their aggregation."
+        exit 1
+      fi
+
+      echo
+      echo "File sources of the Vector agent config generated for the worker:"
+      kubectl get configmap -n "$NAMESPACE" airflow-worker-automatic-log-config \
+        -o jsonpath='{.data.vector\.yaml}' | grep -E '^ +- \$\{LOG_DIR\}/'
+  - script: kubectl cp -n $NAMESPACE ./task-log-aggregation.py test-airflow-python-0:/tmp
+    timeout: 240
+  - script: >-
+      kubectl exec -n $NAMESPACE test-airflow-python-0 --
+      python /tmp/task-log-aggregation.py
+{% endif %}

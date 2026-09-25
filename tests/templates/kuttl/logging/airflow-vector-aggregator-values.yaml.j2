@@ -121,6 +121,18 @@ customConfig:
       condition: >-
         .pod == "airflow-worker-custom-log-config-0" &&
         .container == "vector"
+    # Task-attempt logs of the DAG run triggered in step 52. Celery hands each task to whichever
+    # worker picks it up first, so both worker role groups are accepted.
+    # `.file` is the path below the container's log directory, as set by the Vector agent's
+    # `extended_logs_files` transform. Airflow 3 names the attempt files `attempt=<n>.log`,
+    # Airflow 2 `<try_number>.log`.
+    filteredWorkerTaskLogs:
+      type: filter
+      inputs: [validEvents]
+      condition: >-
+        starts_with(string!(.pod), "airflow-worker-") &&
+        .container == "airflow" &&
+        match(string(.file) ?? "", r'(attempt=\d+|/\d+)\.log$')
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
     filteredExampleTriggerTargetDagBashTaskBase:
       type: filter
