@@ -9,6 +9,7 @@
 - Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
   via `spec.webservers.roleConfig.trustedProxies` ([#835]).
 - Added airflow `3.3.1` ([#865]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
 
 ### Changed
 
@@ -44,6 +45,7 @@
   overridden, whereas previously the operator's value always took precedence ([#838]).
 - Make operations infallible where appropriate ([#852], [#860]).
 - Deprecated airflow `3.2.2` ([#865]).
+- Bump stackable-operator to 0.119.0 ([#868]).
 
 ### Fixed
 
@@ -76,6 +78,7 @@
 [#860]: https://github.com/stackabletech/airflow-operator/pull/860
 [#862]: https://github.com/stackabletech/airflow-operator/pull/862
 [#865]: https://github.com/stackabletech/airflow-operator/pull/865
+[#868]: https://github.com/stackabletech/airflow-operator/pull/868
 
 ## [26.7.0] - 2026-07-21
 
