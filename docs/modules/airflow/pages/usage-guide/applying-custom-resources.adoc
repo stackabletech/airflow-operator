@@ -56,7 +56,7 @@ dags
 |_ pyspark_pi.yaml
 ----
 
-The Spark job calculates the value of pi using one of the example scripts that comes bundled with Spark:
+The Spark job calculates the value of `pi` using one of the example scripts that comes bundled with Spark:
 
 [source,yaml]
 ----
@@ -72,16 +72,7 @@ There are two classes that are used to:
 
 The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they are typically used for all custom resources and thus are best decoupled from the DAG that calls them.
 This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
-
-[source,python]
-----
-include::example$example_spark_kubernetes_operator.py[]
-----
-
-[source,python]
-----
-include::example$example_spark_kubernetes_sensor.py[]
-----
+These files are used in an Airflow demo where they are mounted into the Airflow cluster via a `ConfigMap` https://github.com/stackabletech/demos/blob/main/stacks/airflow/airflow.yaml[here{external-link-icon}^].
 
 [source,python]
 ----
@@ -97,9 +88,7 @@ include::example$example-spark-dag.py[]
 
 [NOTE]
 ====
-The sensor only tracks the `status.phase` of the SparkApplication.
-It cannot copy the Spark driver log into the Airflow task log: the Spark operator deletes the driver Pod as soon as the application reaches `Succeeded` or `Failed`.
-To keep driver and executor logs, enable log aggregation for the SparkApplication as described in xref:spark-k8s:usage-guide/logging.adoc[], or use the xref:spark-k8s:usage-guide/history-server.adoc[Spark history server] for event logs.
+To persist Spark driver and executor logs independently of any Airflow configuration (such as remote logging), enable log aggregation for the SparkApplication as described in xref:spark-k8s:usage-guide/logging.adoc[], or use the xref:spark-k8s:usage-guide/history-server.adoc[Spark history server] for event logs.
 ====
 
 Once this DAG is xref:usage-guide/mounting-dags.adoc[mounted] in the DAG folder it can be called and its progress viewed from within the Webserver UI:
@@ -110,13 +99,13 @@ Clicking on the "spark_pi_monitor" task and selecting the logs shows that the st
 
 image::airflow_dag_log.png[Airflow Connections]
 
-NOTE: If the `KubernetesExecutor` is employed the logs are only accessible via the SDP logging mechanism, described https://docs.stackable.tech/home/stable/concepts/logging[here].
+NOTE: If the `KubernetesExecutor` is employed the logs are only persisted via the SDP logging mechanism, described https://docs.stackable.tech/home/stable/concepts/logging[here] or with xref:usage-guide/logging.adoc[remote logging].
 
 TIP: A full example of the above is used as an integration test https://github.com/stackabletech/airflow-operator/tree/main/tests/templates/kuttl/mount-dags-gitsync[here{external-link-icon}^].
 
 == Logging
 
-As mentioned above, the Airflow task logs are available from the webserver UI if the jobs run with the `celeryExecutor`.
+As mentioned above, the Airflow task logs are always available from the webserver UI if the jobs run with the `celeryExecutor` or if xref:usage-guide/logging.adoc[remote logging] has been configured.
 If the SDP logging mechanism has been deployed, log information can also be retrieved from the vector backend (e.g. Opensearch):
 
 image::airflow_dag_log_opensearch.png[Opensearch]
