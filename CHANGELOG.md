@@ -46,6 +46,7 @@
 - Make operations infallible where appropriate ([#852], [#860]).
 - Deprecated airflow `3.2.2` ([#865]).
 - Bump stackable-operator to 0.119.0 ([#868]).
+- Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 
 ### Fixed
 
@@ -79,6 +80,7 @@
 [#862]: https://github.com/stackabletech/airflow-operator/pull/862
 [#865]: https://github.com/stackabletech/airflow-operator/pull/865
 [#868]: https://github.com/stackabletech/airflow-operator/pull/868
+[#870]: https://github.com/stackabletech/airflow-operator/pull/870
 
 ## [26.7.0] - 2026-07-21
 
