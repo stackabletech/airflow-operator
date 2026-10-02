@@ -72,19 +72,18 @@ There are two classes that are used to:
 
 The classes `SparkKubernetesOperator` and `SparkKubernetesSensor` are located in two different Python modules as they are typically used for all custom resources and thus are best decoupled from the DAG that calls them.
 This also demonstrates that modularized DAGs can be used for Airflow jobs as long as all dependencies exist in or below the root folder pulled by git-sync.
-These files are used in an Airflow demo where they are mounted into the Airflow cluster via a `ConfigMap` https://github.com/stackabletech/demos/blob/main/stacks/airflow/airflow.yaml[here{external-link-icon}^].
+The two modules are not reproduced here: the repository this layout is taken from is private, as it is used to test git-sync access to protected repositories.
+The https://github.com/stackabletech/demos/blob/main/stacks/airflow/airflow.yaml[Airflow demo{external-link-icon}^] shows the same two classes publicly, using a different layout: it defines them in `pyspark_pi.py` itself, before the DAG code, and mounts that file into the Airflow cluster from a `ConfigMap`.
+Both classes use the `kubernetes_in_cluster` connection defined above unless a different one is passed as `kubernetes_conn_id`.
 
 [source,python]
 ----
 include::example$example-spark-dag.py[]
 ----
-<1> the wrapper class used for calling the job via `KubernetesHook`
-<2> the connection that created for in-cluster usage
-<3> the wrapper class used for monitoring the job via `KubernetesHook`
-<4> the start of the DAG code
-<5> the initial task to invoke the job
-<6> the subsequent task to monitor the job
-<7> the jobs are chained together in the correct order
+<1> the start of the DAG code
+<2> the initial task to invoke the job
+<3> the subsequent task to monitor the job
+<4> the jobs are chained together in the correct order
 
 [NOTE]
 ====
@@ -100,8 +99,6 @@ Clicking on the "spark_pi_monitor" task and selecting the logs shows that the st
 image::airflow_dag_log.png[Airflow Connections]
 
 NOTE: If the `KubernetesExecutor` is employed the logs are only persisted via the SDP logging mechanism, described https://docs.stackable.tech/home/stable/concepts/logging[here] or with xref:usage-guide/logging.adoc[remote logging].
-
-TIP: A full example of the above is used as an integration test https://github.com/stackabletech/airflow-operator/tree/main/tests/templates/kuttl/mount-dags-gitsync[here{external-link-icon}^].
 
 == Logging
 
