@@ -55,7 +55,7 @@ Users that log in with LDAP are assigned to a default {airflow-access-control-do
 
 TLS verification for the authentication connection cannot be disabled; the operator rejects an AuthenticationClass that turns it off.
 
-You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-docs}/authentication.stackable.tech/authenticationclass/v1alpha1/[AuthenticationClass reference {external-link-icon}^].
+You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-ref}/authentication.stackable.tech/v1alpha1/authenticationclass{crd-ref-release}[AuthenticationClass reference {external-link-icon}^].
 
 The users and roles can be viewed as before in the Webserver UI, but the blue "+" button is not available when authenticating via LDAP:
 
