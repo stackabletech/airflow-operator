@@ -415,6 +415,16 @@ impl HasStatusCondition for v1alpha2::AirflowCluster {
 }
 
 impl v1alpha2::AirflowCluster {
+    /// The OPA config, if OPA authorization is configured.
+    pub fn get_opa_config(&self) -> Option<&OpaConfig> {
+        self.spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .and_then(|authorization| authorization.opa.as_ref())
+            .map(|opa| &opa.opa)
+    }
+
     /// The name of the group-listener provided for a specific role.
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
@@ -967,11 +977,15 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
-    pub(crate) fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
+    pub(crate) fn default_config(
+        cluster_name: &str,
+        role: &AirflowRole,
+        opa_config: Option<&OpaConfig>,
+    ) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role),
+            affinity: get_affinity(cluster_name, role, opa_config),
             graceful_shutdown_timeout: Some(match role {
                 AirflowRole::Webserver
                 | AirflowRole::Scheduler
