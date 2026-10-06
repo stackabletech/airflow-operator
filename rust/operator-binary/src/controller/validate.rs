@@ -148,7 +148,8 @@ pub fn validate_cluster(
             },
         );
 
-        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+        let default_config =
+            AirflowConfig::default_config(&airflow.name_any(), &role, airflow.get_opa_config());
 
         let mut group_configs = BTreeMap::new();
         for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
@@ -431,7 +432,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Webserver, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(
@@ -530,7 +532,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Scheduler)
             .expect("scheduler role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Scheduler, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(
@@ -607,7 +610,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Webserver, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(

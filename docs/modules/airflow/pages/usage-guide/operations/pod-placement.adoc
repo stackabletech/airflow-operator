@@ -6,6 +6,8 @@ The default affinities created by the operator are:
 
 1. Co-locate all the Airflow Pods (weight 20)
 2. Distribute all Pods within the same role (worker, webserver, scheduler) (weight 70)
+3. If OPA authorization is configured: co-locate the webservers with the OPA Pods (weight 50).
+   Only the webservers are configured with the OPA auth manager.
 
 == Kubernetes executors
 

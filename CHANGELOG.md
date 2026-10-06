@@ -10,6 +10,7 @@
   via `spec.webservers.roleConfig.trustedProxies` ([#835]).
 - Added airflow `3.3.1` ([#865]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
+- Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#XXX]).
 
 ### Changed
 
