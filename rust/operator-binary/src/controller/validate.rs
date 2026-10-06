@@ -148,9 +148,7 @@ pub fn validate_cluster(
             Ok(ValidatedWebserverRoleConfig {
                 pdb: webservers.role_config.common.pod_disruption_budget.clone(),
                 listener_class: webservers.role_config.listener_class.clone(),
-                group_listener_name: airflow
-                    .group_listener_name(&AirflowRole::Webserver)
-                    .expect("the webserver role always has a group listener"),
+                group_listener_name: airflow.webserver_role_group_listener_name(),
                 trusted_proxies,
             })
         })

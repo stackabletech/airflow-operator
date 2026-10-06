@@ -414,20 +414,15 @@ impl HasStatusCondition for v1alpha2::AirflowCluster {
 }
 
 impl v1alpha2::AirflowCluster {
-    /// The name of the group-listener provided for a specific role.
+    /// The name of the group-listener provided for the Webserver role:
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
-    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<ListenerName> {
-        match role {
-            AirflowRole::Webserver => Some(
-                ListenerName::from_str(&role_service_name(&self.name_any(), &role.to_string()))
-                    .expect("the group listener name is a valid Listener name"),
-            ),
-            AirflowRole::Scheduler
-            | AirflowRole::Worker
-            | AirflowRole::DagProcessor
-            | AirflowRole::Triggerer => None,
-        }
+    pub fn webserver_role_group_listener_name(&self) -> ListenerName {
+        ListenerName::from_str(&role_service_name(
+            &self.name_any(),
+            WEBSERVER_ROLE_NAME.as_ref(),
+        ))
+        .expect("the group listener name is a valid Listener name")
     }
 
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
