@@ -9,6 +9,8 @@
 - Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
   via `spec.webservers.roleConfig.trustedProxies` ([#835]).
 - Added airflow `3.3.1` ([#865]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
+- Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
 
 ### Changed
 
@@ -48,6 +50,8 @@
   typed fields instead of maps keyed by role, and only the webserver carries a listener class, a
   group listener and trusted proxies, so those are no longer optional fields that four of the five
   roles leave unset ([#867]).
+- Bump stackable-operator to 0.119.0 ([#868]).
+- Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 
 ### Fixed
 
@@ -81,6 +85,9 @@
 [#862]: https://github.com/stackabletech/airflow-operator/pull/862
 [#865]: https://github.com/stackabletech/airflow-operator/pull/865
 [#867]: https://github.com/stackabletech/airflow-operator/pull/867
+[#868]: https://github.com/stackabletech/airflow-operator/pull/868
+[#870]: https://github.com/stackabletech/airflow-operator/pull/870
+[#872]: https://github.com/stackabletech/airflow-operator/pull/872
 
 ## [26.7.0] - 2026-07-21
 
