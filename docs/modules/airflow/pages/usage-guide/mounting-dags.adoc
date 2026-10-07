@@ -27,7 +27,7 @@ include::example$example-airflow-dags-configmap.yaml[]
 [WARNING]
 --
 If a DAG mounted via ConfigMap consists of modularized files, Python uses this as a "root" directory when looking for referenced files.
-If this is the case, then either the standard DAGs location should be used, or `PYTHONPATH` should be overriden to point to the new location (it is also necessary to include the logging configuration in the path) as shown below:
+If this is the case, then either the standard DAGs location should be used, or `PYTHONPATH` should be overridden to point to the new location (it is also necessary to include the logging configuration in the path) as shown below:
 [source,yaml]
 ----
     envOverrides: &envOverrides
