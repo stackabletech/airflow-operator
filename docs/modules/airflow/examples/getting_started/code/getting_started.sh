@@ -74,10 +74,6 @@ exit 1
 ;;
 esac
 
-# As of SDP 26.3 CRDs are managed by the operator not helm, so there should be an initial delay
-# to allow the CRDs to be detected
-sleep 10
-
 echo "Creating credentials secret"
 # tag::apply-airflow-credentials[]
 kubectl apply -f airflow-credentials.yaml
