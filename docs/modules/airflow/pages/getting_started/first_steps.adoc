@@ -64,7 +64,7 @@ Where:
 * `spec.clusterConfig.metadataDatabase`: specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
 * the product version of the Docker image provided by Stackable must be set in `spec.image.productVersion`.
 * `spec.celeryExecutors`: deploy executors managed by Airflow's Celery engine.
-Alternatively you can use `kuberenetesExectors` that use Airflow's Kubernetes engine for executor management.
+Alternatively you can use `kubernetesExecutors` that use Airflow's Kubernetes engine for executor management.
 For more information see https://airflow.apache.org/docs/apache-airflow/stable/executor/index.html#executor-types).
 * `spec.celeryExecutors.resultBackend`: specifies one of the supported database types (in this case, `postgresql`) along with references to the host, database and the secret containing the connection credentials.
 * `spec.celeryExecutors.broker`: specifies one of the supported queue/broker types (in this case, `redis`) along with references to the host and the secret containing the connection credentials.
