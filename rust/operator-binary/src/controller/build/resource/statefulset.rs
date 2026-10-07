@@ -221,17 +221,13 @@ pub fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if let Some(listener_group_name) = validated_cluster
-        .role_configs
-        .get(airflow_role)
-        .and_then(|role_config| role_config.group_listener_name.clone())
-    {
+    if let Some(listener_group_name) = validated_cluster.group_listener_name(airflow_role) {
         // Listener endpoints for the Webserver role will use persistent volumes
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
         // cluster-internal) as the address should still be consistent.
         let pvc = listener_operator_volume_source_builder_build_pvc(
-            &ListenerReference::Listener(listener_group_name),
+            &ListenerReference::Listener(listener_group_name.clone()),
             &unversioned_recommended_labels,
             &LISTENER_PVC_NAME,
         );

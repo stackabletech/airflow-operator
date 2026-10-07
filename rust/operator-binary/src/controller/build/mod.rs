@@ -27,7 +27,7 @@ use crate::{
             statefulset::build_server_rolegroup_statefulset,
         },
     },
-    crd::{AirflowConfigOverrides, Container},
+    crd::{AirflowConfigOverrides, AirflowRole, Container},
 };
 
 pub mod graceful_shutdown;
@@ -93,23 +93,27 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
         config_maps.push(executor_template_config_map);
     }
 
-    for (role, role_group_configs) in &cluster.role_groups {
-        if let Some(role_config) = cluster.role_configs.get(role) {
-            if let Some(pdb_config) = &role_config.pdb {
-                pod_disruption_budgets.extend(build_pdb(pdb_config, cluster, role));
-            }
-            if let Some(listener_class) = &role_config.listener_class
-                && let Some(group_listener_name) = &role_config.group_listener_name
-            {
-                listeners.push(build_group_listener(
-                    cluster,
-                    role,
-                    listener_class.clone(),
-                    group_listener_name.clone(),
-                ));
-            }
-        }
-
+    // One entry per role, in `AirflowRole` declaration order. Each role's groups come from its own
+    // field, so the role and its groups cannot be paired up wrongly here.
+    for (role, role_group_configs) in [
+        (
+            &AirflowRole::Webserver,
+            &cluster.webserver_role_group_configs,
+        ),
+        (
+            &AirflowRole::Scheduler,
+            &cluster.scheduler_role_group_configs,
+        ),
+        (&AirflowRole::Worker, &cluster.worker_role_group_configs),
+        (
+            &AirflowRole::DagProcessor,
+            &cluster.dagprocessor_role_group_configs,
+        ),
+        (
+            &AirflowRole::Triggerer,
+            &cluster.triggerer_role_group_configs,
+        ),
+    ] {
         for (role_group_name, rg_config) in role_group_configs {
             let logging = &rg_config.config.logging;
 
@@ -149,6 +153,21 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
                 })?,
             );
         }
+
+        if let Some(pdb) = cluster.pdb(role) {
+            pod_disruption_budgets.extend(build_pdb(pdb, cluster, role));
+        }
+    }
+
+    // Only the webserver serves the web UI, so it is the only role with a group listener; it is
+    // built once here rather than inside the role loop.
+    if let Some(webserver) = &cluster.webserver_config {
+        listeners.push(build_group_listener(
+            cluster,
+            &AirflowRole::Webserver,
+            webserver.listener_class.clone(),
+            webserver.group_listener_name.clone(),
+        ));
     }
 
     Ok(KubernetesResources {
@@ -335,7 +354,14 @@ pub(crate) mod test_support {
             serde_yaml::with::singleton_map_recursive::deserialize(cluster_value)
                 .expect("the test CR deserialises");
 
-        let dereferenced = DereferencedObjects {
+        validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced_objects())
+            .expect("test cluster validates")
+    }
+
+    /// The resolved external objects a test cluster is validated against: no AuthenticationClasses
+    /// and no OPA authorization, so validation depends on the CR alone.
+    pub fn dereferenced_objects() -> DereferencedObjects {
+        DereferencedObjects {
             authentication_config: AirflowClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![],
                 user_registration: true,
@@ -343,10 +369,7 @@ pub(crate) mod test_support {
                 sync_roles_at: FlaskRolesSyncMoment::default(),
             },
             authorization_config: AirflowAuthorizationResolved { opa: None },
-        };
-
-        validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced)
-            .expect("test cluster validates")
+        }
     }
 
     /// A Celery-executor cluster whose webserver trusts the given reverse proxies.

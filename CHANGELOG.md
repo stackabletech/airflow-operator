@@ -46,6 +46,10 @@
   overridden, whereas previously the operator's value always took precedence ([#838]).
 - Make operations infallible where appropriate ([#852], [#860]).
 - Deprecated airflow `3.2.2` ([#865]).
+- Internal operator refactoring: the validated cluster carries each role's configuration in its own
+  typed fields instead of maps keyed by role, and only the webserver carries a listener class, a
+  group listener and trusted proxies, so those are no longer optional fields that four of the five
+  roles leave unset ([#867]).
 - Bump stackable-operator to 0.119.0 ([#868]).
 - Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 
@@ -80,6 +84,7 @@
 [#860]: https://github.com/stackabletech/airflow-operator/pull/860
 [#862]: https://github.com/stackabletech/airflow-operator/pull/862
 [#865]: https://github.com/stackabletech/airflow-operator/pull/865
+[#867]: https://github.com/stackabletech/airflow-operator/pull/867
 [#868]: https://github.com/stackabletech/airflow-operator/pull/868
 [#870]: https://github.com/stackabletech/airflow-operator/pull/870
 [#872]: https://github.com/stackabletech/airflow-operator/pull/872
