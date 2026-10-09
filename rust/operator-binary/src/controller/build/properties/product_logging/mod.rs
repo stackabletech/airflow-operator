@@ -318,7 +318,7 @@ mod tests {
             create_airflow_stdlib_config(
                 &log_config,
                 "/stackable/log/airflow",
-                &resolved_image("3.0.6"),
+                &resolved_image("3.3.1"),
             ),
             create_airflow_structlog_config(&log_config, "/stackable/log/airflow"),
         ] {
@@ -333,6 +333,8 @@ mod tests {
     fn test_logging_variant_selection() {
         // The stdlib config copies Airflow's default logging config, the structlog one
         // defines its own `mask_secrets_core` filter.
+        // N.B. This test assumes either Airflow 2.* or 3.0.* for stdlib_content as the
+        // code branches at this point.
         let log_config =
             ValidatedContainerLogConfigChoice::Automatic(AutomaticContainerLogConfig::default());
         let stdlib_content = create_airflow_config(
@@ -344,7 +346,7 @@ mod tests {
         let structlog_content = create_airflow_config(
             &log_config,
             "/stackable/log/airflow",
-            &resolved_image("3.1.6"),
+            &resolved_image("3.3.1"),
         )
         .expect("automatic log config produces content");
         assert!(stdlib_content.contains("deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)"));

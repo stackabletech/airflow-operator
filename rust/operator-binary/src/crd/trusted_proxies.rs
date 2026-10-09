@@ -208,6 +208,12 @@ mod tests {
     }
 
     #[test]
+    fn an_invalid_trusted_proxy_is_rejected() {
+        TrustedProxy::from_str("airflow.example.com")
+            .expect_err("a hostname is not a valid trusted proxy");
+    }
+
+    #[test]
     fn rejects_a_non_numeric_prefix_length() {
         assert!(matches!(
             TrustedProxy::from_str("10.244.0.0/sixteen"),
@@ -308,6 +314,21 @@ mod tests {
             ensure_wildcard_is_sole_entry(&entries),
             Err(Error::WildcardMustBeSoleEntry)
         ));
+    }
+
+    #[test]
+    fn a_wildcard_with_another_entry_reports_wildcard_must_be_sole_entry() {
+        let entries = [
+            TrustedProxy::from_str("*").expect("must be accepted"),
+            TrustedProxy::from_str("10.0.0.0/8").expect("must be accepted"),
+        ];
+
+        let error = ensure_wildcard_is_sole_entry(&entries)
+            .expect_err("* combined with another entry must be rejected");
+        assert!(
+            matches!(error, Error::WildcardMustBeSoleEntry),
+            "error was: {error:?}"
+        );
     }
 
     #[test]

@@ -320,10 +320,7 @@ fn add_version_specific_env_vars(
             // behind a reverse proxy.
             // This covers the uvicorn backend, the only one the SDP image can run.
             let trusted_proxies = cluster
-                .role_configs
-                .get(airflow_role)
-                .map(|role_config| role_config.trusted_proxies.as_slice())
-                .unwrap_or_default()
+                .trusted_proxies(airflow_role)
                 .iter()
                 .map(TrustedProxy::to_string)
                 .collect::<Vec<_>>()
@@ -342,11 +339,7 @@ fn add_version_specific_env_vars(
         // The 2.x uses Werkzeug's `ProxyFix` to allow forwarded-headers and it does so regardless
         // of the peer source. The only valid value for `spec.webservers.roleConfig.trustedProxies` is `["*"]`.
         if airflow_role == &AirflowRole::Webserver {
-            let trusted_proxies = cluster
-                .role_configs
-                .get(airflow_role)
-                .map(|role_config| role_config.trusted_proxies.as_slice())
-                .unwrap_or_default();
+            let trusted_proxies = cluster.trusted_proxies(airflow_role);
 
             if !trusted_proxies.is_empty() {
                 env_vars = env_vars
@@ -540,7 +533,7 @@ mod tests {
     #[test]
     fn test_airflow_3_authorization_env_vars() {
         let authorization_config = get_test_authorization_config();
-        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.0.6");
+        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.3.1");
         let authorization_env_vars = authorization_env_vars
             .into_iter()
             .map(|env| (env.name, env.value.expect("env var value must be present")))

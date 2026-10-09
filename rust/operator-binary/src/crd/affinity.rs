@@ -1,6 +1,9 @@
 use stackable_operator::{
-    commons::affinity::{
-        StackableAffinityFragment, affinity_between_cluster_pods, affinity_between_role_pods,
+    commons::{
+        affinity::{
+            StackableAffinityFragment, affinity_between_cluster_pods, affinity_between_role_pods,
+        },
+        opa::OpaConfig,
     },
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
@@ -8,24 +11,51 @@ use stackable_operator::{
 use crate::crd::{APP_NAME, AirflowRole};
 
 /// Used for all [`AirflowRole`]s besides executors.
-pub fn get_affinity(cluster_name: &str, role: &AirflowRole) -> StackableAffinityFragment {
-    get_affinity_for_role(cluster_name, &role.to_string())
+pub fn get_affinity(
+    cluster_name: &str,
+    role: &AirflowRole,
+    opa_config: Option<&OpaConfig>,
+) -> StackableAffinityFragment {
+    let opa_config = match role {
+        // Only the webserver is configured with the OPA auth manager, so only the webserver is
+        // co-located with the OPA Pods.
+        AirflowRole::Webserver => opa_config,
+        AirflowRole::Scheduler
+        | AirflowRole::Worker
+        | AirflowRole::DagProcessor
+        | AirflowRole::Triggerer => None,
+    };
+    get_affinity_for_role(cluster_name, &role.to_string(), opa_config)
 }
 
 /// There is no [`AirflowRole`] for executors (only for workers), so let's have a special case here.
 pub fn get_executor_affinity(cluster_name: &str) -> StackableAffinityFragment {
-    get_affinity_for_role(cluster_name, "executor")
+    get_affinity_for_role(cluster_name, "executor", None)
 }
 
-fn get_affinity_for_role(cluster_name: &str, role: &str) -> StackableAffinityFragment {
+fn get_affinity_for_role(
+    cluster_name: &str,
+    role: &str,
+    opa_config: Option<&OpaConfig>,
+) -> StackableAffinityFragment {
+    // Built before the `let`s below, which shadow the helper functions with their results.
+    let affinity_to_opa_pods = opa_config.map(|opa_config| {
+        affinity_between_role_pods(
+            "opa",
+            &opa_config.config_map_name, // The discovery cm has the same name as the OpaCluster itself
+            "server",
+            50,
+        )
+    });
     let affinity_between_cluster_pods = affinity_between_cluster_pods(APP_NAME, cluster_name, 20);
     let affinity_between_role_pods = affinity_between_role_pods(APP_NAME, cluster_name, role, 70);
 
+    let mut pod_affinities = vec![affinity_between_cluster_pods];
+    pod_affinities.extend(affinity_to_opa_pods);
+
     StackableAffinityFragment {
         pod_affinity: Some(PodAffinity {
-            preferred_during_scheduling_ignored_during_execution: Some(vec![
-                affinity_between_cluster_pods,
-            ]),
+            preferred_during_scheduling_ignored_during_execution: Some(pod_affinities),
             required_during_scheduling_ignored_during_execution: None,
         }),
         pod_anti_affinity: Some(PodAntiAffinity {
@@ -73,7 +103,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             credentialsSecretName: airflow-admin-credentials
             metadataDatabase:
@@ -90,6 +120,10 @@ mod tests {
               redis:
                 host: airflow-redis-master
                 credentialsSecretName: airflow-redis-credentials
+            authorization:
+              opa:
+                configMapName: simple-opa
+                package: airflow
           webservers:
             roleGroups:
               default:
@@ -111,36 +145,61 @@ mod tests {
         let resolved_role = airflow
             .get_role(&role)
             .expect("the role is defined in the test cluster");
-        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+        let default_config =
+            AirflowConfig::default_config(&airflow.name_any(), &role, airflow.get_opa_config());
         let rolegroup = resolved_role
             .role_groups
             .get("default")
             .expect("the 'default' role group is defined in the test cluster");
+
+        let mut expected_pod_affinities = vec![WeightedPodAffinityTerm {
+            pod_affinity_term: PodAffinityTerm {
+                label_selector: Some(LabelSelector {
+                    match_expressions: None,
+                    match_labels: Some(BTreeMap::from([
+                        ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
+                        (
+                            "app.kubernetes.io/instance".to_string(),
+                            "airflow".to_string(),
+                        ),
+                    ])),
+                }),
+                topology_key: "kubernetes.io/hostname".to_string(),
+                ..PodAffinityTerm::default()
+            },
+            weight: 20,
+        }];
+        // Only the webserver is configured with the OPA auth manager.
+        if role == AirflowRole::Webserver {
+            expected_pod_affinities.push(WeightedPodAffinityTerm {
+                pod_affinity_term: PodAffinityTerm {
+                    label_selector: Some(LabelSelector {
+                        match_expressions: None,
+                        match_labels: Some(BTreeMap::from([
+                            ("app.kubernetes.io/name".to_string(), "opa".to_string()),
+                            (
+                                "app.kubernetes.io/instance".to_string(),
+                                "simple-opa".to_string(),
+                            ),
+                            (
+                                "app.kubernetes.io/component".to_string(),
+                                "server".to_string(),
+                            ),
+                        ])),
+                    }),
+                    topology_key: "kubernetes.io/hostname".to_string(),
+                    ..PodAffinityTerm::default()
+                },
+                weight: 50,
+            });
+        }
 
         let expected: StackableAffinity = StackableAffinity {
             node_affinity: None,
             node_selector: None,
             pod_affinity: Some(PodAffinity {
                 required_during_scheduling_ignored_during_execution: None,
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    WeightedPodAffinityTerm {
-                        pod_affinity_term: PodAffinityTerm {
-                            label_selector: Some(LabelSelector {
-                                match_expressions: None,
-                                match_labels: Some(BTreeMap::from([
-                                    ("app.kubernetes.io/name".to_string(), "airflow".to_string()),
-                                    (
-                                        "app.kubernetes.io/instance".to_string(),
-                                        "airflow".to_string(),
-                                    ),
-                                ])),
-                            }),
-                            topology_key: "kubernetes.io/hostname".to_string(),
-                            ..PodAffinityTerm::default()
-                        },
-                        weight: 20,
-                    },
-                ]),
+                preferred_during_scheduling_ignored_during_execution: Some(expected_pod_affinities),
             }),
             pod_anti_affinity: Some(PodAntiAffinity {
                 required_during_scheduling_ignored_during_execution: None,
@@ -191,7 +250,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             credentialsSecretName: airflow-admin-credentials
             metadataDatabase:

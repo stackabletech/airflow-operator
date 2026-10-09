@@ -27,7 +27,7 @@ from stackable.spark_kubernetes_sensor import SparkKubernetesSensor
 from stackable.spark_kubernetes_operator import SparkKubernetesOperator
 
 
-with DAG(  # <4>
+with DAG(  # <1>
     dag_id="sparkapp_dag",
     schedule=None,
     start_date=datetime(2022, 1, 1),
@@ -59,7 +59,7 @@ with DAG(  # <4>
     )
     document.update({"metadata": {"name": application_name, "namespace": ns}})
 
-    t1 = SparkKubernetesOperator(  # <5>
+    t1 = SparkKubernetesOperator(  # <2>
         task_id="spark_pi_submit",
         namespace=ns,
         application_file=document,
@@ -67,7 +67,7 @@ with DAG(  # <4>
         dag=dag,
     )
 
-    t2 = SparkKubernetesSensor(  # <6>
+    t2 = SparkKubernetesSensor(  # <3>
         task_id="spark_pi_monitor",
         namespace=ns,
         application_name="{{ task_instance.xcom_pull(task_ids='spark_pi_submit')['metadata']['name'] }}",
@@ -75,4 +75,4 @@ with DAG(  # <4>
         dag=dag,
     )
 
-    t1 >> t2  # <7>
+    t1 >> t2  # <4>

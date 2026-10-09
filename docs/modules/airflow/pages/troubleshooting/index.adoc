@@ -139,7 +139,7 @@ with DAG(
 ----
 
 Assume this DAG lies in the `dags` folder in the current directory.
-Testing this with `ruff` indicates one incompatability with Airflow 3.x and one deprecated operator:
+Testing this with `ruff` indicates one incompatibility with Airflow 3.x and one deprecated operator:
 
 [source,bash]
 ----
