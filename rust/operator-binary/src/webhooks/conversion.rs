@@ -5,7 +5,7 @@ use stackable_operator::{
     webhook::{
         WebhookServer, WebhookServerError, WebhookServerOptions,
         health::HealthCheckRegistry,
-        webhooks::{ConversionWebhook, ConversionWebhookOptions},
+        webhooks::{ConversionReview, ConversionWebhook, ConversionWebhookOptions},
     },
 };
 
@@ -29,9 +29,11 @@ pub async fn create_webhook_server(
     readiness_checks: HealthCheckRegistry,
     client: Client,
 ) -> Result<WebhookServer, Error> {
+    // The conversion handlers are cast to fn pointers so both CRD entries share a single element
+    // type (each `fn` item otherwise has its own unique type).
     let crds_and_handlers = vec![(
         AirflowCluster::merged_crd(AirflowClusterVersion::V1Alpha2).context(MergeCrdSnafu)?,
-        AirflowCluster::try_convert,
+        AirflowCluster::try_convert as fn(ConversionReview) -> ConversionReview,
     )];
 
     let conversion_webhook_options = ConversionWebhookOptions {

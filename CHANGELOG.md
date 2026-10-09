@@ -4,6 +4,7 @@
 
 ### Added
 
+- Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.lineage` ([#822]).
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#862]).
 - Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
@@ -71,6 +72,7 @@
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
+[#822]: https://github.com/stackabletech/airflow-operator/pull/822
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
 [#828]: https://github.com/stackabletech/airflow-operator/pull/828
 [#829]: https://github.com/stackabletech/airflow-operator/pull/829
