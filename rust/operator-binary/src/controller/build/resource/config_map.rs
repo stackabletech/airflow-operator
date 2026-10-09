@@ -17,10 +17,14 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster, ValidatedLogging,
-        build::properties::{
-            ConfigFileName,
-            product_logging::{create_airflow_config, vector_config_file_content},
-            webserver_config,
+        build::{
+            object_meta,
+            properties::{
+                ConfigFileName,
+                product_logging::{create_airflow_config, vector_config_file_content},
+                webserver_config,
+            },
+            recommended_labels_for_role_group_resources,
         },
     },
     crd::{AirflowConfigOverrides, Container},
@@ -31,12 +35,6 @@ pub enum Error {
     #[snafu(display("failed to build webserver config for role group {role_group}"))]
     BuildWebserverConfig {
         source: webserver_config::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to build ConfigMap for role group {role_group}"))]
-    BuildConfigMap {
-        source: stackable_operator::builder::configmap::Error,
         role_group: RoleGroupName,
     },
 }
@@ -63,15 +61,19 @@ pub fn build_rolegroup_config_map(
 
     cm_builder
         .metadata(
-            validated_cluster
-                .object_meta(
-                    validated_cluster
-                        .role_group_resource_names(role_name, role_group_name)
-                        .role_group_config_map()
-                        .to_string(),
-                    validated_cluster.recommended_labels_for(role_name, role_group_name),
-                )
-                .build(),
+            object_meta(
+                validated_cluster,
+                validated_cluster
+                    .role_group_resource_names(role_name, role_group_name)
+                    .role_group_config_map()
+                    .to_string(),
+                recommended_labels_for_role_group_resources(
+                    validated_cluster,
+                    role_name,
+                    role_group_name,
+                ),
+            )
+            .build(),
         )
         .add_data(ConfigFileName::WebserverConfig.to_string(), config_file);
 
@@ -90,7 +92,7 @@ pub fn build_rolegroup_config_map(
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config_file_content());
     }
 
-    cm_builder.build().with_context(|_| BuildConfigMapSnafu {
-        role_group: role_group_name.clone(),
-    })
+    Ok(cm_builder
+        .build()
+        .expect("The ConfigMap metadata is set in this function."))
 }

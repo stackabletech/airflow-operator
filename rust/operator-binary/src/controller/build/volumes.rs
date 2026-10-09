@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
+    constant,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
     product_logging,
     v2::{
@@ -12,9 +13,9 @@ use stackable_operator::{
 
 use crate::crd::MAX_LOG_FILES_SIZE;
 
-stackable_operator::constant!(pub CONFIG_VOLUME_NAME: VolumeName = "config");
-stackable_operator::constant!(pub LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
-stackable_operator::constant!(pub LOG_VOLUME_NAME: VolumeName = "log");
+constant!(pub CONFIG_VOLUME_NAME: VolumeName = "config");
+constant!(pub LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
+constant!(pub LOG_VOLUME_NAME: VolumeName = "log");
 
 pub fn create_volumes(
     config_map_name: &str,
@@ -56,4 +57,17 @@ pub fn create_volumes(
     });
 
     volumes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *CONFIG_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+    }
 }

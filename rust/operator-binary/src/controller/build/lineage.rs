@@ -25,10 +25,8 @@ use stackable_operator::{
         ResolvedOpenLineageConnection,
         v1alpha1::{OpenLineageConfig, OpenLineageError, OpenLineageTransport},
     },
-    k8s_openapi::api::core::v1::{EnvVar, Volume, VolumeMount},
+    k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector, Volume, VolumeMount},
 };
-
-use crate::util::env_var_from_secret;
 
 // OpenLineage Python client transport env vars. These are the Airflow provider's fallback config
 // source, used only when no Airflow-native transport (`AIRFLOW__OPENLINEAGE__TRANSPORT` /
@@ -58,6 +56,9 @@ pub const OPENLINEAGE_AUTH_SECRET_KEY: &str = "apiKey";
 pub enum Error {
     #[snafu(display("failed to resolve OpenLineage connection"))]
     ResolveConnection { source: OpenLineageError },
+
+    #[snafu(display("failed to build the OpenLineage transport URL"))]
+    TransportUrl { source: OpenLineageError },
 
     #[snafu(display("failed to build TLS volumes and mounts for the OpenLineage connection"))]
     TlsVolumesAndMounts { source: TlsClientDetailsError },
@@ -107,18 +108,23 @@ impl ResolvedLineageConfig {
         let mut volume_mounts = Vec::new();
 
         let OpenLineageTransport::Http(http) = &connection.transport;
+        let transport_url = http.url().context(TransportUrlSnafu)?;
 
         // Transport (delivered via the OpenLineage Python client fallback env vars).
         env_vars.push(plain_env(
             OPENLINEAGE_TRANSPORT_TYPE,
             OPENLINEAGE_TRANSPORT_TYPE_HTTP,
         ));
-        env_vars.push(plain_env(OPENLINEAGE_TRANSPORT_URL, &http.transport_url()));
-        // The client joins the base URL and the endpoint itself, so the leading slash of the CRD
-        // `path` is stripped to avoid a doubled separator.
+        // The client joins the base URL and the endpoint itself, so the URL is split into its
+        // origin and its path, with the leading slash of the path stripped to avoid a doubled
+        // separator.
+        env_vars.push(plain_env(
+            OPENLINEAGE_TRANSPORT_URL,
+            &transport_url.origin().ascii_serialization(),
+        ));
         env_vars.push(plain_env(
             OPENLINEAGE_TRANSPORT_ENDPOINT,
-            http.path.trim_start_matches('/'),
+            transport_url.path().trim_start_matches('/'),
         ));
 
         env_vars.push(plain_env(AIRFLOW_OPENLINEAGE_NAMESPACE, &lineage.namespace));
@@ -155,15 +161,6 @@ impl ResolvedLineageConfig {
             ));
         }
 
-        // Airflow has no global OpenLineage job name (names are derived per DAG/task), so the shared
-        // `jobName` field is not applicable and is ignored.
-        if lineage.job_name.is_some() {
-            tracing::debug!(
-                "The OpenLineage `jobName` field is not used by Airflow and will be ignored; \
-                 Airflow derives OpenLineage job names per DAG/task."
-            );
-        }
-
         Ok(Self {
             env_vars,
             volumes,
@@ -176,6 +173,21 @@ fn plain_env(name: &str, value: &str) -> EnvVar {
     EnvVar {
         name: name.to_string(),
         value: Some(value.to_string()),
+        ..Default::default()
+    }
+}
+
+fn env_var_from_secret(name: &str, secret_name: &str, secret_key: &str) -> EnvVar {
+    EnvVar {
+        name: name.to_string(),
+        value_from: Some(EnvVarSource {
+            secret_key_ref: Some(SecretKeySelector {
+                name: secret_name.to_string(),
+                key: secret_key.to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }
@@ -205,7 +217,7 @@ mod tests {
     ) -> OpenLineageConnectionSpec {
         OpenLineageConnectionSpec {
             transport: OpenLineageTransport::Http(HttpTransport {
-                host: "marquez".to_string(),
+                host: "marquez".parse().expect("valid host name"),
                 port: 5000,
                 path: HttpTransport::DEFAULT_PATH.to_string(),
                 tls,
@@ -217,7 +229,7 @@ mod tests {
     fn connection_with_path(tls: TlsClientDetails, path: &str) -> OpenLineageConnectionSpec {
         OpenLineageConnectionSpec {
             transport: OpenLineageTransport::Http(HttpTransport {
-                host: "marquez".to_string(),
+                host: "marquez".parse().expect("valid host name"),
                 port: 5000,
                 path: path.to_string(),
                 tls,
@@ -230,7 +242,6 @@ mod tests {
         OpenLineageConfig {
             connection: InlineConnectionOrReference::Inline(connection),
             namespace: namespace.to_string(),
-            job_name: None,
         }
     }
 
@@ -350,6 +361,10 @@ mod tests {
         let conn = connection(no_verification_tls());
         let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
 
+        assert_eq!(
+            env_value(&config, OPENLINEAGE_TRANSPORT_URL),
+            Some("https://marquez:5000")
+        );
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY),
             Some("false")

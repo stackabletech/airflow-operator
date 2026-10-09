@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -18,6 +18,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    constant,
     crd::{git_sync, openlineage},
     deep_merger::ObjectOverrides,
     k8s_openapi::{
@@ -31,7 +32,7 @@ use stackable_operator::{
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::Logging,
     },
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -40,13 +41,14 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         product_logging::framework::STACKABLE_LOG_DIR,
-        role_utils::GenericCommonConfig,
+        role_utils::{CommonConfiguration, GenericCommonConfig, Role, RoleGroup},
         types::{
             common::Port,
             kubernetes::{
                 ConfigMapName, ContainerName, ListenerClassName, ListenerName,
                 PersistentVolumeClaimName, SecretName, VolumeName,
             },
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -73,26 +75,29 @@ pub mod authentication;
 pub mod authorization;
 pub mod databases;
 pub mod internal_secret;
+pub mod trusted_proxies;
 
 pub const APP_NAME: &str = "airflow";
 pub const FIELD_MANAGER: &str = "airflow-operator";
-pub const OPERATOR_NAME: &str = "airflow.stackable.tech";
+pub const AIRFLOW_OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
 
-stackable_operator::constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
+constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
 pub const TEMPLATE_NAME: &str = "airflow_executor_pod_template.yaml";
 
-stackable_operator::constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
+constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = "listener");
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(8080);
 pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: Port = Port(9102);
-stackable_operator::constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
+// The metrics container has no logging configuration, so it is not a `Container` variant and
+// carries its name directly.
+constant!(pub METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 const DEFAULT_AIRFLOW_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 const DEFAULT_WORKER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
@@ -101,6 +106,12 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+constant!(WEBSERVER_ROLE_NAME: RoleName = "webserver");
+constant!(SCHEDULER_ROLE_NAME: RoleName = "scheduler");
+constant!(WORKER_ROLE_NAME: RoleName = "worker");
+constant!(DAG_PROCESSOR_ROLE_NAME: RoleName = "dagprocessor");
+constant!(TRIGGERER_ROLE_NAME: RoleName = "triggerer");
 
 pub type AirflowRoleType =
     Role<AirflowConfigFragment, AirflowConfigOverrides, GenericRoleConfig, GenericCommonConfig>;
@@ -338,6 +349,21 @@ pub mod versioned {
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "webserver_default_listener_class")]
         pub listener_class: ListenerClassName,
+
+        /// Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+        ///
+        /// The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+        /// (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+        /// only entry in the list if used: combining it with other entries is rejected, since it
+        /// would silently degrade to trusting only those other entries.
+        ///
+        /// On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+        /// forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+        /// `*`, since Airflow 2.x has no way to restrict it further.
+        ///
+        /// Leave this empty (the default) and forwarded headers are ignored entirely.
+        #[serde(default)]
+        pub trusted_proxies: Vec<String>,
     }
 }
 
@@ -367,6 +393,7 @@ impl Default for v1alpha2::WebserverRoleConfig {
     fn default() -> Self {
         v1alpha2::WebserverRoleConfig {
             listener_class: webserver_default_listener_class(),
+            trusted_proxies: Vec::new(),
             common: Default::default(),
         }
     }
@@ -394,20 +421,25 @@ impl HasStatusCondition for v1alpha2::AirflowCluster {
 }
 
 impl v1alpha2::AirflowCluster {
-    /// The name of the group-listener provided for a specific role.
+    /// The OPA config, if OPA authorization is configured.
+    pub fn get_opa_config(&self) -> Option<&OpaConfig> {
+        self.spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .and_then(|authorization| authorization.opa.as_ref())
+            .map(|opa| &opa.opa)
+    }
+
+    /// The name of the group-listener provided for the Webserver role:
     /// Webservers will use this group listener so that only one load balancer
     /// is needed for that role.
-    pub fn group_listener_name(&self, role: &AirflowRole) -> Option<ListenerName> {
-        match role {
-            AirflowRole::Webserver => Some(
-                ListenerName::from_str(&role_service_name(&self.name_any(), &role.to_string()))
-                    .expect("the group listener name is a valid Listener name"),
-            ),
-            AirflowRole::Scheduler
-            | AirflowRole::Worker
-            | AirflowRole::DagProcessor
-            | AirflowRole::Triggerer => None,
-        }
+    pub fn webserver_role_group_listener_name(&self) -> ListenerName {
+        ListenerName::from_str(&role_service_name(
+            &self.name_any(),
+            WEBSERVER_ROLE_NAME.as_ref(),
+        ))
+        .expect("the group listener name is a valid Listener name")
     }
 
     /// the worker role will not be returned if airflow provisions pods as needed (i.e. when
@@ -430,10 +462,6 @@ impl v1alpha2::AirflowCluster {
                 }
             }
         }
-    }
-
-    pub fn role_config(&self, role: &AirflowRole) -> Option<GenericRoleConfig> {
-        self.get_role(role).map(|r| r.role_config)
     }
 
     /// Retrieve and merge resource configs for the executor template
@@ -513,35 +541,12 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    Eq,
-    Hash,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    EnumString,
-)]
+#[derive(Clone, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AirflowRole {
-    #[strum(serialize = "webserver")]
     Webserver,
-
-    #[strum(serialize = "scheduler")]
     Scheduler,
-
-    #[strum(serialize = "worker")]
     Worker,
-
-    #[strum(serialize = "dagprocessor")]
     DagProcessor,
-
-    #[strum(serialize = "triggerer")]
     Triggerer,
 }
 
@@ -581,7 +586,10 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow api-server &".to_string(),
+                        format!(
+                            "airflow api-server{} &",
+                            self.proxy_headers_argument(cluster)
+                        ),
                     ]);
                 }
                 AirflowRole::Scheduler => {
@@ -604,16 +612,20 @@ impl AirflowRole {
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
                         container_debug_command(),
-                        "airflow scheduler &".to_string(),
                     ]);
                     if !has_dag_processors {
                         // If no dag_processors role has been specified, the
                         // process needs to be included with the scheduler
                         // (with 3.x there is no longer the possibility of
                         // starting it as a subprocess, so it has to be
-                        // explicitly started *somewhere*)
+                        // explicitly started *somewhere*).
+                        // It is started before the scheduler because the
+                        // trailing `wait_for_termination $!` binds to the
+                        // process that was backgrounded last, and that must be
+                        // the scheduler.
                         command.extend(vec!["airflow dag-processor &".to_string()]);
                     }
+                    command.extend(vec!["airflow scheduler &".to_string()]);
                 }
                 AirflowRole::DagProcessor => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
@@ -694,6 +706,24 @@ impl AirflowRole {
         command
     }
 
+    /// Add this CLI arg to enable proxy header support.
+    /// Additional env vars are needed for the full functionality.
+    /// See `env_vars::add_version_specific_env_vars` for the counterpart function.
+    /// Only the webserver runs the api-server; every other role returns the empty string.
+    fn proxy_headers_argument(&self, cluster: &ValidatedCluster) -> &'static str {
+        if !matches!(self, AirflowRole::Webserver) {
+            return "";
+        }
+
+        let has_trusted_proxies = !cluster.trusted_proxies(self).is_empty();
+
+        if has_trusted_proxies {
+            " --proxy-headers"
+        } else {
+            ""
+        }
+    }
+
     fn authentication_start_commands(
         auth_config: &AirflowClientAuthenticationDetailsResolved,
     ) -> Vec<String> {
@@ -737,18 +767,18 @@ impl AirflowRole {
             AirflowRole::Triggerer => None,
         }
     }
+}
 
-    pub fn listener_class_name(
-        &self,
-        airflow: &v1alpha2::AirflowCluster,
-    ) -> Option<ListenerClassName> {
+impl Deref for AirflowRole {
+    type Target = RoleName;
+
+    fn deref(&self) -> &Self::Target {
         match self {
-            Self::Webserver => airflow
-                .spec
-                .webservers
-                .to_owned()
-                .map(|webserver| webserver.role_config.listener_class),
-            Self::Worker | Self::Scheduler | Self::DagProcessor | Self::Triggerer => None,
+            AirflowRole::Webserver => &WEBSERVER_ROLE_NAME,
+            AirflowRole::Scheduler => &SCHEDULER_ROLE_NAME,
+            AirflowRole::Worker => &WORKER_ROLE_NAME,
+            AirflowRole::DagProcessor => &DAG_PROCESSOR_ROLE_NAME,
+            AirflowRole::Triggerer => &TRIGGERER_ROLE_NAME,
         }
     }
 }
@@ -825,11 +855,22 @@ pub enum Container {
     GitSync,
 }
 
+// Typed container names. They must match the strum `Display` (kebab-case) of the variants above,
+// which is pinned by a unit test.
+constant!(AIRFLOW_CONTAINER_NAME: ContainerName = "airflow");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+constant!(BASE_CONTAINER_NAME: ContainerName = "base");
+constant!(GIT_SYNC_CONTAINER_NAME: ContainerName = "git-sync");
+
 impl Container {
-    /// The type-safe container name for this variant (matching its kebab-case serialization).
-    pub fn to_container_name(&self) -> ContainerName {
-        ContainerName::from_str(&self.to_string())
-            .expect("a Container variant name is a valid container name")
+    /// The typed container name of this variant.
+    pub fn name(&self) -> &'static ContainerName {
+        match self {
+            Container::Airflow => &AIRFLOW_CONTAINER_NAME,
+            Container::Vector => &VECTOR_CONTAINER_NAME,
+            Container::Base => &BASE_CONTAINER_NAME,
+            Container::GitSync => &GIT_SYNC_CONTAINER_NAME,
+        }
     }
 }
 
@@ -892,11 +933,15 @@ pub struct AirflowConfig {
 }
 
 impl AirflowConfig {
-    pub(crate) fn default_config(cluster_name: &str, role: &AirflowRole) -> AirflowConfigFragment {
+    pub(crate) fn default_config(
+        cluster_name: &str,
+        role: &AirflowRole,
+        opa_config: Option<&OpaConfig>,
+    ) -> AirflowConfigFragment {
         AirflowConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role),
+            affinity: get_affinity(cluster_name, role, opa_config),
             graceful_shutdown_timeout: Some(match role {
                 AirflowRole::Webserver
                 | AirflowRole::Scheduler
@@ -976,8 +1021,39 @@ mod tests {
         commons::product_image_selection::ResolvedProductImage,
         versioned::test_utils::RoundtripTestData,
     };
+    use strum::IntoEnumIterator;
 
-    use crate::{v1alpha1, v1alpha2};
+    use super::*;
+    use crate::{
+        controller::build::test_support::{validated_cluster, validated_cluster_with},
+        v1alpha1, v1alpha2,
+    };
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *WEBSERVER_ROLE_NAME;
+        let _ = *SCHEDULER_ROLE_NAME;
+        let _ = *WORKER_ROLE_NAME;
+        let _ = *DAG_PROCESSOR_ROLE_NAME;
+        let _ = *TRIGGERER_ROLE_NAME;
+        let _ = *TEMPLATE_VOLUME_NAME;
+        let _ = *LISTENER_PVC_NAME;
+        let _ = *METRICS_CONTAINER_NAME;
+        let _ = *AIRFLOW_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
+        let _ = *BASE_CONTAINER_NAME;
+        let _ = *GIT_SYNC_CONTAINER_NAME;
+    }
+
+    /// The typed container names returned by `name` must agree with the strum `Display`
+    /// of `Container`, which the logging configuration still uses as the per-container key.
+    #[test]
+    fn container_names_match_display() {
+        for container in Container::iter() {
+            assert_eq!(container.name().to_string(), container.to_string());
+        }
+    }
 
     #[test]
     fn test_cluster_config() {
@@ -988,7 +1064,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             loadExamples: true
             exposeConfig: true
@@ -1017,10 +1093,16 @@ mod tests {
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec
             .image
-            .resolve("airflow", "oci.example.org", "0.0.0-dev")
+            .resolve(
+                "airflow",
+                "oci.example.org",
+                &"0.0.0-dev"
+                    .parse()
+                    .expect("static semantic version must parse"),
+            )
             .expect("test: resolved product image is always valid");
 
-        assert_eq!("3.1.6", &resolved_airflow_image.product_version);
+        assert_eq!("3.3.1", &resolved_airflow_image.product_version);
 
         assert_eq!(
             "KubernetesExecutor",
@@ -1030,6 +1112,105 @@ mod tests {
         assert!(cluster.spec.cluster_config.expose_config);
         // defaults to true
         assert!(cluster.spec.cluster_config.database_initialization.enabled);
+    }
+
+    #[test]
+    fn webserver_role_config_defaults_to_no_trusted_proxies() {
+        let role_config: v1alpha2::WebserverRoleConfig =
+            serde_yaml::from_str("listenerClass: external-stable")
+                .expect("the role config deserialises");
+
+        assert!(role_config.trusted_proxies.is_empty());
+    }
+
+    #[test]
+    fn webserver_role_config_accepts_trusted_proxies() {
+        let role_config: v1alpha2::WebserverRoleConfig = serde_yaml::from_str(
+            "
+            trustedProxies:
+              - 10.244.0.0/16
+              - 192.168.1.1
+            ",
+        )
+        .expect("the role config deserialises");
+
+        assert_eq!(
+            role_config.trusted_proxies,
+            ["10.244.0.0/16", "192.168.1.1"]
+        );
+    }
+
+    /// The commands that background a process, i.e. the candidates for `$!`.
+    fn backgrounded_commands(role: &AirflowRole, cluster: &ValidatedCluster) -> Vec<String> {
+        role.get_commands(cluster)
+            .into_iter()
+            .filter(|command| command.ends_with(" &"))
+            .collect()
+    }
+
+    #[test]
+    fn every_role_backgrounds_its_own_process_last() {
+        let cluster = validated_cluster("kubernetesExecutors", "{config: {}}");
+
+        assert!(
+            cluster.image.product_version.starts_with("3."),
+            "the test cluster must run Airflow 3.x for this to test anything"
+        );
+        assert!(!cluster.has_role(&AirflowRole::DagProcessor));
+
+        for role in AirflowRole::iter() {
+            let own_process = match role {
+                AirflowRole::Webserver => "airflow api-server &",
+                AirflowRole::Scheduler => "airflow scheduler &",
+                AirflowRole::Worker => "airflow celery worker &",
+                AirflowRole::DagProcessor => "airflow dag-processor &",
+                AirflowRole::Triggerer => "airflow triggerer &",
+            };
+
+            assert_eq!(
+                backgrounded_commands(&role, &cluster).last(),
+                Some(&own_process.to_string()),
+                "{role:?} must background its own process last"
+            );
+        }
+    }
+
+    #[test]
+    fn a_scheduler_without_a_dag_processor_role_starts_the_dag_processor() {
+        let cluster = validated_cluster("kubernetesExecutors", "{config: {}}");
+        let backgrounded = backgrounded_commands(&AirflowRole::Scheduler, &cluster);
+
+        assert!(
+            backgrounded.contains(&"airflow dag-processor &".to_string()),
+            "the scheduler must start the dag-processor, but backgrounds only: {backgrounded:?}"
+        );
+    }
+
+    #[test]
+    fn a_scheduler_with_a_dag_processor_role_does_not_start_the_dag_processor() {
+        let cluster = validated_cluster_with("kubernetesExecutors", "{config: {}}", |cluster| {
+            cluster["spec"]
+                .as_mapping_mut()
+                .expect("the test CR has a spec mapping")
+                .insert(
+                    "dagProcessors".into(),
+                    serde_yaml::from_str("{config: {}, roleGroups: {default: {config: {}}}}")
+                        .expect("the dag-processor role is valid YAML"),
+                );
+        });
+
+        assert!(
+            cluster.has_role(&AirflowRole::DagProcessor),
+            "the fixture must declare a dag-processor role for this to test anything"
+        );
+
+        let backgrounded = backgrounded_commands(&AirflowRole::Scheduler, &cluster);
+
+        assert!(
+            !backgrounded.contains(&"airflow dag-processor &".to_string()),
+            "the dedicated dag-processor role runs the process, so the scheduler must not \
+             start a second one, but backgrounds: {backgrounded:?}"
+        );
     }
 
     impl RoundtripTestData for v1alpha1::AirflowClusterSpec {

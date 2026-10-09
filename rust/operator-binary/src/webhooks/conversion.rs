@@ -4,6 +4,7 @@ use stackable_operator::{
     kube::{Client, core::crd::MergeError},
     webhook::{
         WebhookServer, WebhookServerError, WebhookServerOptions,
+        health::HealthCheckRegistry,
         webhooks::{ConversionReview, ConversionWebhook, ConversionWebhookOptions},
     },
 };
@@ -25,6 +26,7 @@ pub enum Error {
 pub async fn create_webhook_server(
     operator_environment: &OperatorEnvironmentOptions,
     disable_crd_maintenance: bool,
+    readiness_checks: HealthCheckRegistry,
     client: Client,
 ) -> Result<WebhookServer, Error> {
     // The conversion handlers are cast to fn pointers so both CRD entries share a single element
@@ -48,10 +50,13 @@ pub async fn create_webhook_server(
         webhook_service_name: operator_environment.operator_service_name.to_owned(),
     };
 
-    let webhook_server =
-        WebhookServer::new(vec![Box::new(conversion_webhook)], webhook_server_options)
-            .await
-            .context(CreateWebhookSnafu)?;
+    let webhook_server = WebhookServer::new(
+        vec![Box::new(conversion_webhook)],
+        webhook_server_options,
+        readiness_checks,
+    )
+    .await
+    .context(CreateWebhookSnafu)?;
 
     Ok(webhook_server)
 }

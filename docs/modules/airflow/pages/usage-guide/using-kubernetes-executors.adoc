@@ -85,6 +85,9 @@ Afterwards the Pod is immediately terminated and e.g. console output or logs are
 
 In order to persist task logs, Airflow can be configured to store its https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/kubernetes_executor.html#managing-dags-and-logs[executor logs on disk (PV)] or as described in the following section on S3.
 
+TIP: The following sections create the S3 connection by hand in the Airflow Web UI.
+See xref:usage-guide/logging.adoc#remote-logging[] for the same setup with the connection supplied declaratively through a Secret, which also covers endpoints that need a CA certificate.
+
 [#s3-connection]
 === Add S3 connection in Airflow Web UI
 

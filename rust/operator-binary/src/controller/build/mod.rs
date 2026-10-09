@@ -1,13 +1,24 @@
 //! Builders that assemble Kubernetes resources from the validated cluster.
 
+use std::marker::PhantomData;
+
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::types::operator::RoleGroupName;
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    kvp::Labels,
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        kvp::label,
+        types::operator::{RoleGroupName, RoleName},
+    },
+};
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        CONTROLLER_NAME, EXECUTOR_ROLE_GROUP_NAME, EXECUTOR_ROLE_NAME, KubernetesResources,
+        OPERATOR_NAME, PRODUCT_NAME, Prepared, ValidatedCluster,
         build::resource::{
-            config_map,
+            config_map::build_rolegroup_config_map,
             executor::build_executor_template_config_map,
             listener::build_group_listener,
             pdb::build_pdb,
@@ -15,9 +26,8 @@ use crate::{
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_server_rolegroup_statefulset,
         },
-        executor_role_group_name, executor_role_name,
     },
-    crd::{AirflowConfigOverrides, Container},
+    crd::{AirflowConfigOverrides, AirflowRole, Container},
 };
 
 pub mod graceful_shutdown;
@@ -49,7 +59,7 @@ pub enum Error {
 /// Does not need a Kubernetes client: every reference to another Kubernetes resource is already
 /// dereferenced and validated by this point. Cluster configuration is likewise already validated,
 /// so the errors returned here are resource-assembly failures only.
-pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut listeners = vec![];
@@ -59,10 +69,10 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
     // The Kubernetes-executor pod template (only built for the Kubernetes executor; the Celery
     // executor's workers are a regular role with its own role groups instead).
     if let Some(executor_template) = &cluster.cluster_config.executor_template {
-        let executor_role_group = executor_role_group_name();
-        let executor_config_map = config_map::build_rolegroup_config_map(
+        let executor_role_group = EXECUTOR_ROLE_GROUP_NAME.clone();
+        let executor_config_map = build_rolegroup_config_map(
             cluster,
-            &executor_role_name(),
+            &EXECUTOR_ROLE_NAME,
             &executor_role_group,
             // The Kubernetes-executor pod template does not apply webserver_config.py overrides.
             &AirflowConfigOverrides::default(),
@@ -84,23 +94,27 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         config_maps.push(executor_template_config_map);
     }
 
-    for (role, role_group_configs) in &cluster.role_groups {
-        if let Some(role_config) = cluster.role_configs.get(role) {
-            if let Some(pdb_config) = &role_config.pdb {
-                pod_disruption_budgets.extend(build_pdb(pdb_config, cluster, role));
-            }
-            if let Some(listener_class) = &role_config.listener_class
-                && let Some(group_listener_name) = &role_config.group_listener_name
-            {
-                listeners.push(build_group_listener(
-                    cluster,
-                    role,
-                    listener_class.clone(),
-                    group_listener_name.clone(),
-                ));
-            }
-        }
-
+    // One entry per role, in `AirflowRole` declaration order. Each role's groups come from its own
+    // field, so the role and its groups cannot be paired up wrongly here.
+    for (role, role_group_configs) in [
+        (
+            &AirflowRole::Webserver,
+            &cluster.webserver_role_group_configs,
+        ),
+        (
+            &AirflowRole::Scheduler,
+            &cluster.scheduler_role_group_configs,
+        ),
+        (&AirflowRole::Worker, &cluster.worker_role_group_configs),
+        (
+            &AirflowRole::DagProcessor,
+            &cluster.dagprocessor_role_group_configs,
+        ),
+        (
+            &AirflowRole::Triggerer,
+            &cluster.triggerer_role_group_configs,
+        ),
+    ] {
         for (role_group_name, rg_config) in role_group_configs {
             let logging = &rg_config.config.logging;
 
@@ -115,9 +129,9 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
                 role_group_name,
             ));
             config_maps.push(
-                config_map::build_rolegroup_config_map(
+                build_rolegroup_config_map(
                     cluster,
-                    &ValidatedCluster::role_name(role),
+                    role,
                     role_group_name,
                     &rg_config.config_overrides,
                     logging,
@@ -140,6 +154,21 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
                 })?,
             );
         }
+
+        if let Some(pdb) = cluster.pdb(role) {
+            pod_disruption_budgets.extend(build_pdb(pdb, cluster, role));
+        }
+    }
+
+    // Only the webserver serves the web UI, so it is the only role with a group listener; it is
+    // built once here rather than inside the role loop.
+    if let Some(webserver) = &cluster.webserver_config {
+        listeners.push(build_group_listener(
+            cluster,
+            &AirflowRole::Webserver,
+            webserver.listener_class.clone(),
+            webserver.group_listener_name.clone(),
+        ));
     }
 
     Ok(KubernetesResources {
@@ -150,16 +179,95 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 
+/// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, the resource
+/// `name`, an owner reference back to the cluster, and the given recommended `labels`.
+///
+/// Consolidates the metadata chain repeated by the child-resource builders. Call sites that
+/// need extra labels/annotations chain them onto the returned builder.
+pub(crate) fn object_meta(
+    cluster: &ValidatedCluster,
+    name: impl Into<String>,
+    labels: Labels,
+) -> ObjectMetaBuilder {
+    let mut builder = ObjectMetaBuilder::new();
+    builder
+        .name_and_namespace(cluster)
+        .name(name)
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
+        .with_labels(labels);
+    builder
+}
+
+pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
+    label::recommended_labels_for_cluster_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+) -> Labels {
+    label::recommended_labels_for_role_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_unversioned_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+/// Selector labels matching the pods of a role group.
+pub(crate) fn role_group_selector(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
+}
+
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use stackable_operator::kube::Resource;
-
-    use super::build;
+pub(crate) mod test_support {
     use crate::{
         controller::{
             ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
@@ -171,12 +279,34 @@ mod tests {
         },
     };
 
+    /// The expected `app.kubernetes.io/version` label value for the given product version.
+    ///
+    /// The `-stackable` suffix carries the operator's own version, which is `0.0.0-dev` on main
+    /// but rewritten by the release process — so tests must derive it rather than hardcode it,
+    /// or they fail on release branches.
+    pub fn app_version_label(product_version: &str) -> String {
+        format!(
+            "{product_version}-stackable{}",
+            crate::built_info::PKG_VERSION
+        )
+    }
+
     /// A validated cluster with default `webserver`/`scheduler` role groups and the given executor
     /// (its `spec` key plus config, as standalone YAML), built via `validate_cluster` from a
     /// minimal test CR (mirroring `validate::tests::test_cluster`), since `ValidatedCluster`
     /// carries several resolved types (git-sync resources, validated logging, …) that are
     /// impractical to construct by hand.
-    fn validated_cluster(executor_key: &str, executor_config: &str) -> ValidatedCluster {
+    pub fn validated_cluster(executor_key: &str, executor_config: &str) -> ValidatedCluster {
+        validated_cluster_with(executor_key, executor_config, |_| {})
+    }
+
+    /// As [`validated_cluster`], but `patch` may modify the parsed CR before it is validated —
+    /// used to add role-level config that the base fixture does not carry.
+    pub fn validated_cluster_with(
+        executor_key: &str,
+        executor_config: &str,
+        patch: impl FnOnce(&mut serde_yaml::Value),
+    ) -> ValidatedCluster {
         let cluster_yaml = r#"
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
@@ -186,7 +316,7 @@ mod tests {
           uid: e6ac237d-a6d4-43a1-8135-f36506110912
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -218,11 +348,21 @@ mod tests {
                 executor_key.into(),
                 serde_yaml::from_str(executor_config).expect("the executor config is valid YAML"),
             );
+
+        patch(&mut cluster_value);
+
         let cluster: v1alpha2::AirflowCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(cluster_value)
                 .expect("the test CR deserialises");
 
-        let dereferenced = DereferencedObjects {
+        validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced_objects())
+            .expect("test cluster validates")
+    }
+
+    /// The resolved external objects a test cluster is validated against: no AuthenticationClasses
+    /// and no OPA authorization, so validation depends on the CR alone.
+    pub fn dereferenced_objects() -> DereferencedObjects {
+        DereferencedObjects {
             authentication_config: AirflowClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![],
                 user_registration: true,
@@ -231,23 +371,61 @@ mod tests {
             },
             authorization_config: AirflowAuthorizationResolved { opa: None },
             resolved_lineage_config: None,
-        };
+        }
+    }
 
-        validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced)
-            .expect("test cluster validates")
+    /// A Celery-executor cluster whose webserver trusts the given reverse proxies.
+    pub fn cluster_with_trusted_proxies(trusted_proxies: &[&str]) -> ValidatedCluster {
+        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+            .iter()
+            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .collect();
+
+        validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            |cluster| {
+                cluster["spec"]["webservers"]
+                    .as_mapping_mut()
+                    .expect("the webservers role is a mapping")
+                    .insert(
+                        "roleConfig".into(),
+                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+                            serde_yaml::Value::String("trustedProxies".to_owned()),
+                            serde_yaml::Value::Sequence(trusted_proxies),
+                        )])),
+                    );
+            },
+        )
     }
 
     /// Validated cluster with a Celery executor (its workers are provisioned via the queue, so no
     /// executor pod template is built).
-    fn celery_executor_cluster() -> ValidatedCluster {
+    pub fn celery_executor_cluster() -> ValidatedCluster {
         validated_cluster("celeryExecutors", "{config: {}, roleGroups: {}}")
     }
 
     /// Validated cluster with a Kubernetes executor, which builds an executor pod-template
     /// ConfigMap instead of a worker role.
-    fn kubernetes_executor_cluster() -> ValidatedCluster {
+    pub fn kubernetes_executor_cluster() -> ValidatedCluster {
         validated_cluster("kubernetesExecutors", "{config: {}}")
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use stackable_operator::kube::Resource;
+
+    use super::{
+        build,
+        test_support::{
+            app_version_label, celery_executor_cluster, cluster_with_trusted_proxies,
+            kubernetes_executor_cluster, validated_cluster_with,
+        },
+    };
+    use crate::controller::ValidatedCluster;
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -256,6 +434,93 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    /// The bash arguments of the `airflow` container of the given role group's StatefulSet.
+    fn airflow_container_args(cluster: &ValidatedCluster, stateful_set_name: &str) -> String {
+        let resources = build(cluster).expect("build succeeds");
+        let stateful_set = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.meta().name.as_deref() == Some(stateful_set_name))
+            .expect("the StatefulSet exists");
+
+        stateful_set
+            .spec
+            .as_ref()
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .as_ref()
+            .expect("the Pod template has a spec")
+            .containers
+            .iter()
+            .find(|container| container.name == "airflow")
+            .expect("the airflow container exists")
+            .args
+            .as_ref()
+            .expect("the airflow container has args")
+            .join("\n")
+    }
+
+    /// The environment of the `airflow` container of the given StatefulSet, as name/value pairs.
+    ///
+    /// This reads the rendered `EnvVar`s straight off the built container rather than going through
+    /// `EnvVarSet`, keeping the test helper lean and focused on the values it asserts on.
+    fn airflow_container_env(
+        cluster: &ValidatedCluster,
+        stateful_set_name: &str,
+    ) -> BTreeMap<String, String> {
+        let resources = build(cluster).expect("build succeeds");
+        let stateful_set = resources
+            .stateful_sets
+            .iter()
+            .find(|sts| sts.meta().name.as_deref() == Some(stateful_set_name))
+            .expect("the StatefulSet exists");
+
+        stateful_set
+            .spec
+            .as_ref()
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .as_ref()
+            .expect("the Pod template has a spec")
+            .containers
+            .iter()
+            .find(|container| container.name == "airflow")
+            .expect("the airflow container exists")
+            .env
+            .as_ref()
+            .expect("the airflow container has env vars")
+            .iter()
+            .filter_map(|env_var| {
+                env_var
+                    .value
+                    .as_ref()
+                    .map(|value| (env_var.name.clone(), value.clone()))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn webserver_start_command_passes_proxy_headers_when_proxies_are_trusted() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+
+        assert!(
+            args.contains("airflow api-server --proxy-headers &"),
+            "args were:\n{args}"
+        );
+    }
+
+    #[test]
+    fn webserver_start_command_omits_proxy_headers_by_default() {
+        let cluster = celery_executor_cluster();
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+
+        assert!(args.contains("airflow api-server &"), "args were:\n{args}");
+        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
     }
 
     #[test]
@@ -311,15 +576,13 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none"),
                 ("app.kubernetes.io/instance", "my-airflow"),
                 (
                     "app.kubernetes.io/managed-by",
                     "airflow.stackable.tech_airflowcluster",
                 ),
                 ("app.kubernetes.io/name", "airflow"),
-                ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "3.1.6-stackable0.0.0-dev"),
+                ("app.kubernetes.io/version", &app_version_label("3.3.1")),
                 ("stackable.tech/vendor", "Stackable"),
             ]
             .map(|(key, value)| (key.to_string(), value.to_string())),
@@ -357,6 +620,147 @@ mod tests {
                 "my-airflow-scheduler-default",
                 "my-airflow-webserver-default",
             ]
+        );
+    }
+
+    #[test]
+    fn trusted_proxies_are_rendered_as_a_comma_separated_list() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16", "192.168.1.1"]);
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(
+            env.get("FORWARDED_ALLOW_IPS"),
+            Some(&"10.244.0.0/16,192.168.1.1".to_owned())
+        );
+    }
+
+    #[test]
+    fn no_proxy_env_var_without_trusted_proxies() {
+        let cluster = celery_executor_cluster();
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// The scheduler runs no HTTP server, so it must not carry the proxy configuration even when
+    /// the webserver does.
+    #[test]
+    fn trusted_proxies_are_not_set_on_other_roles() {
+        let cluster = cluster_with_trusted_proxies(&["10.244.0.0/16"]);
+        let env = airflow_container_env(&cluster, "my-airflow-scheduler-default");
+
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+    }
+
+    /// Builds a 2.x Celery-executor cluster whose webserver trusts the given reverse proxies.
+    fn cluster_with_trusted_proxies_on_airflow_2x(trusted_proxies: &[&str]) -> ValidatedCluster {
+        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+            .iter()
+            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .collect();
+
+        validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            move |cluster| {
+                cluster["spec"]["image"]["productVersion"] = serde_yaml::Value::from("2.9.3");
+                cluster["spec"]["webservers"]
+                    .as_mapping_mut()
+                    .expect("the webservers role is a mapping")
+                    .insert(
+                        "roleConfig".into(),
+                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+                            serde_yaml::Value::String("trustedProxies".to_owned()),
+                            serde_yaml::Value::Sequence(trusted_proxies.clone()),
+                        )])),
+                    );
+            },
+        )
+    }
+
+    #[test]
+    fn trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["10.244.0.0/16"]);
+
+        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
+        assert!(args.contains("airflow webserver &"), "args were:\n{args}");
+        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&"True".to_owned())
+        );
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
+            Some(&"1".to_owned())
+        );
+    }
+
+    #[test]
+    fn wildcard_trusted_proxies_enables_proxy_fix_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["*"]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(
+            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            Some(&"True".to_owned())
+        );
+    }
+
+    /// No `trustedProxies` means no `ProxyFix` on Airflow 2.x either.
+    #[test]
+    fn no_proxy_fix_without_trusted_proxies_on_airflow_2x() {
+        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&[]);
+
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"), None);
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"), None);
+    }
+
+    /// A cluster with the given `spec.clusterConfig.volumeMounts` (as standalone YAML).
+    fn cluster_with_user_volume_mounts(
+        executor_key: &str,
+        executor_config: &str,
+        volume_mounts: &str,
+    ) -> ValidatedCluster {
+        validated_cluster_with(executor_key, executor_config, |cluster| {
+            cluster["spec"]["clusterConfig"]
+                .as_mapping_mut()
+                .expect("clusterConfig is a mapping")
+                .insert(
+                    "volumeMounts".into(),
+                    serde_yaml::from_str(volume_mounts).expect("valid volumeMounts YAML"),
+                );
+        })
+    }
+
+    /// A user-supplied volumeMount that collides with an operator-managed mount path must be
+    /// reported as an error (the operator's own mounts are added first and are infallible).
+    #[test]
+    fn user_volume_mount_colliding_with_config_path_is_an_error() {
+        let cluster = cluster_with_user_volume_mounts(
+            "kubernetesExecutors",
+            "{config: {}}",
+            "[{name: user-volume, mountPath: /stackable/app/config}]",
+        );
+
+        let Err(error) = build(&cluster) else {
+            panic!("the colliding mount must be rejected");
+        };
+        assert!(
+            matches!(
+                error,
+                super::Error::StatefulSet {
+                    source:
+                        crate::controller::build::resource::statefulset::Error::AddVolumeMount { .. },
+                    ..
+                } | super::Error::ExecutorTemplate {
+                    source: crate::controller::build::resource::executor::Error::AddVolumeMount { .. },
+                }
+            ),
+            "unexpected error: {error:?}"
         );
     }
 }

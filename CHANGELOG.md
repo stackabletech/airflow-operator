@@ -5,19 +5,93 @@
 ### Added
 
 - Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.lineage` ([#822]).
+- Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
+  ([#862]).
+- Support for configuring which reverse proxies the webserver trusts `X-Forwarded-*` headers from,
+  via `spec.webservers.roleConfig.trustedProxies` ([#835]).
+- Added airflow `3.3.1` ([#865]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
+- Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
 
 ### Changed
 
+- BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
+  Abbreviated values such as `26.7` are no longer accepted ([#862]).
+- BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
+  always defaulting to `Always` ([#862]).
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#814]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#821]).
-- Bump stackable-operator to 0.114.0 ([#827]).
+- Bump stackable-operator to 0.118.0 ([#827], [#838], [#862]).
+- The reconciler now applies resources and derives the cluster status in discrete
+  apply and update_status steps ([#828]).
+- The level configured for the `airflow.task` logger now sets the level of the `task` handler,
+  which is what the Airflow UI displays, instead of the level of the logger itself. It still
+  defaults to `INFO`, matching Airflow's own default. A level above `INFO` is applied to the
+  handler alone and quietens the UI without raising the logger, so the console and file handlers
+  keep receiving records that the UI no longer shows. A level below `INFO` has to be applied to
+  the logger as well, because a logger discards records before any handler can filter them, so in
+  that direction the UI and the other destinations open up together and cannot be set apart
+  ([#829]).
+- BREAKING: Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels
+  from the resources they don't apply to (previously set to `none` or a placeholder value).
+  StatefulSets created by older operator versions cannot be updated in place: after the
+  operator upgrade, delete each StatefulSet so that the operator immediately recreates it with
+  the new labels ([#838]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#838]).
+- Environment variable overrides (`envOverrides`) are now applied after all environment
+  variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
+  overridden, whereas previously the operator's value always took precedence ([#838]).
+- Make operations infallible where appropriate ([#852], [#860]).
+- Deprecated airflow `3.2.2` ([#865]).
+- Internal operator refactoring: the validated cluster carries each role's configuration in its own
+  typed fields instead of maps keyed by role, and only the webserver carries a listener class, a
+  group listener and trusted proxies, so those are no longer optional fields that four of the five
+  roles leave unset ([#867]).
+- Bump stackable-operator to 0.119.0 ([#868]).
+- Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
+- test: Bump vector-aggregator to 0.58.0 ([#876]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#840]).
+- Task logs are served from `BASE_LOG_FOLDER` instead of the `task` handler's `base_log_folder` at the Vector agent log directory ([#834]).
+- Avoid Python import race conditions by pre-cloning the git repo not only for Celery-based stacklets, but also for Kubernetes executor-based setups ([#844]).
+- The Airflow 3.x scheduler container now supervises the scheduler instead of the dag-processor. Before, a dead scheduler left the Pod `Running` and `Ready` with nothing scheduling DAGs ([#847]).
+- The operator now watches all resources that it creates and early-exits the reconcile action when the
+  cluster is marked for deletion ([#849]).
+
+### Removed
+
+- Removed airflow `3.1.6` ([#865]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
 [#822]: https://github.com/stackabletech/airflow-operator/pull/822
 [#827]: https://github.com/stackabletech/airflow-operator/pull/827
+[#828]: https://github.com/stackabletech/airflow-operator/pull/828
+[#829]: https://github.com/stackabletech/airflow-operator/pull/829
+[#834]: https://github.com/stackabletech/airflow-operator/pull/834
+[#835]: https://github.com/stackabletech/airflow-operator/pull/835
+[#838]: https://github.com/stackabletech/airflow-operator/pull/838
+[#840]: https://github.com/stackabletech/airflow-operator/pull/840
+[#844]: https://github.com/stackabletech/airflow-operator/pull/844
+[#847]: https://github.com/stackabletech/airflow-operator/pull/847
+[#849]: https://github.com/stackabletech/airflow-operator/pull/849
+[#852]: https://github.com/stackabletech/airflow-operator/pull/852
+[#860]: https://github.com/stackabletech/airflow-operator/pull/860
+[#862]: https://github.com/stackabletech/airflow-operator/pull/862
+[#865]: https://github.com/stackabletech/airflow-operator/pull/865
+[#867]: https://github.com/stackabletech/airflow-operator/pull/867
+[#868]: https://github.com/stackabletech/airflow-operator/pull/868
+[#870]: https://github.com/stackabletech/airflow-operator/pull/870
+[#872]: https://github.com/stackabletech/airflow-operator/pull/872
+[#876]: https://github.com/stackabletech/airflow-operator/pull/876
 
 ## [26.7.0] - 2026-07-21
 

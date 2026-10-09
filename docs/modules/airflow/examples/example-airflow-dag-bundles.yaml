@@ -5,7 +5,7 @@ metadata:
   name: airflow-dag-bundles
 spec:
   image:
-    productVersion: 3.1.6
+    productVersion: 3.3.1
   clusterConfig:
     loadExamples: false
     exposeConfig: false
@@ -24,7 +24,7 @@ spec:
             "classpath": "airflow.providers.git.bundles.git.GitDagBundle",
             "kwargs": {
               "git_conn_id": "repo1",
-              "tracking_ref": "3.1.6",
+              "tracking_ref": "3.3.1",
               "subdir": "airflow-core/src/airflow/example_dags"
             }
           },
@@ -33,7 +33,7 @@ spec:
             "classpath": "airflow.providers.git.bundles.git.GitDagBundle",
             "kwargs": {
               "git_conn_id": "repo2",
-              "tracking_ref": "3.1.6",
+              "tracking_ref": "3.3.1",
               "subdir": "airflow-core/src/airflow/example_dags"
             }
           }

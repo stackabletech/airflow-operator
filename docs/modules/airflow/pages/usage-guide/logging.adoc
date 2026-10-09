@@ -1,12 +1,14 @@
-= Log aggregation
-:description: Forward Airflow logs to a Vector aggregator by configuring the ConfigMap and enabling the log agent.
+= Logging
+:description: Forward Airflow logs to a Vector aggregator, and persist task logs to S3 with Airflow's remote logging.
+
+== Log aggregation
 
 The logs can be forwarded to a Vector log aggregator by providing a discovery ConfigMap for the aggregator and by enabling the log agent:
 
 NOTE: The `task` handler is responsible for showing the task logs in the UI.
-Unfortunately, the log level of the `task` handler cannot be specified.
-To avoid that all logs are emitted to the UI, the log level of the `airflow.task` logger is set explicitly to `INFO`.
-You can change the log level as shown below.
+Its log level is taken from the level configured for the `airflow.task` logger and defaults to `INFO`, as it does in Airflow itself.
+A level above `INFO` applies to the handler only, so it quietens the UI while the other destinations keep receiving the records they received before.
+A level below `INFO` cannot apply to the handler alone: a logger discards records before any of its handlers can filter them, so the logger has to be opened up as well and the additional records then reach every destination, not just the UI.
 
 [source,yaml]
 ----
@@ -29,11 +31,12 @@ spec:
         enableVectorAgent: true
         containers:
           airflow:
+            # Show only WARN and above in the UI, while the other destinations keep receiving INFO.
             loggers:
+              "airflow.task":
+                level: WARN
               "airflow.processor":
                 level: INFO
-              "airflow.task":
-                level: DEBUG
   schedulers:
     config:
       logging:
@@ -46,3 +49,172 @@ spec:
 ----
 
 Further information on how to configure logging, can be found in xref:concepts:logging.adoc[].
+
+== Task logs
+
+Task logs are not part of the log aggregation described above.
+Airflow writes them to the directory given by `[logging] base_log_folder`, which is `/stackable/airflow/logs` by default, and the api-server reads them back from there to display them in the UI.
+That directory is neither watched by the Vector agent nor part of the size-capped log volume mounted at `/stackable/log`.
+
+Task logs therefore only live as long as the Pod that produced them: with the `CeleryExecutor` they are lost when a worker Pod is replaced, and with the `KubernetesExecutor` when the task Pod is removed, which happens shortly after the task has finished.
+Use <<#remote-logging,remote logging>> if task logs need to outlive the Pod.
+
+[#remote-logging]
+== Remote logging task logs to S3
+
+With remote logging enabled, Airflow uploads the log of a task attempt to an S3 bucket when the attempt finishes, and the api-server serves it from there from then on.
+This applies to both executors.
+
+The connection to the bucket can either be created by hand in the Airflow Web UI, as described in xref:usage-guide/using-kubernetes-executors.adoc#s3-connection[], or be supplied declaratively as shown below.
+
+IMPORTANT: The Stackable `S3Connection` and `S3Bucket` resources are not involved here.
+Airflow addresses the bucket through its own connection abstraction, so the connection has to be supplied in Airflow's own format.
+
+=== Prerequisites
+
+* A bucket that already exists -- Airflow does not create it.
+* Credentials for that bucket.
+* The `apache-airflow-providers-amazon` provider, which is part of the Stackable Airflow image, so there is nothing to install.
+
+=== Define the connection
+
+Airflow accepts a connection as a JSON document in an environment variable named `AIRFLOW_CONN_<CONN_ID>`.
+Keep it in a Secret so that the credentials do not end up in the `AirflowCluster` resource:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-s3-logging
+type: Opaque
+stringData:
+  AIRFLOW_CONN_MINIO_S3: >- # <1>
+    {
+      "conn_type": "aws",
+      "login": "<access-key>",
+      "password": "<secret-key>",
+      "extra": {
+        "endpoint_url": "https://minio.default.svc.cluster.local:9000",
+        "verify": "/stackable/mount/minio-tls/ca.crt",
+        "region_name": "us-east-1"
+      }
+    }
+----
+<1> The part after `AIRFLOW_CONN_` is the connection ID, lower-cased: `AIRFLOW_CONN_MINIO_S3` becomes `minio_s3`.
+No `Connection` entry in the metadata database is created or needed; this environment variable is the connection.
+
+The fields of the connection:
+
+* `conn_type`: `aws` is also the correct type for S3-compatible endpoints such as MinIO, because the handler is the `amazon` provider's `S3TaskHandler` in every case.
+  The `endpoint_url` is what directs it away from AWS.
+* `endpoint_url`: The address of the S3-compatible endpoint. Omit it for Amazon S3 itself.
+* `verify`: The CA bundle the endpoint's certificate is validated against, needed whenever that certificate is not signed by a publicly trusted CA -- see <<#provide-a-ca-certificate,Provide a CA certificate>>.
+  Setting it to `false` disables verification instead. Omit the field for plain HTTP endpoints.
+* `region_name`: Ignored by MinIO, but a region is required to construct the client, so it cannot be left out.
+
+=== Mount the Secret
+
+The connection has to reach the container as an environment variable.
+Use `podOverrides` for this, so that the credentials stay in the Secret:
+
+[source,yaml]
+----
+spec:
+  webservers:
+    podOverrides: &s3LoggingSecret
+      spec:
+        containers:
+          - name: airflow
+            envFrom:
+              - secretRef:
+                  name: airflow-s3-logging
+  celeryExecutors:
+    podOverrides: *s3LoggingSecret
+----
+
+WARNING: Do not use `envOverrides` for the connection.
+It is a plain string-to-string map without support for `valueFrom`, so the credentials would be stored verbatim in the `AirflowCluster` resource and appear in every `kubectl describe pod` and GitOps diff.
+
+When using `kubernetesExecutors`, add a separate override for that role instead of reusing the anchor above.
+The task Pod's main container is named `base`, not `airflow`:
+
+[source,yaml]
+----
+spec:
+  kubernetesExecutors:
+    podOverrides:
+      spec:
+        containers:
+          - name: base
+            envFrom:
+              - secretRef:
+                  name: airflow-s3-logging
+----
+
+[#provide-a-ca-certificate]
+=== Provide a CA certificate
+
+Skip this section for Amazon S3, or for an endpoint whose certificate is signed by a publicly trusted CA.
+
+For an in-cluster endpoint secured with a Stackable Secret Operator certificate, the CA that signed it must be available to Airflow.
+`clusterConfig.volumes` and `clusterConfig.volumeMounts` apply to all roles at once, including `kubernetesExecutors` task Pods:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    volumes:
+      - name: minio-tls
+        ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: pod
+            spec:
+              accessModes: [ReadWriteOnce]
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: secrets.stackable.tech
+    volumeMounts:
+      - name: minio-tls
+        mountPath: /stackable/mount/minio-tls
+----
+
+Only `ca.crt` out of this volume is used; the certificate and key that come with it stay unused.
+The mount path is what goes into the `verify` field of the connection.
+
+=== Enable remote logging
+
+[source,yaml]
+----
+spec:
+  webservers:
+    envOverrides: &remoteLogging
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
+      AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: "s3://airflow/logs" # <1>
+      AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: "minio_s3" # <2>
+      AIRFLOW__LOGGING__DELETE_LOCAL_LOGS: "False" # <3>
+  celeryExecutors:
+    envOverrides: *remoteLogging
+----
+<1> Bucket and prefix the logs are written to.
+<2> Must match the connection ID from the Secret above, lower-cased.
+<3> Set this to `True` to remove the copy on the Pod once the upload succeeded.
+
+Remote logging works together with the logging configuration the operator generates: that configuration keeps Airflow's `REMOTE_TASK_LOG` setting, which is what wires up the remote handler.
+
+=== What to expect
+
+The upload happens when a task attempt finishes, not while it runs.
+The api-server reports per request where it took the log from, in a `Log message source details` group at the top of the log:
+
+* While the task runs, and for a moment after it finished, the log comes from the Pod that runs it, for example `http://airflow-worker-default-0…:8793/log/dag_id=…/attempt=1.log`.
+* Once the upload completed, it comes from `s3://airflow/logs/dag_id=…/attempt=1.log`.
+
+Objects in the bucket are laid out as `<remote base log folder>/dag_id=<dag>/run_id=<run>/task_id=<task>/attempt=<n>.log`.
+
+To confirm that the S3 copy is really being served, delete the Pod that ran a finished task -- this removes the local copy -- and open the task's log again.

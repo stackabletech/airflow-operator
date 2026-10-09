@@ -492,7 +492,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -1006,7 +1007,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -1478,7 +1480,7 @@ spec:
                                     nullable: true
                                     type: string
                                   host:
-                                    description: 'Host of the OpenLineage backend without any protocol or port. For example: `marquez`.'
+                                    description: 'Hostname or IP address of the OpenLineage backend without any protocol or port. For example: `marquez`.'
                                     type: string
                                   path:
                                     default: /api/v1/lineage
@@ -1543,12 +1545,6 @@ spec:
                           reference:
                             type: string
                         type: object
-                      jobName:
-                        description: |-
-                          A stable OpenLineage job name. Setting this prevents fragmented run history.
-                          If unset, operators resolve a name from workload-specific configuration.
-                        nullable: true
-                        type: string
                       namespace:
                         default: default
                         description: The OpenLineage namespace lineage is reported under.
@@ -2136,7 +2132,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -2650,7 +2647,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -2718,12 +2716,13 @@ spec:
                     description: Version of the product, e.g. `1.4.1`.
                     type: string
                   pullPolicy:
-                    default: Always
                     description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the image.'
                     enum:
                     - IfNotPresent
                     - Always
                     - Never
+                    - null
+                    nullable: true
                     type: string
                   pullSecrets:
                     description: '[Image pull secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod) to pull images from a private registry.'
@@ -2749,11 +2748,46 @@ spec:
                     type: string
                   stackableVersion:
                     description: |-
-                      Stackable version of the product, e.g. `23.4`, `23.4.1` or `0.0.0-dev`.
+                      Stackable version of the product, e.g. `26.7.0` or `0.0.0-dev`.
 
-                      If not specified, the operator will use its own version, e.g. `23.4.1`. When using a nightly
+                      If not specified, the operator will use its own version, e.g. `26.7.1`. When using a nightly
                       operator or a PR version, it will use the nightly `0.0.0-dev` image.
+
+                      If this is used in combination with `stackableVersionPolicy: LatestPatch`, the correct
+                      floating tag is computed automatically, e.g. `26.7.0` becomes `26.7` for the product image.
                     nullable: true
+                    type: string
+                  stackableVersionPolicy:
+                    default: Exact
+                    description: |-
+                      Configure the Stackable version policy. Defaults to `Exact`.
+
+                      Currently, two variants are supported:
+
+                      - `Exact`, which uses the exact, fully-qualified, canonical version of a product image.
+                      - `LatestPatch`, referencing a floating tag which always points to the latest patch version
+                        in the current release line. The current release line is either automatically derived by
+                        the operator based on its own version, or can be overridden with `stackableVersion`.
+
+                      A potential newer image is only pulled when Pods are rotated or their containers are
+                      restarted. Pods are NOT rotated and containers are NOT restarted automatically when a new
+                      image is available. This behaviour makes this a passive update mechanism, rather than an
+                      active one.
+
+                      It should be noted that when this field is set to `LatestPatch`, the operator automatically
+                      uses `Always` as the pull policy for product images. If set to `Exact`, `IfNotPresent` is
+                      used. Explicitly setting `pullPolicy` takes precedence.
+
+                      ### Examples
+
+                      - The `stackableVersion` field is not set, the operator falls back to its own version, eg.
+                        26.7.0. If this field is set to `LatestPatch`, the `26.7` floating tag will be used for
+                        product images, else, `26.7.0` will be used.
+                      - The `stackableVersion` field is set to `26.3.0`. If this field is set to `LatestPatch`,
+                        the `26.3` floating tag will be used for product images, else, `26.3.0` will be used.
+                    enum:
+                    - Exact
+                    - LatestPatch
                     type: string
                 type: object
               kubernetesExecutors:
@@ -3214,7 +3248,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -3707,7 +3742,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -4221,7 +4257,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -4723,7 +4760,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -5237,7 +5275,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -5739,7 +5778,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -5762,6 +5802,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -5802,6 +5843,24 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
+
+                          On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+                          forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+                          `*`, since Airflow 2.x has no way to restrict it further.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely.
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:
@@ -6261,7 +6320,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -6837,7 +6897,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -7351,7 +7412,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -7799,7 +7861,7 @@ spec:
                                     nullable: true
                                     type: string
                                   host:
-                                    description: 'Host of the OpenLineage backend without any protocol or port. For example: `marquez`.'
+                                    description: 'Hostname or IP address of the OpenLineage backend without any protocol or port. For example: `marquez`.'
                                     type: string
                                   path:
                                     default: /api/v1/lineage
@@ -7864,12 +7926,6 @@ spec:
                           reference:
                             type: string
                         type: object
-                      jobName:
-                        description: |-
-                          A stable OpenLineage job name. Setting this prevents fragmented run history.
-                          If unset, operators resolve a name from workload-specific configuration.
-                        nullable: true
-                        type: string
                       namespace:
                         default: default
                         description: The OpenLineage namespace lineage is reported under.
@@ -8457,7 +8513,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -8971,7 +9028,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -9039,12 +9097,13 @@ spec:
                     description: Version of the product, e.g. `1.4.1`.
                     type: string
                   pullPolicy:
-                    default: Always
                     description: '[Pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) used when pulling the image.'
                     enum:
                     - IfNotPresent
                     - Always
                     - Never
+                    - null
+                    nullable: true
                     type: string
                   pullSecrets:
                     description: '[Image pull secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod) to pull images from a private registry.'
@@ -9070,11 +9129,46 @@ spec:
                     type: string
                   stackableVersion:
                     description: |-
-                      Stackable version of the product, e.g. `23.4`, `23.4.1` or `0.0.0-dev`.
+                      Stackable version of the product, e.g. `26.7.0` or `0.0.0-dev`.
 
-                      If not specified, the operator will use its own version, e.g. `23.4.1`. When using a nightly
+                      If not specified, the operator will use its own version, e.g. `26.7.1`. When using a nightly
                       operator or a PR version, it will use the nightly `0.0.0-dev` image.
+
+                      If this is used in combination with `stackableVersionPolicy: LatestPatch`, the correct
+                      floating tag is computed automatically, e.g. `26.7.0` becomes `26.7` for the product image.
                     nullable: true
+                    type: string
+                  stackableVersionPolicy:
+                    default: Exact
+                    description: |-
+                      Configure the Stackable version policy. Defaults to `Exact`.
+
+                      Currently, two variants are supported:
+
+                      - `Exact`, which uses the exact, fully-qualified, canonical version of a product image.
+                      - `LatestPatch`, referencing a floating tag which always points to the latest patch version
+                        in the current release line. The current release line is either automatically derived by
+                        the operator based on its own version, or can be overridden with `stackableVersion`.
+
+                      A potential newer image is only pulled when Pods are rotated or their containers are
+                      restarted. Pods are NOT rotated and containers are NOT restarted automatically when a new
+                      image is available. This behaviour makes this a passive update mechanism, rather than an
+                      active one.
+
+                      It should be noted that when this field is set to `LatestPatch`, the operator automatically
+                      uses `Always` as the pull policy for product images. If set to `Exact`, `IfNotPresent` is
+                      used. Explicitly setting `pullPolicy` takes precedence.
+
+                      ### Examples
+
+                      - The `stackableVersion` field is not set, the operator falls back to its own version, eg.
+                        26.7.0. If this field is set to `LatestPatch`, the `26.7` floating tag will be used for
+                        product images, else, `26.7.0` will be used.
+                      - The `stackableVersion` field is set to `26.3.0`. If this field is set to `LatestPatch`,
+                        the `26.3` floating tag will be used for product images, else, `26.3.0` will be used.
+                    enum:
+                    - Exact
+                    - LatestPatch
                     type: string
                 type: object
               kubernetesExecutors:
@@ -9535,7 +9629,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -10028,7 +10123,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -10542,7 +10638,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -11044,7 +11141,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -11558,7 +11656,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about
@@ -12060,7 +12159,8 @@ spec:
                     default: {}
                     description: |-
                       `envOverrides` configure environment variables to be set in the Pods.
-                      It is a map from strings to strings - environment variables and the value to set.
+                      It is a map from environment variable names to their values. The names are validated to be
+                      valid environment variable names.
                       Read the
                       [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                       for more information and consult the operator specific usage guide to find out about
@@ -12083,6 +12183,7 @@ spec:
                       podDisruptionBudget:
                         enabled: true
                         maxUnavailable: null
+                      trustedProxies: []
                     description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                     properties:
                       listenerClass:
@@ -12123,6 +12224,24 @@ spec:
                             nullable: true
                             type: integer
                         type: object
+                      trustedProxies:
+                        default: []
+                        description: |-
+                          Enable trusted proxies when Airflow is deployed behind a reverse proxy like Istio or nginx.
+
+                          The reverse proxies whose `X-Forwarded-*` headers the webserver trusts, as IP addresses
+                          (`10.0.0.1`), CIDR networks (`10.244.0.0/16`), or `*` for every peer. `*` must be the
+                          only entry in the list if used: combining it with other entries is rejected, since it
+                          would silently degrade to trusting only those other entries.
+
+                          On Airflow 3.x this restricts trust to the listed peers. On 2.x it only switches
+                          forwarded-header handling on or off: any non-empty list trusts every peer, the same as
+                          `*`, since Airflow 2.x has no way to restrict it further.
+
+                          Leave this empty (the default) and forwarded headers are ignored entirely.
+                        items:
+                          type: string
+                        type: array
                     type: object
                   roleGroups:
                     additionalProperties:
@@ -12582,7 +12701,8 @@ spec:
                           default: {}
                           description: |-
                             `envOverrides` configure environment variables to be set in the Pods.
-                            It is a map from strings to strings - environment variables and the value to set.
+                            It is a map from environment variable names to their values. The names are validated to be
+                            valid environment variable names.
                             Read the
                             [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides)
                             for more information and consult the operator specific usage guide to find out about

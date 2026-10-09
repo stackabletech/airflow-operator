@@ -7,6 +7,7 @@ use stackable_operator::{
             security::PodSecurityContextBuilder, volume::VolumeBuilder,
         },
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -16,7 +17,7 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::api::ObjectMeta,
-    kvp::{Annotation, Label, LabelError},
+    kvp::Annotation,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::pod::{
@@ -33,14 +34,18 @@ use crate::{
         AirflowRoleGroupConfig, ValidatedCluster, ValidatedLogging,
         build::{
             graceful_shutdown::add_graceful_shutdown_config,
+            object_meta,
             properties::env_vars,
+            recommended_labels_for_role_group_resources,
+            recommended_labels_for_unversioned_role_group_resources,
             resource::{
                 pod::{
-                    add_authentication_volumes_and_volume_mounts, add_git_sync_resources,
-                    build_logging_container,
+                    GitSyncSidecarsAddition, add_authentication_volumes_and_volume_mounts,
+                    add_git_sync_resources, build_logging_container,
                 },
                 service::stateful_set_service_name,
             },
+            role_group_selector,
             volumes::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
         },
     },
@@ -59,9 +64,6 @@ pub enum Error {
         source: crate::controller::build::graceful_shutdown::Error,
     },
 
-    #[snafu(display("failed to build label"))]
-    BuildLabel { source: LabelError },
-
     #[snafu(display("failed to add needed volume"))]
     AddVolume {
         source: stackable_operator::builder::pod::Error,
@@ -71,9 +73,6 @@ pub enum Error {
     AddVolumeMount {
         source: stackable_operator::builder::pod::container::Error,
     },
-
-    #[snafu(display("failed to build Statefulset environmental variables"))]
-    BuildStatefulsetEnvVars { source: env_vars::Error },
 
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
@@ -87,13 +86,15 @@ fn build_rolegroup_metadata(
     cluster: &ValidatedCluster,
     role: &AirflowRole,
     role_group_name: &RoleGroupName,
-    prometheus_label: Label,
     name: String,
 ) -> ObjectMeta {
-    cluster
-        .object_meta(name, cluster.recommended_labels(role, role_group_name))
-        .with_label(prometheus_label)
-        .build()
+    object_meta(
+        cluster,
+        name,
+        recommended_labels_for_role_group_resources(cluster, role, role_group_name),
+    )
+    .with_label(RESTART_CONTROLLER_ENABLED_LABEL.clone())
+    .build()
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -115,15 +116,20 @@ pub fn build_server_rolegroup_statefulset(
     let executor = &validated_cluster.cluster_config.executor;
 
     let mut pb = PodBuilder::new();
-    let resource_names = validated_cluster
-        .role_group_resource_names(&ValidatedCluster::role_name(airflow_role), role_group_name);
+    let resource_names = validated_cluster.role_group_resource_names(airflow_role, role_group_name);
 
-    let recommended_object_labels =
-        validated_cluster.recommended_labels(airflow_role, role_group_name);
-    // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
-    // version keeps the labels stable across version upgrades).
-    let unversioned_recommended_labels =
-        validated_cluster.unversioned_recommended_labels(airflow_role, role_group_name);
+    let recommended_object_labels = recommended_labels_for_role_group_resources(
+        validated_cluster,
+        airflow_role,
+        role_group_name,
+    );
+    // Used for PVC templates, which cannot be modified once they are deployed. The version label
+    // is omitted so the labels stay stable across version upgrades.
+    let unversioned_recommended_labels = recommended_labels_for_unversioned_role_group_resources(
+        validated_cluster,
+        airflow_role,
+        role_group_name,
+    );
 
     let pb_metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_object_labels)
@@ -145,16 +151,13 @@ pub fn build_server_rolegroup_statefulset(
                 .service_account_name()
                 .to_string(),
         )
-        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
+        .security_context(
+            PodSecurityContextBuilder::with_stackable_defaults()
+                .fs_group(1000)
+                .build(),
+        );
 
-    let mut airflow_container = new_container_builder(&Container::Airflow.to_container_name());
-
-    add_authentication_volumes_and_volume_mounts(
-        authentication_config,
-        &mut airflow_container,
-        &mut pb,
-    )
-    .context(PodSnafu)?;
+    let mut airflow_container = new_container_builder(Container::Airflow.name());
 
     add_graceful_shutdown_config(merged_airflow_config.graceful_shutdown_timeout, &mut pb)
         .context(GracefulShutdownSnafu)?;
@@ -174,34 +177,28 @@ pub fn build_server_rolegroup_statefulset(
         ])
         .args(vec![airflow_container_args.join("\n")]);
 
-    airflow_container.add_env_vars(
-        env_vars::build_airflow_statefulset_envs(
-            validated_cluster,
-            airflow_role,
-            env_overrides,
-            git_sync_resources,
-        )
-        .context(BuildStatefulsetEnvVarsSnafu)?,
-    );
+    airflow_container.add_env_vars(env_vars::build_airflow_statefulset_envs(
+        validated_cluster,
+        airflow_role,
+        env_overrides,
+        git_sync_resources,
+    ));
 
-    let volume_mounts = validated_cluster.volume_mounts();
-    airflow_container
-        .add_volume_mounts(volume_mounts)
-        .context(AddVolumeMountSnafu)?;
+    // Statically named operator mounts first: their names and paths are distinct constants, so
+    // they cannot collide with each other. Everything derived from user input (authentication,
+    // user-supplied mounts) is added afterwards and stays fallible.
     airflow_container
         .add_volume_mount(&*CONFIG_VOLUME_NAME, CONFIG_PATH)
-        .context(AddVolumeMountSnafu)?;
-    airflow_container
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?;
-    airflow_container
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?;
+        .expect("The mount paths are statically defined and there should be no duplicates.");
 
     if let AirflowExecutor::KubernetesExecutors { .. } = executor {
         airflow_container
             .add_volume_mount(&*TEMPLATE_VOLUME_NAME, TEMPLATE_LOCATION)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
     // for roles with an http endpoint
@@ -224,17 +221,13 @@ pub fn build_server_rolegroup_statefulset(
 
     let mut pvcs: Option<Vec<PersistentVolumeClaim>> = None;
 
-    if let Some(listener_group_name) = validated_cluster
-        .role_configs
-        .get(airflow_role)
-        .and_then(|role_config| role_config.group_listener_name.clone())
-    {
+    if let Some(listener_group_name) = validated_cluster.group_listener_name(airflow_role) {
         // Listener endpoints for the Webserver role will use persistent volumes
         // so that load balancers can hard-code the target addresses. This will
         // be the case even when no class is set (and the value defaults to
         // cluster-internal) as the address should still be consistent.
         let pvc = listener_operator_volume_source_builder_build_pvc(
-            &ListenerReference::Listener(listener_group_name),
+            &ListenerReference::Listener(listener_group_name.clone()),
             &unversioned_recommended_labels,
             &LISTENER_PVC_NAME,
         );
@@ -242,21 +235,45 @@ pub fn build_server_rolegroup_statefulset(
 
         airflow_container
             .add_volume_mount(&*LISTENER_PVC_NAME, LISTENER_VOLUME_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
-    // If the DAG is modularized we may encounter a timing issue whereby the celery worker
-    // has started *before* all modules referenced by the DAG have been fetched by gitsync
-    // and registered. This will result in ModuleNotFoundError errors. This can be avoided
-    // by running a one-off git-sync process in an init-container so that all DAG
-    // dependencies are fully loaded. The sidecar git-sync is then used for regular updates.
-    let use_git_sync_init_containers = matches!(executor, AirflowExecutor::CeleryExecutors { .. });
+    // Statically named operator volumes first, for the same reason.
+    pb.add_volumes(volumes::create_volumes(
+        resource_names.role_group_config_map().as_ref(),
+        &logging.product_container,
+    ))
+    .expect("The volume names are statically defined and there should be no duplicates.");
+
+    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
+        pb.add_volume(
+            VolumeBuilder::new(&*TEMPLATE_VOLUME_NAME)
+                .with_config_map(validated_cluster.executor_template_configmap_name())
+                .build(),
+        )
+        .expect("The volume names are statically defined and there should be no duplicates.");
+    }
+
+    // Authentication mounts and volumes next: their names derive from the AuthenticationClass
+    // contents, so a collision with the static names above surfaces as an error, not a panic.
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut airflow_container,
+        &mut pb,
+    )
+    .context(PodSnafu)?;
+
+    // User-supplied mounts can collide with the operator-managed ones above, so this stays fallible.
+    airflow_container
+        .add_volume_mounts(validated_cluster.volume_mounts())
+        .context(AddVolumeMountSnafu)?;
+
     add_git_sync_resources(
         &mut pb,
         &mut airflow_container,
         git_sync_resources,
-        true,
-        use_git_sync_init_containers,
+        // We need a git-sync sidecar to keep the git contents up-to-date
+        &GitSyncSidecarsAddition::Add,
     )
     .context(PodSnafu)?;
 
@@ -311,22 +328,10 @@ pub fn build_server_rolegroup_statefulset(
         .build();
     pb.add_container(metrics_container);
 
+    // User-supplied volumes last (fallible); operator-managed and authentication volumes were
+    // added above.
     pb.add_volumes(validated_cluster.volumes().clone())
         .context(AddVolumeSnafu)?;
-    pb.add_volumes(volumes::create_volumes(
-        resource_names.role_group_config_map().as_ref(),
-        &logging.product_container,
-    ))
-    .context(AddVolumeSnafu)?;
-
-    if let AirflowExecutor::KubernetesExecutors { .. } = executor {
-        pb.add_volume(
-            VolumeBuilder::new(&*TEMPLATE_VOLUME_NAME)
-                .with_config_map(validated_cluster.executor_template_configmap_name())
-                .build(),
-        )
-        .context(AddVolumeSnafu)?;
-    }
 
     if let Some(vector_log_config) = &logging.vector_container {
         pb.add_container(build_logging_container(
@@ -338,19 +343,15 @@ pub fn build_server_rolegroup_statefulset(
     let mut pod_template = pb.build_template();
     pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
-    let restarter_label =
-        Label::try_from(("restarter.stackable.tech/enabled", "true")).context(BuildLabelSnafu)?;
-
     let metadata = build_rolegroup_metadata(
         validated_cluster,
         airflow_role,
         role_group_name,
-        restarter_label,
         resource_names.stateful_set_name().to_string(),
     );
 
     let statefulset_match_labels =
-        validated_cluster.role_group_selector(airflow_role, role_group_name);
+        role_group_selector(validated_cluster, airflow_role, role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some(

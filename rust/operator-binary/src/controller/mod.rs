@@ -1,15 +1,13 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     commons::{
         affinity::StackableAffinity,
+        pdb::PdbConfig,
         product_image_selection::ResolvedProductImage,
         resources::{NoRuntimeLimits, Resources},
     },
+    constant,
     crd::{git_sync, listener},
     database_connections::{
         TemplatingMechanism,
@@ -25,13 +23,11 @@ use stackable_operator::{
         rbac::v1::RoleBinding,
     },
     kube::{Resource, ResourceExt, api::ObjectMeta},
-    kvp::Labels,
     product_logging::spec::ContainerLogConfig,
     shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::meta::ownerreference_from_resource,
-        kvp::label::{recommended_labels, role_group_selector},
+        builder::pod::container::EnvVarSet,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         role_utils,
@@ -51,26 +47,39 @@ use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
     controller::build::lineage::ResolvedLineageConfig,
     crd::{
-        APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        AirflowStorageConfig, ExecutorConfig, OPERATOR_NAME,
+        AIRFLOW_OPERATOR_NAME, APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor,
+        AirflowRole, AirflowStorageConfig, ExecutorConfig,
         authentication::AirflowClientAuthenticationDetailsResolved,
         authorization::AirflowAuthorizationResolved,
         databases::{
             CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
         },
+        trusted_proxies::TrustedProxy,
         v1alpha2,
     },
 };
 
+pub mod apply;
 pub mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 
-// Placeholder version label value for resources whose labels must not change after deployment.
-stackable_operator::constant!(UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
+constant!(PRODUCT_NAME: ProductName = APP_NAME);
+constant!(OPERATOR_NAME: OperatorName = AIRFLOW_OPERATOR_NAME);
+constant!(CONTROLLER_NAME: ControllerName = AIRFLOW_CONTROLLER_NAME);
+
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+/// Marker for applied Kubernetes resources.
+pub struct Applied;
 
 /// Every Kubernetes resource produced by the build step.
-pub struct KubernetesResources {
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub services: Vec<Service>,
     pub listeners: Vec<listener::v1alpha1::Listener>,
@@ -78,14 +87,21 @@ pub struct KubernetesResources {
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
+}
+// Webserver role only — all non-Option
+#[derive(Clone, Debug)]
+pub struct ValidatedWebserverRoleConfig {
+    pub pdb: PdbConfig,
+    pub listener_class: ListenerClassName,
+    pub group_listener_name: ListenerName,
+    pub trusted_proxies: Vec<TrustedProxy>,
 }
 
-/// Per-role configuration extracted during validation.
+// Other roles: scheduler, worker, dagprocessor, triggerer
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<ListenerClassName>,
-    pub group_listener_name: Option<ListenerName>,
+    pub pdb: PdbConfig,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus overrides.
@@ -146,7 +162,7 @@ pub struct ValidatedExecutorTemplate {
     /// The merged + validated executor config (resources, affinity, logging, …).
     pub config: ValidatedAirflowConfig,
     /// Env-var overrides for the executor pod template (`spec.kubernetesExecutors.envOverrides`).
-    pub env_overrides: HashMap<String, String>,
+    pub env_overrides: EnvVarSet,
     /// Pod overrides for the executor pod template (`spec.kubernetesExecutors.podOverrides`).
     pub pod_overrides: PodTemplateSpec,
 }
@@ -211,20 +227,60 @@ pub struct ValidatedCluster {
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
-    pub role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
+    pub webserver_config: Option<ValidatedWebserverRoleConfig>,
+    pub webserver_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub scheduler_config: Option<ValidatedRoleConfig>,
+    pub scheduler_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub dagprocessor_config: Option<ValidatedRoleConfig>,
+    pub dagprocessor_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub triggerer_config: Option<ValidatedRoleConfig>,
+    pub triggerer_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+}
+
+/// The non-derived inputs to [`ValidatedCluster::new`].
+///
+/// Named fields, so the five same-typed role-group maps — and the four
+/// `Option<ValidatedRoleConfig>` — cannot be swapped silently.
+pub struct ValidatedClusterParams {
+    pub name: ClusterName,
+    pub namespace: NamespaceName,
+    pub uid: Uid,
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub webserver_config: Option<ValidatedWebserverRoleConfig>,
+    pub webserver_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub scheduler_config: Option<ValidatedRoleConfig>,
+    pub scheduler_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub dagprocessor_config: Option<ValidatedRoleConfig>,
+    pub dagprocessor_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub triggerer_config: Option<ValidatedRoleConfig>,
+    pub triggerer_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, AirflowRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
-    pub fn new(
-        name: ClusterName,
-        namespace: NamespaceName,
-        uid: Uid,
-        image: ResolvedProductImage,
-        cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<AirflowRole, BTreeMap<RoleGroupName, AirflowRoleGroupConfig>>,
-        role_configs: BTreeMap<AirflowRole, ValidatedRoleConfig>,
-    ) -> Self {
+    pub fn new(params: ValidatedClusterParams) -> Self {
+        let ValidatedClusterParams {
+            name,
+            namespace,
+            uid,
+            image,
+            cluster_config,
+            webserver_config,
+            webserver_role_group_configs,
+            scheduler_config,
+            scheduler_role_group_configs,
+            dagprocessor_config,
+            dagprocessor_role_group_configs,
+            triggerer_config,
+            triggerer_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
+        } = params;
+
         // `app_version_label_value` is constructed to be a valid label value, so it is also a valid
         // `ProductVersion`.
         let product_version = ProductVersion::from_str(&image.app_version_label_value)
@@ -243,37 +299,127 @@ impl ValidatedCluster {
             product_version,
             image,
             cluster_config,
-            role_groups,
-            role_configs,
+            webserver_config,
+            webserver_role_group_configs,
+            scheduler_config,
+            scheduler_role_group_configs,
+            dagprocessor_config,
+            dagprocessor_role_group_configs,
+            triggerer_config,
+            triggerer_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
         }
     }
 
-    /// Whether the cluster has the given role configured (i.e. it has role groups for it).
+    /// Whether the cluster declares the given role.
     pub fn has_role(&self, role: &AirflowRole) -> bool {
-        self.role_groups.contains_key(role)
+        match role {
+            AirflowRole::Webserver => self.webserver_config.is_some(),
+            AirflowRole::Scheduler => self.scheduler_config.is_some(),
+            AirflowRole::Worker => self.worker_config.is_some(),
+            AirflowRole::DagProcessor => self.dagprocessor_config.is_some(),
+            AirflowRole::Triggerer => self.triggerer_config.is_some(),
+        }
+    }
+
+    /// The PodDisruptionBudget config of `role`, or `None` if the cluster does not declare it.
+    pub(crate) fn pdb(&self, role: &AirflowRole) -> Option<&PdbConfig> {
+        match role {
+            AirflowRole::Webserver => self.webserver_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::Scheduler => self.scheduler_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::Worker => self.worker_config.as_ref().map(|config| &config.pdb),
+            AirflowRole::DagProcessor => {
+                self.dagprocessor_config.as_ref().map(|config| &config.pdb)
+            }
+            AirflowRole::Triggerer => self.triggerer_config.as_ref().map(|config| &config.pdb),
+        }
+    }
+
+    /// The name of the group Listener provided for `role`, if the role serves the web UI.
+    pub(crate) fn group_listener_name(&self, role: &AirflowRole) -> Option<&ListenerName> {
+        match role {
+            AirflowRole::Webserver => self
+                .webserver_config
+                .as_ref()
+                .map(|config| &config.group_listener_name),
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::DagProcessor
+            | AirflowRole::Triggerer => None,
+        }
+    }
+
+    /// The reverse proxies `role` trusts `X-Forwarded-*` headers from.
+    ///
+    /// Empty for every role but the webserver, which alone serves the web UI — and empty for the
+    /// webserver too when the cluster declares no webserver role, or it trusts no proxies.
+    pub(crate) fn trusted_proxies(&self, role: &AirflowRole) -> &[TrustedProxy] {
+        match role {
+            AirflowRole::Webserver => self
+                .webserver_config
+                .as_ref()
+                .map(|config| config.trusted_proxies.as_slice())
+                .unwrap_or_default(),
+            AirflowRole::Scheduler
+            | AirflowRole::Worker
+            | AirflowRole::DagProcessor
+            | AirflowRole::Triggerer => &[],
+        }
     }
 
     /// The Secret holding the shared internal secret (`<cluster>-internal-secret`).
     pub fn internal_secret_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-internal-secret", self.name_any()))
+        const SUFFIX: &str = "-internal-secret";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-internal-secret` must not exceed the limit of Secret names."
+        );
+        // A ClusterName is an RFC 1035 label, so appending an alphanumeric-terminated suffix keeps
+        // it a valid RFC 1123 subdomain.
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the internal secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared JWT secret (`<cluster>-jwt-secret`).
     pub fn jwt_secret_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-jwt-secret", self.name_any()))
+        const SUFFIX: &str = "-jwt-secret";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-jwt-secret` must not exceed the limit of Secret names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the JWT secret name is a valid Secret name")
     }
 
     /// The Secret holding the shared Fernet key (`<cluster>-fernet-key`).
     pub fn fernet_key_name(&self) -> SecretName {
-        SecretName::from_str(&format!("{}-fernet-key", self.name_any()))
+        const SUFFIX: &str = "-fernet-key";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= SecretName::MAX_LENGTH,
+            "The string `<cluster_name>-fernet-key` must not exceed the limit of Secret names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        SecretName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the Fernet key secret name is a valid Secret name")
     }
 
     /// The ConfigMap holding the Kubernetes-executor pod template (`<cluster>-executor-pod-template`).
     pub fn executor_template_configmap_name(&self) -> ConfigMapName {
-        ConfigMapName::from_str(&format!("{}-executor-pod-template", self.name_any()))
+        const SUFFIX: &str = "-executor-pod-template";
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= ConfigMapName::MAX_LENGTH,
+            "The string `<cluster_name>-executor-pod-template` must not exceed the limit of \
+            ConfigMap names."
+        );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+        ConfigMapName::from_str(&format!("{}{SUFFIX}", self.name))
             .expect("the executor pod-template ConfigMap name is a valid ConfigMap name")
     }
 
@@ -334,7 +480,7 @@ impl ValidatedCluster {
     pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
         role_utils::ResourceNames {
             cluster_name: self.name.clone(),
-            product_name: product_name(),
+            product_name: PRODUCT_NAME.clone(),
         }
     }
 
@@ -350,135 +496,15 @@ impl ValidatedCluster {
             role_group_name: role_group_name.clone(),
         }
     }
-
-    /// The type-safe role name for an Airflow role.
-    ///
-    /// Infallible: every `AirflowRole` serialises to a short, valid role name.
-    pub fn role_name(role: &AirflowRole) -> RoleName {
-        role.to_string()
-            .parse()
-            .expect("an AirflowRole serialises to a valid RoleName")
-    }
-
-    /// Recommended labels for a role-group resource.
-    pub fn recommended_labels(
-        &self,
-        role: &AirflowRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_for(&Self::role_name(role), role_group_name)
-    }
-
-    /// Recommended labels for a resource that is not tied to a concrete [`AirflowRole`] (e.g. the
-    /// Kubernetes executor pod template), using a free-form role/role-group label value.
-    pub fn recommended_labels_for(
-        &self,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
-    }
-
-    /// Recommended labels with the constant [`UNVERSIONED_PRODUCT_VERSION`], for PVC templates
-    /// that cannot be modified after deployment (keeps the labels stable across version upgrades).
-    pub fn unversioned_recommended_labels(
-        &self,
-        role: &AirflowRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_with(
-            &UNVERSIONED_PRODUCT_VERSION,
-            &Self::role_name(role),
-            role_group_name,
-        )
-    }
-
-    fn recommended_labels_with(
-        &self,
-        product_version: &ProductVersion,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        recommended_labels(
-            self,
-            &product_name(),
-            product_version,
-            &operator_name(),
-            &controller_name(),
-            role_name,
-            role_group_name,
-        )
-    }
-
-    /// Selector labels matching the pods of a role group.
-    pub fn role_group_selector(
-        &self,
-        role: &AirflowRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        role_group_selector(
-            self,
-            &product_name(),
-            &Self::role_name(role),
-            role_group_name,
-        )
-    }
-
-    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, the resource `name`, an owner
-    /// reference back to this cluster, and the given recommended `labels`.
-    pub(crate) fn object_meta(&self, name: impl Into<String>, labels: Labels) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-        builder
-            .name_and_namespace(self)
-            .name(name)
-            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
-            .with_labels(labels);
-        builder
-    }
 }
 
-/// The product name (`airflow`) as a type-safe label value.
-pub(crate) fn product_name() -> ProductName {
-    ProductName::from_str(APP_NAME).expect("'airflow' is a valid product name")
-}
+// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
+// AirflowRole). Used to derive its labels and ConfigMap name.
+constant!(pub EXECUTOR_ROLE_NAME: RoleName = "executor");
+constant!(pub EXECUTOR_ROLE_GROUP_NAME: RoleGroupName = "kubernetes");
 
-/// The operator name as a type-safe label value.
-pub(crate) fn operator_name() -> OperatorName {
-    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
-}
-
-/// The controller name as a type-safe label value.
-pub(crate) fn controller_name() -> ControllerName {
-    ControllerName::from_str(AIRFLOW_CONTROLLER_NAME)
-        .expect("the controller name is a valid label value")
-}
-
-/// Pseudo role/role-group names for the Kubernetes executor's resources (it is not a real
-/// AirflowRole). Used to derive its labels and ConfigMap name.
-pub const EXECUTOR_ROLE_NAME: &str = "executor";
-pub const EXECUTOR_ROLE_GROUP_NAME: &str = "kubernetes";
-
-/// The executor pseudo-role name (`executor`) as a type-safe value.
-pub fn executor_role_name() -> RoleName {
-    EXECUTOR_ROLE_NAME
-        .parse()
-        .expect("'executor' is a valid role name")
-}
-
-/// The executor's role-group name (`kubernetes`), used for its role-group ConfigMap.
-pub fn executor_role_group_name() -> RoleGroupName {
-    EXECUTOR_ROLE_GROUP_NAME
-        .parse()
-        .expect("'kubernetes' is a valid role group name")
-}
-
-/// The executor *pod-template* role-group name (`executor-template`), used for the template
-/// ConfigMap/pod labels.
-pub fn executor_template_role_group_name() -> RoleGroupName {
-    "executor-template"
-        .parse()
-        .expect("'executor-template' is a valid role group name")
-}
+// The executor *pod-template* role-group name, used for the template ConfigMap/pod labels.
+constant!(pub EXECUTOR_TEMPLATE_ROLE_GROUP_NAME: RoleGroupName = "executor-template");
 
 /// Lets [`ValidatedCluster`] stand in for the raw [`v1alpha2::AirflowCluster`] when building owner
 /// references and metadata for child objects. Kind/group/version are delegated to the CRD; the
@@ -532,17 +558,114 @@ impl HasUid for ValidatedCluster {
 
 #[cfg(test)]
 mod tests {
-    use strum::IntoEnumIterator;
+    use indoc::formatdoc;
 
-    use super::ValidatedCluster;
-    use crate::crd::AirflowRole;
+    use super::*;
+    use crate::controller::{
+        build::test_support::dereferenced_objects, validate::validate_cluster,
+    };
 
-    /// Locks the invariant behind the `expect` in [`ValidatedCluster::role_name`]: every
-    /// `AirflowRole` variant (present and future) must serialise to a valid `RoleName`.
     #[test]
-    fn every_airflow_role_serialises_to_a_valid_role_name() {
-        for role in AirflowRole::iter() {
-            ValidatedCluster::role_name(&role);
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *PRODUCT_NAME;
+        let _ = *OPERATOR_NAME;
+        let _ = *CONTROLLER_NAME;
+        let _ = *EXECUTOR_ROLE_NAME;
+        let _ = *EXECUTOR_ROLE_GROUP_NAME;
+        let _ = *EXECUTOR_TEMPLATE_ROLE_GROUP_NAME;
+    }
+
+    #[test]
+    fn webserver_trusted_proxies_are_parsed() {
+        let cluster = validated_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16\n        - 192.168.1.1",
+        );
+
+        let trusted_proxies = cluster.trusted_proxies(&AirflowRole::Webserver);
+
+        let rendered: Vec<String> = trusted_proxies
+            .iter()
+            .map(TrustedProxy::to_string)
+            .collect();
+        assert_eq!(rendered, ["10.244.0.0/16", "192.168.1.1"]);
+    }
+
+    /// Only the webserver serves HTTP, so no other role may pick the setting up even if a
+    /// webserver configured it.
+    #[test]
+    fn non_webserver_roles_have_no_trusted_proxies() {
+        let cluster = validated_cluster_with_webserver_role_config(
+            "      trustedProxies:\n        - 10.244.0.0/16",
+        );
+
+        for role in [
+            AirflowRole::Scheduler,
+            AirflowRole::Worker,
+            AirflowRole::DagProcessor,
+            AirflowRole::Triggerer,
+        ] {
+            assert!(
+                cluster.trusted_proxies(&role).is_empty(),
+                "role {role:?} must not have trusted proxies"
+            );
         }
+    }
+
+    #[test]
+    fn a_webserver_without_trusted_proxies_yields_an_empty_list() {
+        let cluster =
+            validated_cluster_with_webserver_role_config("      listenerClass: external-stable");
+
+        assert!(cluster.trusted_proxies(&AirflowRole::Webserver).is_empty());
+    }
+
+    /// The validated cluster for a CR with the given `webservers.roleConfig` block spliced in.
+    ///
+    /// The `roleConfig` must be one the webserver accepts: the trusted proxies are parsed and
+    /// checked by `validate_cluster`, not by [`ValidatedCluster::trusted_proxies`], which only
+    /// hands back what validation already accepted. The rejection cases live in
+    /// [`crate::crd::trusted_proxies`], next to the parsing they exercise.
+    fn validated_cluster_with_webserver_role_config(role_config: &str) -> ValidatedCluster {
+        validate_cluster(
+            &test_cluster_with_webserver_role_config(role_config),
+            "oci.stackable.tech/sdp",
+            dereferenced_objects(),
+        )
+        .expect("test cluster validates")
+    }
+
+    /// A cluster CR with the given `webservers.roleConfig` block spliced in.
+    fn test_cluster_with_webserver_role_config(role_config: &str) -> v1alpha2::AirflowCluster {
+        let cluster = formatdoc! {"
+            apiVersion: airflow.stackable.tech/v1alpha2
+            kind: AirflowCluster
+            metadata:
+              name: airflow
+              namespace: default
+              uid: e6ac237d-a6d4-43a1-8135-f36506110912
+            spec:
+              image:
+                productVersion: 3.3.1
+              clusterConfig:
+                credentialsSecretName: airflow-admin-credentials
+                metadataDatabase:
+                  postgresql:
+                    host: airflow-postgresql
+                    database: airflow
+                    credentialsSecretName: airflow-postgresql-credentials
+              webservers:
+                roleConfig:
+            {role_config}
+                roleGroups:
+                  default:
+                    config: {{}}
+              kubernetesExecutors:
+                config: {{}}
+        "};
+
+        let deserializer = serde_yaml::Deserializer::from_str(&cluster);
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+            .expect("the test CR deserialises")
     }
 }

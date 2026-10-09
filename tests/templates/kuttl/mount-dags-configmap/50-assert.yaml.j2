@@ -6,7 +6,12 @@ metadata:
 timeout: 480
 commands:
 {% if test_scenario['values']['airflow-latest'].find(",") > 0 %}
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ test_scenario['values']['airflow-latest'].split(',')[0] }}"
+{% set airflow_version = test_scenario['values']['airflow-latest'].split(',')[0] %}
 {% else %}
-  - script: kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py --airflow-version "{{ test_scenario['values']['airflow-latest'] }}"
+{% set airflow_version = test_scenario['values']['airflow-latest'] %}
 {% endif %}
+  - script: |
+      kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py \
+          --airflow-version "{{ airflow_version }}" \
+          --component scheduler \
+          --component dag_processor

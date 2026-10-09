@@ -148,11 +148,6 @@ lineage:
 ----
 <1> URL path of the endpoint events are sent to. Defaults to `/api/v1/lineage`.
 
-== Job name (`jobName`)
-
-The shared `lineage.jobName` field has no effect for Airflow: Airflow derives OpenLineage job names per
-DAG and task. The field is accepted for cross-operator consistency but ignored.
-
 == Overriding injected configuration
 
 The OpenLineage environment variables are applied to every role (and the Kubernetes-executor pod template)

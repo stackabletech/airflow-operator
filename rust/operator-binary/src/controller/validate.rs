@@ -2,38 +2,40 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection,
+    commons::product_image_selection::{self, ResolvedProductImage},
     config::fragment,
     crd::git_sync,
-    k8s_openapi::api::core::v1::{EnvVar, VolumeMount},
+    k8s_openapi::api::core::v1::VolumeMount,
     kube::ResourceExt,
     product_logging::spec::Logging,
-    role_utils::{GenericRoleConfig, RoleGroup},
+    role_utils::GenericRoleConfig,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
+        builder::pod::container::EnvVarSet,
         controller_utils::{get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
-        role_utils::{GenericCommonConfig, RoleGroupConfig, with_validated_config},
+        role_utils::{GenericCommonConfig, RoleGroup, RoleGroupConfig, with_validated_config},
         types::{
             kubernetes::ConfigMapName,
             operator::{ClusterName, RoleGroupName},
         },
     },
 };
-use strum::IntoEnumIterator;
 
 use super::{
     AirflowRoleGroupConfig, ValidatedAirflowConfig, ValidatedCluster, ValidatedClusterConfig,
-    ValidatedExecutorTemplate, ValidatedLogging, ValidatedRoleConfig,
-    build::volumes::LOG_VOLUME_NAME, dereference::DereferencedObjects,
+    ValidatedClusterParams, ValidatedExecutorTemplate, ValidatedLogging, ValidatedRoleConfig,
+    ValidatedWebserverRoleConfig, build::volumes::LOG_VOLUME_NAME,
+    dereference::DereferencedObjects,
 };
 use crate::{
-    airflow_controller::{CONTAINER_IMAGE_BASE_NAME, env_vars_from_overrides},
+    airflow_controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
         AirflowConfig, AirflowConfigFragment, AirflowConfigOverrides, AirflowExecutor, AirflowRole,
-        AirflowRoleType, Container, v1alpha2,
+        AirflowRoleType, Container,
+        trusted_proxies::{self, TrustedProxy},
+        v1alpha2,
     },
 };
 
@@ -75,11 +77,6 @@ pub enum Error {
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to parse an environment variable override name"))]
-    ParseEnvVarName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
-
     #[snafu(display("failed to validate the logging configuration"))]
     ValidateLoggingConfig {
         source: stackable_operator::v2::product_logging::framework::Error,
@@ -92,6 +89,11 @@ pub enum Error {
 
     #[snafu(display("invalid git-sync specification"))]
     InvalidGitSyncSpec { source: git_sync::v1alpha2::Error },
+
+    #[snafu(display("failed to parse the trusted proxies configured for the webserver role"))]
+    ParseTrustedProxies {
+        source: crate::crd::trusted_proxies::Error,
+    },
 }
 
 pub fn validate_cluster(
@@ -105,7 +107,7 @@ pub fn validate_cluster(
         .resolve(
             CONTAINER_IMAGE_BASE_NAME,
             image_repository,
-            crate::built_info::PKG_VERSION,
+            &crate::built_info::PKG_VERSION_SEMVER,
         )
         .context(ResolveProductImageSnafu)?;
 
@@ -124,52 +126,80 @@ pub fn validate_cluster(
         .vector_aggregator_config_map_name
         .clone();
 
-    let mut role_groups = BTreeMap::new();
-    let mut role_configs = BTreeMap::new();
+    // Only the webserver serves the web UI, so only it has a listener class, a group listener and
+    // trusted proxies. The other roles carry nothing but their Pod disruption budget.
+    let webserver_config = airflow
+        .spec
+        .webservers
+        .as_ref()
+        .map(|webservers| {
+            let trusted_proxies = webservers
+                .role_config
+                .trusted_proxies
+                .iter()
+                .map(|trusted_proxy| TrustedProxy::from_str(trusted_proxy))
+                .collect::<Result<Vec<_>, _>>()
+                .and_then(|entries| {
+                    trusted_proxies::ensure_wildcard_is_sole_entry(&entries)?;
+                    Ok(entries)
+                })
+                .context(ParseTrustedProxiesSnafu)?;
 
-    // if the kubernetes executor is specified there will be no worker role as the pods
-    // are provisioned by airflow as defined by the task (default: one pod per task)
-    for role in AirflowRole::iter() {
-        let Some(resolved_role) = airflow.get_role(&role) else {
-            continue;
-        };
+            Ok(ValidatedWebserverRoleConfig {
+                pdb: webservers.role_config.common.pod_disruption_budget.clone(),
+                listener_class: webservers.role_config.listener_class.clone(),
+                group_listener_name: airflow.webserver_role_group_listener_name(),
+                trusted_proxies,
+            })
+        })
+        .transpose()?;
+    let webserver_role_group_configs = validate_role_groups(
+        airflow,
+        &AirflowRole::Webserver,
+        &vector_aggregator_config_map_name,
+        &resolved_product_image,
+    )?;
 
-        role_configs.insert(
-            role.clone(),
-            ValidatedRoleConfig {
-                pdb: airflow
-                    .role_config(&role)
-                    .map(|rc| rc.pod_disruption_budget),
-                listener_class: role.listener_class_name(airflow),
-                group_listener_name: airflow.group_listener_name(&role),
-            },
-        );
+    let scheduler_config = airflow.spec.schedulers.as_ref().map(pdb_only_role_config);
+    let scheduler_role_group_configs = validate_role_groups(
+        airflow,
+        &AirflowRole::Scheduler,
+        &vector_aggregator_config_map_name,
+        &resolved_product_image,
+    )?;
 
-        let default_config = AirflowConfig::default_config(&airflow.name_any(), &role);
+    let dagprocessor_config = airflow
+        .spec
+        .dag_processors
+        .as_ref()
+        .map(pdb_only_role_config);
+    let dagprocessor_role_group_configs = validate_role_groups(
+        airflow,
+        &AirflowRole::DagProcessor,
+        &vector_aggregator_config_map_name,
+        &resolved_product_image,
+    )?;
 
-        let mut group_configs = BTreeMap::new();
-        for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
-            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
-                ParseRoleGroupNameSnafu {
-                    role_group: rolegroup_name.clone(),
-                }
-            })?;
-            let config = validate_role_group(
-                &resolved_role,
-                &role_group_name,
-                rolegroup,
-                &default_config,
-                &vector_aggregator_config_map_name,
-                &resolved_product_image,
-                &airflow.spec.cluster_config.dags_git_sync,
-                &airflow.spec.cluster_config.volume_mounts,
-            )?;
+    let triggerer_config = airflow.spec.triggerers.as_ref().map(pdb_only_role_config);
+    let triggerer_role_group_configs = validate_role_groups(
+        airflow,
+        &AirflowRole::Triggerer,
+        &vector_aggregator_config_map_name,
+        &resolved_product_image,
+    )?;
 
-            group_configs.insert(role_group_name, config);
-        }
-
-        role_groups.insert(role, group_configs);
-    }
+    // If the Kubernetes executor is specified there is no worker role, as the Pods are provisioned
+    // by Airflow as defined by the task (default: one Pod per task).
+    let worker_config = match &airflow.spec.executor {
+        AirflowExecutor::CeleryExecutors { config } => Some(pdb_only_role_config(config.as_ref())),
+        AirflowExecutor::KubernetesExecutors { .. } => None,
+    };
+    let worker_role_group_configs = validate_role_groups(
+        airflow,
+        &AirflowRole::Worker,
+        &vector_aggregator_config_map_name,
+        &resolved_product_image,
+    )?;
 
     let DereferencedObjects {
         authentication_config,
@@ -208,11 +238,14 @@ pub fn validate_cluster(
                 &Container::Base,
                 &vector_aggregator_config_map_name,
             )?;
+
+            let env_overrides: EnvVarSet = common_configuration.env_overrides.clone().into();
+
             // Resolve the executor's git-sync resources up-front too, mirroring the role groups.
             let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
                 &airflow.spec.cluster_config.dags_git_sync,
                 &resolved_product_image,
-                &env_vars_from_overrides(&common_configuration.env_overrides),
+                &env_overrides.clone().into_iter().collect::<Vec<_>>(),
                 &airflow.spec.cluster_config.volume_mounts,
                 LOG_VOLUME_NAME.as_ref(),
                 &logging.git_sync_container,
@@ -224,19 +257,19 @@ pub fn validate_cluster(
                     logging,
                     git_sync_resources,
                 ),
-                env_overrides: common_configuration.env_overrides.clone(),
+                env_overrides,
                 pod_overrides: common_configuration.pod_overrides.clone(),
             })
         }
         AirflowExecutor::CeleryExecutors { .. } => None,
     };
 
-    Ok(ValidatedCluster::new(
-        cluster_name,
+    Ok(ValidatedCluster::new(ValidatedClusterParams {
+        name: cluster_name,
         namespace,
         uid,
-        resolved_product_image,
-        ValidatedClusterConfig {
+        image: resolved_product_image,
+        cluster_config: ValidatedClusterConfig {
             executor: airflow.spec.executor.clone(),
             executor_template,
             authentication_config,
@@ -256,9 +289,61 @@ pub fn validate_cluster(
             volumes: airflow.spec.cluster_config.volumes.clone(),
             volume_mounts: airflow.spec.cluster_config.volume_mounts.clone(),
         },
-        role_groups,
-        role_configs,
-    ))
+        webserver_config,
+        webserver_role_group_configs,
+        scheduler_config,
+        scheduler_role_group_configs,
+        dagprocessor_config,
+        dagprocessor_role_group_configs,
+        triggerer_config,
+        triggerer_role_group_configs,
+        worker_config,
+        worker_role_group_configs,
+    }))
+}
+
+/// The validated role-level config of a role that carries nothing but its Pod disruption budget.
+fn pdb_only_role_config(role: &AirflowRoleType) -> ValidatedRoleConfig {
+    ValidatedRoleConfig {
+        pdb: role.role_config.pod_disruption_budget.clone(),
+    }
+}
+
+/// The validated config of every role group of `role`, or an empty map if the role is absent.
+fn validate_role_groups(
+    airflow: &v1alpha2::AirflowCluster,
+    role: &AirflowRole,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<BTreeMap<RoleGroupName, AirflowRoleGroupConfig>, Error> {
+    let Some(resolved_role) = airflow.get_role(role) else {
+        return Ok(BTreeMap::new());
+    };
+    let default_config =
+        AirflowConfig::default_config(&airflow.name_any(), role, airflow.get_opa_config());
+
+    resolved_role
+        .role_groups
+        .iter()
+        .map(|(rolegroup_name, rolegroup)| {
+            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role_group: rolegroup_name.clone(),
+                }
+            })?;
+            let config = validate_role_group(
+                &resolved_role,
+                &role_group_name,
+                rolegroup,
+                &default_config,
+                vector_aggregator_config_map_name,
+                resolved_product_image,
+                &airflow.spec.cluster_config.dags_git_sync,
+                &airflow.spec.cluster_config.volume_mounts,
+            )?;
+            Ok((role_group_name, config))
+        })
+        .collect()
 }
 
 /// Validate and merge one role group against its role.
@@ -284,14 +369,6 @@ fn validate_role_group(
         role_group: role_group_name.clone(),
     })?;
 
-    let mut env_overrides = EnvVarSet::new();
-    for (env_var_name, env_var_value) in validated.config.env_overrides {
-        env_overrides = env_overrides.with_value(
-            &EnvVarName::from_str(&env_var_name).context(ParseEnvVarNameSnafu)?,
-            env_var_value,
-        );
-    }
-
     let merged_config = validated.config.config;
     let logging = validate_logging(
         &merged_config.logging,
@@ -299,12 +376,14 @@ fn validate_role_group(
         vector_aggregator_config_map_name,
     )?;
 
+    let env_overrides: EnvVarSet = validated.config.env_overrides.clone().into();
+
     // The git-sync resources depend on this role group's env-var overrides and (git-sync) logging
     // config, so they are resolved (and validated) here, up-front, rather than at build time.
     let git_sync_resources = git_sync::v1alpha2::GitSyncResources::new(
         dags_git_sync,
         image,
-        &Vec::<EnvVar>::from(env_overrides.clone()),
+        &env_overrides.clone().into_iter().collect::<Vec<_>>(),
         volume_mounts,
         LOG_VOLUME_NAME.as_ref(),
         &logging.git_sync_container,
@@ -361,10 +440,14 @@ pub(crate) fn validate_logging(
 mod tests {
     use std::collections::BTreeMap;
 
-    use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
+    use rstest::rstest;
+    use stackable_operator::v2::builder::pod::container::{EnvVarName, EnvVarSet};
 
-    use super::validate_role_group;
-    use crate::crd::{AirflowConfig, AirflowRole, v1alpha2};
+    use super::{Error, validate_cluster, validate_role_group};
+    use crate::{
+        controller::build::test_support::dereferenced_objects,
+        crd::{AirflowConfig, AirflowRole, v1alpha2},
+    };
 
     /// A minimal resolved product image for tests that exercise `validate_role_group` (which needs
     /// one to resolve git-sync resources; the test role groups configure no git-sync, so the value
@@ -372,9 +455,9 @@ mod tests {
     fn test_resolved_product_image()
     -> stackable_operator::commons::product_image_selection::ResolvedProductImage {
         stackable_operator::commons::product_image_selection::ResolvedProductImage {
-            product_version: "3.0.6".to_string(),
-            app_version_label_value: "3.0.6".parse().expect("valid label value"),
-            image: "oci.example.org/sdp/airflow:3.0.6-stackable0.0.0-dev".to_string(),
+            product_version: "3.3.1".to_string(),
+            app_version_label_value: "3.3.1".parse().expect("valid label value"),
+            image: "oci.example.org/sdp/airflow:3.3.1-stackable0.0.0-dev".to_string(),
             image_pull_policy: "IfNotPresent".to_string(),
             pull_secrets: None,
         }
@@ -388,7 +471,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -433,7 +516,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Webserver, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(
@@ -461,19 +545,17 @@ mod tests {
         );
 
         // env overrides layer role-group on top of role.
-        let env_overrides: BTreeMap<String, Option<String>> =
-            Vec::<EnvVar>::from(validated.env_overrides)
-                .into_iter()
-                .map(|env_var| (env_var.name, env_var.value))
-                .collect();
-        assert_eq!(env_overrides.len(), 2);
         assert_eq!(
-            env_overrides.get("ROLE_ENV_VAR").unwrap().as_deref(),
-            Some("role-env-value")
-        );
-        assert_eq!(
-            env_overrides.get("GROUP_ENV_VAR").unwrap().as_deref(),
-            Some("group-env-value")
+            validated.env_overrides,
+            EnvVarSet::new()
+                .with_value(
+                    &EnvVarName::from_str_unsafe("ROLE_ENV_VAR"),
+                    "role-env-value"
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("GROUP_ENV_VAR"),
+                    "group-env-value"
+                )
         );
     }
 
@@ -490,7 +572,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -534,7 +616,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Scheduler)
             .expect("scheduler role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Scheduler);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Scheduler, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(
@@ -556,7 +639,7 @@ mod tests {
                 .overrides
                 .is_empty()
         );
-        assert!(Vec::<EnvVar>::from(validated.env_overrides).is_empty());
+        assert_eq!(validated.env_overrides, EnvVarSet::new());
     }
 
     /// `replicas` and the role←role-group merged `pod_overrides` are produced by
@@ -571,7 +654,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.1.6
+            productVersion: 3.3.1
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -611,7 +694,8 @@ mod tests {
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
-        let default_config = AirflowConfig::default_config("airflow", &AirflowRole::Webserver);
+        let default_config =
+            AirflowConfig::default_config("airflow", &AirflowRole::Webserver, None);
         let rolegroup = role.role_groups.get("default").expect("default role group");
 
         let validated = validate_role_group(
@@ -640,5 +724,42 @@ mod tests {
         assert_eq!(labels.get("role-label"), Some(&"role".to_string()));
         assert_eq!(labels.get("rg-label"), Some(&"rg".to_string()));
         assert_eq!(labels.get("shared"), Some(&"rg".to_string()));
+    }
+
+    /// A `trustedProxies` list the webserver cannot accept must be rejected here, where it is
+    /// parsed and checked. `ValidatedCluster::trusted_proxies` is infallible and only hands back
+    /// what validation already accepted, so nothing downstream can catch this.
+    ///
+    /// The entries themselves are covered by `crd::trusted_proxies`; what this adds is that a
+    /// cluster carrying them fails to validate rather than silently losing the setting.
+    #[rstest]
+    #[case::wildcard_combined_with_another_entry(&["*", "10.0.0.0/8"])]
+    #[case::not_an_ip_address(&["airflow.example.com"])]
+    fn an_invalid_webserver_trusted_proxy_list_is_rejected(#[case] trusted_proxies: &[&str]) {
+        let mut cluster = test_cluster();
+        // The namespace and uid are resolved before the trusted proxies are, so the fixture needs
+        // both for this to fail on the list rather than on the metadata.
+        cluster.metadata.namespace = Some("default".to_owned());
+        cluster.metadata.uid = Some("e6ac237d-a6d4-43a1-8135-f36506110912".to_owned());
+        cluster
+            .spec
+            .webservers
+            .as_mut()
+            .expect("the test CR declares a webserver role")
+            .role_config
+            .trusted_proxies = trusted_proxies
+            .iter()
+            .map(|proxy| proxy.to_string())
+            .collect();
+
+        let error = validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced_objects())
+            // `ValidatedCluster` is not `Debug`, so map the success case away before `expect_err`.
+            .map(|_| ())
+            .expect_err("the webserver must reject this trusted proxy list");
+
+        assert!(
+            matches!(error, Error::ParseTrustedProxies { .. }),
+            "error was: {error:?}"
+        );
     }
 }

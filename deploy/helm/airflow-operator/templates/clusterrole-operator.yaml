@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "operator.fullname" . }}-clusterrole
+  name: {{ include "airflow-operator.fullname" . }}-clusterrole
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "airflow-operator.labels" . | nindent 4 }}
 rules:
   # For automatic cluster domain detection
   - apiGroups:
@@ -31,7 +31,7 @@ rules:
       - patch
       - watch
   # Per AirflowCluster RoleBinding for the workload ServiceAccount to the airflow-clusterrole.
-  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete) and watched by the controller.
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -42,6 +42,7 @@ rules:
       - get
       - list
       - patch
+      - watch
   # Allows the operator to create RoleBindings that reference the airflow-clusterrole
   # (the product ClusterRole bound to workload pods, defined below)
   - apiGroups:
@@ -51,7 +52,7 @@ rules:
     verbs:
       - bind
     resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
+      - {{ include "airflow-operator.name" . }}-clusterrole
   # StatefulSets for each role group (webserver, scheduler, worker, triggerer, dag-processor).
   # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
   - apiGroups:
@@ -66,7 +67,7 @@ rules:
       - patch
       - watch
   # PodDisruptionBudgets per role to protect against simultaneous pod evictions.
-  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete) and watched by the controller.
   - apiGroups:
       - policy
     resources:
@@ -77,6 +78,7 @@ rules:
       - get
       - list
       - patch
+      - watch
   # Required for maintaining the CRDs within the operator (including the conversion webhook info).
   # Also for the startup condition check before the controller can run.
   - apiGroups:
@@ -94,7 +96,7 @@ rules:
       - list
       - watch
   # Listener for the Webserver role to expose HTTP access via a configurable ListenerClass.
-  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete).
+  # Applied via SSA (create + patch), tracked for orphan cleanup (list + delete) and watched by the controller.
   - apiGroups:
       - listeners.stackable.tech
     resources:
@@ -105,21 +107,22 @@ rules:
       - get
       - list
       - patch
+      - watch
   # Primary reconciliation target: the controller watches AirflowCluster resources (list + watch)
   # and reads them during reconciliation (get).
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "airflow-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters
+      - {{ include "airflow-operator.name" . }}clusters
     verbs:
       - get
       - list
       - watch
   # Write reconciliation status conditions back to AirflowCluster objects
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "airflow-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters/status
+      - {{ include "airflow-operator.name" . }}clusters/status
     verbs:
       - patch
   # Resolve TLS and authentication provider configuration.
