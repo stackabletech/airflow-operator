@@ -508,7 +508,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             usesDefaultFeatures = false;
             features = [ "clone-impls" "full" "parsing" "printing" "proc-macro" "visit-mut" ];
           }
@@ -989,9 +989,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.6.0";
+        version = "1.8.0";
         edition = "2021";
-        sha256 = "0c3n82hdi355xa6z9x4zgnpjwsh1szkkcs0zl8q8nl5ggk874j7p";
+        sha256 = "0f6q6vc8fj6xn4j1wd4yakiza6lhgwai49gp1zdwgzggh3nwjlb6";
         dependencies = [
           {
             name = "find-msvc-tools";
@@ -1220,7 +1220,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "full" ];
           }
         ];
@@ -1767,7 +1767,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "full" "extra-traits" ];
           }
         ];
@@ -1823,7 +1823,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
 
@@ -2191,7 +2191,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
         features = {
@@ -2399,7 +2399,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "visit" "visit-mut" ];
           }
         ];
@@ -2647,7 +2647,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
         features = {
@@ -3106,7 +3106,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "full" ];
           }
         ];
@@ -4791,9 +4791,9 @@ rec {
       };
       "indoc" = rec {
         crateName = "indoc";
-        version = "2.0.7";
+        version = "2.0.8";
         edition = "2021";
-        sha256 = "01np60qdq6lvgh8ww2caajn9j4dibx9n58rvzf7cya1jz69mrkvr";
+        sha256 = "1lc4agds9bqf3lin6kkz2jgmahaqwrkaq1fkij5fpzvcg68jcyx3";
         procMacro = true;
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
@@ -5469,9 +5469,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "k8s_version";
         authors = [
@@ -6697,9 +6697,9 @@ rec {
       };
       "opentelemetry" = rec {
         crateName = "opentelemetry";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "1db15c0f4csj7v8zkbd9h3i503divafysd5l64rxpfby4qdhpnvc";
+        sha256 = "1vnrd8d4khv82xqb80yy4sixmx78c5dhhz2c3saa8xf8r5m1l7wc";
         dependencies = [
           {
             name = "futures-core";
@@ -6751,9 +6751,9 @@ rec {
       };
       "opentelemetry-appender-tracing" = rec {
         crateName = "opentelemetry-appender-tracing";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "1ns05asawxbi8cra6s3jnsbx6z5gg9fcm6ba6sx2c4ziv3l09cz2";
+        sha256 = "1iy5s849mmdsp5smp2js667zsripy53addwczpjq1kj67k2z208z";
         libName = "opentelemetry_appender_tracing";
         dependencies = [
           {
@@ -6802,9 +6802,9 @@ rec {
       };
       "opentelemetry-http" = rec {
         crateName = "opentelemetry-http";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "003kp3rsb332b77yma9qza3rdnj4h2y17r81gsgj015ap0jkcb7f";
+        sha256 = "04g8nzsqm0p38k37jh3icjw1rilvyz5v5dd7magph178isylj8ih";
         libName = "opentelemetry_http";
         dependencies = [
           {
@@ -6846,9 +6846,9 @@ rec {
       };
       "opentelemetry-otlp" = rec {
         crateName = "opentelemetry-otlp";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "0i534gxld0zh27z8xpx5kwhqnhky2nd0bfam34ijm5i1bqs6g6k9";
+        sha256 = "06ifiklf5x6qj12r2ivx372vbf1pk6ck3j1ixwl72dhyhhjaymh7";
         libName = "opentelemetry_otlp";
         dependencies = [
           {
@@ -6978,9 +6978,9 @@ rec {
       };
       "opentelemetry-proto" = rec {
         crateName = "opentelemetry-proto";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "0pgnw8h6nb50jind8npn821szb8mhwsf0zppswwczv0a3b0imni5";
+        sha256 = "1bmgs4j2apyq097j2qwm1i688r15gghlp845rldk969jvkfzaxnm";
         libName = "opentelemetry_proto";
         dependencies = [
           {
@@ -7044,9 +7044,9 @@ rec {
       };
       "opentelemetry-semantic-conventions" = rec {
         crateName = "opentelemetry-semantic-conventions";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "11vvl60n1bdph9jypfhzrwi91pa8y9g663wgpcphb41mpkhv326j";
+        sha256 = "0qk9skm77rxhkc4a50cjx7c6vnkqnljrjkqid4l8agpxzqwzcg3s";
         libName = "opentelemetry_semantic_conventions";
         features = {
         };
@@ -7054,9 +7054,9 @@ rec {
       };
       "opentelemetry_sdk" = rec {
         crateName = "opentelemetry_sdk";
-        version = "0.33.0";
+        version = "0.33.1";
         edition = "2021";
-        sha256 = "083myvvimjw7im65pq8cnqbnkl991iz1vm6pxwij348wklym6ffb";
+        sha256 = "0qb0hq325pxarxjkrr1vmpa3zvx0787gs1kh4281jkcpn8nr2aip";
         dependencies = [
           {
             name = "futures-channel";
@@ -7497,7 +7497,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
         features = {
@@ -8251,7 +8251,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
 
@@ -9375,13 +9375,13 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
         devDependencies = [
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "extra-traits" ];
           }
         ];
@@ -9763,7 +9763,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             usesDefaultFeatures = false;
             features = [ "clone-impls" "derive" "parsing" "printing" "proc-macro" ];
           }
@@ -9795,7 +9795,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             usesDefaultFeatures = false;
             features = [ "clone-impls" "derive" "parsing" "printing" ];
           }
@@ -9804,13 +9804,9 @@ rec {
       };
       "serde_json" = rec {
         crateName = "serde_json";
-        version = "1.0.151";
+        version = "1.0.154";
         edition = "2021";
-        sha256 = "051zww7lvpw147vvwss1ng6w587qyrkzg75fvj08q2dfrmgbahf8";
-        authors = [
-          "Erick Tryzelaar <erick.tryzelaar@gmail.com>"
-          "David Tolnay <dtolnay@gmail.com>"
-        ];
+        sha256 = "1mjby21g8fxhrsfp73yz8wg6n2f4h23ah0nczds409l53f5wrsg7";
         dependencies = [
           {
             name = "itoa";
@@ -9848,7 +9844,7 @@ rec {
           "alloc" = [ "serde_core/alloc" ];
           "default" = [ "std" ];
           "indexmap" = [ "dep:indexmap" ];
-          "preserve_order" = [ "indexmap" "std" ];
+          "preserve_order" = [ "indexmap" "alloc" "dep:foldhash" ];
           "std" = [ "memchr/std" "serde_core/std" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "raw_value" "std" ];
@@ -10531,9 +10527,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_certs";
         authors = [
@@ -10630,13 +10626,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.119.0";
+        version = "0.120.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_operator";
         authors = [
@@ -10833,9 +10829,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -10857,7 +10853,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
 
@@ -10868,9 +10864,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_shared";
         authors = [
@@ -10949,9 +10945,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -11055,13 +11051,13 @@ rec {
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";
-        version = "0.11.1";
+        version = "0.12.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_versioned";
         authors = [
@@ -11105,13 +11101,13 @@ rec {
       };
       "stackable-versioned-macros" = rec {
         crateName = "stackable-versioned-macros";
-        version = "0.11.1";
+        version = "0.12.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -11162,7 +11158,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
 
@@ -11173,9 +11169,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "6978794bc605befece4d5d53263467307a0fb663";
-          sha256 = "1vgif2lgq7vx13rd0zx0wfphwxxxaravx7aaw7pyxyf7xbvmcihl";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "e9016793939521e4253315fd937b3cc728aa94a7";
+          sha256 = "0v067fk30dc1zxcsyv9wzrfybbnpbpqiqx6s4z9krw7qah35w8m6";
         };
         libName = "stackable_webhook";
         authors = [
@@ -11497,11 +11493,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "clone-impls" "default" "derive" "extra-traits" "full" "parsing" "printing" "proc-macro" "visit" "visit-mut" ];
       };
-      "syn 3.0.6" = rec {
+      "syn 3.0.8" = rec {
         crateName = "syn";
-        version = "3.0.6";
+        version = "3.0.8";
         edition = "2021";
-        sha256 = "1vmw7s58rzrs926nv5m06x7qbgswm1aa9iw3s1bj5var47kyi4w5";
+        sha256 = "08n64gc43mrcq1b8il3dcj6vlcawkwq9dxr44vqpx3ydffins081";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
         ];
@@ -11573,7 +11569,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             usesDefaultFeatures = false;
             features = [ "derive" "parsing" "printing" "clone-impls" "visit" "extra-traits" ];
           }
@@ -11666,7 +11662,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
           }
         ];
 
@@ -12030,7 +12026,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "full" ];
           }
         ];
@@ -13257,9 +13253,9 @@ rec {
       };
       "unicode-ident" = rec {
         crateName = "unicode-ident";
-        version = "1.0.26";
+        version = "1.0.27";
         edition = "2021";
-        sha256 = "0m3915ipi4zz7isncf5k1dz47ys0nq9j7l4l2n2rm03zaxwg8ifj";
+        sha256 = "0qv54hz0sxmspjyr162z3435pnyylzjjhx3j4k1s359pqgb59ix2";
         libName = "unicode_ident";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
@@ -13416,9 +13412,9 @@ rec {
       };
       "uuid" = rec {
         crateName = "uuid";
-        version = "1.27.0";
+        version = "1.28.0";
         edition = "2021";
-        sha256 = "16h5h6bf5ybh1lj97lcdl41g7fqbiczpavpsb0zf3b63p4v7s9wp";
+        sha256 = "01mnlhz09hwdjaxwzjd6bql3fjb5zl9n8dzaxn7dvdxyhiiiihbw";
         authors = [
           "Ashley Mannix<ashleymannix@live.com.au>"
           "Dylan DPC<dylan.dpc@gmail.com>"
@@ -13708,7 +13704,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "visit" "visit-mut" "full" "extra-traits" ];
           }
           {
@@ -15258,7 +15254,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "fold" "visit" ];
           }
           {
@@ -15374,7 +15370,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "fold" "visit" ];
           }
           {
@@ -15541,7 +15537,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 3.0.6";
+            packageId = "syn 3.0.8";
             features = [ "extra-traits" ];
           }
         ];
