@@ -1,0 +1,2 @@
+# Pin the timezone so that it does not affect the tests
+timezone: Etc/UTC
