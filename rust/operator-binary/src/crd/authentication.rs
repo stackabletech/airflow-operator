@@ -384,7 +384,7 @@ mod tests {
         assert_eq!(
             AirflowClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
-                    provider: serde_yaml::from_str("hostname: my.ldap.server").unwrap()
+                    provider: yaml_serde::from_str("hostname: my.ldap.server").unwrap()
                 }],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
@@ -910,7 +910,7 @@ mod tests {
     fn deserialize_airflow_client_authentication_details(
         input: &str,
     ) -> Vec<AirflowClientAuthenticationDetails> {
-        serde_yaml::from_str(input)
+        yaml_serde::from_str(input)
             .expect("The definition of the authentication configuration should be valid.")
     }
 
@@ -921,10 +921,10 @@ mod tests {
         if input.is_empty() {
             Vec::new()
         } else {
-            let deserializer = serde_yaml::Deserializer::from_str(input);
+            let deserializer = yaml_serde::Deserializer::from_str(input);
             deserializer
                 .map(|d| {
-                    serde_yaml::with::singleton_map_recursive::deserialize(d)
+                    yaml_serde::with::singleton_map_recursive::deserialize(d)
                         .expect("The definition of the AuthenticationClass should be valid.")
                 })
                 .collect()
