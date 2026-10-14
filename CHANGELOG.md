@@ -53,6 +53,7 @@
 - Bump stackable-operator to 0.119.0 ([#868]).
 - Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 - test: Bump vector-aggregator to 0.58.0 ([#876]).
+- Replace the unmaintained `serde_yaml` with `yaml_serde` ([#879]).
 
 ### Fixed
 
@@ -90,6 +91,7 @@
 [#870]: https://github.com/stackabletech/airflow-operator/pull/870
 [#872]: https://github.com/stackabletech/airflow-operator/pull/872
 [#876]: https://github.com/stackabletech/airflow-operator/pull/876
+[#879]: https://github.com/stackabletech/airflow-operator/pull/879
 
 ## [26.7.0] - 2026-07-21
 
