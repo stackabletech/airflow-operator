@@ -661,8 +661,8 @@ mod tests {
                 config: {{}}
         "};
 
-        let deserializer = serde_yaml::Deserializer::from_str(&cluster);
-        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+        let deserializer = yaml_serde::Deserializer::from_str(&cluster);
+        yaml_serde::with::singleton_map_recursive::deserialize(deserializer)
             .expect("the test CR deserialises")
     }
 }

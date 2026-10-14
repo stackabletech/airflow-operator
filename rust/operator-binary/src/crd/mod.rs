@@ -1079,9 +1079,9 @@ mod tests {
                 config: {}
           ";
 
-        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let deserializer = yaml_serde::Deserializer::from_str(cluster);
         let cluster: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec
@@ -1110,7 +1110,7 @@ mod tests {
     #[test]
     fn webserver_role_config_defaults_to_no_trusted_proxies() {
         let role_config: v1alpha2::WebserverRoleConfig =
-            serde_yaml::from_str("listenerClass: external-stable")
+            yaml_serde::from_str("listenerClass: external-stable")
                 .expect("the role config deserialises");
 
         assert!(role_config.trusted_proxies.is_empty());
@@ -1118,7 +1118,7 @@ mod tests {
 
     #[test]
     fn webserver_role_config_accepts_trusted_proxies() {
-        let role_config: v1alpha2::WebserverRoleConfig = serde_yaml::from_str(
+        let role_config: v1alpha2::WebserverRoleConfig = yaml_serde::from_str(
             "
             trustedProxies:
               - 10.244.0.0/16
@@ -1187,7 +1187,7 @@ mod tests {
                 .expect("the test CR has a spec mapping")
                 .insert(
                     "dagProcessors".into(),
-                    serde_yaml::from_str("{config: {}, roleGroups: {default: {config: {}}}}")
+                    yaml_serde::from_str("{config: {}, roleGroups: {default: {config: {}}}}")
                         .expect("the dag-processor role is valid YAML"),
                 );
         });

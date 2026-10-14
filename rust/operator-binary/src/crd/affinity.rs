@@ -138,9 +138,9 @@ mod tests {
                 replicas: 1
         ";
 
-        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let deserializer = yaml_serde::Deserializer::from_str(cluster);
         let airflow: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let resolved_role = airflow
             .get_role(&role)
@@ -269,9 +269,9 @@ mod tests {
           kubernetesExecutors: {}
           ";
 
-        let deserializer = serde_yaml::Deserializer::from_str(cluster);
+        let deserializer = yaml_serde::Deserializer::from_str(cluster);
         let airflow: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {
             node_affinity: None,

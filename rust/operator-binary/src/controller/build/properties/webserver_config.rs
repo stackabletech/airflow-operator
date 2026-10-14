@@ -457,9 +457,9 @@ mod tests {
                   caCert:
                     secretClass: openldap-tls
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(ldap_provider_yaml);
+        let deserializer = yaml_serde::Deserializer::from_str(ldap_provider_yaml);
         let ldap_provider: ldap::v1alpha1::AuthenticationProvider =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: vec![AirflowAuthenticationClassResolved::Ldap {
@@ -521,9 +521,9 @@ mod tests {
             provider_hint: Keycloak
         "
         );
-        let deserializer = serde_yaml::Deserializer::from_str(&oidc_provider_yaml1);
+        let deserializer = yaml_serde::Deserializer::from_str(&oidc_provider_yaml1);
         let oidc_provider1: oidc::v1alpha1::AuthenticationProvider =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let oidc_provider_yaml2 = r#"
             hostname: my.keycloak2.server
@@ -532,9 +532,9 @@ mod tests {
               - openid
             provider_hint: Keycloak
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(oidc_provider_yaml2);
+        let deserializer = yaml_serde::Deserializer::from_str(oidc_provider_yaml2);
         let oidc_provider2: oidc::v1alpha1::AuthenticationProvider =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let authentication_config = AirflowClientAuthenticationDetailsResolved {
             authentication_classes_resolved: vec![
