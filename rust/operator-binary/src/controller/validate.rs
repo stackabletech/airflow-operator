@@ -439,7 +439,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use rstest::rstest;
-    use stackable_operator::v2::builder::pod::container::{EnvVarName, EnvVarSet};
+    use stackable_operator::{
+        utils::yaml_from_str_singleton_map,
+        v2::builder::pod::container::{EnvVarName, EnvVarSet},
+    };
 
     use super::{Error, validate_cluster, validate_role_group};
     use crate::{
@@ -504,8 +507,7 @@ mod tests {
           kubernetesExecutors:
             config: {}
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
-        serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap()
+        yaml_from_str_singleton_map(cluster_yaml).unwrap()
     }
 
     #[test]
@@ -599,9 +601,7 @@ mod tests {
           kubernetesExecutors:
             config: {}
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
-        let result: Result<v1alpha2::AirflowCluster, _> =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer);
+        let result: Result<v1alpha2::AirflowCluster, _> = yaml_from_str_singleton_map(cluster_yaml);
         assert!(
             result.is_err(),
             "a `null` configOverrides value should be rejected: values are typed as `String`"
@@ -686,9 +686,7 @@ mod tests {
           kubernetesExecutors:
             config: {}
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(cluster_yaml);
-        let cluster: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let cluster: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster_yaml).unwrap();
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");
