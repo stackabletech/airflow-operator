@@ -556,6 +556,7 @@ impl HasUid for ValidatedCluster {
 #[cfg(test)]
 mod tests {
     use indoc::formatdoc;
+    use stackable_operator::utils::yaml_from_str_singleton_map;
 
     use super::*;
     use crate::controller::{
@@ -661,8 +662,6 @@ mod tests {
                 config: {{}}
         "};
 
-        let deserializer = yaml_serde::Deserializer::from_str(&cluster);
-        yaml_serde::with::singleton_map_recursive::deserialize(deserializer)
-            .expect("the test CR deserialises")
+        yaml_from_str_singleton_map(&cluster).expect("the test CR deserialises")
     }
 }

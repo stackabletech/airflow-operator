@@ -1011,7 +1011,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
 mod tests {
     use indoc::formatdoc;
     use stackable_operator::{
-        commons::product_image_selection::ResolvedProductImage,
+        commons::product_image_selection::ResolvedProductImage, utils::yaml_from_str_singleton_map,
         versioned::test_utils::RoundtripTestData,
     };
     use strum::IntoEnumIterator;
@@ -1079,9 +1079,7 @@ mod tests {
                 config: {}
           ";
 
-        let deserializer = yaml_serde::Deserializer::from_str(cluster);
-        let cluster: v1alpha2::AirflowCluster =
-            yaml_serde::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let cluster: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster).unwrap();
 
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec
