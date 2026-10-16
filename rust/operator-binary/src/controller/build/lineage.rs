@@ -17,40 +17,48 @@
 //! The Python client's HTTP transport has no CA-path option (only a boolean `verify`), so a
 //! SecretClass-provided CA is trusted by mounting it and pointing `REQUESTS_CA_BUNDLE` at it.
 
+use std::str::FromStr;
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
     commons::tls_verification::TlsClientDetailsError,
+    constant,
     crd::openlineage::{
         ResolvedOpenLineageConnection,
         v1alpha1::{OpenLineageConfig, OpenLineageError, OpenLineageTransport},
     },
-    k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector, Volume, VolumeMount},
+    k8s_openapi::api::core::v1::{EnvVar, Volume, VolumeMount},
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        macros::attributed_string_type,
+        types::kubernetes::{SecretKey, SecretName},
+    },
 };
 
 // OpenLineage Python client transport env vars. These are the Airflow provider's fallback config
 // source, used only when no Airflow-native transport (`AIRFLOW__OPENLINEAGE__TRANSPORT` /
 // `__CONFIG_PATH`) is configured - which is exactly the state this operator leaves them in.
-const OPENLINEAGE_TRANSPORT_TYPE: &str = "OPENLINEAGE__TRANSPORT__TYPE";
-const OPENLINEAGE_TRANSPORT_URL: &str = "OPENLINEAGE__TRANSPORT__URL";
-const OPENLINEAGE_TRANSPORT_ENDPOINT: &str = "OPENLINEAGE__TRANSPORT__ENDPOINT";
-const OPENLINEAGE_TRANSPORT_VERIFY: &str = "OPENLINEAGE__TRANSPORT__VERIFY";
-const OPENLINEAGE_TRANSPORT_AUTH_TYPE: &str = "OPENLINEAGE__TRANSPORT__AUTH__TYPE";
-const OPENLINEAGE_TRANSPORT_AUTH_API_KEY: &str = "OPENLINEAGE__TRANSPORT__AUTH__API_KEY";
+constant!(OPENLINEAGE_TRANSPORT_TYPE: EnvVarName = "OPENLINEAGE__TRANSPORT__TYPE");
+constant!(OPENLINEAGE_TRANSPORT_URL: EnvVarName = "OPENLINEAGE__TRANSPORT__URL");
+constant!(OPENLINEAGE_TRANSPORT_ENDPOINT: EnvVarName = "OPENLINEAGE__TRANSPORT__ENDPOINT");
+constant!(OPENLINEAGE_TRANSPORT_VERIFY: EnvVarName = "OPENLINEAGE__TRANSPORT__VERIFY");
+constant!(OPENLINEAGE_TRANSPORT_AUTH_TYPE: EnvVarName = "OPENLINEAGE__TRANSPORT__AUTH__TYPE");
+constant!(OPENLINEAGE_TRANSPORT_AUTH_API_KEY: EnvVarName = "OPENLINEAGE__TRANSPORT__AUTH__API_KEY");
 
-/// Airflow-native OpenLineage namespace setting. This is orthogonal to the transport lookup and is
-/// applied regardless of where the transport config comes from.
-const AIRFLOW_OPENLINEAGE_NAMESPACE: &str = "AIRFLOW__OPENLINEAGE__NAMESPACE";
+// Airflow-native OpenLineage namespace setting. This is orthogonal to the transport lookup and is
+// applied regardless of where the transport config comes from.
+constant!(AIRFLOW_OPENLINEAGE_NAMESPACE: EnvVarName = "AIRFLOW__OPENLINEAGE__NAMESPACE");
 
-/// Standard `requests`/Python CA-bundle env var. Used to trust a SecretClass-provided CA, since the
-/// OpenLineage Python HTTP transport has no CA-path option (only a boolean `verify`).
-const REQUESTS_CA_BUNDLE: &str = "REQUESTS_CA_BUNDLE";
+// Standard `requests`/Python CA-bundle env var. Used to trust a SecretClass-provided CA, since the
+// OpenLineage Python HTTP transport has no CA-path option (only a boolean `verify`).
+constant!(REQUESTS_CA_BUNDLE: EnvVarName = "REQUESTS_CA_BUNDLE");
 
 const OPENLINEAGE_TRANSPORT_TYPE_HTTP: &str = "http";
 const OPENLINEAGE_AUTH_TYPE_API_KEY: &str = "api_key";
 
-/// Fixed Secret key that must hold the OpenLineage HTTP transport API key / bearer token.
-const OPENLINEAGE_AUTH_SECRET_KEY: &str = "apiKey";
+// Fixed Secret key that must hold the OpenLineage HTTP transport API key / bearer token.
+constant!(OPENLINEAGE_AUTH_SECRET_KEY: SecretKey = "apiKey");
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -62,6 +70,12 @@ pub enum Error {
 
     #[snafu(display("failed to build TLS volumes and mounts for the OpenLineage connection"))]
     TlsVolumesAndMounts { source: TlsClientDetailsError },
+
+    #[snafu(display("failed to parse the OpenLineage credentials Secret name {secret_name:?}"))]
+    ParseCredentialsSecretName {
+        source: attributed_string_type::Error,
+        secret_name: String,
+    },
 }
 
 /// The resolved, Airflow-specific OpenLineage configuration: the environment variables to add to
@@ -103,7 +117,7 @@ impl ResolvedLineageConfig {
         connection: &ResolvedOpenLineageConnection,
         lineage_namespace: &str,
     ) -> Result<Self, Error> {
-        let mut env_vars = Vec::new();
+        let mut env_vars = EnvVarSet::new();
         let mut volumes = Vec::new();
         let mut volume_mounts = Vec::new();
 
@@ -111,23 +125,20 @@ impl ResolvedLineageConfig {
         let transport_url = http.url().context(TransportUrlSnafu)?;
 
         // Transport (delivered via the OpenLineage Python client fallback env vars).
-        env_vars.push(plain_env(
-            OPENLINEAGE_TRANSPORT_TYPE,
-            OPENLINEAGE_TRANSPORT_TYPE_HTTP,
-        ));
         // The client joins the base URL and the endpoint itself, so the URL is split into its
         // origin and its path, with the leading slash of the path stripped to avoid a doubled
         // separator.
-        env_vars.push(plain_env(
-            OPENLINEAGE_TRANSPORT_URL,
-            &transport_url.origin().ascii_serialization(),
-        ));
-        env_vars.push(plain_env(
-            OPENLINEAGE_TRANSPORT_ENDPOINT,
-            transport_url.path().trim_start_matches('/'),
-        ));
-
-        env_vars.push(plain_env(AIRFLOW_OPENLINEAGE_NAMESPACE, lineage_namespace));
+        env_vars = env_vars
+            .with_value(&OPENLINEAGE_TRANSPORT_TYPE, OPENLINEAGE_TRANSPORT_TYPE_HTTP)
+            .with_value(
+                &OPENLINEAGE_TRANSPORT_URL,
+                transport_url.origin().ascii_serialization(),
+            )
+            .with_value(
+                &OPENLINEAGE_TRANSPORT_ENDPOINT,
+                transport_url.path().trim_start_matches('/'),
+            )
+            .with_value(&AIRFLOW_OPENLINEAGE_NAMESPACE, lineage_namespace);
 
         // TLS handling.
         if http.tls.uses_tls_verification() {
@@ -140,55 +151,37 @@ impl ResolvedLineageConfig {
                     .context(TlsVolumesAndMountsSnafu)?;
                 volumes.extend(tls_volumes);
                 volume_mounts.extend(tls_mounts);
-                env_vars.push(plain_env(REQUESTS_CA_BUNDLE, &ca_cert_path));
+                env_vars = env_vars.with_value(&REQUESTS_CA_BUNDLE, ca_cert_path);
             }
         } else if http.tls.uses_tls() {
             // TLS configured but verification disabled.
-            env_vars.push(plain_env(OPENLINEAGE_TRANSPORT_VERIFY, "false"));
+            env_vars = env_vars.with_value(&OPENLINEAGE_TRANSPORT_VERIFY, "false");
         }
 
         // Authentication. The token is delivered from the `credentialsSecretName` Secret via a
         // secretKeyRef so it never lands in the CRD, ConfigMap or a plaintext env value.
         if let Some(secret_name) = &http.credentials_secret_name {
-            env_vars.push(plain_env(
-                OPENLINEAGE_TRANSPORT_AUTH_TYPE,
-                OPENLINEAGE_AUTH_TYPE_API_KEY,
-            ));
-            env_vars.push(env_var_from_secret(
-                OPENLINEAGE_TRANSPORT_AUTH_API_KEY,
-                secret_name,
-                OPENLINEAGE_AUTH_SECRET_KEY,
-            ));
+            let secret_name =
+                SecretName::from_str(secret_name).context(ParseCredentialsSecretNameSnafu {
+                    secret_name: secret_name.clone(),
+                })?;
+            env_vars = env_vars
+                .with_value(
+                    &OPENLINEAGE_TRANSPORT_AUTH_TYPE,
+                    OPENLINEAGE_AUTH_TYPE_API_KEY,
+                )
+                .with_secret_key_ref(
+                    &OPENLINEAGE_TRANSPORT_AUTH_API_KEY,
+                    &secret_name,
+                    &OPENLINEAGE_AUTH_SECRET_KEY,
+                );
         }
 
         Ok(Self {
-            env_vars,
+            env_vars: env_vars.into(),
             volumes,
             volume_mounts,
         })
-    }
-}
-
-fn plain_env(name: &str, value: &str) -> EnvVar {
-    EnvVar {
-        name: name.to_string(),
-        value: Some(value.to_string()),
-        ..Default::default()
-    }
-}
-
-fn env_var_from_secret(name: &str, secret_name: &str, secret_key: &str) -> EnvVar {
-    EnvVar {
-        name: name.to_string(),
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                name: secret_name.to_string(),
-                key: secret_key.to_string(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
     }
 }
 
@@ -236,11 +229,11 @@ mod tests {
         }
     }
 
-    fn env_value<'a>(config: &'a ResolvedLineageConfig, name: &str) -> Option<&'a str> {
+    fn env_value<'a>(config: &'a ResolvedLineageConfig, name: &EnvVarName) -> Option<&'a str> {
         config
             .env_vars
             .iter()
-            .find(|e| e.name == name)
+            .find(|e| e.name == name.to_string())
             .and_then(|e| e.value.as_deref())
     }
 
@@ -281,24 +274,27 @@ mod tests {
         let config = ResolvedLineageConfig::build(&connection(no_tls()), NAMESPACE)
             .expect("lineage config should build for plain http connection");
 
-        assert_eq!(env_value(&config, OPENLINEAGE_TRANSPORT_TYPE), Some("http"));
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_URL),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_TYPE),
+            Some("http")
+        );
+        assert_eq!(
+            env_value(&config, &OPENLINEAGE_TRANSPORT_URL),
             Some("http://marquez:5000")
         );
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_ENDPOINT),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_ENDPOINT),
             Some("api/v1/lineage")
         );
         assert_eq!(
-            env_value(&config, AIRFLOW_OPENLINEAGE_NAMESPACE),
+            env_value(&config, &AIRFLOW_OPENLINEAGE_NAMESPACE),
             Some("default")
         );
         assert!(config.volumes.is_empty());
         assert!(config.volume_mounts.is_empty());
-        assert!(env_value(&config, OPENLINEAGE_TRANSPORT_AUTH_TYPE).is_none());
-        assert!(env_value(&config, REQUESTS_CA_BUNDLE).is_none());
-        assert!(env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY).is_none());
+        assert!(env_value(&config, &OPENLINEAGE_TRANSPORT_AUTH_TYPE).is_none());
+        assert!(env_value(&config, &REQUESTS_CA_BUNDLE).is_none());
+        assert!(env_value(&config, &OPENLINEAGE_TRANSPORT_VERIFY).is_none());
     }
 
     #[test]
@@ -308,7 +304,7 @@ mod tests {
             ResolvedLineageConfig::build(&conn, "lineage-ns").expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, AIRFLOW_OPENLINEAGE_NAMESPACE),
+            env_value(&config, &AIRFLOW_OPENLINEAGE_NAMESPACE),
             Some("lineage-ns")
         );
     }
@@ -320,16 +316,16 @@ mod tests {
             ResolvedLineageConfig::build(&conn, NAMESPACE).expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_URL),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_URL),
             Some("https://marquez:5000")
         );
         assert_eq!(
-            env_value(&config, REQUESTS_CA_BUNDLE),
+            env_value(&config, &REQUESTS_CA_BUNDLE),
             Some("/stackable/secrets/openlineage-cert/ca.crt")
         );
         assert_eq!(config.volumes.len(), 1);
         assert_eq!(config.volume_mounts.len(), 1);
-        assert!(env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY).is_none());
+        assert!(env_value(&config, &OPENLINEAGE_TRANSPORT_VERIFY).is_none());
     }
 
     #[test]
@@ -339,12 +335,12 @@ mod tests {
             ResolvedLineageConfig::build(&conn, NAMESPACE).expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_URL),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_URL),
             Some("https://marquez:5000")
         );
         assert!(config.volumes.is_empty());
-        assert!(env_value(&config, REQUESTS_CA_BUNDLE).is_none());
-        assert!(env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY).is_none());
+        assert!(env_value(&config, &REQUESTS_CA_BUNDLE).is_none());
+        assert!(env_value(&config, &OPENLINEAGE_TRANSPORT_VERIFY).is_none());
     }
 
     #[test]
@@ -354,15 +350,15 @@ mod tests {
             ResolvedLineageConfig::build(&conn, NAMESPACE).expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_URL),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_URL),
             Some("https://marquez:5000")
         );
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_VERIFY),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_VERIFY),
             Some("false")
         );
         assert!(config.volumes.is_empty());
-        assert!(env_value(&config, REQUESTS_CA_BUNDLE).is_none());
+        assert!(env_value(&config, &REQUESTS_CA_BUNDLE).is_none());
     }
 
     /// The CRD `path` is passed through as the transport endpoint, with the leading slash stripped
@@ -374,7 +370,7 @@ mod tests {
             ResolvedLineageConfig::build(&conn, NAMESPACE).expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_ENDPOINT),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_ENDPOINT),
             Some("custom/lineage")
         );
     }
@@ -386,14 +382,14 @@ mod tests {
             ResolvedLineageConfig::build(&conn, NAMESPACE).expect("lineage config should build");
 
         assert_eq!(
-            env_value(&config, OPENLINEAGE_TRANSPORT_AUTH_TYPE),
+            env_value(&config, &OPENLINEAGE_TRANSPORT_AUTH_TYPE),
             Some("api_key")
         );
 
         let api_key = config
             .env_vars
             .iter()
-            .find(|e| e.name == OPENLINEAGE_TRANSPORT_AUTH_API_KEY)
+            .find(|e| e.name == OPENLINEAGE_TRANSPORT_AUTH_API_KEY.to_string())
             .expect("api key env var must be present");
         // The token is Secret-backed: never a plaintext value.
         assert!(api_key.value.is_none());
@@ -403,6 +399,6 @@ mod tests {
             .and_then(|s| s.secret_key_ref.as_ref())
             .expect("api key must be a secretKeyRef");
         assert_eq!(secret_key_ref.name, "openlineage-auth-secret");
-        assert_eq!(secret_key_ref.key, OPENLINEAGE_AUTH_SECRET_KEY);
+        assert_eq!(secret_key_ref.key, OPENLINEAGE_AUTH_SECRET_KEY.to_string());
     }
 }
