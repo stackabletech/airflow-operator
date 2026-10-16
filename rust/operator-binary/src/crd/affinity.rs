@@ -83,6 +83,7 @@ mod tests {
         },
         kube::ResourceExt,
         role_utils::GenericRoleConfig,
+        utils::yaml_from_str_singleton_map,
         v2::role_utils::{GenericCommonConfig, with_validated_config},
     };
 
@@ -96,6 +97,8 @@ mod tests {
     #[case(AirflowRole::Scheduler)]
     #[case(AirflowRole::Webserver)]
     fn test_affinity_defaults(#[case] role: AirflowRole) {
+        use stackable_operator::utils::yaml_from_str_singleton_map;
+
         let cluster = "
         apiVersion: airflow.stackable.tech/v1alpha2
         kind: AirflowCluster
@@ -138,9 +141,7 @@ mod tests {
                 replicas: 1
         ";
 
-        let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let airflow: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster).unwrap();
 
         let resolved_role = airflow
             .get_role(&role)
@@ -269,9 +270,7 @@ mod tests {
           kubernetesExecutors: {}
           ";
 
-        let deserializer = serde_yaml::Deserializer::from_str(cluster);
-        let airflow: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        let airflow: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster).unwrap();
 
         let expected: StackableAffinity = StackableAffinity {
             node_affinity: None,

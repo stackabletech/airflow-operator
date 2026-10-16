@@ -56,7 +56,7 @@ pub enum Error {
     },
 
     #[snafu(display("pod template serialization"))]
-    PodTemplateSerde { source: serde_yaml::Error },
+    PodTemplateSerde { source: yaml_serde::Error },
 
     #[snafu(display("failed to build shared pod resources"))]
     Pod {
@@ -211,7 +211,7 @@ pub fn build_executor_template_config_map(
         )
         .add_data(
             TEMPLATE_NAME,
-            serde_yaml::to_string(&pod_template).context(PodTemplateSerdeSnafu)?,
+            yaml_serde::to_string(&pod_template).context(PodTemplateSerdeSnafu)?,
         );
 
     Ok(cm_builder

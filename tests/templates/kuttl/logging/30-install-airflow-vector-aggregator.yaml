@@ -14,4 +14,4 @@ kind: ConfigMap
 metadata:
   name: airflow-vector-aggregator-discovery
 data:
-  ADDRESS: airflow-vector-aggregator:6123
+  ADDRESS: http://airflow-vector-aggregator:6123

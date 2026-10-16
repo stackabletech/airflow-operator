@@ -305,7 +305,7 @@ pub(crate) mod test_support {
     pub fn validated_cluster_with(
         executor_key: &str,
         executor_config: &str,
-        patch: impl FnOnce(&mut serde_yaml::Value),
+        patch: impl FnOnce(&mut yaml_serde::Value),
     ) -> ValidatedCluster {
         let cluster_yaml = r#"
         apiVersion: airflow.stackable.tech/v1alpha2
@@ -339,20 +339,20 @@ pub(crate) mod test_support {
         "#;
         // The executor block is inserted into the parsed document rather than spliced into the
         // YAML text, so the fixture does not depend on matching the template's indentation.
-        let mut cluster_value: serde_yaml::Value =
-            serde_yaml::from_str(cluster_yaml).expect("the test CR is valid YAML");
+        let mut cluster_value: yaml_serde::Value =
+            yaml_serde::from_str(cluster_yaml).expect("the test CR is valid YAML");
         cluster_value["spec"]
             .as_mapping_mut()
             .expect("the test CR has a spec mapping")
             .insert(
                 executor_key.into(),
-                serde_yaml::from_str(executor_config).expect("the executor config is valid YAML"),
+                yaml_serde::from_str(executor_config).expect("the executor config is valid YAML"),
             );
 
         patch(&mut cluster_value);
 
         let cluster: v1alpha2::AirflowCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(cluster_value)
+            yaml_serde::with::singleton_map_recursive::deserialize(cluster_value)
                 .expect("the test CR deserialises");
 
         validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced_objects())
@@ -376,9 +376,9 @@ pub(crate) mod test_support {
 
     /// A Celery-executor cluster whose webserver trusts the given reverse proxies.
     pub fn cluster_with_trusted_proxies(trusted_proxies: &[&str]) -> ValidatedCluster {
-        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+        let trusted_proxies: Vec<yaml_serde::Value> = trusted_proxies
             .iter()
-            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .map(|proxy| yaml_serde::Value::String((*proxy).to_owned()))
             .collect();
 
         validated_cluster_with(
@@ -390,9 +390,9 @@ pub(crate) mod test_support {
                     .expect("the webservers role is a mapping")
                     .insert(
                         "roleConfig".into(),
-                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
-                            serde_yaml::Value::String("trustedProxies".to_owned()),
-                            serde_yaml::Value::Sequence(trusted_proxies),
+                        yaml_serde::Value::Mapping(yaml_serde::Mapping::from_iter([(
+                            yaml_serde::Value::String("trustedProxies".to_owned()),
+                            yaml_serde::Value::Sequence(trusted_proxies),
                         )])),
                     );
             },
@@ -654,24 +654,24 @@ mod tests {
 
     /// Builds a 2.x Celery-executor cluster whose webserver trusts the given reverse proxies.
     fn cluster_with_trusted_proxies_on_airflow_2x(trusted_proxies: &[&str]) -> ValidatedCluster {
-        let trusted_proxies: Vec<serde_yaml::Value> = trusted_proxies
+        let trusted_proxies: Vec<yaml_serde::Value> = trusted_proxies
             .iter()
-            .map(|proxy| serde_yaml::Value::String((*proxy).to_owned()))
+            .map(|proxy| yaml_serde::Value::String((*proxy).to_owned()))
             .collect();
 
         validated_cluster_with(
             "celeryExecutors",
             "{config: {}, roleGroups: {}}",
             move |cluster| {
-                cluster["spec"]["image"]["productVersion"] = serde_yaml::Value::from("2.9.3");
+                cluster["spec"]["image"]["productVersion"] = yaml_serde::Value::from("2.9.3");
                 cluster["spec"]["webservers"]
                     .as_mapping_mut()
                     .expect("the webservers role is a mapping")
                     .insert(
                         "roleConfig".into(),
-                        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
-                            serde_yaml::Value::String("trustedProxies".to_owned()),
-                            serde_yaml::Value::Sequence(trusted_proxies.clone()),
+                        yaml_serde::Value::Mapping(yaml_serde::Mapping::from_iter([(
+                            yaml_serde::Value::String("trustedProxies".to_owned()),
+                            yaml_serde::Value::Sequence(trusted_proxies.clone()),
                         )])),
                     );
             },
@@ -731,7 +731,7 @@ mod tests {
                 .expect("clusterConfig is a mapping")
                 .insert(
                     "volumeMounts".into(),
-                    serde_yaml::from_str(volume_mounts).expect("valid volumeMounts YAML"),
+                    yaml_serde::from_str(volume_mounts).expect("valid volumeMounts YAML"),
                 );
         })
     }

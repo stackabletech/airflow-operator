@@ -51,9 +51,13 @@
   typed fields instead of maps keyed by role, and only the webserver carries a listener class, a
   group listener and trusted proxies, so those are no longer optional fields that four of the five
   roles leave unset ([#867]).
-- Bump stackable-operator to 0.119.0 ([#868]).
+- Bump stackable-operator to 0.121.0 ([#868], [#879]).
 - Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 - test: Bump vector-aggregator to 0.58.0 ([#876]).
+- test: Update OPA to 1.20.2 in integration tests ([#880]).
+- Support Vector 0.58.0 ([#876], [#878]).
+- Replace the unmaintained `serde_yaml` with `yaml_serde` ([#879]).
+- All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#879]).
 
 ### Fixed
 
@@ -92,6 +96,9 @@
 [#870]: https://github.com/stackabletech/airflow-operator/pull/870
 [#872]: https://github.com/stackabletech/airflow-operator/pull/872
 [#876]: https://github.com/stackabletech/airflow-operator/pull/876
+[#878]: https://github.com/stackabletech/airflow-operator/pull/878
+[#879]: https://github.com/stackabletech/airflow-operator/pull/879
+[#880]: https://github.com/stackabletech/airflow-operator/pull/880
 
 ## [26.7.0] - 2026-07-21
 
