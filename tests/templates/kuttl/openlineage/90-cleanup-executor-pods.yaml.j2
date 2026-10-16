@@ -1,0 +1,10 @@
+{% if test_scenario['values']['executor'] == 'kubernetes' %}
+---
+# Force-delete leftover KubernetesExecutor DAG task pods so that kuttl can delete the
+# namespace within its timeout. See the script for the details.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 600
+commands:
+  - script: sh ../../../../templates/kuttl/commons/cleanup-executor-pods.sh
+{% endif %}

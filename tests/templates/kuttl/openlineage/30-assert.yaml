@@ -1,0 +1,14 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-airflow-python
+timeout: 240
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-airflow-python
+status:
+  readyReplicas: 1
+  replicas: 1
