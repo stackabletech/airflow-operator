@@ -96,8 +96,11 @@ lineage:
 
 When a SecretClass CA is configured, the CA certificate is mounted into the Airflow pods and the OpenLineage
 client is pointed at it via `REQUESTS_CA_BUNDLE`.
-Use `verification.server.caCert.webPki` to verify against the common public CAs instead, or
-`verification.none` to disable verification entirely (not recommended).
+
+WARNING: `REQUESTS_CA_BUNDLE` is set on the whole Airflow container, not just for the OpenLineage client.
+The Python `requests` library reads it for every call that verifies certificates, and it _replaces_ the default
+certifi CA bundle instead of extending it. This might break DAGs and Airflow itself.
+If this is a problem, build a CA bundle that contains both the certifi CAs and the OpenLineage backend CA.
 
 == Authentication
 
