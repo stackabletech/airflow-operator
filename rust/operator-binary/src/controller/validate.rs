@@ -509,7 +509,7 @@ mod tests {
           kubernetesExecutors:
             config: {}
         "#;
-        yaml_from_str_singleton_map(cluster_yaml).unwrap()
+        yaml_from_str_singleton_map(cluster_yaml).expect("test cluster yaml should be valid")
     }
 
     #[test]
@@ -688,7 +688,8 @@ mod tests {
           kubernetesExecutors:
             config: {}
         "#;
-        let cluster: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster_yaml).unwrap();
+        let cluster: v1alpha2::AirflowCluster =
+            yaml_from_str_singleton_map(cluster_yaml).expect("test cluster yaml should be valid");
         let role = cluster
             .get_role(&AirflowRole::Webserver)
             .expect("webserver role");

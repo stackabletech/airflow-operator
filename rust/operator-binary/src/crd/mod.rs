@@ -1086,7 +1086,8 @@ mod tests {
                 config: {}
           ";
 
-        let cluster: v1alpha2::AirflowCluster = yaml_from_str_singleton_map(cluster).unwrap();
+        let cluster: v1alpha2::AirflowCluster =
+            yaml_from_str_singleton_map(cluster).expect("test cluster yaml should be valid");
 
         let resolved_airflow_image: ResolvedProductImage = cluster
             .spec

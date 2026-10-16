@@ -291,7 +291,7 @@ mod tests {
             &connection(no_tls()),
             &job(connection(no_tls()), NAMESPACE),
         )
-        .unwrap();
+        .expect("lineage config should build for plain http connection");
 
         assert_eq!(env_value(&config, OPENLINEAGE_TRANSPORT_TYPE), Some("http"));
         assert_eq!(
@@ -316,7 +316,8 @@ mod tests {
     #[test]
     fn explicit_namespace_is_passed_through() {
         let conn = connection(no_tls());
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), "lineage-ns")).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), "lineage-ns"))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, AIRFLOW_OPENLINEAGE_NAMESPACE),
@@ -327,7 +328,8 @@ mod tests {
     #[test]
     fn secret_class_tls_mounts_ca_and_sets_bundle() {
         let conn = connection(secret_class_tls());
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -345,7 +347,8 @@ mod tests {
     #[test]
     fn web_pki_tls_uses_https_without_mounts() {
         let conn = connection(web_pki_tls());
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -359,7 +362,8 @@ mod tests {
     #[test]
     fn tls_without_verification_disables_verify() {
         let conn = connection(no_verification_tls());
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_URL),
@@ -378,7 +382,8 @@ mod tests {
     #[test]
     fn custom_path_is_used_as_transport_endpoint() {
         let conn = connection_with_path(no_tls(), "/custom/lineage");
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_ENDPOINT),
@@ -389,7 +394,8 @@ mod tests {
     #[test]
     fn auth_adds_secret_backed_api_key() {
         let conn = connection_with_auth(no_tls(), Some("openlineage-auth-secret".to_string()));
-        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE)).unwrap();
+        let config = ResolvedLineageConfig::build(&conn, &job(conn.clone(), NAMESPACE))
+            .expect("lineage config should build");
 
         assert_eq!(
             env_value(&config, OPENLINEAGE_TRANSPORT_AUTH_TYPE),
