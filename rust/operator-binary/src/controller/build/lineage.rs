@@ -50,7 +50,7 @@ const OPENLINEAGE_TRANSPORT_TYPE_HTTP: &str = "http";
 const OPENLINEAGE_AUTH_TYPE_API_KEY: &str = "api_key";
 
 /// Fixed Secret key that must hold the OpenLineage HTTP transport API key / bearer token.
-pub const OPENLINEAGE_AUTH_SECRET_KEY: &str = "apiKey";
+const OPENLINEAGE_AUTH_SECRET_KEY: &str = "apiKey";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
