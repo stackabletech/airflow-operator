@@ -458,9 +458,9 @@ mod tests {
     fn test_resolved_product_image()
     -> stackable_operator::commons::product_image_selection::ResolvedProductImage {
         stackable_operator::commons::product_image_selection::ResolvedProductImage {
-            product_version: "3.3.1".to_string(),
-            app_version_label_value: "3.3.1".parse().expect("valid label value"),
-            image: "oci.example.org/sdp/airflow:3.3.1-stackable0.0.0-dev".to_string(),
+            product_version: "3.3.2".to_string(),
+            app_version_label_value: "3.3.2".parse().expect("valid label value"),
+            image: "oci.example.org/sdp/airflow:3.3.2-stackable0.0.0-dev".to_string(),
             image_pull_policy: "IfNotPresent".to_string(),
             pull_secrets: None,
         }
@@ -474,7 +474,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.3.1
+            productVersion: 3.3.2
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -574,7 +574,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.3.1
+            productVersion: 3.3.2
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -654,7 +654,7 @@ mod tests {
           name: airflow
         spec:
           image:
-            productVersion: 3.3.1
+            productVersion: 3.3.2
           clusterConfig:
             loadExamples: false
             exposeConfig: false

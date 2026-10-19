@@ -318,7 +318,7 @@ mod tests {
             create_airflow_stdlib_config(
                 &log_config,
                 "/stackable/log/airflow",
-                &resolved_image("3.3.1"),
+                &resolved_image("3.3.2"),
             ),
             create_airflow_structlog_config(&log_config, "/stackable/log/airflow"),
         ] {
@@ -346,7 +346,7 @@ mod tests {
         let structlog_content = create_airflow_config(
             &log_config,
             "/stackable/log/airflow",
-            &resolved_image("3.3.1"),
+            &resolved_image("3.3.2"),
         )
         .expect("automatic log config produces content");
         assert!(stdlib_content.contains("deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)"));

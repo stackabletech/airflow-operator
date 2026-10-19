@@ -316,7 +316,7 @@ pub(crate) mod test_support {
           uid: e6ac237d-a6d4-43a1-8135-f36506110912
         spec:
           image:
-            productVersion: 3.3.1
+            productVersion: 3.3.2
           clusterConfig:
             loadExamples: false
             exposeConfig: false
@@ -582,7 +582,7 @@ mod tests {
                     "airflow.stackable.tech_airflowcluster",
                 ),
                 ("app.kubernetes.io/name", "airflow"),
-                ("app.kubernetes.io/version", &app_version_label("3.3.1")),
+                ("app.kubernetes.io/version", &app_version_label("3.3.2")),
                 ("stackable.tech/vendor", "Stackable"),
             ]
             .map(|(key, value)| (key.to_string(), value.to_string())),
