@@ -45,6 +45,7 @@ use stackable_operator::{
 
 use crate::{
     airflow_controller::AIRFLOW_CONTROLLER_NAME,
+    controller::build::lineage::ResolvedLineageConfig,
     crd::{
         AIRFLOW_OPERATOR_NAME, APP_NAME, AirflowConfig, AirflowConfigOverrides, AirflowExecutor,
         AirflowRole, AirflowStorageConfig, ExecutorConfig,
@@ -186,6 +187,8 @@ pub struct ValidatedClusterConfig {
     pub executor_template: Option<ValidatedExecutorTemplate>,
     pub authentication_config: AirflowClientAuthenticationDetailsResolved,
     pub authorization_config: AirflowAuthorizationResolved,
+    /// The resolved OpenLineage configuration (`spec.clusterConfig.lineage`), when configured.
+    pub lineage: Option<ResolvedLineageConfig>,
     pub credentials_secret_name: SecretName,
     pub load_examples: bool,
     pub expose_config: bool,

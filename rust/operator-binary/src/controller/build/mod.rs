@@ -31,6 +31,7 @@ use crate::{
 };
 
 pub mod graceful_shutdown;
+pub mod lineage;
 pub mod properties;
 pub mod resource;
 pub mod volumes;
@@ -369,6 +370,7 @@ pub(crate) mod test_support {
                 sync_roles_at: FlaskRolesSyncMoment::default(),
             },
             authorization_config: AirflowAuthorizationResolved { opa: None },
+            resolved_lineage_config: None,
         }
     }
 

@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >-
+      helm install airflow-postgresql
+      --namespace $NAMESPACE
+      --version 16.4.2
+      -f helm-bitnami-postgresql-values.yaml
+      oci://registry-1.docker.io/bitnamicharts/postgresql
+    timeout: 600

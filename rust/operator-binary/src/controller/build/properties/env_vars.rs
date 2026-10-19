@@ -177,6 +177,10 @@ pub fn build_airflow_statefulset_envs(
         _ => {}
     }
 
+    // OpenLineage transport config (applied to every role), inserted before overrides so users can
+    // still override individual values via `envOverrides`.
+    env_vars = env_vars.merge(lineage_env_vars(cluster));
+
     // Needed for the `containerdebug` process to log it's tracing information to.
     env_vars = env_vars
         .with_value(
@@ -268,11 +272,30 @@ pub fn build_airflow_template_envs(
         );
     }
 
-    env_vars = env_vars.merge(env_overrides.clone());
+    // OpenLineage transport config for the tasks executed by the Kubernetes executor, inserted
+    // before overrides so users can still override individual values via `envOverrides`.
+    env_vars = env_vars
+        .merge(lineage_env_vars(cluster))
+        .merge(env_overrides.clone());
 
     tracing::debug!("Env-var set [{:?}]", env_vars);
 
     env_vars
+}
+
+/// The OpenLineage transport env vars resolved from `spec.clusterConfig.lineage` (empty when
+/// lineage is not configured).
+fn lineage_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
+    cluster
+        .cluster_config
+        .lineage
+        .iter()
+        .flat_map(|lineage| lineage.env_vars.iter().cloned())
+        .fold(EnvVarSet::new(), |env_vars, env_var| {
+            env_vars
+                .with_env_var(env_var)
+                .expect("the OpenLineage env var names are valid")
+        })
 }
 
 fn add_version_specific_env_vars(
