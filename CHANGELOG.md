@@ -54,7 +54,7 @@
 - Docs: remove Spark submit/monitor classes and refer to demo usage instead ([#870]).
 - test: Bump vector-aggregator to 0.58.0 ([#876]).
 - test: Update OPA to 1.20.2 in integration tests ([#880]).
-- Support Vector 0.58.0 ([#876], [#878]).
+- Support Vector 0.58.0 ([#876], [#878], [#881]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#879]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#879]).
 
@@ -97,6 +97,7 @@
 [#878]: https://github.com/stackabletech/airflow-operator/pull/878
 [#879]: https://github.com/stackabletech/airflow-operator/pull/879
 [#880]: https://github.com/stackabletech/airflow-operator/pull/880
+[#881]: https://github.com/stackabletech/airflow-operator/pull/881
 
 ## [26.7.0] - 2026-07-21
 
