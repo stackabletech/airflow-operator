@@ -100,6 +100,7 @@
 [#879]: https://github.com/stackabletech/airflow-operator/pull/879
 [#880]: https://github.com/stackabletech/airflow-operator/pull/880
 [#881]: https://github.com/stackabletech/airflow-operator/pull/881
+[#884]: https://github.com/stackabletech/airflow-operator/pull/884
 
 ## [26.7.0] - 2026-07-21
 
