@@ -27,7 +27,7 @@ def assert_metric(role, role_group, metric):
 
 # Check if dag run state is "success", "queued", or "running"
 # TODO: in future, we could wait on it.
-# See: https://airflow.apache.org/docs/apache-airflow/3.3.1/stable-rest-api-ref.html
+# See: https://airflow.apache.org/docs/apache-airflow/3.3.2/stable-rest-api-ref.html
 def assert_dag_started(rest_url, headers, dag_id, dag_run_id):
     dag_run_response = requests.get(
         f"{rest_url}/dags/{dag_id}/dagRuns/{dag_run_id}", headers=headers

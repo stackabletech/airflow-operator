@@ -647,7 +647,7 @@ mod tests {
               uid: e6ac237d-a6d4-43a1-8135-f36506110912
             spec:
               image:
-                productVersion: 3.3.1
+                productVersion: 3.3.2
               clusterConfig:
                 credentialsSecretName: airflow-admin-credentials
                 metadataDatabase:
