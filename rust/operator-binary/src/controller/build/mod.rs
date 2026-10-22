@@ -416,6 +416,7 @@ pub(crate) mod test_support {
 mod tests {
     use std::collections::BTreeMap;
 
+    use rstest::rstest;
     use stackable_operator::kube::Resource;
 
     use super::{
@@ -501,6 +502,49 @@ mod tests {
                     .map(|value| (env_var.name.clone(), value.clone()))
             })
             .collect()
+    }
+
+    /// Asserts that `script` runs `set +x`, without a later `set -x`, before the first line
+    /// containing `needle`.
+    ///
+    /// The containers run under `bash -x`, which prints every command with its variables
+    /// expanded.
+    /// Anything that reads a secret must have xtrace set to off.
+    ///
+    /// Panics if no line contains `needle`.
+    fn assert_not_traced(script: &str, needle: &str) {
+        let lines: Vec<&str> = script.lines().map(str::trim).collect();
+        let position = lines
+            .iter()
+            .position(|line| line.contains(needle))
+            .unwrap_or_else(|| panic!("no line contains {needle:?} in:\n{script}"));
+        let last_toggle = lines[..position]
+            .iter()
+            .rev()
+            .find(|line| matches!(**line, "set +x" | "set -x"));
+
+        assert_eq!(
+            last_toggle,
+            Some(&"set +x"),
+            "{needle:?} is traced in:\n{script}"
+        );
+    }
+
+    #[rstest]
+    #[case::airflow_3x("3.3.2")]
+    #[case::airflow_2x("2.9.3")]
+    fn admin_password_is_not_traced(#[case] product_version: &str) {
+        let cluster = validated_cluster_with(
+            "celeryExecutors",
+            "{config: {}, roleGroups: {}}",
+            |cluster| {
+                cluster["spec"]["image"]["productVersion"] =
+                    yaml_serde::Value::from(product_version);
+            },
+        );
+        let args = airflow_container_args(&cluster, "my-airflow-scheduler-default");
+
+        assert_not_traced(&args, "$ADMIN_PASSWORD");
     }
 
     #[test]
