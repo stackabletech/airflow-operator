@@ -58,6 +58,7 @@
 - Support Vector 0.58.0 ([#876], [#878], [#881]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#879]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#879]).
+- The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#885]).
 
 ### Fixed
 
@@ -101,6 +102,7 @@
 [#880]: https://github.com/stackabletech/airflow-operator/pull/880
 [#881]: https://github.com/stackabletech/airflow-operator/pull/881
 [#884]: https://github.com/stackabletech/airflow-operator/pull/884
+[#885]: https://github.com/stackabletech/airflow-operator/pull/885
 
 ## [26.7.0] - 2026-07-21
 
