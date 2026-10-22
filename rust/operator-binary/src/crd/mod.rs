@@ -541,6 +541,12 @@ pub struct AirflowOpaConfig {
     pub cache: UserInformationCache,
 }
 
+// xtrace (x option) would print the expanded admin password to the container log.
+const CREATE_ADMIN_USER_COMMAND: &str = "set +x
+echo 'Running \"airflow users create [...]\", which is not shown as it leaks the Airflow admin credentials'
+airflow users create --username \"$ADMIN_USERNAME\" --firstname \"$ADMIN_FIRSTNAME\" --lastname \"$ADMIN_LASTNAME\" --email \"$ADMIN_EMAIL\" --password \"$ADMIN_PASSWORD\" --role \"Admin\"
+set -x";
+
 #[derive(Clone, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AirflowRole {
     Webserver,
@@ -597,14 +603,7 @@ impl AirflowRole {
                         tracing::info!("Database initialization has been enabled.");
                         command.extend(vec![
                             "airflow db migrate".to_string(),
-                            "airflow users create \
-                            --username \"$ADMIN_USERNAME\" \
-                            --firstname \"$ADMIN_FIRSTNAME\" \
-                            --lastname \"$ADMIN_LASTNAME\" \
-                            --email \"$ADMIN_EMAIL\" \
-                            --password \"$ADMIN_PASSWORD\" \
-                            --role \"Admin\""
-                                .to_string(),
+                            CREATE_ADMIN_USER_COMMAND.to_string(),
                         ]);
                     } else {
                         tracing::info!("Database initialization routines have been skipped!")
@@ -661,14 +660,7 @@ impl AirflowRole {
                             // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
                             "airflow db init".to_string(),
                             "airflow db upgrade".to_string(),
-                            "airflow users create \
-                            --username \"$ADMIN_USERNAME\" \
-                            --firstname \"$ADMIN_FIRSTNAME\" \
-                            --lastname \"$ADMIN_LASTNAME\" \
-                            --email \"$ADMIN_EMAIL\" \
-                            --password \"$ADMIN_PASSWORD\" \
-                            --role \"Admin\""
-                                .to_string(),
+                            CREATE_ADMIN_USER_COMMAND.to_string(),
                         ]);
                     } else {
                         tracing::info!("Database initialization routines have been skipped!")
