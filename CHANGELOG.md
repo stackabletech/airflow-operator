@@ -70,6 +70,7 @@
 - The Airflow 3.x scheduler container now supervises the scheduler instead of the dag-processor. Before, a dead scheduler left the Pod `Running` and `Ready` with nothing scheduling DAGs ([#847]).
 - The operator now watches all resources that it creates and early-exits the reconcile action when the
   cluster is marked for deletion ([#849]).
+- The scheduler no longer prints the Airflow admin password to the container log ([#886]).
 
 ### Removed
 
@@ -103,6 +104,7 @@
 [#881]: https://github.com/stackabletech/airflow-operator/pull/881
 [#884]: https://github.com/stackabletech/airflow-operator/pull/884
 [#885]: https://github.com/stackabletech/airflow-operator/pull/885
+[#886]: https://github.com/stackabletech/airflow-operator/pull/886
 
 ## [26.7.0] - 2026-07-21
 
