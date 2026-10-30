@@ -34,11 +34,8 @@
   the logger as well, because a logger discards records before any handler can filter them, so in
   that direction the UI and the other destinations open up together and cannot be set apart
   ([#829]).
-- BREAKING: Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels
-  from the resources they don't apply to (previously set to `none` or a placeholder value).
-  StatefulSets created by older operator versions cannot be updated in place: after the
-  operator upgrade, delete each StatefulSet so that the operator immediately recreates it with
-  the new labels ([#838]).
+- Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels from the
+  resources they don't apply to ([#838], [#887]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
 - `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
   operator-specific validation code ([#838]).
@@ -105,6 +102,7 @@
 [#884]: https://github.com/stackabletech/airflow-operator/pull/884
 [#885]: https://github.com/stackabletech/airflow-operator/pull/885
 [#886]: https://github.com/stackabletech/airflow-operator/pull/886
+[#887]: https://github.com/stackabletech/airflow-operator/pull/887
 
 ## [26.7.0] - 2026-07-21
 
