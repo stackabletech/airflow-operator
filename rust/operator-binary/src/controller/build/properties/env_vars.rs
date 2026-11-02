@@ -77,7 +77,9 @@ constant!(ADMIN_PASSWORD_SECRET_KEY: SecretKey = "adminUser.password");
 
 constant!(PYTHONPATH: EnvVarName = "PYTHONPATH");
 
-constant!(CONTAINERDEBUG_LOG_DIRECTORY: EnvVarName = "CONTAINERDEBUG_LOG_DIRECTORY");
+constant!(FILE_LOG_DIRECTORY: EnvVarName = "FILE_LOG_DIRECTORY");
+constant!(FILE_LOG_ROTATION_PERIOD: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
+constant!(FILE_LOG_MAX_FILES: EnvVarName = "FILE_LOG_MAX_FILES");
 constant!(STACKABLE_POST_HOOK: EnvVarName = "_STACKABLE_POST_HOOK");
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
@@ -181,12 +183,17 @@ pub fn build_airflow_statefulset_envs(
     // still override individual values via `envOverrides`.
     env_vars = env_vars.merge(lineage_env_vars(cluster));
 
-    // Needed for the `containerdebug` process to log it's tracing information to.
+    // Let the `containerdebug` process write its tracing information to a file. These are the
+    // generic `stackable-telemetry` variables and apply to the whole airflow container, so any
+    // other telemetry-based process in it would log into the same directory and the Vector
+    // agent would label its events with `container: containerdebug`.
     env_vars = env_vars
         .with_value(
-            &CONTAINERDEBUG_LOG_DIRECTORY,
+            &FILE_LOG_DIRECTORY,
             format!("{STACKABLE_LOG_DIR}/containerdebug"),
         )
+        .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
+        .with_value(&FILE_LOG_MAX_FILES, "2")
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
         // in a fixed (sorted-by-name) order
         .merge(env_overrides.clone());
@@ -529,7 +536,9 @@ mod tests {
         let _ = *AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX;
         let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
         let _ = *AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR;
-        let _ = *CONTAINERDEBUG_LOG_DIRECTORY;
+        let _ = *FILE_LOG_DIRECTORY;
+        let _ = *FILE_LOG_MAX_FILES;
+        let _ = *FILE_LOG_ROTATION_PERIOD;
         let _ = *FORWARDED_ALLOW_IPS;
         let _ = *PYTHONPATH;
         let _ = *STACKABLE_POST_HOOK;

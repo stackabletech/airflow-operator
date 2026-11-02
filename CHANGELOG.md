@@ -12,6 +12,8 @@
 - Added airflow `3.3.2` ([#865], [#884]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
 - Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
+- The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
+  the Vector aggregator ([#888]).
 
 ### Changed
 
@@ -39,9 +41,9 @@
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#840]).
 - `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
   operator-specific validation code ([#838]).
-- Environment variable overrides (`envOverrides`) are now applied after all environment
-  variables set by the operator. In particular, `CONTAINERDEBUG_LOG_DIRECTORY` can now be
-  overridden, whereas previously the operator's value always took precedence ([#838]).
+- Environment variable overrides (`envOverrides`) are now applied after all environment variables
+  set by the operator. In particular, `FILE_LOG_DIRECTORY` can now be overridden, whereas previously
+  the operator's value always took precedence ([#838]).
 - Make operations infallible where appropriate ([#852], [#860]).
 - Deprecated airflow `3.2.2` ([#865]).
 - Internal operator refactoring: the validated cluster carries each role's configuration in its own
@@ -56,6 +58,9 @@
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#879]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#879]).
 - The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#885]).
+- The `containerdebug` log file is rotated hourly and at most two files are kept, set via the
+  environment variables `FILE_LOG_ROTATION_PERIOD` and `FILE_LOG_MAX_FILES`. Rotation is opt-in in
+  containerdebug, so without them the file would grow unbounded ([#888]).
 
 ### Fixed
 
@@ -68,6 +73,9 @@
 - The operator now watches all resources that it creates and early-exits the reconcile action when the
   cluster is marked for deletion ([#849]).
 - The scheduler no longer prints the Airflow admin password to the container log ([#886]).
+- The `containerdebug` process writes its log file again. The operator set
+  `CONTAINERDEBUG_LOG_DIRECTORY`, which containerdebug stopped reading in its version 0.2.0 when it
+  moved to `stackable-telemetry`; the directory is now set via `FILE_LOG_DIRECTORY` ([#888]).
 
 ### Removed
 
@@ -103,6 +111,7 @@
 [#885]: https://github.com/stackabletech/airflow-operator/pull/885
 [#886]: https://github.com/stackabletech/airflow-operator/pull/886
 [#887]: https://github.com/stackabletech/airflow-operator/pull/887
+[#888]: https://github.com/stackabletech/airflow-operator/pull/888
 
 ## [26.7.0] - 2026-07-21
 
