@@ -1,0 +1,49 @@
+= Reading DAG run information in Airflow 3
+:description: Replace direct metadata database access in DAGs with the Airflow REST API.
+:airflow-upgrade-docs: https://airflow.apache.org/docs/apache-airflow/stable/installation/upgrading_to_airflow3.html
+
+In Airflow 3, task code can no longer access the Airflow metadata database directly, so queries such as `session.query(DagRun)` no longer work.
+See the {airflow-upgrade-docs}[Airflow 3 upgrade guide{external-link-icon}^] for background.
+
+DAGs that monitor other DAGs can use the REST API instead, authenticating as a technical user as described in xref:usage-guide/security.adoc#api-access[REST API access]:
+
+[source,python]
+----
+import os
+
+import pendulum
+import requests
+from airflow.sdk import dag, task
+
+AIRFLOW_URL = "http://<cluster>-webserver:8080"
+
+
+@dag(schedule=None, start_date=pendulum.datetime(2026, 1, 1, tz="UTC"), catchup=False)
+def monitor_dag_runs():
+    @task
+    def report(dag_id: str):
+        response = requests.post(
+            f"{AIRFLOW_URL}/auth/token",
+            json={
+                "username": os.environ["AIRFLOW_API_USERNAME"],
+                "password": os.environ["AIRFLOW_API_PASSWORD"],
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+        response = requests.get(
+            f"{AIRFLOW_URL}/api/v2/dags/{dag_id}/dagRuns", headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        for run in response.json()["dag_runs"]:
+            print(run["dag_run_id"], run["state"], run["start_date"], run["end_date"])
+
+    report("<monitored_dag_id>")
+
+
+monitor_dag_runs()
+----
+
+The environment variables can be populated from a Secret holding the technical user's credentials with xref:usage-guide/overrides.adoc#_pod_overrides[Pod overrides].
