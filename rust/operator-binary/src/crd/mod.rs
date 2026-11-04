@@ -289,7 +289,7 @@ pub mod versioned {
         /// [mounting DAGs documentation](DOCS_BASE_URL_PLACEHOLDER/airflow/usage-guide/mounting-dags#_via_git_sync).
         #[serde(default)]
         #[versioned(
-            changed(since = "v1alpha2", from_type = "Vec<git_sync::v1alpha1::GitSync>"),
+            changed(in = "v1alpha2", previous_type = "Vec<git_sync::v1alpha1::GitSync>"),
             hint(vec)
         )]
         pub dags_git_sync: Vec<git_sync::v1alpha2::GitSync>,

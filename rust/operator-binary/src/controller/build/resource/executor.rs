@@ -16,6 +16,7 @@ use stackable_operator::{
     v2::{
         builder::pod::container::{EnvVarSet, new_container_builder},
         product_logging::framework::STACKABLE_LOG_DIR,
+        rbac::RbacResourceNames,
     },
 };
 
