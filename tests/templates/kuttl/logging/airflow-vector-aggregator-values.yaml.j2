@@ -2,14 +2,14 @@
 role: Aggregator
 service:
   ports:
-  - name: api
-    port: 8686
-    protocol: TCP
-    targetPort: 8686
-  - name: vector
-    port: 6123
-    protocol: TCP
-    targetPort: 6000
+    - name: api
+      port: 8686
+      protocol: TCP
+      targetPort: 8686
+    - name: vector
+      port: 6123
+      protocol: TCP
+      targetPort: 6000
 customConfig:
   api:
     address: 0.0.0.0:8686
@@ -22,146 +22,212 @@ customConfig:
   transforms:
     validEvents:
       type: filter
-      inputs: [vector]
+      inputs:
+        - vector
       condition: is_null(.errors)
     filteredAutomaticLogConfigWebserverAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-webserver-automatic-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigWebserverGitSync:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-webserver-automatic-log-config-0" &&
         .container == "git-sync-0"
+    filteredAutomaticLogConfigWebserverContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-webserver-automatic-log-config-0" &&
+        .container == "containerdebug"
     filteredAutomaticLogConfigWebserverVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-webserver-automatic-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigWebserverAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-webserver-custom-log-config-0" &&
         .container == "airflow"
+    filteredCustomLogConfigWebserverContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-webserver-custom-log-config-0" &&
+        .container == "containerdebug"
     filteredCustomLogConfigWebserverVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-webserver-custom-log-config-0" &&
         .container == "vector"
     filteredAutomaticLogConfigSchedulerAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-scheduler-automatic-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigSchedulerGitSync:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-scheduler-automatic-log-config-0" &&
         .container == "git-sync-0"
+    filteredAutomaticLogConfigSchedulerContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-scheduler-automatic-log-config-0" &&
+        .container == "containerdebug"
     filteredAutomaticLogConfigSchedulerVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-scheduler-automatic-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigSchedulerAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-scheduler-custom-log-config-0" &&
         .container == "airflow"
+    filteredCustomLogConfigSchedulerContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-scheduler-custom-log-config-0" &&
+        .container == "containerdebug"
     filteredCustomLogConfigSchedulerVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-scheduler-custom-log-config-0" &&
         .container == "vector"
 {% if test_scenario['values']['executor'] == 'celery' %}
     filteredAutomaticLogConfigWorkerAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-automatic-log-config-0" &&
         .container == "airflow"
     filteredAutomaticLogConfigWorkerGitSync:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-automatic-log-config-0" &&
         .container == "git-sync-0"
     filteredAutomaticLogConfigWorkerGitSyncInit:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-automatic-log-config-0" &&
         .container == "git-sync-0-init"
+    filteredAutomaticLogConfigWorkerContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-worker-automatic-log-config-0" &&
+        .container == "containerdebug"
     filteredAutomaticLogConfigWorkerVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-automatic-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigWorkerAirflow:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-custom-log-config-0" &&
         .container == "airflow"
+    filteredCustomLogConfigWorkerContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "airflow-worker-custom-log-config-0" &&
+        .container == "containerdebug"
     filteredCustomLogConfigWorkerVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         .pod == "airflow-worker-custom-log-config-0" &&
         .container == "vector"
 {% elif test_scenario['values']['executor'] == 'kubernetes' %}
     filteredExampleTriggerTargetDagBashTaskBase:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
         .container == "base"
     filteredExampleTriggerTargetDagBashGitSyncInit:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
         .container == "git-sync-0-init"
     filteredExampleTriggerTargetDagBashTaskVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-bash-task-") &&
         .container == "vector"
     filteredExampleTriggerTargetDagRunThisBase:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
         .container == "base"
     filteredExampleTriggerTargetDagRunThisGitSyncInit:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
         .container == "git-sync-0-init"
     filteredExampleTriggerTargetDagRunThisVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
         starts_with(string!(.pod), "example-trigger-target-dag-run-this-") &&
         .container == "vector"
 {% endif %}
     filteredInvalidEvents:
       type: filter
-      inputs: [vector]
+      inputs:
+        - vector
       condition: |-
         .timestamp == from_unix_timestamp!(0) ||
         is_null(.level) ||
@@ -169,11 +235,29 @@ customConfig:
         is_null(.message)
   sinks:
     test:
-      inputs: [filtered*]
+      inputs:
+        - filtered*
       type: blackhole
+    # Shows all events received from the agents. This sink is intentional and
+    # not a debugging leftover: if a "filtered*" transform gathers no event,
+    # then the assertion only reports a count, whereas this log shows which
+    # pod and container names actually arrived. A failure in CI cannot be
+    # reproduced by enabling this afterwards, so it is kept enabled at the
+    # price of the log volume.
+    stdout:
+      inputs:
+        - vector
+      type: console
+      encoding:
+        codec: json
+      buffer:
+        # Avoid back pressure from a stalling stdout. The test should not
+        # fail because of a sink which only aids debugging.
+        when_full: drop_newest
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     aggregator:
-      inputs: [vector]
+      inputs:
+        - vector
       type: vector
       routing:
         endpoints:
