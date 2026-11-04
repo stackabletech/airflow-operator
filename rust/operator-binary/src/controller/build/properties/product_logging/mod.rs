@@ -377,6 +377,10 @@ mod tests {
         // Airflow logs JSON to `airflow.py.json`, so the Python-JSON source must be present.
         assert!(content.contains("files_py"));
         assert!(content.contains("*.py.json"));
+        // containerdebug logs JSON to `containerdebug.<date>.tracing-rs.json`, so the tracing-rs
+        // source must be present.
+        assert!(content.contains("files_tracing_rs"));
+        assert!(content.contains("*.tracing-rs.json"));
         // The config is env-var-parameterized (resolved at runtime by the Vector container), not
         // baked, so the role-group identity must appear as placeholders.
         assert!(content.contains("${ROLE_NAME}"));
