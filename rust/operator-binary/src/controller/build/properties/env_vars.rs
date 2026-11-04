@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, str::FromStr};
 
+use const_format::concatcp;
 use stackable_operator::{
     constant,
     crd::{authentication::oidc, git_sync},
@@ -15,8 +16,7 @@ use stackable_operator::{
 use crate::{
     controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, CONTAINERDEBUG_LOG_DIR, HTTP_PORT, LOG_CONFIG_DIR,
-        TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -189,7 +189,12 @@ pub fn build_airflow_statefulset_envs(
     // other telemetry-based process in it would log into the same directory and the Vector
     // agent would label its events with `container: containerdebug`.
     env_vars = env_vars
-        .with_value(&FILE_LOG_DIRECTORY, CONTAINERDEBUG_LOG_DIR)
+        // The directory must be exactly one level below the log directory, because the Vector
+        // agent derives the container name from that path segment.
+        .with_value(
+            &FILE_LOG_DIRECTORY,
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
+        )
         .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
         .with_value(&FILE_LOG_MAX_FILES, "2")
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
