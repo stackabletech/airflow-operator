@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
+use const_format::concatcp;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -83,6 +84,11 @@ pub const AIRFLOW_OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
+
+/// Directory which the `containerdebug` process writes its log files to. It must be exactly one
+/// level below the log directory, because the Vector agent derives the container name from that
+/// path segment.
+pub const CONTAINERDEBUG_LOG_DIR: &str = concatcp!(STACKABLE_LOG_DIR, "/containerdebug");
 
 constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
@@ -776,7 +782,13 @@ impl Deref for AirflowRole {
 }
 
 fn container_debug_command() -> String {
-    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
+    // The log directory is created here, because `FILE_LOG_MAX_FILES` makes the telemetry library
+    // prune old log files before it creates the first one, which complains about the directory not
+    // existing yet.
+    format!(
+        "mkdir --parents {CONTAINERDEBUG_LOG_DIR}\n\
+         containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]

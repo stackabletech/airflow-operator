@@ -15,7 +15,8 @@ use stackable_operator::{
 use crate::{
     controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, CONTAINERDEBUG_LOG_DIR, HTTP_PORT, LOG_CONFIG_DIR,
+        TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -188,10 +189,7 @@ pub fn build_airflow_statefulset_envs(
     // other telemetry-based process in it would log into the same directory and the Vector
     // agent would label its events with `container: containerdebug`.
     env_vars = env_vars
-        .with_value(
-            &FILE_LOG_DIRECTORY,
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
-        )
+        .with_value(&FILE_LOG_DIRECTORY, CONTAINERDEBUG_LOG_DIR)
         .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
         .with_value(&FILE_LOG_MAX_FILES, "2")
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already

@@ -13,7 +13,7 @@
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#868]).
 - Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
 - The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
-  the Vector aggregator ([#888]).
+  the Vector aggregator ([#888], [#892]).
 
 ### Changed
 
@@ -112,6 +112,7 @@
 [#886]: https://github.com/stackabletech/airflow-operator/pull/886
 [#887]: https://github.com/stackabletech/airflow-operator/pull/887
 [#888]: https://github.com/stackabletech/airflow-operator/pull/888
+[#892]: https://github.com/stackabletech/airflow-operator/pull/892
 
 ## [26.7.0] - 2026-07-21
 
