@@ -46,4 +46,4 @@ def monitor_dag_runs():
 monitor_dag_runs()
 ----
 
-The environment variables can be populated from a Secret holding the technical user's credentials with xref:usage-guide/overrides.adoc#_pod_overrides[Pod overrides].
+The environment variables can be populated from a Secret holding the user's credentials with xref:usage-guide/overrides.adoc#_pod_overrides[Pod overrides].
