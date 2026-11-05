@@ -1,4 +1,5 @@
 = Troubleshooting
+:description: Common Apache Airflow problems on Kubernetes, covering task logs in Azure or S3, API workers, DAG syntax checks and LDAP logins after a major upgrade.
 
 == Azure Blob Storage Logging
 

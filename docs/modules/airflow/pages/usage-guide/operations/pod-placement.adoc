@@ -1,4 +1,5 @@
 = Pod placement
+:description: Pod placement for Apache Airflow on Kubernetes, covering the default affinities and how Pods started by the Kubernetes executor are placed.
 
 You can configure the Pod placement of the Airflow pods as described in xref:concepts:operations/pod_placement.adoc[].
 
