@@ -11,6 +11,7 @@
 ** xref:airflow:usage-guide/reverse-proxy.adoc[]
 ** xref:airflow:usage-guide/storage-resources.adoc[]
 ** xref:airflow:usage-guide/security.adoc[]
+** xref:airflow:usage-guide/dag-run-information.adoc[]
 ** xref:airflow:usage-guide/logging.adoc[]
 ** xref:airflow:usage-guide/monitoring.adoc[]
 ** xref:airflow:usage-guide/openlineage.adoc[]

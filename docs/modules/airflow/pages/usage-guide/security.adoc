@@ -2,6 +2,7 @@
 :description: Secure Apache Airflow by configuring user authentication and authorization.
 :airflow-access-control-docs: https://airflow.apache.org/docs/apache-airflow-providers-fab/stable/auth-manager/access-control.html
 :keycloak: https://www.keycloak.org/
+:airflow-fab-token-docs: https://airflow.apache.org/docs/apache-airflow-providers-fab/stable/auth-manager/token.html
 
 Secure Apache Airflow by configuring user authentication and authorization.
 Airflow provides built-in user and role management, but can also connect to an LDAP server or an OIDC provider to manage users centrally instead.
@@ -139,6 +140,60 @@ A minimum client configuration in Keycloak for this example looks like this:
 <3> Enables OpenID Connect and OAuth2 support.
 
 Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:concepts:authentication.adoc#_oidc[concepts page].
+
+=== [[api-access]]REST API access
+
+This section applies to Airflow 3.x.
+
+The authentication methods described above (built-in users, LDAP and OpenID Connect) govern how users log in to the web interface.
+The REST API (`/api/v2`) authenticates requests differently: it accepts only JSON Web Tokens (JWTs) issued by Airflow itself.
+A client obtains such a token by sending a username and password to the `/auth/token` endpoint of the webserver:
+
+[source,bash]
+----
+ACCESS_TOKEN=$(
+  curl -s -X POST http://<cluster>-webserver:8080/auth/token \
+    -H 'Content-Type: application/json' \
+    -d '{"username": "<user>", "password": "<password>"}' | jq -r '.access_token'
+)
+curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://<cluster>-webserver:8080/api/v2/dags/<dag_id>/dagRuns
+----
+
+The `/auth/token` endpoint checks the credentials against Airflow's internal user database (and against the LDAP server if LDAP authentication is configured).
+See the {airflow-fab-token-docs}[Airflow documentation on generating tokens{external-link-icon}^] for details.
+
+IMPORTANT: With OpenID Connect, Keycloak is used for the interactive login to the web interface only.
+Tokens issued by Keycloak (for example via the client credentials grant of a service account) are rejected by the REST API with `Invalid JWT token`.
+Users created through a Keycloak login have no usable password in Airflow, so their credentials are rejected by `/auth/token` with `Invalid credentials`.
+
+NOTE: Airflow allows tokens to be obtained for OAuth users by overriding the `create_token` method of the FAB auth manager, as described in the {airflow-fab-token-docs}[Airflow documentation on generating tokens{external-link-icon}^].
+The Stackable Data Platform does not provide or test such an override.
+It requires a custom auth manager in a custom image, and that code is then responsible for validating the token from the identity provider.
+
+IMPORTANT: The example in the Airflow documentation disables signature verification and (as also stated there) should not be used in production.
+
+==== Service-to-service access
+
+For API clients such as scripts, external services or DAGs, create a dedicated user in Airflow's internal user database.
+This works regardless of the authentication method configured for the web interface.
+Assign the least privileged role that covers the required API calls; for example, the `Viewer` role allows reading DAGs and DAG runs, but not modifying them:
+
+[source,bash]
+----
+kubectl exec <cluster>-webserver-<rolegroup>-0 -c airflow -- \
+  airflow users create \
+    --username <technical-user> \
+    --password <password> \
+    --role Viewer \
+    --firstname <first-name> \
+    --lastname <last-name> \
+    --email <email>
+----
+
+Store the credentials in a Kubernetes Secret and make them available to the client.
+Request a new token for each run rather than storing one, as tokens expire.
+See xref:usage-guide/dag-run-information.adoc[] for an example of a DAG that reads DAG run information via the REST API.
 
 == Authorization
 
