@@ -174,7 +174,7 @@ The example in the Airflow documentation disables signature verification and mus
 
 ==== Service-to-service access
 
-For API clients such as scripts, external services or DAGs, create a dedicated technical user in Airflow's internal user database.
+For API clients such as scripts, external services or DAGs, create a dedicated user in Airflow's internal user database.
 This works regardless of the authentication method configured for the web interface.
 Assign the least privileged role that covers the required API calls; for example, the `Viewer` role allows reading DAGs and DAG runs, but not modifying them:
 
