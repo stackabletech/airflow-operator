@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, str::FromStr};
 
+use const_format::concatcp;
 use stackable_operator::{
     constant,
     crd::{authentication::oidc, git_sync},
@@ -188,9 +189,11 @@ pub fn build_airflow_statefulset_envs(
     // other telemetry-based process in it would log into the same directory and the Vector
     // agent would label its events with `container: containerdebug`.
     env_vars = env_vars
+        // The directory must be exactly one level below the log directory, because the Vector
+        // agent derives the container name from that path segment.
         .with_value(
             &FILE_LOG_DIRECTORY,
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
         )
         .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
         .with_value(&FILE_LOG_MAX_FILES, "2")

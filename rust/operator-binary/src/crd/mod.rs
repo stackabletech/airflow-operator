@@ -776,7 +776,13 @@ impl Deref for AirflowRole {
 }
 
 fn container_debug_command() -> String {
-    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
+    // The log directory is created here, because `FILE_LOG_MAX_FILES` makes the telemetry library
+    // prune old log files before it creates the first one, which complains about the directory not
+    // existing yet.
+    format!(
+        "mkdir --parents \"$FILE_LOG_DIRECTORY\"\n\
+         containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
