@@ -1,4 +1,5 @@
 = Allowed Pod disruptions
+:description: PodDisruptionBudgets the Stackable operator writes for Apache Airflow schedulers, webservers and executors, and how to disable them.
 
 You can configure the permitted Pod disruptions for Airflow nodes as described in xref:concepts:operations/pod_disruptions.adoc[].
 
