@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
+use indoc::formatdoc;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -38,6 +39,7 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
     utils::{COMMON_BASH_TRAP_FUNCTIONS, crds::raw_object_list_schema},
     v2::{
+        builder::pod::container::EnvVarName,
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         product_logging::framework::STACKABLE_LOG_DIR,
@@ -83,6 +85,14 @@ pub const AIRFLOW_OPERATOR_NAME: &str = "airflow.stackable.tech";
 pub const CONFIG_PATH: &str = "/stackable/app/config";
 pub const LOG_CONFIG_DIR: &str = "/stackable/app/log_config";
 pub const AIRFLOW_HOME: &str = "/stackable/airflow";
+
+// The `stackable-telemetry` variables which configure the file logs of the `containerdebug`
+// process. They are set on the Airflow container in `env_vars`, and the start command below
+// references the directory as a shell variable, so that an `envOverrides` entry for it takes
+// effect in both places.
+constant!(pub FILE_LOG_DIRECTORY: EnvVarName = "FILE_LOG_DIRECTORY");
+constant!(pub FILE_LOG_MAX_FILES: EnvVarName = "FILE_LOG_MAX_FILES");
+constant!(pub FILE_LOG_ROTATION_PERIOD: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
 
 constant!(pub TEMPLATE_VOLUME_NAME: VolumeName = "airflow-executor-pod-template");
 pub const TEMPLATE_LOCATION: &str = "/templates";
@@ -776,7 +786,15 @@ impl Deref for AirflowRole {
 }
 
 fn container_debug_command() -> String {
-    format!("containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &")
+    // The log directory is created here, because `FILE_LOG_MAX_FILES` makes the telemetry library
+    // prune old log files before it creates the first one, which complains about the directory not
+    // existing yet.
+    formatdoc!(
+        r#"
+        mkdir --parents "${file_log_directory}" || true
+        containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"#,
+        file_log_directory = FILE_LOG_DIRECTORY.as_ref(),
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -1029,6 +1047,9 @@ mod tests {
         let _ = *WORKER_ROLE_NAME;
         let _ = *DAG_PROCESSOR_ROLE_NAME;
         let _ = *TRIGGERER_ROLE_NAME;
+        let _ = *FILE_LOG_DIRECTORY;
+        let _ = *FILE_LOG_MAX_FILES;
+        let _ = *FILE_LOG_ROTATION_PERIOD;
         let _ = *TEMPLATE_VOLUME_NAME;
         let _ = *LISTENER_PVC_NAME;
         let _ = *METRICS_CONTAINER_NAME;

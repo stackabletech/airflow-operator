@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, str::FromStr};
 
+use const_format::concatcp;
 use stackable_operator::{
     constant,
     crd::{authentication::oidc, git_sync},
@@ -15,7 +16,8 @@ use stackable_operator::{
 use crate::{
     controller::{ValidatedCluster, ValidatedLogging},
     crd::{
-        AirflowExecutor, AirflowRole, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
+        AirflowExecutor, AirflowRole, FILE_LOG_DIRECTORY, FILE_LOG_MAX_FILES,
+        FILE_LOG_ROTATION_PERIOD, HTTP_PORT, LOG_CONFIG_DIR, TEMPLATE_LOCATION, TEMPLATE_NAME,
         authentication::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
         },
@@ -77,9 +79,6 @@ constant!(ADMIN_PASSWORD_SECRET_KEY: SecretKey = "adminUser.password");
 
 constant!(PYTHONPATH: EnvVarName = "PYTHONPATH");
 
-constant!(FILE_LOG_DIRECTORY: EnvVarName = "FILE_LOG_DIRECTORY");
-constant!(FILE_LOG_ROTATION_PERIOD: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
-constant!(FILE_LOG_MAX_FILES: EnvVarName = "FILE_LOG_MAX_FILES");
 constant!(STACKABLE_POST_HOOK: EnvVarName = "_STACKABLE_POST_HOOK");
 
 /// Return environment variables to be applied to the statefulsets for the scheduler, webserver (and worker,
@@ -188,9 +187,11 @@ pub fn build_airflow_statefulset_envs(
     // other telemetry-based process in it would log into the same directory and the Vector
     // agent would label its events with `container: containerdebug`.
     env_vars = env_vars
+        // The directory must be exactly one level below the log directory, because the Vector
+        // agent derives the container name from that path segment.
         .with_value(
             &FILE_LOG_DIRECTORY,
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
         )
         .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
         .with_value(&FILE_LOG_MAX_FILES, "2")
@@ -536,9 +537,6 @@ mod tests {
         let _ = *AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX;
         let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
         let _ = *AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR;
-        let _ = *FILE_LOG_DIRECTORY;
-        let _ = *FILE_LOG_MAX_FILES;
-        let _ = *FILE_LOG_ROTATION_PERIOD;
         let _ = *FORWARDED_ALLOW_IPS;
         let _ = *PYTHONPATH;
         let _ = *STACKABLE_POST_HOOK;
