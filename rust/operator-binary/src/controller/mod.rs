@@ -8,7 +8,7 @@ use stackable_operator::{
         resources::{NoRuntimeLimits, Resources},
     },
     constant,
-    crd::{git_sync, listener},
+    crd::{containerdebug::ValidatedContainerdebugConfig, git_sync, listener},
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -117,15 +117,17 @@ pub struct ValidatedAirflowConfig {
     pub resources: Resources<AirflowStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub graceful_shutdown_timeout: Option<Duration>,
     pub git_sync_resources: git_sync::v1alpha2::GitSyncResources,
 }
 
 impl ValidatedAirflowConfig {
     /// Builds the validated config from the merged [`AirflowConfig`], swapping in the
-    /// already-validated logging.
+    /// already-validated `containerdebug` and logging configuration.
     pub(crate) fn from_merged(
         merged: AirflowConfig,
+        containerdebug: ValidatedContainerdebugConfig,
         logging: ValidatedLogging,
         git_sync_resources: git_sync::v1alpha2::GitSyncResources,
     ) -> Self {
@@ -133,6 +135,7 @@ impl ValidatedAirflowConfig {
             resources: merged.resources,
             logging,
             affinity: merged.affinity,
+            containerdebug,
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
             git_sync_resources,
         }
@@ -140,7 +143,8 @@ impl ValidatedAirflowConfig {
 
     /// Builds the validated config from the merged [`ExecutorConfig`] (Kubernetes-executor pod
     /// template), swapping in the already-validated logging. [`ExecutorConfig`] is field-identical
-    /// to [`AirflowConfig`].
+    /// to [`AirflowConfig`], except for `containerdebug`: executor pods don't run `containerdebug`,
+    /// so it is always disabled for them.
     pub(crate) fn from_merged_executor(
         merged: ExecutorConfig,
         logging: ValidatedLogging,
@@ -150,6 +154,7 @@ impl ValidatedAirflowConfig {
             resources: merged.resources,
             logging,
             affinity: merged.affinity,
+            containerdebug: ValidatedContainerdebugConfig::Disabled,
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
             git_sync_resources,
         }

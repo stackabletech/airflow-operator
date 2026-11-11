@@ -163,7 +163,9 @@ pub fn build_server_rolegroup_statefulset(
         .context(GracefulShutdownSnafu)?;
 
     let mut airflow_container_args = Vec::new();
-    airflow_container_args.extend(airflow_role.get_commands(validated_cluster));
+    airflow_container_args.extend(
+        airflow_role.get_commands(validated_cluster, &merged_airflow_config.containerdebug),
+    );
 
     airflow_container
         .image_from_product_image(resolved_product_image)

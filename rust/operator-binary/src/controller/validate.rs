@@ -4,7 +4,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self, ResolvedProductImage},
     config::fragment,
-    crd::git_sync,
+    crd::{containerdebug, git_sync},
     k8s_openapi::api::core::v1::VolumeMount,
     kube::ResourceExt,
     product_logging::spec::Logging,
@@ -74,6 +74,12 @@ pub enum Error {
     #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
     FailedToResolveConfig {
         source: fragment::ValidationError,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("invalid containerdebug configuration for role group {role_group}"))]
+    InvalidContainerdebugConfig {
+        source: containerdebug::Error,
         role_group: RoleGroupName,
     },
 
@@ -370,6 +376,11 @@ fn validate_role_group(
     })?;
 
     let merged_config = validated.config.config;
+    let containerdebug = merged_config.containerdebug.validate().with_context(|_| {
+        InvalidContainerdebugConfigSnafu {
+            role_group: role_group_name.clone(),
+        }
+    })?;
     let logging = validate_logging(
         &merged_config.logging,
         &Container::Airflow,
@@ -392,7 +403,12 @@ fn validate_role_group(
 
     Ok(RoleGroupConfig {
         replicas: validated.replicas,
-        config: ValidatedAirflowConfig::from_merged(merged_config, logging, git_sync_resources),
+        config: ValidatedAirflowConfig::from_merged(
+            merged_config,
+            containerdebug,
+            logging,
+            git_sync_resources,
+        ),
         config_overrides: validated.config.config_overrides,
         env_overrides,
         cli_overrides: validated.config.cli_overrides,

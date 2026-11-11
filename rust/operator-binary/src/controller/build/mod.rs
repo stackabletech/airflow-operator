@@ -432,7 +432,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use rstest::rstest;
-    use stackable_operator::kube::Resource;
+    use stackable_operator::{
+        crd::containerdebug::ValidatedContainerdebugConfig, kube::Resource, shared::time::Duration,
+        v2::product_logging::framework::STACKABLE_LOG_DIR,
+    };
 
     use super::{
         UNVERSIONED_PRODUCT_VERSION, build,
@@ -827,5 +830,48 @@ mod tests {
             ),
             "unexpected error: {error:?}"
         );
+    }
+
+    /// Each role group's StatefulSet starts `containerdebug` from that role group's merged config.
+    #[test]
+    fn stateful_sets_start_containerdebug_from_the_role_group_config() {
+        let cluster = validated_cluster_with("kubernetesExecutors", "{config: {}}", |cluster| {
+            cluster["spec"]["webservers"]["config"] =
+                yaml_serde::from_str("{containerdebug: {interval: 10m}}")
+                    .expect("the webserver config is valid YAML");
+            cluster["spec"]["schedulers"]["roleGroups"]["default"]["config"] =
+                yaml_serde::from_str("{containerdebug: {enabled: false}}")
+                    .expect("the scheduler role group config is valid YAML");
+        });
+        let resources = build(&cluster).expect("the resources build");
+
+        let containerdebug_line = |name: &str| {
+            resources
+                .stateful_sets
+                .iter()
+                .find(|stateful_set| stateful_set.meta().name.as_deref() == Some(name))
+                .and_then(|stateful_set| stateful_set.spec.as_ref())
+                .and_then(|spec| spec.template.spec.as_ref())
+                .expect("the StatefulSet has a pod spec")
+                .containers
+                .iter()
+                .find(|container| container.name == "airflow")
+                .and_then(|container| container.args.as_ref())
+                .expect("the airflow container has args")
+                .join("\n")
+                .lines()
+                .map(str::trim)
+                .find(|line| line.starts_with("containerdebug "))
+                .map(str::to_owned)
+        };
+
+        assert_eq!(
+            containerdebug_line("my-airflow-webserver-default"),
+            ValidatedContainerdebugConfig::Enabled {
+                interval: Duration::from_minutes_unchecked(10)
+            }
+            .background_command(STACKABLE_LOG_DIR)
+        );
+        assert_eq!(containerdebug_line("my-airflow-scheduler-default"), None);
     }
 }
