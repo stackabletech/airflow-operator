@@ -10626,7 +10626,7 @@ rec {
       };
       "stackable-airflow-operator" = rec {
         crateName = "stackable-airflow-operator";
-        version = "26.11.0-rc1";
+        version = "26.11.0";
         edition = "2024";
         crateBin = [
           {
