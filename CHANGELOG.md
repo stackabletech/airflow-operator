@@ -14,6 +14,7 @@
 - Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
 - The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
   the Vector aggregator ([#888], [#892]).
+- Add the `config.containerdebug` field to roles and role groups ([#TBD]).
 
 ### Changed
 
