@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Set `AIRFLOW__API__EXPOSE_CONFIG` instead of the deprecated
+  `AIRFLOW__WEBSERVER__EXPOSE_CONFIG`. Airflow 3 moved the option to the `[api]` section and only
+  still honours the old name through a deprecation shim, which logs a warning on every config
+  read ([#901]).
+
 ### Removed
 
 - BREAKING: Remove the Airflow 2.x specific code paths ([#901]).

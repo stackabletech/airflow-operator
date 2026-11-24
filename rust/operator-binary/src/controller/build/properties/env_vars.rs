@@ -53,7 +53,7 @@ constant!(AIRFLOW_FAB_UPDATE_FAB_PERMS: EnvVarName = "AIRFLOW__FAB__UPDATE_FAB_P
 constant!(FORWARDED_ALLOW_IPS: EnvVarName = "FORWARDED_ALLOW_IPS");
 constant!(AIRFLOW_DATABASE_SQL_ALCHEMY_CONN: EnvVarName = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN");
 
-constant!(AIRFLOW_WEBSERVER_EXPOSE_CONFIG: EnvVarName = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG");
+constant!(AIRFLOW_API_EXPOSE_CONFIG: EnvVarName = "AIRFLOW__API__EXPOSE_CONFIG");
 constant!(AIRFLOW_CORE_EXECUTOR: EnvVarName = "AIRFLOW__CORE__EXECUTOR");
 constant!(AIRFLOW_KUBERNETES_EXECUTOR_POD_TEMPLATE_FILE: EnvVarName =
     "AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE");
@@ -136,7 +136,7 @@ pub fn build_airflow_statefulset_envs(
         );
 
     if cluster.cluster_config.expose_config {
-        env_vars = env_vars.with_value(&AIRFLOW_WEBSERVER_EXPOSE_CONFIG, "True");
+        env_vars = env_vars.with_value(&AIRFLOW_API_EXPOSE_CONFIG, "True");
     }
 
     env_vars = env_vars.with_value(&AIRFLOW_CORE_EXECUTOR, executor.as_airflow_core_executor());
@@ -454,6 +454,7 @@ mod tests {
         let _ = *ADMIN_USERNAME_SECRET_KEY;
         let _ = *AIRFLOW_API_AUTH_BACKENDS;
         let _ = *AIRFLOW_API_AUTH_JWT_SECRET;
+        let _ = *AIRFLOW_API_EXPOSE_CONFIG;
         let _ = *AIRFLOW_API_SECRET_KEY;
         let _ = *AIRFLOW_API_WORKERS;
         let _ = *AIRFLOW_CELERY_BROKER_URL;
@@ -476,7 +477,6 @@ mod tests {
         let _ = *AIRFLOW_METRICS_STATSD_HOST;
         let _ = *AIRFLOW_METRICS_STATSD_ON;
         let _ = *AIRFLOW_METRICS_STATSD_PORT;
-        let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
         let _ = *FORWARDED_ALLOW_IPS;
         let _ = *PYTHONPATH;
         let _ = *STACKABLE_POST_HOOK;
