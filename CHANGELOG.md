@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [26.11.0] - 2026-11-20
+
+## [26.11.0-rc1] - 2026-11-19
+
 ### Added
 
 - Support for emitting [OpenLineage](https://openlineage.io/) lineage events via `spec.clusterConfig.lineage` ([#822]).
