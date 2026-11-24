@@ -9,7 +9,7 @@ including a terminal `COMPLETE` event.
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 import urllib3
@@ -33,7 +33,7 @@ def trigger_dag(base_url: str, headers: dict) -> bool:
     # Airflow 3 API expects an ISO logical_date (a null value can be rejected with a 422).
     # Returns True only if the run was actually accepted (2xx); the DAG may not be registered yet
     # (ConfigMap mount + dag-processor parse takes time), in which case the caller must retry.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     logical_date = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
     patch_resp = requests.patch(
         f"{base_url}/api/v2/dags/{DAG_ID}",
@@ -97,6 +97,7 @@ if __name__ == "__main__":
             if triggered and receiver_has_lineage(opts.receiver_url):
                 print("OpenLineage events for the DAG were received.")
                 sys.exit(0)
+        # Retry on anything: this loop polls until the lineage events arrive.
         except Exception as e:  # noqa: BLE001
             print(f"Retrying after error: {e}")
 

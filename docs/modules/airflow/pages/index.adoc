@@ -70,9 +70,8 @@ kubernetesExecutors:
 
 === DAG-Processors
 
-In Airflow 2.x, a DAG-Processor can be started either as a standalone process or a subprocess within the scheduler component.
-For Airflow 3.x+ it _must_ be started as a standalone process, either in a separate container or in the scheduler container.
-In each case the default will be applied (subprocess or combined in the scheduler container) if the role is not specified.
+A DAG-Processor _must_ be started as a standalone process, either in a separate container or in the scheduler container.
+If the role is not specified, it is combined into the scheduler container.
 
 === Triggerers
 
