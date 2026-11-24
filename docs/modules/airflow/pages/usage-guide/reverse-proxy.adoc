@@ -26,8 +26,7 @@ spec:
 the only entry in the list: combining it with other entries is rejected, since it would silently
 degrade to trusting only those other entries.
 
-The operator starts the api-server with `--proxy-headers` and restricts the headers to the listed
-peers.
+The operator starts the api-server with `--proxy-headers` and restricts the headers to the listed peers.
 
 == Choosing the value
 
@@ -57,8 +56,6 @@ log. Do not list ranges wider than the proxies you operate.
 
 == Interaction with overrides
 
-The operator sets `FORWARDED_ALLOW_IPS` from this field, before `envOverrides` are applied -- so an
-`envOverrides` entry for that variable wins over the value derived from `trustedProxies`. This
-override only takes effect while `trustedProxies` is non-empty: an empty list means the api-server
-is not started with `--proxy-headers` at all, so uvicorn never installs the middleware that reads
-`FORWARDED_ALLOW_IPS`, and the override has no effect regardless of its value.
+The operator sets `FORWARDED_ALLOW_IPS` from this field, before `envOverrides` are applied -- so an `envOverrides` entry for that variable wins over the value derived from `trustedProxies`.
+This override only takes effect while `trustedProxies` is non-empty:
+an empty list means the api-server is not started with `--proxy-headers` at all, so uvicorn never installs the middleware that reads `FORWARDED_ALLOW_IPS`, and the override has no effect regardless of its value.
