@@ -98,13 +98,12 @@ if __name__ == "__main__":
         except requests.exceptions.Timeout:
             print(f"Connection timed out, retrying attempt no [{count}] ....")
         except requests.ConnectionError as e:
-            print(f"Connection Error: {str(e)}")
+            print(f"Connection Error: {e!s}")
         except requests.RequestException as e:
-            print(f"General Error: {str(e)}")
-        except Exception as e:
-            print(
-                f"General error occurred {str(e)}, retrying attempt no [{count}] ...."
-            )
+            print(f"General Error: {e!s}")
+        # Retry on anything: this loop polls until the endpoint reports healthy.
+        except Exception as e:  # noqa: BLE001
+            print(f"General error occurred {e!s}, retrying attempt no [{count}] ....")
 
         if deadline and time.monotonic() > deadline:
             sys.exit(

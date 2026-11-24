@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 
@@ -43,7 +43,7 @@ def assert_dag_started(rest_url, headers, dag_id, dag_run_id):
 
 
 def metrics_v3(role_group: str) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
     # Trigger a deferrable DAG run to create metrics

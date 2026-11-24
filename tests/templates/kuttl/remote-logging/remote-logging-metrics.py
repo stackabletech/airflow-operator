@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 
@@ -87,7 +87,7 @@ def prefix_is_matched(
 
 
 def remote_logging(airflow_version: str) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
     # Trigger a DAG run to create logs

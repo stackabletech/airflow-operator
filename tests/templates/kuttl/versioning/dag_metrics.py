@@ -3,9 +3,15 @@
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
+
+logging.basicConfig(
+    level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
+)
+
+log = logging.getLogger(__name__)
 
 
 def assert_metric(role, metric):
@@ -18,7 +24,7 @@ def assert_metric(role, metric):
     return metric in metric_response.text
 
 
-now = datetime.now(timezone.utc)
+now = datetime.now(UTC)
 ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
 # Trigger a DAG run to create metrics
@@ -57,7 +63,7 @@ response = requests.patch(
     f"{rest_url}/dags/{dag_id}", headers=headers, json={"is_paused": False}
 )
 if response.status_code != 200:
-    logging.error("DAG run could not be activated")
+    log.error("DAG run could not be activated")
     sys.exit(1)
 
 # trigger DAG
@@ -65,7 +71,7 @@ response = requests.post(
     f"{rest_url}/dags/{dag_id}/dagRuns", headers=headers, json=dag_data
 )
 if response.status_code != 200:
-    logging.error("DAG run could not be triggered")
+    log.error("DAG run could not be triggered")
     sys.exit(1)
 
 # Wait for the metrics to be consumed by the statsd-exporter
@@ -77,18 +83,17 @@ loop = 0
 while True:
     try:
         # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
-        # (disable line-break flake checks)
         if (assert_metric("scheduler", "airflow_scheduler_heartbeat")) and (
             assert_metric(
                 "scheduler", "airflow_dagrun_duration_success_sparkapp_dag_count"
             )
-        ):  # noqa: W503, W504
+        ):
             break
         time.sleep(10)
         loop += 1
         if loop == iterations:
-            logging.error("Still waiting for metrics. Exiting to start a new loop....")
+            log.error("Still waiting for metrics. Exiting to start a new loop....")
             # force re-try of script
             sys.exit(1)
     except AssertionError as error:
-        logging.warning(f"Encountered: {error}")
+        log.warning(f"Encountered: {error}")
