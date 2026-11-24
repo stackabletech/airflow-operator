@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+import argparse
 import logging
-import requests
 import sys
 import time
-import argparse
+
+import requests
 
 # Every component of the health endpoint reports its heartbeat under a key named
 # after itself, e.g. `latest_scheduler_heartbeat` for the `scheduler`. The

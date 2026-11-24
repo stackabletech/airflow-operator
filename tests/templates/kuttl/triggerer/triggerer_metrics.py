@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import requests
-import time
-import sys
-from datetime import datetime, timezone
 import argparse
 import logging
+import sys
+import time
+from datetime import datetime, timezone
+
+import requests
 
 
 def exception_handler(exception_type, exception, traceback):

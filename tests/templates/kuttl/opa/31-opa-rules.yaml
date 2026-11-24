@@ -109,12 +109,13 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/dags/~/dagRuns
+    # GET /api/v2/dags/~/dagRuns
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
-        # Disabled: it is unverified whether Airflow sends `~` here.
-        # input.details.id == "~"
+        # Airflow maps the `~` wildcard to `None` before it calls the auth
+        # manager, so the DAG id arrives here as null rather than as "~".
+        input.details.id == null
 
         input.user.name == "jane.doe"
     }

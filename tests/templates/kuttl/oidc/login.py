@@ -1,9 +1,10 @@
 # $NAMESPACE will be replaced with the namespace of the test case.
 
 import logging
-import requests
-import sys
 import os
+import sys
+
+import requests
 from bs4 import BeautifulSoup
 
 logging.basicConfig(

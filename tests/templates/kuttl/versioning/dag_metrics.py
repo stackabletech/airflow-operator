@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import requests
-import time
-import sys
 import logging
+import sys
+import time
 from datetime import datetime, timezone
+
+import requests
 
 
 def assert_metric(role, metric):
