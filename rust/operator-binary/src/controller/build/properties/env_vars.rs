@@ -47,9 +47,6 @@ constant!(AIRFLOW_CELERY_BROKER_URL: EnvVarName = "AIRFLOW__CELERY__BROKER_URL")
 constant!(AIRFLOW_CORE_DAGS_FOLDER: EnvVarName = "AIRFLOW__CORE__DAGS_FOLDER");
 constant!(AIRFLOW_CORE_LOAD_EXAMPLES: EnvVarName = "AIRFLOW__CORE__LOAD_EXAMPLES");
 constant!(AIRFLOW_API_AUTH_BACKENDS: EnvVarName = "AIRFLOW__API__AUTH_BACKENDS");
-constant!(AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX: EnvVarName = "AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX");
-constant!(AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR: EnvVarName = "AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR");
-constant!(AIRFLOW_SCHEDULER_STANDALONE_DAG_PROCESSOR: EnvVarName = "AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR");
 constant!(AIRFLOW_API_AUTH_JWT_SECRET: EnvVarName = "AIRFLOW__API_AUTH__JWT_SECRET");
 constant!(AIRFLOW_API_WORKERS: EnvVarName = "AIRFLOW__API__WORKERS");
 constant!(AIRFLOW_FAB_UPDATE_FAB_PERMS: EnvVarName = "AIRFLOW__FAB__UPDATE_FAB_PERMS");
@@ -93,14 +90,13 @@ pub fn build_airflow_statefulset_envs(
     let executor = &cluster.cluster_config.executor;
     let auth_config = &cluster.cluster_config.authentication_config;
     let authorization_config = &cluster.cluster_config.authorization_config;
-    let resolved_product_image = &cluster.image;
     let metadata_database_connection_details = cluster.metadata_database_connection_details();
     let celery_database_connection_details = cluster.celery_database_connection_details();
 
     let internal_secret_name = cluster.internal_secret_name();
 
     let mut env_vars = static_envs(git_sync_resources)
-        .merge(add_version_specific_env_vars(cluster, airflow_role))
+        .merge(add_core_env_vars(cluster, airflow_role))
         // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
         .with_secret_key_ref(
             &AIRFLOW_API_SECRET_KEY,
@@ -167,13 +163,9 @@ pub fn build_airflow_statefulset_envs(
                 .with_secret_key_ref(&ADMIN_PASSWORD, secret, &ADMIN_PASSWORD_SECRET_KEY);
         }
         AirflowRole::Webserver => {
-            env_vars =
-                env_vars
-                    .merge(authentication_env_vars(auth_config))
-                    .merge(authorization_env_vars(
-                        authorization_config,
-                        &resolved_product_image.product_version,
-                    ));
+            env_vars = env_vars
+                .merge(authentication_env_vars(auth_config))
+                .merge(authorization_env_vars(authorization_config));
         }
         _ => {}
     }
@@ -263,7 +255,7 @@ pub fn build_airflow_template_envs(
         .with_value(&AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE, &cluster.namespace)
         .with_value(&AIRFLOW_CORE_DAGS_FOLDER, dags_folder)
         .merge(static_envs(git_sync_resources))
-        .merge(add_version_specific_env_vars(cluster, &AirflowRole::Worker));
+        .merge(add_core_env_vars(cluster, &AirflowRole::Worker));
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -306,94 +298,56 @@ fn lineage_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
         })
 }
 
-fn add_version_specific_env_vars(
-    cluster: &ValidatedCluster,
-    airflow_role: &AirflowRole,
-) -> EnvVarSet {
-    let mut env_vars = EnvVarSet::new();
-
-    if cluster.image.product_version.starts_with("3.") {
-        env_vars = env_vars
-            .merge(execution_server_env_vars(cluster))
-            .with_value(
-                &AIRFLOW_CORE_AUTH_MANAGER,
-                "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager",
-            )
-            .with_value(
-                &AIRFLOW_API_AUTH_BACKENDS,
-                "airflow.api.auth.backend.session",
-            )
-            // As of 3.x a JWT key is required.
-            // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#jwt-secret
-            // This should be random, but must also be consistent across
-            // api-services and replicas/roles for a given
-            // cluster, but should also be cluster-specific.
-            // It is accessed from a secret to avoid cluster restarts
-            // being triggered by an operator restart.
-            .with_secret_key_ref(
-                &AIRFLOW_API_AUTH_JWT_SECRET,
-                &cluster.jwt_secret_name(),
-                &JWT_SECRET_SECRET_KEY,
-            )
-            // The Airflow default for this is 4.
-            // However, with the default resources this could cause problems,
-            // as the Pod went to 100% CPU usage and didn't get healthy
-            // quick enough, resulting in a crashloop.
-            .with_value(&AIRFLOW_API_WORKERS, "1");
-        if airflow_role == &AirflowRole::Webserver {
-            // Sometimes a race condition can arise when both scheduler and
-            // api-server are updating the DB, which adds overhead (conflicts
-            // are logged) and can result in inconsistencies. This setting
-            // ensure that only the scheduler will do this by default.
-            env_vars = env_vars.with_value(&AIRFLOW_FAB_UPDATE_FAB_PERMS, "False");
-
-            // This env var is needed in addition to `--proxy-headers` when Airflow runs
-            // behind a reverse proxy.
-            // This covers the uvicorn backend, the only one the SDP image can run.
-            let trusted_proxies = cluster
-                .trusted_proxies(airflow_role)
-                .iter()
-                .map(TrustedProxy::to_string)
-                .collect::<Vec<_>>()
-                .join(",");
-
-            if !trusted_proxies.is_empty() {
-                env_vars = env_vars.with_value(&FORWARDED_ALLOW_IPS, trusted_proxies);
-            }
-        }
-    } else {
-        env_vars = env_vars.with_value(
+/// Constructs the env vars that every Airflow role needs, independent of its role-specific
+/// configuration.
+fn add_core_env_vars(cluster: &ValidatedCluster, airflow_role: &AirflowRole) -> EnvVarSet {
+    let mut env_vars = EnvVarSet::new()
+        .merge(execution_server_env_vars(cluster))
+        .with_value(
+            &AIRFLOW_CORE_AUTH_MANAGER,
+            "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager",
+        )
+        .with_value(
             &AIRFLOW_API_AUTH_BACKENDS,
-            "airflow.api.auth.backend.basic_auth, airflow.api.auth.backend.session",
-        );
+            "airflow.api.auth.backend.session",
+        )
+        // A JWT key is required.
+        // See https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#jwt-secret
+        // This should be random, but must also be consistent across
+        // api-services and replicas/roles for a given
+        // cluster, but should also be cluster-specific.
+        // It is accessed from a secret to avoid cluster restarts
+        // being triggered by an operator restart.
+        .with_secret_key_ref(
+            &AIRFLOW_API_AUTH_JWT_SECRET,
+            &cluster.jwt_secret_name(),
+            &JWT_SECRET_SECRET_KEY,
+        )
+        // The Airflow default for this is 4.
+        // However, with the default resources this could cause problems,
+        // as the Pod went to 100% CPU usage and didn't get healthy
+        // quick enough, resulting in a crashloop.
+        .with_value(&AIRFLOW_API_WORKERS, "1");
 
-        // The 2.x uses Werkzeug's `ProxyFix` to allow forwarded-headers and it does so regardless
-        // of the peer source. The only valid value for `spec.webservers.roleConfig.trustedProxies` is `["*"]`.
-        if airflow_role == &AirflowRole::Webserver {
-            let trusted_proxies = cluster.trusted_proxies(airflow_role);
+    if airflow_role == &AirflowRole::Webserver {
+        // Sometimes a race condition can arise when both scheduler and
+        // api-server are updating the DB, which adds overhead (conflicts
+        // are logged) and can result in inconsistencies. This setting
+        // ensure that only the scheduler will do this by default.
+        env_vars = env_vars.with_value(&AIRFLOW_FAB_UPDATE_FAB_PERMS, "False");
 
-            if !trusted_proxies.is_empty() {
-                env_vars = env_vars
-                    .with_value(&AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX, "True")
-                    .with_value(&AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR, "1");
+        // This env var is needed in addition to `--proxy-headers` when Airflow runs
+        // behind a reverse proxy.
+        // This covers the uvicorn backend, the only one the SDP image can run.
+        let trusted_proxies = cluster
+            .trusted_proxies(airflow_role)
+            .iter()
+            .map(TrustedProxy::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
 
-                if !trusted_proxies.iter().any(TrustedProxy::is_wildcard) {
-                    let product_version = &cluster.image.product_version;
-                    tracing::warn!(
-                        "spec.webservers.roleConfig.trustedProxies lists specific addresses, but \
-                         Airflow {product_version}'s webserver has no way to restrict forwarded \
-                         headers to specific peers -- once enabled it trusts X-Forwarded-* from \
-                         any peer, the same as \"*\"",
-                    );
-                }
-            }
-        }
-
-        if cluster.has_role(&AirflowRole::DagProcessor) {
-            // In airflow 2.x the dag-processor can optionally be started as a
-            // standalone process (rather then as a scheduler subprocess),
-            // accompanied by this env-var being set to True.
-            env_vars = env_vars.with_value(&AIRFLOW_SCHEDULER_STANDALONE_DAG_PROCESSOR, "True");
+        if !trusted_proxies.is_empty() {
+            env_vars = env_vars.with_value(&FORWARDED_ALLOW_IPS, trusted_proxies);
         }
     }
 
@@ -428,40 +382,29 @@ fn authentication_env_vars(auth_config: &AirflowClientAuthenticationDetailsResol
         )
 }
 
-/// Constructs the needed authorization env vars for the specific Airflow version.
+/// Constructs the needed authorization env vars.
 ///
-/// `AIRFLOW__CORE__AUTH_MANAGER` always needs to be set as env var.
-///
-/// Airflow 2 needs to OPA settings in the `webserver_config.py` such as `AUTH_OPA_REQUEST_URL`.
-/// Airflow 3 needs to OPA settings as env variables such as `AIRFLOW__CORE__AUTH_OPA_REQUEST_URL`.
-fn authorization_env_vars(
-    authorization_config: &AirflowAuthorizationResolved,
-    product_version: &str,
-) -> EnvVarSet {
+/// `AIRFLOW__CORE__AUTH_MANAGER` always needs to be set as env var, and the OPA settings are
+/// passed as env variables such as `AIRFLOW__CORE__AUTH_OPA_REQUEST_URL`.
+fn authorization_env_vars(authorization_config: &AirflowAuthorizationResolved) -> EnvVarSet {
     let Some(opa) = &authorization_config.opa else {
         return EnvVarSet::new();
     };
 
-    let mut env_vars = EnvVarSet::new().with_value(
-        &AIRFLOW_CORE_AUTH_MANAGER,
-        "opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager",
-    );
-    if product_version.starts_with("2.") {
-        // OPA config needs to go into `webserver_config.py`
-    } else {
-        env_vars = env_vars
-            .with_value(&AIRFLOW_CORE_AUTH_OPA_REQUEST_URL, &opa.connection_string)
-            .with_value(
-                &AIRFLOW_CORE_AUTH_OPA_CACHE_TTL_IN_SEC,
-                opa.cache_entry_time_to_live.as_secs().to_string(),
-            )
-            .with_value(
-                &AIRFLOW_CORE_AUTH_OPA_CACHE_MAXSIZE,
-                opa.cache_max_entries.to_string(),
-            );
-    }
-
-    env_vars
+    EnvVarSet::new()
+        .with_value(
+            &AIRFLOW_CORE_AUTH_MANAGER,
+            "opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager",
+        )
+        .with_value(&AIRFLOW_CORE_AUTH_OPA_REQUEST_URL, &opa.connection_string)
+        .with_value(
+            &AIRFLOW_CORE_AUTH_OPA_CACHE_TTL_IN_SEC,
+            opa.cache_entry_time_to_live.as_secs().to_string(),
+        )
+        .with_value(
+            &AIRFLOW_CORE_AUTH_OPA_CACHE_MAXSIZE,
+            opa.cache_max_entries.to_string(),
+        )
 }
 
 fn execution_server_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
@@ -533,37 +476,16 @@ mod tests {
         let _ = *AIRFLOW_METRICS_STATSD_HOST;
         let _ = *AIRFLOW_METRICS_STATSD_ON;
         let _ = *AIRFLOW_METRICS_STATSD_PORT;
-        let _ = *AIRFLOW_SCHEDULER_STANDALONE_DAG_PROCESSOR;
-        let _ = *AIRFLOW_WEBSERVER_ENABLE_PROXY_FIX;
         let _ = *AIRFLOW_WEBSERVER_EXPOSE_CONFIG;
-        let _ = *AIRFLOW_WEBSERVER_PROXY_FIX_X_FOR;
         let _ = *FORWARDED_ALLOW_IPS;
         let _ = *PYTHONPATH;
         let _ = *STACKABLE_POST_HOOK;
     }
 
     #[test]
-    fn test_airflow_2_authorization_env_vars() {
+    fn authorization_env_vars_with_opa() {
         let authorization_config = get_test_authorization_config();
-        let authorization_env_vars = authorization_env_vars(&authorization_config, "2.10.5");
-        let authorization_env_vars = authorization_env_vars
-            .into_iter()
-            .map(|env| (env.name, env.value.expect("env var value must be present")))
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            authorization_env_vars,
-            [(
-                "AIRFLOW__CORE__AUTH_MANAGER".into(),
-                "opa_auth_manager.opa_fab_auth_manager.OpaFabAuthManager".into()
-            ),]
-        );
-    }
-
-    #[test]
-    fn test_airflow_3_authorization_env_vars() {
-        let authorization_config = get_test_authorization_config();
-        let authorization_env_vars = authorization_env_vars(&authorization_config, "3.3.2");
+        let authorization_env_vars = authorization_env_vars(&authorization_config);
         let authorization_env_vars = authorization_env_vars
             .into_iter()
             .map(|env| (env.name, env.value.expect("env var value must be present")))

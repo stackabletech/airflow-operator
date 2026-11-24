@@ -172,13 +172,6 @@ pub enum AirflowConfigOptions {
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
     AuthLdapAllowSelfSigned,
-    // OPA configs for Airflow 2
-    // Airflow 3 configs need to be passed via env variables!
-    // See `env_vars::authorization_env_vars` for details
-    AuthOpaCacheMaxsize,
-    AuthOpaCacheTtlInSec,
-    AuthOpaRequestUrl,
-    AuthOpaRequestTimeout,
 }
 
 impl FlaskAppConfigOptions for AirflowConfigOptions {
@@ -204,10 +197,6 @@ impl FlaskAppConfigOptions for AirflowConfigOptions {
             AirflowConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
             AirflowConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
-            AirflowConfigOptions::AuthOpaCacheMaxsize => PythonType::IntLiteral,
-            AirflowConfigOptions::AuthOpaCacheTtlInSec => PythonType::IntLiteral,
-            AirflowConfigOptions::AuthOpaRequestUrl => PythonType::StringLiteral,
-            AirflowConfigOptions::AuthOpaRequestTimeout => PythonType::IntLiteral,
         }
     }
 }
@@ -575,7 +564,6 @@ impl AirflowRole {
     /// if authentication is enabled.
     pub fn get_commands(&self, cluster: &ValidatedCluster) -> Vec<String> {
         let auth_config = &cluster.cluster_config.authentication_config;
-        let resolved_product_image = &cluster.image;
         let database_initialization_enabled =
             cluster.cluster_config.database_initialization_enabled;
         let has_dag_processors = cluster.has_role(&AirflowRole::DagProcessor);
@@ -588,115 +576,65 @@ impl AirflowRole {
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
 
-        if resolved_product_image.product_version.starts_with("3.") {
-            // Start-up commands have changed in 3.x.
-            // See https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/upgrading_to_airflow3.html#step-6-changes-to-your-startup-scripts and
-            // https://airflow.apache.org/docs/apache-airflow/3.0.1/installation/setting-up-the-database.html#setting-up-the-database.
-            // `airflow db migrate` is not run for each role so there may be
-            // re-starts of webserver and/or workers (which require the DB).
-            // DB-migrations should be eventually be optional:
-            // See https://github.com/stackabletech/airflow-operator/issues/589.
-            match &self {
-                AirflowRole::Webserver => {
-                    command.extend(Self::authentication_start_commands(auth_config));
-                    command.extend(vec![
-                        "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
-                        format!(
-                            "airflow api-server{} &",
-                            self.proxy_headers_argument(cluster)
-                        ),
-                    ]);
-                }
-                AirflowRole::Scheduler => {
-                    if database_initialization_enabled {
-                        tracing::info!("Database initialization has been enabled.");
-                        command.extend(vec![
-                            "airflow db migrate".to_string(),
-                            CREATE_ADMIN_USER_COMMAND.to_string(),
-                        ]);
-                    } else {
-                        tracing::info!("Database initialization routines have been skipped!")
-                    }
-                    command.extend(vec![
-                        "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
-                    ]);
-                    if !has_dag_processors {
-                        // If no dag_processors role has been specified, the
-                        // process needs to be included with the scheduler
-                        // (with 3.x there is no longer the possibility of
-                        // starting it as a subprocess, so it has to be
-                        // explicitly started *somewhere*).
-                        // It is started before the scheduler because the
-                        // trailing `wait_for_termination $!` binds to the
-                        // process that was backgrounded last, and that must be
-                        // the scheduler.
-                        command.extend(vec!["airflow dag-processor &".to_string()]);
-                    }
-                    command.extend(vec!["airflow scheduler &".to_string()]);
-                }
-                AirflowRole::DagProcessor => command.extend(vec![
+        // `airflow db migrate` is not run for each role so there may be
+        // re-starts of webserver and/or workers (which require the DB).
+        // DB-migrations should be eventually be optional:
+        // See https://github.com/stackabletech/airflow-operator/issues/589.
+        match &self {
+            AirflowRole::Webserver => {
+                command.extend(Self::authentication_start_commands(auth_config));
+                command.extend(vec![
                     "prepare_signal_handlers".to_string(),
                     container_debug_command(),
-                    "airflow dag-processor &".to_string(),
-                ]),
-                AirflowRole::Triggerer => command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow triggerer &".to_string(),
-                ]),
-                AirflowRole::Worker => command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow celery worker &".to_string(),
-                ]),
+                    format!(
+                        "airflow api-server{} &",
+                        self.proxy_headers_argument(cluster)
+                    ),
+                ]);
             }
-        } else {
-            match &self {
-                AirflowRole::Webserver => {
-                    // Getting auth commands for AuthClass
-                    command.extend(Self::authentication_start_commands(auth_config));
+            AirflowRole::Scheduler => {
+                if database_initialization_enabled {
+                    tracing::info!("Database initialization has been enabled.");
                     command.extend(vec![
-                        "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
-                        "airflow webserver &".to_string(),
+                        "airflow db migrate".to_string(),
+                        CREATE_ADMIN_USER_COMMAND.to_string(),
                     ]);
+                } else {
+                    tracing::info!("Database initialization routines have been skipped!")
                 }
-                AirflowRole::Scheduler => {
-                    if database_initialization_enabled {
-                        tracing::info!("Database initialization has been enabled.");
-                        command.extend(vec![
-                            // Database initialization is limited to the scheduler, see https://github.com/stackabletech/airflow-operator/issues/259
-                            "airflow db init".to_string(),
-                            "airflow db upgrade".to_string(),
-                            CREATE_ADMIN_USER_COMMAND.to_string(),
-                        ]);
-                    } else {
-                        tracing::info!("Database initialization routines have been skipped!")
-                    }
-                    command.extend(vec![
-                        "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
-                        "airflow scheduler &".to_string(),
-                    ]);
+                command.extend(vec![
+                    "prepare_signal_handlers".to_string(),
+                    container_debug_command(),
+                ]);
+                if !has_dag_processors {
+                    // If no dag_processors role has been specified, the
+                    // process needs to be included with the scheduler
+                    // (with 3.x there is no longer the possibility of
+                    // starting it as a subprocess, so it has to be
+                    // explicitly started *somewhere*).
+                    // It is started before the scheduler because the
+                    // trailing `wait_for_termination $!` binds to the
+                    // process that was backgrounded last, and that must be
+                    // the scheduler.
+                    command.extend(vec!["airflow dag-processor &".to_string()]);
                 }
-                AirflowRole::DagProcessor => command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow dag-processor &".to_string(),
-                ]),
-                AirflowRole::Triggerer => command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow triggerer &".to_string(),
-                ]),
-                AirflowRole::Worker => command.extend(vec![
-                    "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
-                    "airflow celery worker &".to_string(),
-                ]),
+                command.extend(vec!["airflow scheduler &".to_string()]);
             }
+            AirflowRole::DagProcessor => command.extend(vec![
+                "prepare_signal_handlers".to_string(),
+                container_debug_command(),
+                "airflow dag-processor &".to_string(),
+            ]),
+            AirflowRole::Triggerer => command.extend(vec![
+                "prepare_signal_handlers".to_string(),
+                container_debug_command(),
+                "airflow triggerer &".to_string(),
+            ]),
+            AirflowRole::Worker => command.extend(vec![
+                "prepare_signal_handlers".to_string(),
+                container_debug_command(),
+                "airflow celery worker &".to_string(),
+            ]),
         }
 
         // graceful shutdown part
@@ -710,7 +648,7 @@ impl AirflowRole {
 
     /// Add this CLI arg to enable proxy header support.
     /// Additional env vars are needed for the full functionality.
-    /// See `env_vars::add_version_specific_env_vars` for the counterpart function.
+    /// See `env_vars::add_core_env_vars` for the counterpart function.
     /// Only the webserver runs the api-server; every other role returns the empty string.
     fn proxy_headers_argument(&self, cluster: &ValidatedCluster) -> &'static str {
         if !matches!(self, AirflowRole::Webserver) {
@@ -1164,10 +1102,6 @@ mod tests {
     fn every_role_backgrounds_its_own_process_last() {
         let cluster = validated_cluster("kubernetesExecutors", "{config: {}}");
 
-        assert!(
-            cluster.image.product_version.starts_with("3."),
-            "the test cluster must run Airflow 3.x for this to test anything"
-        );
         assert!(!cluster.has_role(&AirflowRole::DagProcessor));
 
         for role in AirflowRole::iter() {

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Removed
+
+- BREAKING: Remove the Airflow 2.x specific code paths ([#901]).
+
+[#901]: https://github.com/stackabletech/airflow-operator/pull/901
+
 ## [26.11.0] - 2026-11-20
 
 ## [26.11.0-rc1] - 2026-11-19
