@@ -84,6 +84,7 @@
 ### Removed
 
 - Removed airflow `3.1.6` ([#865]).
+- Removed airflow `2.9.3` ([#900]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
@@ -117,6 +118,7 @@
 [#887]: https://github.com/stackabletech/airflow-operator/pull/887
 [#888]: https://github.com/stackabletech/airflow-operator/pull/888
 [#892]: https://github.com/stackabletech/airflow-operator/pull/892
+[#900]: https://github.com/stackabletech/airflow-operator/pull/900
 
 ## [26.7.0] - 2026-07-21
 

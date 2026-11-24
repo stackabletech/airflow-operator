@@ -6,9 +6,5 @@ metadata:
 commands:
   - script: >
       kubectl cp
-{% if test_scenario['values']['airflow'].startswith("2") %}
-      41_check-authorization_2.py
-{% else %}
-      41_check-authorization_3.py
-{% endif %}
+      41_check-authorization.py
       $NAMESPACE/test-runner-0:/stackable/check-authorization.py

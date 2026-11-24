@@ -9,11 +9,8 @@ timeout: 480
 {% else %}
 {% set airflow_version = test_scenario['values']['airflow'] %}
 {% endif %}
-{% set components = "--component scheduler --component triggerer" %}
-{% if airflow_version.startswith("3") %}
-{# Only 3.x runs the dag-processor as a process of its own. #}
-{% set components = components ~ " --component dag_processor" %}
-{% endif %}
+{# The dag-processor runs as a process of its own. #}
+{% set components = "--component scheduler --component triggerer --component dag_processor" %}
 commands:
   - script: |
       kubectl exec -n $NAMESPACE test-airflow-python-0 -- python /tmp/health.py \

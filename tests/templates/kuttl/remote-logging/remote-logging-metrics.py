@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import requests
-import time
-import sys
-from datetime import datetime, timezone
 import argparse
 import logging
+import sys
+import time
+from datetime import UTC, datetime
+
+import requests
 
 
 def exception_handler(exception_type, exception, traceback):
@@ -86,7 +87,7 @@ def prefix_is_matched(
 
 
 def remote_logging(airflow_version: str) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
     # Trigger a DAG run to create logs
@@ -180,9 +181,4 @@ if __name__ == "__main__":
     parser.add_argument("--airflow-version", type=str, help="Airflow version")
     opts = parser.parse_args()
 
-    if opts.airflow_version and not opts.airflow_version.startswith("2."):
-        remote_logging(opts.airflow_version)
-    else:
-        # should not happen as we are using airflow-latest
-        print("Remote logging is not tested for version < 3.x!")
-        sys.exit(1)
+    remote_logging(opts.airflow_version)
