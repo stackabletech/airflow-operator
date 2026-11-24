@@ -12,13 +12,10 @@ data:
     default is_authorized_configuration := false
     default is_authorized_connection := false
     default is_authorized_dag := false
-    # This is no longer present in Airflow 3
-    default is_authorized_dataset := false
     default is_authorized_pool := false
     default is_authorized_variable := false
     default is_authorized_view := false
     default is_authorized_custom_view := false
-    # These are new in Airflow 3
     default is_authorized_backfill := false
     default is_authorized_asset := false
     default is_authorized_asset_alias := false
@@ -34,16 +31,10 @@ data:
     is_authorized_configuration if {
         input.user.name == "airflow"
     }
-    is_authorized_configuration if {
-        input.user.name == "airflow"
-    }
     is_authorized_connection if {
         input.user.name == "airflow"
     }
     is_authorized_dag if {
-        input.user.name == "airflow"
-    }
-    is_authorized_dataset if {
         input.user.name == "airflow"
     }
     is_authorized_pool if {
@@ -68,7 +59,7 @@ data:
         input.user.name == "airflow"
     }
 
-    # GET /api/v1/config
+    # GET /api/v2/config
     is_authorized_configuration if {
         input.method == "GET"
         input.details.section == null
@@ -76,7 +67,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/config?section=core
+    # GET /api/v2/config/section/core/option/dags_folder
     is_authorized_configuration if {
         input.method == "GET"
         input.details.section == "core"
@@ -84,7 +75,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/connections
+    # GET /api/v2/connections
     is_authorized_connection if {
         input.method == "GET"
         input.details.conn_id == null
@@ -92,7 +83,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/connections/postgres_default
+    # GET /api/v2/connections/postgres_default
     is_authorized_connection if {
         input.method == "GET"
         input.details.conn_id == "postgres_default"
@@ -100,7 +91,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/dags/example_trigger_target_dag
+    # GET /api/v2/dags/example_trigger_target_dag
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == null
@@ -120,7 +111,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/dags/example_trigger_target_dag/dagRuns
+    # GET /api/v2/dags/example_trigger_target_dag/dagRuns
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
@@ -129,23 +120,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/datasets
-    is_authorized_dataset if {
-        input.method == "GET"
-        input.details.uri == null
-
-        input.user.name == "jane.doe"
-    }
-
-    # GET /api/v1/datasets/s3%3A%2F%2Fdag1%2Foutput_1.txt
-    is_authorized_dataset if {
-        input.method == "GET"
-        input.details.uri == "s3://dag1/output_1.txt"
-
-        input.user.name == "jane.doe"
-    }
-
-    # GET /api/v1/pools
+    # GET /api/v2/pools
     is_authorized_pool if {
         input.method == "GET"
         input.details.name == null
@@ -153,7 +128,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/pools/default_pool
+    # GET /api/v2/pools/default_pool
     is_authorized_pool if {
         input.method == "GET"
         input.details.name == "default_pool"
@@ -161,7 +136,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # POST /api/v1/variables
+    # POST /api/v2/variables
     is_authorized_variable if {
         input.method == "POST"
         input.details.key == null
@@ -169,7 +144,7 @@ data:
         input.user.name == "jane.doe"
     }
 
-    # GET /api/v1/variables/myVar
+    # GET /api/v2/variables/myVar
     is_authorized_variable if {
         input.method == "GET"
         input.details.key == "myVar"
