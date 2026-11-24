@@ -113,8 +113,7 @@ data:
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
-        # Airflow 2 sets this to null
-        # Ignore for now so this rule can be used with Airflow 2 and 3
+        # Disabled: it is unverified whether Airflow sends `~` here.
         # input.details.id == "~"
 
         input.user.name == "jane.doe"

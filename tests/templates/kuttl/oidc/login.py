@@ -23,29 +23,20 @@ def assert_startwith(a, b, msg):
         raise AssertionError(f"{msg}\n\tleft: {a}\n\tright: {b}")
 
 
-def login_page(base_url: str, airflow_version: str) -> str:
-    if airflow_version.startswith("3"):
-        return f"{base_url}/auth/login/keycloak?next="
-    else:
-        return f"{base_url}/login/keycloak?next="
+def login_page(base_url: str) -> str:
+    return f"{base_url}/auth/login/keycloak?next="
 
 
-def userinfo_page(base_url: str, airflow_version: str) -> str:
-    if airflow_version.startswith("3"):
-        return f"{base_url}/auth/users/userinfo/"
-    else:
-        return f"{base_url}/users/userinfo/"
+def userinfo_page(base_url: str) -> str:
+    return f"{base_url}/auth/users/userinfo/"
 
 
-def auth_cookie(session: requests.Session, airflow_version: str):
-    # Airflow 3's api-server authenticates via this JWT cookie; there is no equivalent on
-    # Airflow 2, which uses Flask's own session cookie instead.
-    if not airflow_version.startswith("3"):
-        return None
+def auth_cookie(session: requests.Session):
+    # The api-server authenticates via this JWT cookie.
     return next((c for c in session.cookies if c.name == "_token"), None)
 
 
-def login(url: str, airflow_version: str) -> requests.Session:
+def login(url: str) -> requests.Session:
     """Log in to Airflow via Keycloak at the given base URL and check that the OIDC data
     Keycloak provides ends up correctly reflected in Airflow. Returns the session so callers
     can inspect e.g. cookies afterwards."""
@@ -53,7 +44,7 @@ def login(url: str, airflow_version: str) -> requests.Session:
     session = requests.Session()
 
     # Click on "Sign In with keycloak" in Airflow
-    login_response = session.get(login_page(url, airflow_version))
+    login_response = session.get(login_page(url))
 
     assert login_response.ok, "Redirection from Airflow to Keycloak failed"
 
@@ -76,7 +67,7 @@ def login(url: str, airflow_version: str) -> requests.Session:
     )
 
     # Open the user information page in Airflow
-    userinfo_url = userinfo_page(url, airflow_version)
+    userinfo_url = userinfo_page(url)
     userinfo_response = session.get(userinfo_url)
 
     assert userinfo_response.ok, "Retrieving user information failed"
@@ -106,19 +97,16 @@ def login(url: str, airflow_version: str) -> requests.Session:
     return session
 
 
-airflow_version = os.environ["AIRFLOW_VERSION"]
-
 # Log in directly against the webserver, bypassing the reverse proxy.
-direct_session = login("http://airflow-webserver:8080", airflow_version)
+direct_session = login("http://airflow-webserver:8080")
 log.info("Direct OIDC login test passed")
 
 # The webserver is plain HTTP here, so its auth cookie must not be marked Secure.
-direct_cookie = auth_cookie(direct_session, airflow_version)
-if airflow_version.startswith("3"):
-    assert direct_cookie is not None, "Expected an auth cookie after a successful login"
-    assert not direct_cookie.secure, (
-        "The auth cookie must not be marked Secure when accessed directly over HTTP"
-    )
+direct_cookie = auth_cookie(direct_session)
+assert direct_cookie is not None, "Expected an auth cookie after a successful login"
+assert not direct_cookie.secure, (
+    "The auth cookie must not be marked Secure when accessed directly over HTTP"
+)
 
 # Log in again through the TLS-terminating reverse proxy installed in
 # 45-install-reverse-proxy.yaml, which is covered by trustedProxies in install-airflow.yaml.j2.
@@ -129,18 +117,15 @@ if airflow_version.startswith("3"):
 proxy_url = (
     f"https://airflow-reverse-proxy.{os.environ['NAMESPACE']}.svc.cluster.local:8443"
 )
-proxied_session = login(proxy_url, airflow_version)
+proxied_session = login(proxy_url)
 log.info("Reverse-proxied OIDC login test passed")
 
-proxied_cookie = auth_cookie(proxied_session, airflow_version)
-if airflow_version.startswith("3"):
-    assert proxied_cookie is not None, (
-        "Expected an auth cookie after a successful login"
-    )
-    assert proxied_cookie.secure, (
-        "The auth cookie must be marked Secure when trustedProxies allows the webserver to "
-        "trust the reverse proxy's X-Forwarded-Proto: https"
-    )
+proxied_cookie = auth_cookie(proxied_session)
+assert proxied_cookie is not None, "Expected an auth cookie after a successful login"
+assert proxied_cookie.secure, (
+    "The auth cookie must be marked Secure when trustedProxies allows the webserver to "
+    "trust the reverse proxy's X-Forwarded-Proto: https"
+)
 
 log.info("OIDC login test passed")
 

@@ -189,11 +189,6 @@ def assert_log_is_readable(headers, dag_run_id: str) -> None:
 
 
 def main(airflow_version: str) -> None:
-    if airflow_version.startswith("2."):
-        # Airflow 2 serves task logs through a different API; not covered here.
-        print(f"Skipping: not applicable to Airflow {airflow_version}")
-        return
-
     headers = {
         "Authorization": f"Bearer {get_token()}",
         "Content-Type": "application/json",

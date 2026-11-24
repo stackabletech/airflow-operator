@@ -10,13 +10,7 @@ import argparse
 # exception is `metadatabase`, which reports a status only.
 HEARTBEAT_KEY = "latest_{}_heartbeat".format
 
-
-def health_url(airflow_version):
-    """Return the health endpoint of the given Airflow version."""
-    if airflow_version and airflow_version.startswith("3"):
-        return "http://airflow-webserver:8080/api/v2/monitor/health"
-    else:
-        return "http://airflow-webserver:8080/api/v1/health"
+HEALTH_URL = "http://airflow-webserver:8080/api/v2/monitor/health"
 
 
 def component_states(health, components):
@@ -73,7 +67,7 @@ if __name__ == "__main__":
     )
     opts = parser.parse_args()
 
-    url = health_url(opts.airflow_version)
+    url = HEALTH_URL
     deadline = time.monotonic() + opts.timeout if opts.timeout else None
     baseline = None
 

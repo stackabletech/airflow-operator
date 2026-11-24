@@ -7,7 +7,6 @@
 dimensions:
   - name: airflow
     values:
-      - 2.9.3
       - 3.0.6
       - 3.2.2
       - 3.3.2
