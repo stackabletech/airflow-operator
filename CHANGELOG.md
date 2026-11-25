@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add the `config.containerdebug` field to roles and role groups ([#899]).
+
+[#899]: https://github.com/stackabletech/airflow-operator/pull/899
+
 ## [26.11.0] - 2026-11-20
 
 ## [26.11.0-rc1] - 2026-11-19

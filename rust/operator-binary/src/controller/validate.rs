@@ -4,7 +4,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self, ResolvedProductImage},
     config::fragment,
-    crd::git_sync,
+    crd::{containerdebug, git_sync},
     k8s_openapi::api::core::v1::VolumeMount,
     kube::ResourceExt,
     product_logging::spec::Logging,
@@ -18,7 +18,7 @@ use stackable_operator::{
         role_utils::{GenericCommonConfig, RoleGroup, RoleGroupConfig, with_validated_config},
         types::{
             kubernetes::ConfigMapName,
-            operator::{ClusterName, RoleGroupName},
+            operator::{ClusterName, RoleGroupName, RoleName},
         },
     },
 };
@@ -74,6 +74,15 @@ pub enum Error {
     #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
     FailedToResolveConfig {
         source: fragment::ValidationError,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display(
+        "invalid containerdebug configuration for role {role} role group {role_group}"
+    ))]
+    InvalidContainerdebugConfig {
+        source: containerdebug::Error,
+        role: RoleName,
         role_group: RoleGroupName,
     },
 
@@ -333,6 +342,7 @@ fn validate_role_groups(
             })?;
             let config = validate_role_group(
                 &resolved_role,
+                role,
                 &role_group_name,
                 rolegroup,
                 &default_config,
@@ -350,6 +360,7 @@ fn validate_role_groups(
 #[allow(clippy::too_many_arguments)]
 fn validate_role_group(
     role: &AirflowRoleType,
+    airflow_role: &AirflowRole,
     role_group_name: &RoleGroupName,
     rolegroup: &RoleGroup<AirflowConfigFragment, GenericCommonConfig, AirflowConfigOverrides>,
     default_config: &AirflowConfigFragment,
@@ -370,6 +381,12 @@ fn validate_role_group(
     })?;
 
     let merged_config = validated.config.config;
+    let containerdebug = merged_config.containerdebug.validate().with_context(|_| {
+        InvalidContainerdebugConfigSnafu {
+            role: (**airflow_role).clone(),
+            role_group: role_group_name.clone(),
+        }
+    })?;
     let logging = validate_logging(
         &merged_config.logging,
         &Container::Airflow,
@@ -392,7 +409,12 @@ fn validate_role_group(
 
     Ok(RoleGroupConfig {
         replicas: validated.replicas,
-        config: ValidatedAirflowConfig::from_merged(merged_config, logging, git_sync_resources),
+        config: ValidatedAirflowConfig::from_merged(
+            merged_config,
+            containerdebug,
+            logging,
+            git_sync_resources,
+        ),
         config_overrides: validated.config.config_overrides,
         env_overrides,
         cli_overrides: validated.config.cli_overrides,
@@ -524,6 +546,7 @@ mod tests {
 
         let validated = validate_role_group(
             &role,
+            &AirflowRole::Webserver,
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
@@ -622,6 +645,7 @@ mod tests {
 
         let validated = validate_role_group(
             &role,
+            &AirflowRole::Scheduler,
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
@@ -699,6 +723,7 @@ mod tests {
 
         let validated = validate_role_group(
             &role,
+            &AirflowRole::Webserver,
             &"default".parse().expect("valid role group name"),
             rolegroup,
             &default_config,
@@ -759,6 +784,78 @@ mod tests {
         assert!(
             matches!(error, Error::ParseTrustedProxies { .. }),
             "error was: {error:?}"
+        );
+    }
+
+    /// [`test_cluster`] with the namespace and uid that `validate_cluster` resolves before it gets
+    /// to the role groups.
+    fn test_cluster_with_metadata() -> v1alpha2::AirflowCluster {
+        let mut cluster = test_cluster();
+        cluster.metadata.namespace = Some("default".to_owned());
+        cluster.metadata.uid = Some("e6ac237d-a6d4-43a1-8135-f36506110912".to_owned());
+        cluster
+    }
+
+    /// A role `config` that does not mention `containerdebug` still gets the default, so the
+    /// `containerdebug` field of the CRD must be optional.
+    #[test]
+    fn containerdebug_defaults_when_not_configured() {
+        use stackable_operator::crd::containerdebug::{
+            DEFAULT_INTERVAL, ValidatedContainerdebugConfig,
+        };
+
+        // The webservers of `test_cluster` have a `config: {}` without `containerdebug`.
+        let Ok(cluster) = validate_cluster(
+            &test_cluster_with_metadata(),
+            "oci.stackable.tech/sdp",
+            dereferenced_objects(),
+        ) else {
+            panic!("the test cluster must validate");
+        };
+
+        assert_eq!(
+            cluster.webserver_role_group_configs
+                [&"default".parse().expect("valid role group name")]
+                .config
+                .containerdebug,
+            ValidatedContainerdebugConfig::Enabled {
+                interval: DEFAULT_INTERVAL
+            }
+        );
+    }
+
+    /// An invalid `containerdebug` config fails the validation, naming the role and role group.
+    #[test]
+    fn zero_containerdebug_interval_fails_validation() {
+        let mut cluster = test_cluster_with_metadata();
+        cluster
+            .spec
+            .schedulers
+            .as_mut()
+            .expect("the test CR declares a scheduler role")
+            .config
+            .config
+            .containerdebug
+            .interval = Some(stackable_operator::shared::time::Duration::from_secs(0));
+
+        let Err(error) =
+            validate_cluster(&cluster, "oci.stackable.tech/sdp", dereferenced_objects())
+        else {
+            panic!("the validation should fail");
+        };
+        let chain: Vec<String> =
+            std::iter::successors(Some(&error as &dyn std::error::Error), |error| {
+                error.source()
+            })
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(
+            chain,
+            [
+                "invalid containerdebug configuration for role scheduler role group default",
+                "the containerdebug interval must not be zero",
+            ]
         );
     }
 }

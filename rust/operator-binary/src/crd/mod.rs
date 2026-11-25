@@ -20,7 +20,13 @@ use stackable_operator::{
         merge::Merge,
     },
     constant,
-    crd::{git_sync, openlineage},
+    crd::{
+        containerdebug::{
+            ValidatedContainerdebugConfig, default_containerdebug_config,
+            v1alpha1::ContainerdebugConfig,
+        },
+        git_sync, openlineage,
+    },
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         api::core::v1::{Volume, VolumeMount},
@@ -573,7 +579,11 @@ impl AirflowRole {
     /// config file is in the Airflow home directory on all pods.
     /// Only the webserver needs to know about authentication CA's which is added via python's certify
     /// if authentication is enabled.
-    pub fn get_commands(&self, cluster: &ValidatedCluster) -> Vec<String> {
+    pub fn get_commands(
+        &self,
+        cluster: &ValidatedCluster,
+        containerdebug: &ValidatedContainerdebugConfig,
+    ) -> Vec<String> {
         let auth_config = &cluster.cluster_config.authentication_config;
         let resolved_product_image = &cluster.image;
         let database_initialization_enabled =
@@ -601,7 +611,7 @@ impl AirflowRole {
                     command.extend(Self::authentication_start_commands(auth_config));
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
+                        container_debug_command(containerdebug),
                         format!(
                             "airflow api-server{} &",
                             self.proxy_headers_argument(cluster)
@@ -620,7 +630,7 @@ impl AirflowRole {
                     }
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
+                        container_debug_command(containerdebug),
                     ]);
                     if !has_dag_processors {
                         // If no dag_processors role has been specified, the
@@ -638,17 +648,17 @@ impl AirflowRole {
                 }
                 AirflowRole::DagProcessor => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow dag-processor &".to_string(),
                 ]),
                 AirflowRole::Triggerer => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow triggerer &".to_string(),
                 ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow celery worker &".to_string(),
                 ]),
             }
@@ -659,7 +669,7 @@ impl AirflowRole {
                     command.extend(Self::authentication_start_commands(auth_config));
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
+                        container_debug_command(containerdebug),
                         "airflow webserver &".to_string(),
                     ]);
                 }
@@ -677,23 +687,23 @@ impl AirflowRole {
                     }
                     command.extend(vec![
                         "prepare_signal_handlers".to_string(),
-                        container_debug_command(),
+                        container_debug_command(containerdebug),
                         "airflow scheduler &".to_string(),
                     ]);
                 }
                 AirflowRole::DagProcessor => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow dag-processor &".to_string(),
                 ]),
                 AirflowRole::Triggerer => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow triggerer &".to_string(),
                 ]),
                 AirflowRole::Worker => command.extend(vec![
                     "prepare_signal_handlers".to_string(),
-                    container_debug_command(),
+                    container_debug_command(containerdebug),
                     "airflow celery worker &".to_string(),
                 ]),
             }
@@ -785,15 +795,18 @@ impl Deref for AirflowRole {
     }
 }
 
-fn container_debug_command() -> String {
+fn container_debug_command(containerdebug: &ValidatedContainerdebugConfig) -> String {
     // The log directory is created here, because `FILE_LOG_MAX_FILES` makes the telemetry library
     // prune old log files before it creates the first one, which complains about the directory not
     // existing yet.
     formatdoc!(
         r#"
         mkdir --parents "${file_log_directory}" || true
-        containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &"#,
+        {containerdebug_command}"#,
         file_log_directory = FILE_LOG_DIRECTORY.as_ref(),
+        containerdebug_command = containerdebug
+            .background_command(STACKABLE_LOG_DIR)
+            .unwrap_or_default(),
     )
 }
 
@@ -913,7 +926,7 @@ pub struct ExecutorConfig {
     pub graceful_shutdown_timeout: Option<Duration>,
 }
 
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
         Clone,
@@ -937,6 +950,9 @@ pub struct AirflowConfig {
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
 
+    #[fragment_attrs(serde(default))]
+    pub containerdebug: ContainerdebugConfig,
+
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
@@ -952,6 +968,7 @@ impl AirflowConfig {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role, opa_config),
+            containerdebug: default_containerdebug_config(),
             graceful_shutdown_timeout: Some(match role {
                 AirflowRole::Webserver
                 | AirflowRole::Scheduler
@@ -1027,6 +1044,7 @@ fn default_resources(role: &AirflowRole) -> ResourcesFragment<AirflowStorageConf
 #[cfg(test)]
 mod tests {
     use indoc::formatdoc;
+    use rstest::rstest;
     use stackable_operator::{
         commons::product_image_selection::ResolvedProductImage, utils::yaml_from_str_singleton_map,
         versioned::test_utils::RoundtripTestData,
@@ -1152,9 +1170,13 @@ mod tests {
         );
     }
 
-    /// The commands that background a process, i.e. the candidates for `$!`.
+    /// The commands that background a process, i.e. the candidates for `$!`, with `containerdebug`
+    /// enabled (its default), so that its backgrounded process is among them.
     fn backgrounded_commands(role: &AirflowRole, cluster: &ValidatedCluster) -> Vec<String> {
-        role.get_commands(cluster)
+        let containerdebug = ValidatedContainerdebugConfig::Enabled {
+            interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL,
+        };
+        role.get_commands(cluster, &containerdebug)
             .into_iter()
             .filter(|command| command.ends_with(" &"))
             .collect()
@@ -1393,6 +1415,42 @@ mod tests {
                   default:
                     replicas: 1
                 "#
+        }
+    }
+
+    /// Every role starts `containerdebug` from the given config, in both the Airflow 2.x and 3.x
+    /// start commands. The command itself is owned (and tested) by operator-rs, so only the wiring
+    /// is checked here.
+    #[rstest]
+    fn every_role_starts_containerdebug_from_the_given_config(
+        #[values("2.9.3", "3.3.2")] product_version: &str,
+        #[values(
+            ValidatedContainerdebugConfig::Enabled {
+                interval: Duration::from_minutes_unchecked(10),
+            },
+            ValidatedContainerdebugConfig::Disabled
+        )]
+        containerdebug: ValidatedContainerdebugConfig,
+    ) {
+        let cluster = validated_cluster_with("kubernetesExecutors", "{config: {}}", |cluster| {
+            cluster["spec"]["image"]["productVersion"] = product_version.into();
+        });
+        assert_eq!(cluster.image.product_version, product_version);
+        let expected: Vec<String> = containerdebug
+            .background_command(STACKABLE_LOG_DIR)
+            .into_iter()
+            .collect();
+
+        for role in AirflowRole::iter() {
+            let commands = role.get_commands(&cluster, &containerdebug).join("\n");
+            let containerdebug_lines: Vec<String> = commands
+                .lines()
+                .map(str::trim)
+                .filter(|line| line.starts_with("containerdebug "))
+                .map(str::to_owned)
+                .collect();
+
+            assert_eq!(containerdebug_lines, expected, "{role:?}: {commands}");
         }
     }
 }
