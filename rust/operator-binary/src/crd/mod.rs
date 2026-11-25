@@ -576,10 +576,9 @@ impl AirflowRole {
             remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         ];
 
-        // `airflow db migrate` is not run for each role so there may be
-        // re-starts of webserver and/or workers (which require the DB).
-        // DB-migrations should be eventually be optional:
-        // See https://github.com/stackabletech/airflow-operator/issues/589.
+        // `airflow db migrate` only runs on the scheduler, and only when database
+        // initialization is enabled, so the webserver and the workers, which both need the
+        // database, may restart until the migration has completed.
         match &self {
             AirflowRole::Webserver => {
                 command.extend(Self::authentication_start_commands(auth_config));

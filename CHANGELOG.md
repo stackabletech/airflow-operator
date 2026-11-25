@@ -5,9 +5,10 @@
 ### Fixed
 
 - Set `AIRFLOW__API__EXPOSE_CONFIG` instead of the deprecated
-  `AIRFLOW__WEBSERVER__EXPOSE_CONFIG`. Airflow 3 moved the option to the `[api]` section and only
-  still honours the old name through a deprecation shim, which logs a warning on every config
-  read ([#901]).
+  `AIRFLOW__WEBSERVER__EXPOSE_CONFIG`. Airflow moved the option to the `[api]` section in 3.0.1 and
+  only still honours the old name through a deprecation shim, which logs a warning on every config
+  read.
+  See [Airflow's deprecated options table](https://github.com/apache/airflow/blob/3.3.2/shared/configuration/src/airflow_shared/configuration/parser.py#L261) for the move ([#901]).
 
 ### Removed
 
