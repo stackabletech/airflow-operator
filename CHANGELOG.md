@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add the `config.containerdebug` field to roles and role groups ([#899]).
+
+[#899]: https://github.com/stackabletech/airflow-operator/pull/899
+
 ## [26.11.0] - 2026-11-20
 
 ## [26.11.0-rc1] - 2026-11-19
@@ -18,7 +24,6 @@
 - Webservers now have a default affinity to the OPA Pods when OPA authorization is configured ([#872]).
 - The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
   the Vector aggregator ([#888], [#892]).
-- Add the `config.containerdebug` field to roles and role groups ([#899]).
 
 ### Changed
 
@@ -85,6 +90,7 @@
 ### Removed
 
 - Removed airflow `3.1.6` ([#865]).
+- Removed airflow `2.9.3` ([#900]).
 
 [#814]: https://github.com/stackabletech/airflow-operator/pull/814
 [#821]: https://github.com/stackabletech/airflow-operator/pull/821
@@ -118,7 +124,7 @@
 [#887]: https://github.com/stackabletech/airflow-operator/pull/887
 [#888]: https://github.com/stackabletech/airflow-operator/pull/888
 [#892]: https://github.com/stackabletech/airflow-operator/pull/892
-[#899]: https://github.com/stackabletech/airflow-operator/pull/899
+[#900]: https://github.com/stackabletech/airflow-operator/pull/900
 
 ## [26.7.0] - 2026-07-21
 

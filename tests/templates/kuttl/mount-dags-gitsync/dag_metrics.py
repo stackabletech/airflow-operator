@@ -1,10 +1,17 @@
 #!/usr/bin/env python
 
-import requests
-import time
-import sys
 import logging
-from datetime import datetime, timezone
+import sys
+import time
+from datetime import UTC, datetime
+
+import requests
+
+logging.basicConfig(
+    level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
+)
+
+log = logging.getLogger(__name__)
 
 
 def assert_metric(role, metric):
@@ -17,7 +24,7 @@ def assert_metric(role, metric):
     return metric in metric_response.text
 
 
-now = datetime.now(timezone.utc)
+now = datetime.now(UTC)
 ts = now.strftime("%Y-%m-%dT%H:%M:%S.%f") + now.strftime("%z")
 
 # Trigger a DAG run to create metrics
@@ -63,9 +70,8 @@ response = requests.post(
 # Wait for the metrics to be consumed by the statsd-exporter
 time.sleep(5)
 
-logging.info(f"Response code: {response.status_code}")
+log.info(f"Response code: {response.status_code}")
 assert response.status_code == 200, "DAG run could not be triggered."
 # Worker is not deployed with the kubernetes executor so retrieve success metric from scheduler
-# (disable line-break flake checks)
 assert_metric("scheduler", "airflow_scheduler_heartbeat")
 assert_metric("scheduler", "airflow_dagrun_duration_success_sparkapp_dag_count")

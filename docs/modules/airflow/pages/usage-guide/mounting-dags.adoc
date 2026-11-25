@@ -111,7 +111,6 @@ Use DAG bundles when:
 
 === Prerequisites
 
-* Airflow 3.x (the `dag_bundle_config_list` setting does not exist in Airflow 2.x).
 * Each `GitDagBundle` requires an https://airflow.apache.org/docs/apache-airflow-providers-git/stable/connections/git.html[Airflow Git connection] - even for public repositories.
   For public repos, the connection only needs a `host` (the repository URL) and no credentials.
   Connections can be created via the Airflow UI, CLI, a https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html[secrets backend], or - as shown in the example below - via `AIRFLOW_CONN_*` environment variables.
