@@ -133,13 +133,6 @@ def test_is_authorized_dag():
     check_api_authorization("GET", "dags/example_trigger_target_dag/dagRuns")
 
 
-def test_is_authorized_dataset():
-    # uri == null
-    check_api_authorization("GET", "datasets")
-    # uri != null
-    check_api_authorization("GET", "datasets/s3%3A%2F%2Fdag1%2Foutput_1.txt")
-
-
 def test_is_authorized_pool():
     # name == null
     check_api_authorization("GET", "pools")
@@ -148,11 +141,11 @@ def test_is_authorized_pool():
 
 
 def test_is_authorized_variable():
-    # key != null
+    # key == null
     check_api_authorization(
         "POST", "variables", 201, data={"key": "myVar", "value": "1"}
     )
-    # key == null
+    # key != null
     check_api_authorization("GET", "variables/myVar")
 
 

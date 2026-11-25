@@ -9,11 +9,8 @@ timeout: 480
 {% else %}
 {% set airflow_version = test_scenario['values']['airflow'] %}
 {% endif %}
-{% set components = "--component scheduler" %}
-{% if airflow_version.startswith("3") %}
-{# With 3.x the scheduler container also runs the dag-processor. #}
-{% set components = components ~ " --component dag_processor" %}
-{% endif %}
+{# The scheduler container also runs the dag-processor. #}
+{% set components = "--component scheduler --component dag_processor" %}
 commands:
   # Called twice so that the webserver logs more than one request, which the
   # log aggregation is asserted on further down.
