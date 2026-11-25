@@ -12,7 +12,14 @@
 
 ### Removed
 
-- BREAKING: Remove the Airflow 2.x specific code paths ([#901]).
+- BREAKING: Remove the Airflow 2.x specific code paths.
+  The OPA settings were the only ones that Airflow 2 read from `webserver_config.py`, so
+  `AUTH_OPA_REQUEST_URL`, `AUTH_OPA_CACHE_TTL_IN_SEC`, `AUTH_OPA_CACHE_MAXSIZE` and
+  `AUTH_OPA_REQUEST_TIMEOUT` are no longer known `configOverrides` keys for
+  `webserver_config.py`. Delete such entries. Unknown keys are written out verbatim, so a
+  left-over `AUTH_OPA_REQUEST_URL` renders as unquoted Python and the webserver fails to start.
+  Airflow 3 reads the OPA settings from the `AIRFLOW__CORE__AUTH_OPA_*` environment variables,
+  which the operator sets from `spec.clusterConfig.authorization.opa` ([#901]).
 
 [#901]: https://github.com/stackabletech/airflow-operator/pull/901
 
