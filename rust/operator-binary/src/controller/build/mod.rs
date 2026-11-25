@@ -716,6 +716,32 @@ mod tests {
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
     }
 
+    /// Airflow moved `expose_config` from the `[webserver]` to the `[api]` section and only
+    /// honours the old name through a deprecation shim, which logs a warning on every config
+    /// read, so the operator must set the `[api]` variable.
+    #[test]
+    fn expose_config_sets_the_api_env_var() {
+        let mut cluster = celery_executor_cluster();
+        cluster.cluster_config.expose_config = true;
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(
+            env.get("AIRFLOW__API__EXPOSE_CONFIG"),
+            Some(&"True".to_owned())
+        );
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__EXPOSE_CONFIG"), None);
+    }
+
+    /// Airflow defaults `expose_config` to `False`, so the operator leaves the variable unset
+    /// rather than spelling the default out.
+    #[test]
+    fn no_expose_config_env_var_when_disabled() {
+        let cluster = celery_executor_cluster();
+        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
+
+        assert_eq!(env.get("AIRFLOW__API__EXPOSE_CONFIG"), None);
+    }
+
     /// A cluster with the given `spec.clusterConfig.volumeMounts` (as standalone YAML).
     fn cluster_with_user_volume_mounts(
         executor_key: &str,
