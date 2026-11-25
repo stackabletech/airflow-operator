@@ -96,7 +96,7 @@ pub fn build_airflow_statefulset_envs(
     let internal_secret_name = cluster.internal_secret_name();
 
     let mut env_vars = static_envs(git_sync_resources)
-        .merge(add_core_env_vars(cluster, airflow_role))
+        .merge(core_env_vars(cluster))
         // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
         .with_secret_key_ref(
             &AIRFLOW_API_SECRET_KEY,
@@ -164,6 +164,7 @@ pub fn build_airflow_statefulset_envs(
         }
         AirflowRole::Webserver => {
             env_vars = env_vars
+                .merge(webserver_env_vars(cluster))
                 .merge(authentication_env_vars(auth_config))
                 .merge(authorization_env_vars(authorization_config));
         }
@@ -255,7 +256,7 @@ pub fn build_airflow_template_envs(
         .with_value(&AIRFLOW_KUBERNETES_EXECUTOR_NAMESPACE, &cluster.namespace)
         .with_value(&AIRFLOW_CORE_DAGS_FOLDER, dags_folder)
         .merge(static_envs(git_sync_resources))
-        .merge(add_core_env_vars(cluster, &AirflowRole::Worker));
+        .merge(core_env_vars(cluster));
 
     // _STACKABLE_POST_HOOK will contain a command to create a shutdown hook that will be
     // evaluated in the wrapper for each stackable spark container: this is necessary for pods
@@ -300,8 +301,10 @@ fn lineage_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
 
 /// Constructs the env vars that every Airflow role needs, independent of its role-specific
 /// configuration.
-fn add_core_env_vars(cluster: &ValidatedCluster, airflow_role: &AirflowRole) -> EnvVarSet {
-    let mut env_vars = EnvVarSet::new()
+///
+/// See `webserver_env_vars` for the ones only the api-server needs.
+fn core_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
+    EnvVarSet::new()
         .merge(execution_server_env_vars(cluster))
         .with_value(
             &AIRFLOW_CORE_AUTH_MANAGER,
@@ -327,31 +330,33 @@ fn add_core_env_vars(cluster: &ValidatedCluster, airflow_role: &AirflowRole) -> 
         // However, with the default resources this could cause problems,
         // as the Pod went to 100% CPU usage and didn't get healthy
         // quick enough, resulting in a crashloop.
-        .with_value(&AIRFLOW_API_WORKERS, "1");
+        .with_value(&AIRFLOW_API_WORKERS, "1")
+}
 
-    if airflow_role == &AirflowRole::Webserver {
-        // Sometimes a race condition can arise when both scheduler and
-        // api-server are updating the DB, which adds overhead (conflicts
-        // are logged) and can result in inconsistencies. This setting
-        // ensure that only the scheduler will do this by default.
-        env_vars = env_vars.with_value(&AIRFLOW_FAB_UPDATE_FAB_PERMS, "False");
+/// Constructs the env vars that only the webserver needs, because it is the role that runs the
+/// api-server.
+fn webserver_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
+    // Sometimes a race condition can arise when both scheduler and
+    // api-server are updating the DB, which adds overhead (conflicts
+    // are logged) and can result in inconsistencies. This setting
+    // ensure that only the scheduler will do this by default.
+    let env_vars = EnvVarSet::new().with_value(&AIRFLOW_FAB_UPDATE_FAB_PERMS, "False");
 
-        // This env var is needed in addition to `--proxy-headers` when Airflow runs
-        // behind a reverse proxy.
-        // This covers the uvicorn backend, the only one the SDP image can run.
-        let trusted_proxies = cluster
-            .trusted_proxies(airflow_role)
-            .iter()
-            .map(TrustedProxy::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
+    // This env var is needed in addition to `--proxy-headers` when Airflow runs
+    // behind a reverse proxy.
+    // This covers the uvicorn backend, the only one the SDP image can run.
+    let trusted_proxies = cluster
+        .trusted_proxies(&AirflowRole::Webserver)
+        .iter()
+        .map(TrustedProxy::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
 
-        if !trusted_proxies.is_empty() {
-            env_vars = env_vars.with_value(&FORWARDED_ALLOW_IPS, trusted_proxies);
-        }
+    if trusted_proxies.is_empty() {
+        env_vars
+    } else {
+        env_vars.with_value(&FORWARDED_ALLOW_IPS, trusted_proxies)
     }
-
-    env_vars
 }
 
 fn authentication_env_vars(auth_config: &AirflowClientAuthenticationDetailsResolved) -> EnvVarSet {

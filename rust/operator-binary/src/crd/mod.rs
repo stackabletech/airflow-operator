@@ -643,7 +643,7 @@ impl AirflowRole {
 
     /// Add this CLI arg to enable proxy header support.
     /// Additional env vars are needed for the full functionality.
-    /// See `env_vars::add_core_env_vars` for the counterpart function.
+    /// See `env_vars::webserver_env_vars` for the counterpart function.
     /// Only the webserver runs the api-server; every other role returns the empty string.
     fn proxy_headers_argument(&self, cluster: &ValidatedCluster) -> &'static str {
         if !matches!(self, AirflowRole::Webserver) {
