@@ -72,13 +72,6 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
             output
         });
 
-    let remote_task_log = "
-# This will cause the relevant RemoteLogIO handler to be initialized
-REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
-log = logging.getLogger(__name__)
-log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
-";
-
     format!(
         "\
 import logging
@@ -89,7 +82,12 @@ from airflow.config_templates import airflow_local_settings
 os.makedirs('{log_dir}', exist_ok=True)
 
 LOGGING_CONFIG = deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)
-{remote_task_log}
+
+# This will cause the relevant RemoteLogIO handler to be initialized
+REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
+log = logging.getLogger(__name__)
+log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
+
 
 LOGGING_CONFIG.setdefault('loggers', {{}})
 for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
