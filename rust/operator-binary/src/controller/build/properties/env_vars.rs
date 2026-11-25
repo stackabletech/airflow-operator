@@ -97,7 +97,6 @@ pub fn build_airflow_statefulset_envs(
 
     let mut env_vars = static_envs(git_sync_resources)
         .merge(core_env_vars(cluster))
-        // Replaces AIRFLOW__WEBSERVER__SECRET_KEY >= 3.0.2.
         .with_secret_key_ref(
             &AIRFLOW_API_SECRET_KEY,
             &internal_secret_name,
