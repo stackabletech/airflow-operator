@@ -104,9 +104,11 @@ data:
     is_authorized_dag if {
         input.method == "GET"
         input.access_entity == "RUN"
-        # Airflow maps the `~` wildcard to `None` before it calls the auth
-        # manager, so the DAG id arrives here as null rather than as "~".
-        input.details.id == null
+        # Airflow 3.1.0+ maps the `~` wildcard to `None` before it calls the
+        # auth manager, so the DAG id arrives here as null, while 3.0.x passes
+        # `~` through unchanged. See
+        # https://github.com/apache/airflow/blob/3.1.0/airflow-core/src/airflow/api_fastapi/core_api/security.py#L122
+        input.details.id in [null, "~"]
 
         input.user.name == "jane.doe"
     }
