@@ -553,7 +553,6 @@ mod tests {
 
     #[rstest]
     #[case::airflow_3x("3.3.2")]
-    #[case::airflow_2x("2.9.3")]
     fn admin_password_is_not_traced(#[case] product_version: &str) {
         let cluster = validated_cluster_with(
             "celeryExecutors",
@@ -717,71 +716,30 @@ mod tests {
         assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
     }
 
-    /// Builds a 2.x Celery-executor cluster whose webserver trusts the given reverse proxies.
-    fn cluster_with_trusted_proxies_on_airflow_2x(trusted_proxies: &[&str]) -> ValidatedCluster {
-        let trusted_proxies: Vec<yaml_serde::Value> = trusted_proxies
-            .iter()
-            .map(|proxy| yaml_serde::Value::String((*proxy).to_owned()))
-            .collect();
-
-        validated_cluster_with(
-            "celeryExecutors",
-            "{config: {}, roleGroups: {}}",
-            move |cluster| {
-                cluster["spec"]["image"]["productVersion"] = yaml_serde::Value::from("2.9.3");
-                cluster["spec"]["webservers"]
-                    .as_mapping_mut()
-                    .expect("the webservers role is a mapping")
-                    .insert(
-                        "roleConfig".into(),
-                        yaml_serde::Value::Mapping(yaml_serde::Mapping::from_iter([(
-                            yaml_serde::Value::String("trustedProxies".to_owned()),
-                            yaml_serde::Value::Sequence(trusted_proxies.clone()),
-                        )])),
-                    );
-            },
-        )
-    }
-
+    /// Airflow moved `expose_config` from the `[webserver]` to the `[api]` section and only
+    /// honours the old name through a deprecation shim, which logs a warning on every config
+    /// read, so the operator must set the `[api]` variable.
     #[test]
-    fn trusted_proxies_enables_proxy_fix_on_airflow_2x() {
-        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["10.244.0.0/16"]);
-
-        let args = airflow_container_args(&cluster, "my-airflow-webserver-default");
-        assert!(args.contains("airflow webserver &"), "args were:\n{args}");
-        assert!(!args.contains("--proxy-headers"), "args were:\n{args}");
-
+    fn expose_config_sets_the_api_env_var() {
+        let mut cluster = celery_executor_cluster();
+        cluster.cluster_config.expose_config = true;
         let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
-        assert_eq!(env.get("FORWARDED_ALLOW_IPS"), None);
+
         assert_eq!(
-            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
+            env.get("AIRFLOW__API__EXPOSE_CONFIG"),
             Some(&"True".to_owned())
         );
-        assert_eq!(
-            env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"),
-            Some(&"1".to_owned())
-        );
+        assert_eq!(env.get("AIRFLOW__WEBSERVER__EXPOSE_CONFIG"), None);
     }
 
+    /// Airflow defaults `expose_config` to `False`, so the operator leaves the variable unset
+    /// rather than spelling the default out.
     #[test]
-    fn wildcard_trusted_proxies_enables_proxy_fix_on_airflow_2x() {
-        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&["*"]);
-
+    fn no_expose_config_env_var_when_disabled() {
+        let cluster = celery_executor_cluster();
         let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
-        assert_eq!(
-            env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"),
-            Some(&"True".to_owned())
-        );
-    }
 
-    /// No `trustedProxies` means no `ProxyFix` on Airflow 2.x either.
-    #[test]
-    fn no_proxy_fix_without_trusted_proxies_on_airflow_2x() {
-        let cluster = cluster_with_trusted_proxies_on_airflow_2x(&[]);
-
-        let env = airflow_container_env(&cluster, "my-airflow-webserver-default");
-        assert_eq!(env.get("AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX"), None);
-        assert_eq!(env.get("AIRFLOW__WEBSERVER__PROXY_FIX_X_FOR"), None);
+        assert_eq!(env.get("AIRFLOW__API__EXPOSE_CONFIG"), None);
     }
 
     /// A cluster with the given `spec.clusterConfig.volumeMounts` (as standalone YAML).

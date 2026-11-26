@@ -19,7 +19,6 @@ use crate::{
             AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
             DEFAULT_OIDC_PROVIDER, FlaskRolesSyncMoment,
         },
-        authorization::AirflowAuthorizationResolved,
     },
 };
 
@@ -65,11 +64,7 @@ pub fn build(
     config_file_overrides: &BTreeMap<String, String>,
 ) -> Result<String, Error> {
     // this will call default values from AirflowClientAuthenticationDetails
-    let mut config = build_airflow_config(
-        &validated_cluster.cluster_config.authentication_config,
-        &validated_cluster.cluster_config.authorization_config,
-        &validated_cluster.image.product_version,
-    )?;
+    let mut config = build_airflow_config(&validated_cluster.cluster_config.authentication_config)?;
 
     let mut file_config = config_file_overrides.clone();
 
@@ -119,13 +114,11 @@ pub fn build(
 }
 
 /// Builds the operator-default `webserver_config.py` entries derived from the resolved
-/// authentication/authorization config.
+/// authentication config.
 ///
 /// Returns the assembled map; the caller applies user `config_overrides` on top.
 pub fn build_airflow_config(
     authentication_config: &AirflowClientAuthenticationDetailsResolved,
-    authorization_config: &AirflowAuthorizationResolved,
-    product_version: &str,
 ) -> Result<BTreeMap<String, String>> {
     let mut config = BTreeMap::new();
 
@@ -133,7 +126,6 @@ pub fn build_airflow_config(
     config.insert(AirflowConfigOptions::AuthType.to_string(), "AUTH_DB".into());
 
     append_authentication_config(&mut config, authentication_config)?;
-    append_authorization_config(&mut config, authorization_config, product_version);
 
     Ok(config)
 }
@@ -361,35 +353,6 @@ fn append_oidc_config(
     Ok(())
 }
 
-fn append_authorization_config(
-    config: &mut BTreeMap<String, String>,
-    authorization_config: &AirflowAuthorizationResolved,
-    product_version: &str,
-) {
-    // See `env_vars::authorization_env_vars` for why we only care about Airflow 2
-    if !product_version.starts_with("2.") {
-        return;
-    }
-    let Some(opa_config) = &authorization_config.opa else {
-        return;
-    };
-
-    config.extend([
-        (
-            AirflowConfigOptions::AuthOpaRequestUrl.to_string(),
-            opa_config.connection_string.to_owned(),
-        ),
-        (
-            AirflowConfigOptions::AuthOpaCacheTtlInSec.to_string(),
-            opa_config.cache_entry_time_to_live.as_secs().to_string(),
-        ),
-        (
-            AirflowConfigOptions::AuthOpaCacheMaxsize.to_string(),
-            opa_config.cache_max_entries.to_string(),
-        ),
-    ]);
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -398,20 +361,14 @@ mod tests {
     use rstest::rstest;
     use stackable_operator::{
         crd::authentication::{ldap, oidc},
-        shared::time::Duration,
         utils::yaml_from_str_singleton_map,
     };
 
     use super::build_airflow_config;
-    use crate::crd::{
-        authentication::{
-            AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
-            FlaskRolesSyncMoment, default_user_registration,
-        },
-        authorization::{AirflowAuthorizationResolved, OpaConfigResolved},
+    use crate::crd::authentication::{
+        AirflowAuthenticationClassResolved, AirflowClientAuthenticationDetailsResolved,
+        FlaskRolesSyncMoment, default_user_registration,
     };
-
-    const TEST_AIRFLOW_VERSION: &str = "3.3.2";
 
     #[test]
     fn test_auth_db_config() {
@@ -422,14 +379,7 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
-        let authorization_config = AirflowAuthorizationResolved { opa: None };
-
-        let result = build_airflow_config(
-            &authentication_config,
-            &authorization_config,
-            TEST_AIRFLOW_VERSION,
-        )
-        .expect("Ok");
+        let result = build_airflow_config(&authentication_config).expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -470,14 +420,7 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
-        let authorization_config = AirflowAuthorizationResolved { opa: None };
-
-        let result = build_airflow_config(
-            &authentication_config,
-            &authorization_config,
-            TEST_AIRFLOW_VERSION,
-        )
-        .expect("Ok");
+        let result = build_airflow_config(&authentication_config).expect("Ok");
 
         assert_eq!(BTreeMap::from([
             ("AUTH_LDAP_ALLOW_SELF_SIGNED".into(), "false".into()),
@@ -562,14 +505,7 @@ mod tests {
             sync_roles_at: FlaskRolesSyncMoment::Registration,
         };
 
-        let authorization_config = AirflowAuthorizationResolved { opa: None };
-
-        let result = build_airflow_config(
-            &authentication_config,
-            &authorization_config,
-            TEST_AIRFLOW_VERSION,
-        )
-        .expect("Ok");
+        let result = build_airflow_config(&authentication_config).expect("Ok");
 
         assert_eq!(
             BTreeMap::from([
@@ -612,41 +548,6 @@ mod tests {
               ]
               "}
                 )
-            ]),
-            result
-        );
-    }
-
-    #[test]
-    fn test_opa_config() {
-        let authentication_config = AirflowClientAuthenticationDetailsResolved {
-            authentication_classes_resolved: vec![],
-            user_registration: true,
-            user_registration_role: "User".to_string(),
-            sync_roles_at: FlaskRolesSyncMoment::Registration,
-        };
-
-        let authorization_config = AirflowAuthorizationResolved {
-            opa: Some(OpaConfigResolved {
-                connection_string: "http://opa:8081/v1/data/airflow".to_string(),
-                cache_entry_time_to_live: Duration::from_secs(30),
-                cache_max_entries: 1000,
-            }),
-        };
-
-        let result = build_airflow_config(
-            &authentication_config,
-            &authorization_config,
-            TEST_AIRFLOW_VERSION,
-        )
-        .expect("Ok");
-
-        assert_eq!(
-            BTreeMap::from([
-                ("AUTH_ROLES_SYNC_AT_LOGIN".into(), "false".into()),
-                ("AUTH_TYPE".into(), "AUTH_DB".into()),
-                ("AUTH_USER_REGISTRATION".into(), "true".into()),
-                ("AUTH_USER_REGISTRATION_ROLE".into(), "User".into())
             ]),
             result
         );

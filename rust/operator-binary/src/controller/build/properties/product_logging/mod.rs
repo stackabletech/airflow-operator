@@ -41,10 +41,8 @@ pub fn create_airflow_config(
         return None;
     };
 
-    let config = if resolved_product_image.product_version.starts_with("2.")
-        || resolved_product_image.product_version.starts_with("3.0.")
-    {
-        create_airflow_stdlib_config(log_config, log_dir, resolved_product_image)
+    let config = if resolved_product_image.product_version.starts_with("3.0.") {
+        create_airflow_stdlib_config(log_config, log_dir)
     } else {
         create_airflow_structlog_config(log_config, log_dir)
     };
@@ -52,11 +50,7 @@ pub fn create_airflow_config(
     Some(config)
 }
 
-fn create_airflow_stdlib_config(
-    log_config: &AutomaticContainerLogConfig,
-    log_dir: &str,
-    resolved_product_image: &ResolvedProductImage,
-) -> String {
+fn create_airflow_stdlib_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {
     let loggers_config = log_config
         .loggers
         .iter()
@@ -78,17 +72,6 @@ LOGGING_CONFIG['loggers']['{name}']['level'] = {level}
             output
         });
 
-    let remote_task_log = if resolved_product_image.product_version.starts_with("2.") {
-        ""
-    } else {
-        "
-# This will cause the relevant RemoteLogIO handler to be initialized
-REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
-log = logging.getLogger(__name__)
-log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
-"
-    };
-
     format!(
         "\
 import logging
@@ -99,7 +82,12 @@ from airflow.config_templates import airflow_local_settings
 os.makedirs('{log_dir}', exist_ok=True)
 
 LOGGING_CONFIG = deepcopy(airflow_local_settings.DEFAULT_LOGGING_CONFIG)
-{remote_task_log}
+
+# This will cause the relevant RemoteLogIO handler to be initialized
+REMOTE_TASK_LOG = airflow_local_settings.REMOTE_TASK_LOG
+log = logging.getLogger(__name__)
+log.info('Custom logging remote task log %s', REMOTE_TASK_LOG)
+
 
 LOGGING_CONFIG.setdefault('loggers', {{}})
 for logger_name, logger_config in LOGGING_CONFIG['loggers'].items():
@@ -315,11 +303,7 @@ mod tests {
         let log_config = AutomaticContainerLogConfig::default();
 
         for content in [
-            create_airflow_stdlib_config(
-                &log_config,
-                "/stackable/log/airflow",
-                &resolved_image("3.3.2"),
-            ),
+            create_airflow_stdlib_config(&log_config, "/stackable/log/airflow"),
             create_airflow_structlog_config(&log_config, "/stackable/log/airflow"),
         ] {
             assert!(content.contains("os.makedirs('/stackable/log/airflow', exist_ok=True)"));
@@ -333,8 +317,8 @@ mod tests {
     fn test_logging_variant_selection() {
         // The stdlib config copies Airflow's default logging config, the structlog one
         // defines its own `mask_secrets_core` filter.
-        // N.B. This test assumes either Airflow 2.* or 3.0.* for stdlib_content as the
-        // code branches at this point.
+        // N.B. This test assumes Airflow 3.0.* for stdlib_content as the code branches at
+        // this point.
         let log_config =
             ValidatedContainerLogConfigChoice::Automatic(AutomaticContainerLogConfig::default());
         let stdlib_content = create_airflow_config(
@@ -402,7 +386,7 @@ mod tests {
     }
 
     fn stdlib_config(log_config: &AutomaticContainerLogConfig) -> String {
-        create_airflow_stdlib_config(log_config, "/stackable/log", &resolved_image("2.10.0"))
+        create_airflow_stdlib_config(log_config, "/stackable/log")
     }
 
     /// The requested level paired with the `task` handler level and the `airflow.task` logger
